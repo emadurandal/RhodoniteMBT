@@ -1,6 +1,7 @@
 {
   "name": "emadurandal/WebGPU",
   "version": "0.1.0",
+  "source": "src",
   "readme": "README.mbt.md",
   "repository": "",
   "license": "Apache-2.0",

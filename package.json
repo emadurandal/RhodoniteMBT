@@ -1,0 +1,17 @@
+{
+  "name": "webgpu-ex",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build:moon": "cd moon && moon build --target js",
+    "dev": "npm run build:moon && vite",
+    "build": "npm run build:moon && tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.64",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}

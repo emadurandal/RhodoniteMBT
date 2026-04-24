@@ -1,7 +1,0 @@
-// import {
-//   "emadurandal/WebGPU" @lib,
-// }
-
-options(
-  "is-main": true,
-)

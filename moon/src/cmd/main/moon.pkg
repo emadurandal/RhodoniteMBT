@@ -1,0 +1,12 @@
+// import {
+//   "emadurandal/WebGPU" @lib,
+// }
+
+import {
+  "emadurandal/WebGPU" @lib,
+}
+
+options(
+  "is-main": true,
+  link: { "js": { "exports": [ "create_webgpu_renderer" ], "format": "esm" } },
+)

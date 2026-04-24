@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# moon
+.mooncakes
+
+# MoonBit build artifacts - ignore everything in target except the JS build output
+moon/target/*
+!moon/target/js/
+moon/target/js/*
+!moon/target/js/release/
+moon/target/js/release/*
+!moon/target/js/release/build/
+moon/target/js/release/build/*
+!moon/target/js/release/build/main/
+moon/_build
