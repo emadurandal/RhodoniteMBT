@@ -14,6 +14,7 @@ pub using @w {
   type GPUShaderModule,
   type WebGPUCanvasContext,
   type WebGPUDevice,
+  type WebGPUQueue,
   device_createBuffer,
   device_createCommandEncoder,
   device_createRenderPipeline,

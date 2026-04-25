@@ -5,7 +5,7 @@ pub struct Renderer {
   context : WebGPUCanvasContext
   device : WebGPUDevice
   pipeline : GPURenderPipeline
-  queue : GPUQueue
+  queue : WebGPUQueue
 }
 
 ///|
@@ -25,7 +25,12 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
     [context.format],
   )
 
-  Some({ context: webgpu_context, device, pipeline, queue: context.queue })
+  Some({
+    context: webgpu_context,
+    device,
+    pipeline,
+    queue: WebGPUQueue::new(context.queue),
+  })
 }
 
 ///|
@@ -51,5 +56,5 @@ pub fn render_frame(renderer : Renderer) -> Unit {
 
   // Finish encoding and submit
   let command_buffer = encoder.finish()
-  queue_submit(renderer.queue, command_buffer)
+  renderer.queue.submit(command_buffer)
 }
