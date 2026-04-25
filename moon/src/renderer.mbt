@@ -22,7 +22,7 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
     vertex_module,
     fragment_module,
     "triangle-list",
-    context.format,
+    [context.format],
   )
 
   Some({ context: webgpu_context, device, pipeline, queue: context.queue })

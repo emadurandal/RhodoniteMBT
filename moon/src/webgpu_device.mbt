@@ -38,7 +38,7 @@ pub fn WebGPUDevice::createRenderPipeline(
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
   topology : String,
-  format : String,
+  formats : Array[String],
 ) -> GPURenderPipeline {
-  device_createRenderPipeline(self.device, vertex, fragment, topology, format)
+  device_createRenderPipeline(self.device, vertex, fragment, topology, formats)
 }

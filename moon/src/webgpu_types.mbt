@@ -1,6 +1,7 @@
 // WebGPU FFI type definitions for MoonBit
 
 // Core WebGPU types
+
 ///|
 pub type GPU
 
@@ -79,9 +80,9 @@ extern "js" fn device_createRenderPipeline(
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
   topology : String,
-  format : String,
+  formats : Array[String],
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topology, format) => {
+  #| (device, vertex, fragment, topology, formats) => {
   #|   return device.createRenderPipeline({
   #|     layout: 'auto',
   #|     vertex: {
@@ -91,7 +92,7 @@ extern "js" fn device_createRenderPipeline(
   #|     fragment: {
   #|       module: fragment,
   #|       entryPoint: 'fragmentMain',
-  #|       targets: [{ format }]
+  #|       targets: formats.map(format => ({ format }))
   #|     },
   #|     primitive: {
   #|       topology
