@@ -60,7 +60,7 @@ pub extern "js" fn device_getQueue(device : GPUDevice) -> GPUQueue =
   #| (device) => device.queue
 
 ///|
-extern "js" fn device_createBuffer(
+pub extern "js" fn device_createBuffer(
   device : GPUDevice,
   size : Int,
   usage : Int,
@@ -68,14 +68,14 @@ extern "js" fn device_createBuffer(
   #| (device, size, usage) => device.createBuffer({ size, usage })
 
 ///|
-extern "js" fn device_createShaderModule(
+pub extern "js" fn device_createShaderModule(
   device : GPUDevice,
   code : String,
 ) -> GPUShaderModule =
   #| (device, code) => device.createShaderModule({ code })
 
 ///|
-extern "js" fn device_createRenderPipeline(
+pub extern "js" fn device_createRenderPipeline(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
@@ -101,7 +101,7 @@ extern "js" fn device_createRenderPipeline(
   #| }
 
 ///|
-extern "js" fn device_createCommandEncoder(
+pub extern "js" fn device_createCommandEncoder(
   device : GPUDevice,
 ) -> GPUCommandEncoder =
   #| (device) => device.createCommandEncoder()
@@ -116,7 +116,7 @@ extern "js" fn getCanvasContext(canvasId : String) -> GPUCanvasContext =
   #| }
 
 ///|
-extern "js" fn context_configure(
+pub extern "js" fn context_configure(
   context : GPUCanvasContext,
   device : GPUDevice,
   format : String,
@@ -130,7 +130,7 @@ extern "js" fn context_configure(
   #| }
 
 ///|
-extern "js" fn context_getCurrentTexture(
+pub extern "js" fn context_getCurrentTexture(
   context : GPUCanvasContext,
 ) -> GPUTexture =
   #| (context) => context.getCurrentTexture()
@@ -138,13 +138,13 @@ extern "js" fn context_getCurrentTexture(
 // GPUTexture methods
 
 ///|
-extern "js" fn texture_createView(texture : GPUTexture) -> GPUTextureView =
+pub extern "js" fn texture_createView(texture : GPUTexture) -> GPUTextureView =
   #| (texture) => texture.createView()
 
 // Command encoder methods
 
 ///|
-extern "js" fn encoder_beginRenderPass(
+pub extern "js" fn encoder_beginRenderPass(
   encoder : GPUCommandEncoder,
   view : GPUTextureView,
   r : Double,
@@ -164,33 +164,35 @@ extern "js" fn encoder_beginRenderPass(
   #| }
 
 ///|
-extern "js" fn encoder_finish(encoder : GPUCommandEncoder) -> GPUCommandBuffer =
+pub extern "js" fn encoder_finish(
+  encoder : GPUCommandEncoder,
+) -> GPUCommandBuffer =
   #| (encoder) => encoder.finish()
 
 // Render pass encoder methods
 
 ///|
-extern "js" fn renderPass_setPipeline(
+pub extern "js" fn renderPass_setPipeline(
   pass : GPURenderPassEncoder,
   pipeline : GPURenderPipeline,
 ) -> Unit =
   #| (pass, pipeline) => pass.setPipeline(pipeline)
 
 ///|
-extern "js" fn renderPass_draw(
+pub extern "js" fn renderPass_draw(
   pass : GPURenderPassEncoder,
   vertexCount : Int,
 ) -> Unit =
   #| (pass, vertexCount) => pass.draw(vertexCount)
 
 ///|
-extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
+pub extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
   #| (pass) => pass.end()
 
 // Queue methods
 
 ///|
-extern "js" fn queue_submit(
+pub extern "js" fn queue_submit(
   queue : GPUQueue,
   commandBuffer : GPUCommandBuffer,
 ) -> Unit =

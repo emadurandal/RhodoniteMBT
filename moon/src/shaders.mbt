@@ -1,6 +1,7 @@
 // WGSL shader code for triangle rendering
 
-pub let vertex_shader_code : String = 
+///|
+pub let vertex_shader_code : String =
   #| struct VertexOutput {
   #|   @builtin(position) position: vec4<f32>,
   #|   @location(0) color: vec3<f32>,
@@ -26,7 +27,8 @@ pub let vertex_shader_code : String =
   #|   return output;
   #| }
 
-pub let fragment_shader_code : String = 
+///|
+pub let fragment_shader_code : String =
   #| @fragment
   #| fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
   #|   return vec4<f32>(color, 1.0);
