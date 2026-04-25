@@ -1,6 +1,8 @@
 ///|
 /// Re-export `emadurandal/WebGPU/webgpu_objects` for JS / external `emadurandal/WebGPU` API.
 pub using @w {
+  type GPU,
+  type GPUAdapter,
   type GPURenderPipeline,
   type GPUBuffer,
   type GPUCanvasContext,
@@ -15,6 +17,11 @@ pub using @w {
   type WebGPUCanvasContext,
   type WebGPUDevice,
   type WebGPUQueue,
+  type WebGPUInstance,
+  navigatorGPU,
+  gpu_requestAdapter,
+  gpu_requestDevice,
+  gpu_getPreferredCanvasFormat,
   device_createBuffer,
   device_createCommandEncoder,
   device_createRenderPipeline,

@@ -2,6 +2,7 @@
 
 // Triangle vertices with positions and colors
 // Format: x, y, r, g, b
+
 ///|
 pub let triangle_vertices : Array[Double] = [
   // Top vertex - Red

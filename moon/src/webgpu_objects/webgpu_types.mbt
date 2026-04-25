@@ -44,13 +44,25 @@ pub type GPUCommandBuffer
 // Navigator GPU access
 
 ///|
-extern "js" fn navigatorGPU() -> GPU =
+pub extern "js" fn navigatorGPU() -> GPU =
   #| () => navigator.gpu
+
+///|
+pub extern "js" fn gpu_requestAdapter(
+  gpu : GPU,
+) -> @js_async.Promise[GPUAdapter] =
+  #| (gpu) => gpu.requestAdapter()
+
+///|
+pub extern "js" fn gpu_requestDevice(
+  adapter : GPUAdapter,
+) -> @js_async.Promise[GPUDevice] =
+  #| (adapter) => adapter.requestDevice()
 
 // Synchronous getter methods (these are called after async init in JS)
 
 ///|
-extern "js" fn gpu_getPreferredCanvasFormat(gpu : GPU) -> String =
+pub extern "js" fn gpu_getPreferredCanvasFormat(gpu : GPU) -> String =
   #| (gpu) => gpu.getPreferredCanvasFormat()
 
 // GPUDevice methods

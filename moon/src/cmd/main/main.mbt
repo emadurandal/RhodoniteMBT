@@ -5,26 +5,27 @@
 /// 
 /// 
 pub fn create_webgpu_renderer(
-  device : @lib.GPUDevice,
   context : @lib.GPUCanvasContext,
-  format : String,
-) -> Unit {
-  let webgpu_device = @lib.WebGPUDevice::new(device)
-  let webgpu_queue = webgpu_device.getQueue()
-  let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(context)
-  let webgpu_context = @lib.WebGPUContext::new(
-    webgpu_device, webgpu_canvas_context, format, webgpu_queue,
-  )
-
-  // Create renderer
-  match @lib.create_renderer(webgpu_context) {
-    Some(renderer) => {
-      // Render single frame
-      @lib.render_frame(renderer)
-      println("WebGPU triangle rendered successfully!")
+) -> @js_async.Promise[Unit] {
+  @js_async.Promise::from_async(() => {
+    let instance = @lib.WebGPUInstance::new(@lib.navigatorGPU())
+    let adapter = instance.requestAdapter()
+    let device = adapter.requestDevice()
+    let format = instance.getPreferredCanvasFormat()
+    let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(context)
+    webgpu_canvas_context.configure(device.get(), format)
+    let queue = device.getQueue()
+    let webgpu_context = @lib.WebGPUContext::new(
+      device, webgpu_canvas_context, format, queue,
+    )
+    match @lib.create_renderer(webgpu_context) {
+      Some(renderer) => {
+        @lib.render_frame(renderer)
+        println("WebGPU triangle rendered successfully!")
+      }
+      None => println("Failed to create renderer")
     }
-    None => println("Failed to create renderer")
-  }
+  })
 }
 
 ///|
