@@ -4,12 +4,14 @@
 /// Run with `moon run src/cmd/main` from the project root.
 /// 
 /// 
-async fn create_webgpu_renderer_async(context : @lib.GPUCanvasContext) -> Unit {
+async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
   let instance = @lib.WebGPUInstance::new(@lib.navigatorGPU())
   let adapter = instance.requestAdapter()
   let device = adapter.requestDevice()
   let format = instance.getPreferredCanvasFormat()
-  let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(context)
+  let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(
+    @lib.canvas_getContext(canvas),
+  )
   webgpu_canvas_context.configure(device.get(), format)
   let queue = device.getQueue()
   let webgpu_context = @lib.WebGPUContext::new(
@@ -26,9 +28,9 @@ async fn create_webgpu_renderer_async(context : @lib.GPUCanvasContext) -> Unit {
 
 ///|
 pub fn create_webgpu_renderer(
-  context : @lib.GPUCanvasContext,
+  canvas : @lib.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() => create_webgpu_renderer_async(context))
+  @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
 }
 
 ///|

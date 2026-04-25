@@ -9,14 +9,10 @@ if (!navigator.gpu) {
 			const canvas = document.getElementById(
 				"webgpu-canvas",
 			) as HTMLCanvasElement;
-			const context = canvas.getContext("webgpu");
-			if (!context) {
-				throw new Error("Failed to get WebGPU context");
-			}
 
 			// `Promise::from_async` in MoonBit returns a JS Promise; await here
 			// (adapter / device / configure run inside MoonBit with a valid coroutine)
-			await create_webgpu_renderer(context);
+			await create_webgpu_renderer(canvas);
 		} catch (error) {
 			console.error("Failed to initialize WebGPU:", error);
 			document.body.innerHTML =

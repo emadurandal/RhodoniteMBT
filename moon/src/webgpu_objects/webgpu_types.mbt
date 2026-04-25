@@ -41,11 +41,20 @@ pub type GPURenderPassEncoder
 ///|
 pub type GPUCommandBuffer
 
+///|
+pub type HTMLCanvasElement
+
 // Navigator GPU access
 
 ///|
 pub extern "js" fn navigatorGPU() -> GPU =
   #| () => navigator.gpu
+
+///|
+pub extern "js" fn canvas_getContext(
+  canvas : HTMLCanvasElement,
+) -> GPUCanvasContext =
+  #| (canvas) => canvas.getContext("webgpu")
 
 ///|
 pub extern "js" fn gpu_requestAdapter(
