@@ -8,19 +8,14 @@ pub struct Renderer {
 
 ///|
 pub fn create_renderer(context : WebGPUContext) -> Renderer? {
+  let device = WebGPUDevice::new(context.device)
+
   // Create shader modules
-  let vertex_module = device_createShaderModule(
-    context.device,
-    vertex_shader_code,
-  )
-  let fragment_module = device_createShaderModule(
-    context.device,
-    fragment_shader_code,
-  )
+  let vertex_module = device.createShaderModule(vertex_shader_code)
+  let fragment_module = device.createShaderModule(fragment_shader_code)
 
   // Create render pipeline
-  let pipeline = device_createRenderPipeline(
-    context.device,
+  let pipeline = device.createRenderPipeline(
     vertex_module,
     fragment_module,
     "triangle-list",
