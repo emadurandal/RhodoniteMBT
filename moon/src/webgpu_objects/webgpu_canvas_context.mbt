@@ -27,6 +27,6 @@ pub fn WebGPUCanvasContext::configure(
 ///|
 pub fn WebGPUCanvasContext::getCurrentTexture(
   self : WebGPUCanvasContext,
-) -> GPUTexture {
-  context_getCurrentTexture(self.context)
+) -> WebGPUTexture {
+  WebGPUTexture::new(context_getCurrentTexture(self.context))
 }

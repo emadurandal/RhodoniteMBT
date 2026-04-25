@@ -42,3 +42,10 @@ pub fn WebGPUDevice::createRenderPipeline(
 ) -> GPURenderPipeline {
   device_createRenderPipeline(self.device, vertex, fragment, topology, formats)
 }
+
+///|
+pub fn WebGPUDevice::createCommandEncoder(
+  self : WebGPUDevice,
+) -> GPUCommandEncoder {
+  device_createCommandEncoder(self.device)
+}

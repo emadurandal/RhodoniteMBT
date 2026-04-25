@@ -32,10 +32,10 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
 pub fn render_frame(renderer : Renderer) -> Unit {
   // Get current texture from canvas context
   let texture = renderer.context.getCurrentTexture()
-  let view = texture_createView(texture)
+  let view = texture.createView()
 
   // Create command encoder
-  let encoder = device_createCommandEncoder(renderer.device.get())
+  let encoder = renderer.device.createCommandEncoder()
 
   // Begin render pass with dark blue background
   let render_pass = encoder_beginRenderPass(encoder, view, 0.0, 0.0, 0.2, 1.0)
