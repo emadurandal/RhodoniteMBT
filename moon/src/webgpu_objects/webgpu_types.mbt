@@ -180,20 +180,19 @@ pub extern "js" fn texture_createView(texture : GPUTexture) -> GPUTextureView =
 ///|
 pub extern "js" fn encoder_beginRenderPass(
   encoder : GPUCommandEncoder,
-  view : GPUTextureView,
-  r : Double,
-  g : Double,
-  b : Double,
-  a : Double,
+  attachments : Array[WebGPUColorAttachment],
 ) -> GPURenderPassEncoder =
-  #| (encoder, view, r, g, b, a) => {
+  #| (encoder, attachments) => {
   #|   return encoder.beginRenderPass({
-  #|     colorAttachments: [{
-  #|       view,
-  #|       clearValue: { r, g, b, a },
-  #|       loadOp: 'clear',
-  #|       storeOp: 'store'
-  #|     }]
+  #|     colorAttachments: 
+  #|       attachments.map(attachment => {
+  #|         return {
+  #|           view: attachment.view,
+  #|           clearValue: attachment.clearValue,
+  #|           loadOp: attachment.loadOp,
+  #|           storeOp: attachment.storeOp
+  #|         };
+  #|       }),
   #|   });
   #| }
 

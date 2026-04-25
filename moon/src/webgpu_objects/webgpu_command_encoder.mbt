@@ -22,14 +22,10 @@ pub fn WebGPUCommandEncoder::get(
 ///|
 pub fn WebGPUCommandEncoder::beginRenderPass(
   self : WebGPUCommandEncoder,
-  view : GPUTextureView,
-  r : Double,
-  g : Double,
-  b : Double,
-  a : Double,
+  attachments : Array[WebGPUColorAttachment],
 ) -> WebGPURenderPassEncoder {
   WebGPURenderPassEncoder::new(
-    encoder_beginRenderPass(self.encoder, view, r, g, b, a),
+    encoder_beginRenderPass(self.encoder, attachments),
   )
 }
 

@@ -19,6 +19,8 @@ pub using @w {
   type WebGPUQueue,
   type WebGPUInstance,
   type HTMLCanvasElement,
+  type WebGPUColorAttachment,
+  type WebGPUColor,
   navigatorGPU,
   canvas_getContext,
   gpu_requestAdapter,
