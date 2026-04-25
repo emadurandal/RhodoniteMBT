@@ -23,3 +23,10 @@ pub fn WebGPUCanvasContext::configure(
 ) -> Unit {
   context_configure(self.context, device, format)
 }
+
+///|
+pub fn WebGPUCanvasContext::getCurrentTexture(
+  self : WebGPUCanvasContext,
+) -> GPUTexture {
+  context_getCurrentTexture(self.context)
+}

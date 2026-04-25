@@ -31,7 +31,7 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
 ///|
 pub fn render_frame(renderer : Renderer) -> Unit {
   // Get current texture from canvas context
-  let texture = context_getCurrentTexture(renderer.context.get())
+  let texture = renderer.context.getCurrentTexture()
   let view = texture_createView(texture)
 
   // Create command encoder
