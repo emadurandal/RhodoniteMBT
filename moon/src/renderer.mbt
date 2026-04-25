@@ -38,7 +38,7 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   let encoder = renderer.device.createCommandEncoder()
 
   // Begin render pass with dark blue background
-  let render_pass = encoder_beginRenderPass(encoder, view, 0.0, 0.0, 0.2, 1.0)
+  let render_pass = encoder.beginRenderPass(view, 0.0, 0.0, 0.2, 1.0)
 
   // Set pipeline
   renderPass_setPipeline(render_pass, renderer.pipeline)
@@ -50,6 +50,6 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   renderPass_end(render_pass)
 
   // Finish encoding and submit
-  let command_buffer = encoder_finish(encoder)
+  let command_buffer = encoder_finish(encoder.get())
   queue_submit(renderer.queue, command_buffer)
 }

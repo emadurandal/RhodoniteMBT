@@ -46,6 +46,6 @@ pub fn WebGPUDevice::createRenderPipeline(
 ///|
 pub fn WebGPUDevice::createCommandEncoder(
   self : WebGPUDevice,
-) -> GPUCommandEncoder {
-  device_createCommandEncoder(self.device)
+) -> WebGPUCommandEncoder {
+  WebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
 }
