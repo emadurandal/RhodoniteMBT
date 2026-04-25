@@ -41,15 +41,15 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   let render_pass = encoder.beginRenderPass(view, 0.0, 0.0, 0.2, 1.0)
 
   // Set pipeline
-  renderPass_setPipeline(render_pass, renderer.pipeline)
+  render_pass.setPipeline(renderer.pipeline)
 
   // Draw triangle
-  renderPass_draw(render_pass, get_vertex_count())
+  render_pass.draw(get_vertex_count())
 
   // End render pass
-  renderPass_end(render_pass)
+  render_pass.end()
 
   // Finish encoding and submit
-  let command_buffer = encoder_finish(encoder.get())
+  let command_buffer = encoder.finish()
   queue_submit(renderer.queue, command_buffer)
 }

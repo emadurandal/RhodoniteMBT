@@ -27,6 +27,15 @@ pub fn WebGPUCommandEncoder::beginRenderPass(
   g : Double,
   b : Double,
   a : Double,
-) -> GPURenderPassEncoder {
-  encoder_beginRenderPass(self.encoder, view, r, g, b, a)
+) -> WebGPURenderPassEncoder {
+  WebGPURenderPassEncoder::new(
+    encoder_beginRenderPass(self.encoder, view, r, g, b, a),
+  )
+}
+
+///|
+pub fn WebGPUCommandEncoder::finish(
+  self : WebGPUCommandEncoder,
+) -> GPUCommandBuffer {
+  encoder_finish(self.encoder)
 }
