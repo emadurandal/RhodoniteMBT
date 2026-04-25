@@ -2,18 +2,18 @@
 
 ///|
 pub struct WebGPUContext {
-  device : GPUDevice
-  context : GPUCanvasContext
+  device : WebGPUDevice
+  context : WebGPUCanvasContext
   format : String
-  queue : GPUQueue
+  queue : WebGPUQueue
 }
 
 ///|
 pub fn WebGPUContext::new(
-  device : GPUDevice,
-  context : GPUCanvasContext,
+  device : WebGPUDevice,
+  context : WebGPUCanvasContext,
   format : String,
-  queue : GPUQueue,
+  queue : WebGPUQueue,
 ) -> WebGPUContext {
   { device, context, format, queue }
 }

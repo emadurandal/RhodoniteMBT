@@ -9,8 +9,12 @@ pub fn create_webgpu_renderer(
   context : @lib.GPUCanvasContext,
   format : String,
 ) -> Unit {
-  let queue = @lib.device_getQueue(device)
-  let webgpu_context = @lib.WebGPUContext::new(device, context, format, queue)
+  let webgpu_device = @lib.WebGPUDevice::new(device)
+  let webgpu_queue = webgpu_device.getQueue()
+  let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(context)
+  let webgpu_context = @lib.WebGPUContext::new(
+    webgpu_device, webgpu_canvas_context, format, webgpu_queue,
+  )
 
   // Create renderer
   match @lib.create_renderer(webgpu_context) {

@@ -10,15 +10,13 @@ pub struct Renderer {
 
 ///|
 pub fn create_renderer(context : WebGPUContext) -> Renderer? {
-  let device = WebGPUDevice::new(context.device)
-  let webgpu_context = WebGPUCanvasContext::new(context.context)
 
   // Create shader modules
-  let vertex_module = device.createShaderModule(vertex_shader_code)
-  let fragment_module = device.createShaderModule(fragment_shader_code)
+  let vertex_module = context.device.createShaderModule(vertex_shader_code)
+  let fragment_module = context.device.createShaderModule(fragment_shader_code)
 
   // Create render pipeline
-  let pipeline = device.createRenderPipeline(
+  let pipeline = context.device.createRenderPipeline(
     vertex_module,
     fragment_module,
     "triangle-list",
@@ -26,10 +24,10 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
   )
 
   Some({
-    context: webgpu_context,
-    device,
+    context: context.context,
+    device: context.device,
     pipeline,
-    queue: WebGPUQueue::new(context.queue),
+    queue: context.queue,
   })
 }
 

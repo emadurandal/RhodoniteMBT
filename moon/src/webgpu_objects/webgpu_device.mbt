@@ -16,6 +16,11 @@ pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
 }
 
 ///|
+pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
+  WebGPUQueue::new(device_getQueue(self.device))
+}
+
+///|
 pub fn WebGPUDevice::createBuffer(
   self : WebGPUDevice,
   size : Int,
