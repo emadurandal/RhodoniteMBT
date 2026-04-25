@@ -1,5 +1,6 @@
 // WebGPU initialization functions
 
+///|
 pub struct WebGPUContext {
   device : GPUDevice
   context : GPUCanvasContext
@@ -7,6 +8,7 @@ pub struct WebGPUContext {
   queue : GPUQueue
 }
 
+///|
 pub fn WebGPUContext::new(
   device : GPUDevice,
   context : GPUCanvasContext,

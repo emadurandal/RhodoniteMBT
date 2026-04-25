@@ -2,13 +2,16 @@
 
 ///|
 pub struct Renderer {
-  context : WebGPUContext
+  context : WebGPUCanvasContext
+  device : WebGPUDevice
   pipeline : GPURenderPipeline
+  queue : GPUQueue
 }
 
 ///|
 pub fn create_renderer(context : WebGPUContext) -> Renderer? {
   let device = WebGPUDevice::new(context.device)
+  let webgpu_context = WebGPUCanvasContext::new(context.context)
 
   // Create shader modules
   let vertex_module = device.createShaderModule(vertex_shader_code)
@@ -22,17 +25,17 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
     context.format,
   )
 
-  Some({ context, pipeline })
+  Some({ context: webgpu_context, device, pipeline, queue: context.queue })
 }
 
 ///|
 pub fn render_frame(renderer : Renderer) -> Unit {
   // Get current texture from canvas context
-  let texture = context_getCurrentTexture(renderer.context.context)
+  let texture = context_getCurrentTexture(renderer.context.get())
   let view = texture_createView(texture)
 
   // Create command encoder
-  let encoder = device_createCommandEncoder(renderer.context.device)
+  let encoder = device_createCommandEncoder(renderer.device.get())
 
   // Begin render pass with dark blue background
   let render_pass = encoder_beginRenderPass(encoder, view, 0.0, 0.0, 0.2, 1.0)
@@ -48,5 +51,5 @@ pub fn render_frame(renderer : Renderer) -> Unit {
 
   // Finish encoding and submit
   let command_buffer = encoder_finish(encoder)
-  queue_submit(renderer.context.queue, command_buffer)
+  queue_submit(renderer.queue, command_buffer)
 }
