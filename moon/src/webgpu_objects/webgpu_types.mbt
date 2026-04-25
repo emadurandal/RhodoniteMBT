@@ -54,13 +54,26 @@ pub extern "js" fn navigatorGPU() -> GPU =
 pub extern "js" fn canvas_getContext(
   canvas : HTMLCanvasElement,
 ) -> GPUCanvasContext =
-  #| (canvas) => canvas.getContext("webgpu")
+  #| (canvas) => {
+  #|   const context = canvas.getContext("webgpu");
+  #|   if (!context) {
+  #|     throw new Error("Failed to get WebGPU context");
+  #|   }
+  #|   return context;
+  #| }
 
 ///|
+/// Use `Promise[GPUAdapter]` (not optional): `GPUAdapter?` in the Promise layer
+/// can mis-classify valid handles as [None] at the JS boundary. On `null`, reject
+/// so [Promise::wait] fails instead of returning a bogus [None].
 pub extern "js" fn gpu_requestAdapter(
   gpu : GPU,
 ) -> @js_async.Promise[GPUAdapter] =
-  #| (gpu) => gpu.requestAdapter()
+  #| (gpu) =>
+  #|   gpu.requestAdapter().then((a) => {
+  #|     if (a) return a;
+  #|     throw new Error("No WebGPU adapter (requestAdapter returned null)");
+  #|   })
 
 ///|
 pub extern "js" fn gpu_requestDevice(
