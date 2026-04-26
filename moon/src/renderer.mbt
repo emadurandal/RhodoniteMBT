@@ -43,10 +43,10 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   // Begin render pass with dark blue background
   let render_pass = encoder.beginRenderPass([
     WebGPUColorAttachment::new(
-      view,
-      WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
-      "clear",
-      "store",
+      view~,
+      clearValue=WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
+      loadOp="clear",
+      storeOp="store",
     ),
   ])
 

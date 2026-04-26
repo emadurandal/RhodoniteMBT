@@ -10,10 +10,10 @@ pub struct WebGPUColorAttachment {
 
 ///|
 pub fn WebGPUColorAttachment::new(
-  view : GPUTextureView,
-  clearValue : WebGPUColor,
-  loadOp : String,
-  storeOp : String,
+  view~ : GPUTextureView,
+  clearValue~ : WebGPUColor,
+  loadOp~ : String,
+  storeOp~ : String,
 ) -> WebGPUColorAttachment {
   { view, clearValue, loadOp, storeOp }
 }
