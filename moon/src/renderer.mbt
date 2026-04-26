@@ -43,14 +43,19 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   let encoder = renderer.device.createCommandEncoder()
 
   // Begin render pass with dark blue background
-  let render_pass = encoder.beginRenderPass([
-    WebGPUColorAttachment::new(
-      view~,
-      clearValue=WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
-      loadOp="clear",
-      storeOp="store",
-    ),
-  ])
+  let render_pass = encoder.beginRenderPass(
+    WebGPURenderPassDescriptor::new(colorAttachments=[
+      Some(
+        WebGPUColorAttachment::new(
+          view~,
+          // clearValue=Some(WebGPUColor::new(0.0, 0.0, 1.2, 1.0)),
+          clearValue=None,
+          loadOp="clear",
+          storeOp="store",
+        ),
+      ),
+    ]),
+  )
 
   // Set pipeline
   render_pass.setPipeline(renderer.pipeline)

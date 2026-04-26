@@ -3,7 +3,7 @@
 ///|
 pub struct WebGPUColorAttachment {
   view : GPUTextureView
-  clearValue : WebGPUColor
+  clearValue : WebGPUColor?
   loadOp : String
   storeOp : String
 }
@@ -11,7 +11,7 @@ pub struct WebGPUColorAttachment {
 ///|
 pub fn WebGPUColorAttachment::new(
   view~ : GPUTextureView,
-  clearValue~ : WebGPUColor,
+  clearValue~ : WebGPUColor?,
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPUColorAttachment {
@@ -21,6 +21,6 @@ pub fn WebGPUColorAttachment::new(
 ///|
 pub fn WebGPUColorAttachment::get(
   self : WebGPUColorAttachment,
-) -> (GPUTextureView, WebGPUColor, String, String) {
+) -> (GPUTextureView, WebGPUColor?, String, String) {
   (self.view, self.clearValue, self.loadOp, self.storeOp)
 }
