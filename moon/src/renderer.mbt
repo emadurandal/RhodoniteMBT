@@ -64,8 +64,12 @@ pub fn render_frame(renderer : Renderer) -> Unit {
 
   // End render pass
   render_pass.end()
+  render_pass.release()
 
   // Finish encoding and submit
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
+  encoder.release()
+  textureView_release(view)
+  renderer.context.present()
 }

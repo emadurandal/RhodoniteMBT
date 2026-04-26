@@ -44,50 +44,54 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
     return
   }
 
-  let wgpu_inst = @wgpu.Instance::create()
-  let surf_desc = @wgpu.surface_descriptor_metal_layer_new(cametal)
-  let surface = wgpu_inst.create_surface(surf_desc)
-  @wgpu.surface_descriptor_free(surf_desc)
-
-  let adapter = wgpu_inst.request_adapter_sync_options_surface_u32(
-    surface,
-    feature_level_u32=@wgpu.FEATURE_LEVEL_CORE,
-    backend_type_u32=@wgpu.BACKEND_TYPE_METAL,
+  let instance = @w.WebGPUInstance::create()
+  let webgpu_canvas_context = @w.WebGPUCanvasContext::newMetalLayer(
+    instance, cametal, width, height,
   )
-  let device = adapter.request_device_sync(wgpu_inst)
-  let queue = device.queue()
-  let usage = @wgpu.TextureUsage::from_u64(
-    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
-  )
-  let wu = width.reinterpret_as_uint()
-  let hu = height.reinterpret_as_uint()
-  let format = surface.configure_default(adapter, device, wu, hu, usage)
-
-  // 画面全体を覆う大きな三角（NDC フルスクリーン）だと、塗りと同じに見える。
-  // 中心付近の小さな三角にし、クリア色とのコントラストで形が分かるようにする。
+  let adapter = instance.requestAdapter()
+  let device = adapter.requestDevice()
+  let format = instance.getPreferredCanvasFormat()
+  webgpu_canvas_context.configure(device.get(), format)
+  let render_format = webgpu_canvas_context.getFormat()
+  let queue = device.getQueue()
   let wgsl : String =
-    #|struct VSOut { @builtin(position) pos: vec4<f32> };
+    #|struct VertexOutput {
+    #|  @builtin(position) position: vec4<f32>,
+    #|  @location(0) color: vec3<f32>,
+    #|};
     #|
     #|@vertex
-    #|fn vs_main(@builtin(vertex_index) vid: u32) -> VSOut {
-    #|  // 上・右下・左下の小さな正三角形（各辺がクリア色と隣接して見える）
-    #|  var positions = array<vec2<f32>, 3>(
-    #|    vec2<f32>( 0.0,  0.5),
+    #|fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+    #|  var pos = array<vec2<f32>, 3>(
+    #|    vec2<f32>(0.0, 0.5),
     #|    vec2<f32>(-0.5, -0.5),
-    #|    vec2<f32>( 0.5, -0.5),
+    #|    vec2<f32>(0.5, -0.5),
     #|  );
-    #|  var out: VSOut;
-    #|  out.pos = vec4<f32>(positions[vid], 0.0, 1.0);
-    #|  return out;
+    #|  var colors = array<vec3<f32>, 3>(
+    #|    vec3<f32>(1.0, 0.0, 0.0),
+    #|    vec3<f32>(0.0, 1.0, 0.0),
+    #|    vec3<f32>(0.0, 0.0, 1.0),
+    #|  );
+    #|  var output: VertexOutput;
+    #|  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
+    #|  output.color = colors[vertexIndex];
+    #|  return output;
     #|}
     #|
     #|@fragment
-    #|fn fs_main() -> @location(0) vec4<f32> {
-    #|  return vec4<f32>(0.0, 0.75, 1.0, 1.0);
+    #|fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
+    #|  return vec4<f32>(color, 1.0);
     #|}
     #|
-  let sm = device.create_shader_module_wgsl(wgsl)
-  let pipeline = device.create_render_pipeline_color_format(sm, format)
+  let shader = device.createShaderModule(wgsl)
+  let pipeline = device.createRenderPipeline(
+    @w.WebGPURenderPipelineDescriptor::new(
+      vertex=shader,
+      fragment=shader,
+      topology="triangle-list",
+      formats=[render_format],
+    ),
+  )
 
   let quit = @ref.new(false)
   while !quit.val {
@@ -99,39 +103,41 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
         _ => ()
       }
     }
-    try {
-      let frame = surface.get_current_frame_or_raise()
-      let view = frame.texture.create_view()
-      let encoder = device.create_command_encoder()
-      let pass = encoder.begin_render_pass_color_clear(
-        view, 0.12, 0.12, 0.16, 1.0,
-      )
-      pass.set_pipeline(pipeline)
-      pass.draw(3U, 1U, 0U, 0U)
-      pass.end()
-      pass.release()
-      let cmd = encoder.finish()
-      queue.submit_one(cmd)
-      let _ = device.poll(wait=true)
-      cmd.release()
-      encoder.release()
-      view.release()
-      frame.present_or_raise()
-      frame.release()
-    } catch {
-      _ => ()
-    }
-    wgpu_inst.process_events()
+    let texture = webgpu_canvas_context.getCurrentTexture()
+    let view = texture.createView()
+    let encoder = device.createCommandEncoder()
+    let render_pass = encoder.beginRenderPass(
+      @w.WebGPURenderPassDescriptor::new(colorAttachments=[
+        Some(
+          @w.WebGPURenderPassColorAttachment::new(
+            view~,
+            clearValue=@w.WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
+            loadOp="clear",
+            storeOp="store",
+          ),
+        ),
+      ]),
+    )
+    render_pass.setPipeline(pipeline)
+    render_pass.draw(3)
+    render_pass.end()
+    render_pass.release()
+    let command_buffer = encoder.finish()
+    queue.submit(command_buffer)
+    encoder.release()
+    @w.textureView_release(view)
+    webgpu_canvas_context.present()
+    let _ = device.poll(wait=true)
+    instance.processEvents()
     timer.delay(16)
   }
-  surface.unconfigure()
-  pipeline.release()
-  sm.release()
+  @w.renderPipeline_release(pipeline)
+  @w.shaderModule_release(shader)
+  webgpu_canvas_context.release()
   queue.release()
   device.release()
   adapter.release()
-  surface.release()
-  wgpu_inst.release()
+  instance.release()
   sdl_metal_destroy_view(metal_view)
   @lib.sdl_DestroyWindow(sdl_win)
   ctx.quit()

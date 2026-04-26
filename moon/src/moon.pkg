@@ -3,3 +3,7 @@ import {
 }
 
 supported_targets = "js"
+
+options(
+  targets: { "webgpu_reexport.mbt": [ "js" ] },
+)

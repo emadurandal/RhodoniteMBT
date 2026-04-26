@@ -40,4 +40,5 @@ pub using @w {
   renderPass_end,
   renderPass_setPipeline,
   texture_createView,
+  textureView_release,
 }

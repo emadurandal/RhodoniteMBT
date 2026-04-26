@@ -3,3 +3,7 @@ import {
 }
 
 supported_targets = "js"
+
+options(
+  targets: { "webgpu_types_js.mbt": [ "js" ] },
+)

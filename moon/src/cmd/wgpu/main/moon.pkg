@@ -1,5 +1,5 @@
 import {
-  "Milky2018/wgpu_mbt" @wgpu,
+  "emadurandal/WebGPU/webgpu_objects/native" @w,
   "Milky2018/wgpu_mbt/c" @c,
   "Kaida-Amethyst/sdl3" @sdl3,
   "Kaida-Amethyst/sdl3/lib" @lib,

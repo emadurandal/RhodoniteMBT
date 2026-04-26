@@ -30,3 +30,8 @@ pub fn WebGPUCanvasContext::getCurrentTexture(
 ) -> WebGPUTexture {
   WebGPUTexture::new(context_getCurrentTexture(self.context))
 }
+
+///|
+pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
+  ignore(self)
+}

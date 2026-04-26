@@ -35,3 +35,8 @@ pub fn WebGPUCommandEncoder::finish(
 ) -> GPUCommandBuffer {
   encoder_finish(self.encoder)
 }
+
+///|
+pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
+  ignore(self)
+}

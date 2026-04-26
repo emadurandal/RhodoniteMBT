@@ -19,3 +19,8 @@ pub fn WebGPUTexture::get(self : WebGPUTexture) -> GPUTexture {
 pub fn WebGPUTexture::createView(self : WebGPUTexture) -> GPUTextureView {
   texture_createView(self.texture)
 }
+
+///|
+pub fn textureView_release(view : GPUTextureView) -> Unit {
+  ignore(view)
+}

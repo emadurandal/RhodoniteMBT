@@ -97,13 +97,6 @@ pub extern "js" fn device_createCommandEncoder(
 // Canvas context methods
 
 ///|
-extern "js" fn getCanvasContext(canvasId : String) -> GPUCanvasContext =
-  #| (canvasId) => {
-  #|   const canvas = document.getElementById(canvasId);
-  #|   return canvas.getContext('webgpu');
-  #| }
-
-///|
 pub extern "js" fn context_configure(
   context : GPUCanvasContext,
   device : GPUDevice,

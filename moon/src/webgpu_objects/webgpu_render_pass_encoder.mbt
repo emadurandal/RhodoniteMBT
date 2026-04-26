@@ -39,3 +39,8 @@ pub fn WebGPURenderPassEncoder::draw(
 pub fn WebGPURenderPassEncoder::end(self : WebGPURenderPassEncoder) -> Unit {
   renderPass_end(self.encoder)
 }
+
+///|
+pub fn WebGPURenderPassEncoder::release(self : WebGPURenderPassEncoder) -> Unit {
+  ignore(self)
+}
