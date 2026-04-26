@@ -46,7 +46,7 @@ pub fn render_frame(renderer : Renderer) -> Unit {
   let render_pass = encoder.beginRenderPass(
     WebGPURenderPassDescriptor::new(colorAttachments=[
       Some(
-        WebGPUColorAttachment::new(
+        WebGPURenderPassColorAttachment::new(
           view~,
           clearValue=WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
           loadOp="clear",

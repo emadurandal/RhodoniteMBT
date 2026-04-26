@@ -1,7 +1,7 @@
 // WebGPU color attachment implementation
 
 ///|
-pub struct WebGPUColorAttachment {
+pub struct WebGPURenderPassColorAttachment {
   view : GPUTextureView
   clearValue : WebGPUColor?
   loadOp : String
@@ -9,18 +9,18 @@ pub struct WebGPUColorAttachment {
 }
 
 ///|
-pub fn WebGPUColorAttachment::new(
+pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,
   loadOp~ : String,
   storeOp~ : String,
-) -> WebGPUColorAttachment {
+) -> WebGPURenderPassColorAttachment {
   { view, clearValue, loadOp, storeOp }
 }
 
 ///|
-pub fn WebGPUColorAttachment::get(
-  self : WebGPUColorAttachment,
+pub fn WebGPURenderPassColorAttachment::get(
+  self : WebGPURenderPassColorAttachment,
 ) -> (GPUTextureView, WebGPUColor?, String, String) {
   (self.view, self.clearValue, self.loadOp, self.storeOp)
 }

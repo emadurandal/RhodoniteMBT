@@ -2,12 +2,12 @@
 
 ///|
 pub struct WebGPURenderPassDescriptor {
-  colorAttachments : Array[WebGPUColorAttachment?]
+  colorAttachments : Array[WebGPURenderPassColorAttachment?]
 }
 
 ///|
 pub fn WebGPURenderPassDescriptor::new(
-  colorAttachments~ : Array[WebGPUColorAttachment?],
+  colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
 ) -> WebGPURenderPassDescriptor {
   { colorAttachments, }
 }
@@ -15,6 +15,6 @@ pub fn WebGPURenderPassDescriptor::new(
 ///|
 pub fn WebGPURenderPassDescriptor::get(
   self : WebGPURenderPassDescriptor,
-) -> Array[WebGPUColorAttachment?] {
+) -> Array[WebGPURenderPassColorAttachment?] {
   self.colorAttachments
 }
