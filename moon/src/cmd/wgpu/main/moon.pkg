@@ -1,9 +1,16 @@
 import {
   "Milky2018/wgpu_mbt" @wgpu,
+  "Milky2018/wgpu_mbt/c" @c,
+  "Kaida-Amethyst/sdl3" @sdl3,
+  "Kaida-Amethyst/sdl3/lib" @lib,
+  "moonbitlang/core/ref" @ref,
 }
 
 supported_targets = "native"
 
 options(
   "is-main": true,
+  link: {
+    "native": { "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3" },
+  },
 )

@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/emadurandal/ghq/github.com/emadurandal/MoonBit_WebGPU_ex/moon/.mooncakes/Kaida-Amethyst/sdl3/lib",
+      "program": "/Users/emadurandal/ghq/github.com/emadurandal/MoonBit_WebGPU_ex/moon/.mooncakes/Kaida-Amethyst/sdl3/lib/build/Debug/outDebug"
+    }
+  ]
+}

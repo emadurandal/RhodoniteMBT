@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:moon": "cd moon && moon build --target js",
-    "run:wgpu": "cd moon && moon run --target native src/cmd/wgpu/main",
+    "run:wgpu": "bash scripts/run-wgpu-sdl3.sh",
     "dev": "npm run build:moon && vite",
     "build": "npm run build:moon && tsc && vite build",
     "preview": "vite preview"
