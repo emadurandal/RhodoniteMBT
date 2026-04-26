@@ -54,44 +54,23 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
   webgpu_canvas_context.configure(device.get(), format)
   let render_format = webgpu_canvas_context.getFormat()
   let queue = device.getQueue()
-  let wgsl : String =
-    #|struct VertexOutput {
-    #|  @builtin(position) position: vec4<f32>,
-    #|  @location(0) color: vec3<f32>,
-    #|};
-    #|
-    #|@vertex
-    #|fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-    #|  var pos = array<vec2<f32>, 3>(
-    #|    vec2<f32>(0.0, 0.5),
-    #|    vec2<f32>(-0.5, -0.5),
-    #|    vec2<f32>(0.5, -0.5),
-    #|  );
-    #|  var colors = array<vec3<f32>, 3>(
-    #|    vec3<f32>(1.0, 0.0, 0.0),
-    #|    vec3<f32>(0.0, 1.0, 0.0),
-    #|    vec3<f32>(0.0, 0.0, 1.0),
-    #|  );
-    #|  var output: VertexOutput;
-    #|  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
-    #|  output.color = colors[vertexIndex];
-    #|  return output;
-    #|}
-    #|
-    #|@fragment
-    #|fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-    #|  return vec4<f32>(color, 1.0);
-    #|}
-    #|
-  let shader = device.createShaderModule(wgsl)
-  let pipeline = device.createRenderPipeline(
-    @w.WebGPURenderPipelineDescriptor::new(
-      vertex=shader,
-      fragment=shader,
-      topology="triangle-list",
-      formats=[render_format],
-    ),
+  let webgpu_context = @w.WebGPUContext::new(
+    device, webgpu_canvas_context, render_format, queue,
   )
+  let renderer = match @w.create_renderer(webgpu_context) {
+    Some(renderer) => renderer
+    None => {
+      webgpu_canvas_context.release()
+      queue.release()
+      device.release()
+      adapter.release()
+      instance.release()
+      sdl_metal_destroy_view(metal_view)
+      @lib.sdl_DestroyWindow(sdl_win)
+      ctx.quit()
+      return
+    }
+  }
 
   let quit = @ref.new(false)
   while !quit.val {
@@ -103,36 +82,12 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
         _ => ()
       }
     }
-    let texture = webgpu_canvas_context.getCurrentTexture()
-    let view = texture.createView()
-    let encoder = device.createCommandEncoder()
-    let render_pass = encoder.beginRenderPass(
-      @w.WebGPURenderPassDescriptor::new(colorAttachments=[
-        Some(
-          @w.WebGPURenderPassColorAttachment::new(
-            view~,
-            clearValue=@w.WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
-            loadOp="clear",
-            storeOp="store",
-          ),
-        ),
-      ]),
-    )
-    render_pass.setPipeline(pipeline)
-    render_pass.draw(3)
-    render_pass.end()
-    render_pass.release()
-    let command_buffer = encoder.finish()
-    queue.submit(command_buffer)
-    encoder.release()
-    @w.textureView_release(view)
-    webgpu_canvas_context.present()
+    @w.render_frame(renderer)
     let _ = device.poll(wait=true)
     instance.processEvents()
     timer.delay(16)
   }
-  @w.renderPipeline_release(pipeline)
-  @w.shaderModule_release(shader)
+  renderer.release()
   webgpu_canvas_context.release()
   queue.release()
   device.release()

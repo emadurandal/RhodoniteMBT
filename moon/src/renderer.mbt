@@ -48,7 +48,7 @@ pub fn render_frame(renderer : Renderer) -> Unit {
       Some(
         WebGPURenderPassColorAttachment::new(
           view~,
-          clearValue=WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
+          clearValue=WebGPUColor::new(1.0, 0.0, 0.2, 1.0),
           loadOp="clear",
           storeOp="store",
         ),
