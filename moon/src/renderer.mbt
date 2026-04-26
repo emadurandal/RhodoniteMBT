@@ -17,10 +17,12 @@ pub fn create_renderer(context : WebGPUContext) -> Renderer? {
 
   // Create render pipeline
   let pipeline = context.device.createRenderPipeline(
-    vertex_module,
-    fragment_module,
-    "triangle-list",
-    [context.format],
+    WebGPURenderPipelineDescriptor::new(
+      vertex=vertex_module,
+      fragment=fragment_module,
+      topology="triangle-list",
+      formats=[context.format],
+    ),
   )
 
   Some({

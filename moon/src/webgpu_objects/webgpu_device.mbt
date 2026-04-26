@@ -40,11 +40,9 @@ pub fn WebGPUDevice::createShaderModule(
 ///|
 pub fn WebGPUDevice::createRenderPipeline(
   self : WebGPUDevice,
-  vertex : GPUShaderModule,
-  fragment : GPUShaderModule,
-  topology : String,
-  formats : Array[String],
+  descriptor : WebGPURenderPipelineDescriptor,
 ) -> GPURenderPipeline {
+  let (vertex, fragment, topology, formats) = descriptor.get()
   device_createRenderPipeline(self.device, vertex, fragment, topology, formats)
 }
 

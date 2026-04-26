@@ -21,6 +21,7 @@ pub using @w {
   type HTMLCanvasElement,
   type WebGPUColorAttachment,
   type WebGPUColor,
+  type WebGPURenderPipelineDescriptor,
   navigatorGPU,
   canvas_getContext,
   gpu_requestAdapter,
