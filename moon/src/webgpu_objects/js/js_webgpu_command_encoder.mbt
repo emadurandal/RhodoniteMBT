@@ -23,8 +23,8 @@ pub fn JsWebGPUCommandEncoder::get(
 pub fn JsWebGPUCommandEncoder::beginRenderPass(
   self : JsWebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
-) -> WebGPURenderPassEncoder {
-  WebGPURenderPassEncoder::new(
+) -> JsWebGPURenderPassEncoder {
+  JsWebGPURenderPassEncoder::new(
     encoder_beginRenderPass(self.encoder, descriptor),
   )
 }
