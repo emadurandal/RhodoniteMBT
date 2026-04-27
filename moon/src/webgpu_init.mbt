@@ -5,7 +5,7 @@ pub struct WebGPUContext {
   device : JsWebGPUDevice
   context : JsWebGPUCanvasContext
   format : String
-  queue : WebGPUQueue
+  queue : JsWebGPUQueue
 }
 
 ///|
@@ -13,7 +13,7 @@ pub fn WebGPUContext::new(
   device : JsWebGPUDevice,
   context : JsWebGPUCanvasContext,
   format : String,
-  queue : WebGPUQueue,
+  queue : JsWebGPUQueue,
 ) -> WebGPUContext {
   { device, context, format, queue }
 }

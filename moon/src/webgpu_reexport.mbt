@@ -18,7 +18,7 @@ pub using @w {
   type JsWebGPUDevice,
   type JsWebGPUAdapter,
   type JsWebGPUCanvasContext,
-  type WebGPUQueue,
+  type JsWebGPUQueue,
   type JsWebGPUInstance,
   type WebGPURenderPassColorAttachment,
   type WebGPUColor,

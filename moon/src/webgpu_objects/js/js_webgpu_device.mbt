@@ -16,8 +16,8 @@ pub fn JsWebGPUDevice::get(self : JsWebGPUDevice) -> GPUDevice {
 }
 
 ///|
-pub fn JsWebGPUDevice::getQueue(self : JsWebGPUDevice) -> WebGPUQueue {
-  WebGPUQueue::new(device_getQueue(self.device))
+pub fn JsWebGPUDevice::getQueue(self : JsWebGPUDevice) -> JsWebGPUQueue {
+  JsWebGPUQueue::new(device_getQueue(self.device))
 }
 
 ///|
