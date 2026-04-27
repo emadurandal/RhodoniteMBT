@@ -1,28 +1,28 @@
 // WebGPU device implementation
 
 ///|
-pub struct WebGPUDevice {
+pub struct JsWebGPUDevice {
   device : GPUDevice
 }
 
 ///|
-pub fn WebGPUDevice::new(device : GPUDevice) -> WebGPUDevice {
+pub fn JsWebGPUDevice::new(device : GPUDevice) -> JsWebGPUDevice {
   { device, }
 }
 
 ///|
-pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
+pub fn JsWebGPUDevice::get(self : JsWebGPUDevice) -> GPUDevice {
   self.device
 }
 
 ///|
-pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
+pub fn JsWebGPUDevice::getQueue(self : JsWebGPUDevice) -> WebGPUQueue {
   WebGPUQueue::new(device_getQueue(self.device))
 }
 
 ///|
-pub fn WebGPUDevice::createBuffer(
-  self : WebGPUDevice,
+pub fn JsWebGPUDevice::createBuffer(
+  self : JsWebGPUDevice,
   size : Int,
   usage : Int,
 ) -> GPUBuffer {
@@ -30,16 +30,16 @@ pub fn WebGPUDevice::createBuffer(
 }
 
 ///|
-pub fn WebGPUDevice::createShaderModule(
-  self : WebGPUDevice,
+pub fn JsWebGPUDevice::createShaderModule(
+  self : JsWebGPUDevice,
   code : String,
 ) -> GPUShaderModule {
   device_createShaderModule(self.device, code)
 }
 
 ///|
-pub fn WebGPUDevice::createRenderPipeline(
-  self : WebGPUDevice,
+pub fn JsWebGPUDevice::createRenderPipeline(
+  self : JsWebGPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
 ) -> GPURenderPipeline {
   let (vertex, fragment, topology, formats) = descriptor.get()
@@ -47,8 +47,8 @@ pub fn WebGPUDevice::createRenderPipeline(
 }
 
 ///|
-pub fn WebGPUDevice::createCommandEncoder(
-  self : WebGPUDevice,
+pub fn JsWebGPUDevice::createCommandEncoder(
+  self : JsWebGPUDevice,
 ) -> WebGPUCommandEncoder {
   WebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
 }

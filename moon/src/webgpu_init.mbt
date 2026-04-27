@@ -2,7 +2,7 @@
 
 ///|
 pub struct WebGPUContext {
-  device : WebGPUDevice
+  device : JsWebGPUDevice
   context : WebGPUCanvasContext
   format : String
   queue : WebGPUQueue
@@ -10,7 +10,7 @@ pub struct WebGPUContext {
 
 ///|
 pub fn WebGPUContext::new(
-  device : WebGPUDevice,
+  device : JsWebGPUDevice,
   context : WebGPUCanvasContext,
   format : String,
   queue : WebGPUQueue,

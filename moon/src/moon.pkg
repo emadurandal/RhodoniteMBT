@@ -1,5 +1,5 @@
 import {
-  "emadurandal/WebGPU/webgpu_objects" @w,
+  "emadurandal/WebGPU/webgpu_objects/js" @w,
 }
 
 supported_targets = "js"
