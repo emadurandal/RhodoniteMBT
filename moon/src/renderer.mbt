@@ -2,7 +2,7 @@
 
 ///|
 pub struct Renderer {
-  context : WebGPUCanvasContext
+  context : JsWebGPUCanvasContext
   device : JsWebGPUDevice
   pipeline : GPURenderPipeline
   queue : WebGPUQueue

@@ -9,7 +9,7 @@ async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
   let adapter = instance.requestAdapter()
   let device = adapter.requestDevice()
   let format = instance.getPreferredCanvasFormat()
-  let webgpu_canvas_context = @lib.WebGPUCanvasContext::new(
+  let webgpu_canvas_context = @lib.JsWebGPUCanvasContext::new(
     @lib.canvas_getContext(canvas),
   )
   webgpu_canvas_context.configure(device.get(), format)
