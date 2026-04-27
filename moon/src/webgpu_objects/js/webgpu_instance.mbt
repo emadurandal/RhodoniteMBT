@@ -25,7 +25,7 @@ pub fn WebGPUInstance::getPreferredCanvasFormat(
 ///|
 pub async fn WebGPUInstance::requestAdapter(
   self : WebGPUInstance,
-) -> WebGPUAdapter {
+) -> JsWebGPUAdapter {
   let adapter = @js_async.Promise::wait(gpu_requestAdapter(self.instance))
-  WebGPUAdapter::new(adapter)
+  JsWebGPUAdapter::new(adapter)
 }

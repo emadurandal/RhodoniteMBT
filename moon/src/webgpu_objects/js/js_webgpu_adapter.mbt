@@ -1,23 +1,23 @@
 // WebGPU adapter implementation
 
 ///|
-pub struct WebGPUAdapter {
+pub struct JsWebGPUAdapter {
   adapter : GPUAdapter
 }
 
 ///|
-pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
+pub fn JsWebGPUAdapter::new(adapter : GPUAdapter) -> JsWebGPUAdapter {
   { adapter, }
 }
 
 ///|
-pub fn WebGPUAdapter::get(self : WebGPUAdapter) -> GPUAdapter {
+pub fn JsWebGPUAdapter::get(self : JsWebGPUAdapter) -> GPUAdapter {
   self.adapter
 }
 
 ///|
-pub async fn WebGPUAdapter::requestDevice(
-  self : WebGPUAdapter,
+pub async fn JsWebGPUAdapter::requestDevice(
+  self : JsWebGPUAdapter,
 ) -> JsWebGPUDevice {
   let device = @js_async.Promise::wait(gpu_requestDevice(self.adapter))
   JsWebGPUDevice::new(device)
