@@ -1,27 +1,27 @@
 // WebGPU command encoder implementation
 
 ///|
-pub struct WebGPUCommandEncoder {
+pub struct JsWebGPUCommandEncoder {
   encoder : GPUCommandEncoder
 }
 
 ///|
-pub fn WebGPUCommandEncoder::new(
+pub fn JsWebGPUCommandEncoder::new(
   encoder : GPUCommandEncoder,
-) -> WebGPUCommandEncoder {
+) -> JsWebGPUCommandEncoder {
   { encoder, }
 }
 
 ///|
-pub fn WebGPUCommandEncoder::get(
-  self : WebGPUCommandEncoder,
+pub fn JsWebGPUCommandEncoder::get(
+  self : JsWebGPUCommandEncoder,
 ) -> GPUCommandEncoder {
   self.encoder
 }
 
 ///|
-pub fn WebGPUCommandEncoder::beginRenderPass(
-  self : WebGPUCommandEncoder,
+pub fn JsWebGPUCommandEncoder::beginRenderPass(
+  self : JsWebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> WebGPURenderPassEncoder {
   WebGPURenderPassEncoder::new(
@@ -30,13 +30,13 @@ pub fn WebGPUCommandEncoder::beginRenderPass(
 }
 
 ///|
-pub fn WebGPUCommandEncoder::finish(
-  self : WebGPUCommandEncoder,
+pub fn JsWebGPUCommandEncoder::finish(
+  self : JsWebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
   encoder_finish(self.encoder)
 }
 
 ///|
-pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
+pub fn JsWebGPUCommandEncoder::release(self : JsWebGPUCommandEncoder) -> Unit {
   ignore(self)
 }
