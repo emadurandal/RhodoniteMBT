@@ -29,8 +29,8 @@ pub fn JsWebGPUCanvasContext::configure(
 ///|
 pub fn JsWebGPUCanvasContext::getCurrentTexture(
   self : JsWebGPUCanvasContext,
-) -> WebGPUTexture {
-  WebGPUTexture::new(context_getCurrentTexture(self.context))
+) -> JsWebGPUTexture {
+  JsWebGPUTexture::new(context_getCurrentTexture(self.context))
 }
 
 ///|
