@@ -23,13 +23,13 @@ pub fn WebGPUCanvasContext::newMetalLayer(
   height : Int,
 ) -> WebGPUCanvasContext {
   let desc = @wgpu.surface_descriptor_metal_layer_new(layer)
-  let surface = instance.get().raw.create_surface(desc)
+  let surface = instance.instance.raw.create_surface(desc)
   @wgpu.surface_descriptor_free(desc)
   WebGPUCanvasContext::new(GPUCanvasContext::{
     surface,
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
-    format: @ref.new(instance.getPreferredCanvasFormat()),
+    format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
     currentTexture: @ref.new(None),
   })
 }
@@ -48,42 +48,15 @@ pub fn create_metal_canvas_context(
   height : Int,
 ) -> WebGPUCanvasContext {
   let desc = surface_descriptor_metal_layer_new_html(layer)
-  let surface = instance.get().raw.create_surface(desc)
+  let surface = instance.instance.raw.create_surface(desc)
   @wgpu.surface_descriptor_free(desc)
   WebGPUCanvasContext::new(GPUCanvasContext::{
     surface,
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
-    format: @ref.new(instance.getPreferredCanvasFormat()),
+    format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
     currentTexture: @ref.new(None),
   })
-}
-
-///|
-pub fn WebGPUCanvasContext::get(self : WebGPUCanvasContext) -> GPUCanvasContext {
-  self.context
-}
-
-///|
-pub fn WebGPUCanvasContext::configure(
-  self : WebGPUCanvasContext,
-  device : GPUDevice,
-  format : String,
-) -> Unit {
-  let usage = @wgpu.TextureUsage::from_u64(
-    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
-  )
-  let configured_format = self.context.surface.configure_default(
-    device.adapter,
-    device.raw,
-    self.context.width,
-    self.context.height,
-    usage,
-  )
-  self.context.format.val = texture_format_to_string(configured_format)
-  if self.context.format.val == "" {
-    self.context.format.val = format
-  }
 }
 
 ///|
@@ -92,67 +65,58 @@ pub fn webgpu_canvas_context_configure(
   device : GPUDevice,
   format : String,
 ) -> Unit {
-  context.configure(device, format)
-}
-
-///|
-pub fn WebGPUCanvasContext::getFormat(self : WebGPUCanvasContext) -> String {
-  self.context.format.val
+  let usage = @wgpu.TextureUsage::from_u64(
+    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
+  )
+  let configured_format = context.context.surface.configure_default(
+    device.adapter,
+    device.raw,
+    context.context.width,
+    context.context.height,
+    usage,
+  )
+  context.context.format.val = texture_format_to_string(configured_format)
+  if context.context.format.val == "" {
+    context.context.format.val = format
+  }
 }
 
 ///|
 pub fn webgpu_canvas_context_get_format(
   context : WebGPUCanvasContext,
 ) -> String {
-  context.getFormat()
-}
-
-///|
-pub fn WebGPUCanvasContext::getCurrentTexture(
-  self : WebGPUCanvasContext,
-) -> WebGPUTexture {
-  let surface_texture = self.context.surface.get_current_texture_or_raise() catch {
-    _ => abort("failed to acquire native WebGPU surface texture")
-  }
-  let texture = surface_texture.take_texture()
-  surface_texture.release()
-  self.context.currentTexture.val = Some(texture)
-  WebGPUTexture::new(GPUTexture::{ raw: texture })
+  context.context.format.val
 }
 
 ///|
 pub fn webgpu_canvas_context_get_current_texture(
   context : WebGPUCanvasContext,
 ) -> WebGPUTexture {
-  context.getCurrentTexture()
+  let surface_texture = context.context.surface.get_current_texture_or_raise() catch {
+    _ => abort("failed to acquire native WebGPU surface texture")
+  }
+  let texture = surface_texture.take_texture()
+  surface_texture.release()
+  context.context.currentTexture.val = Some(texture)
+  WebGPUTexture::new(GPUTexture::{ raw: texture })
 }
 
 ///|
-pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
-  self.context.surface.present_or_raise() catch {
+pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
+  context.context.surface.present_or_raise() catch {
     _ => ()
   }
-  match self.context.currentTexture.val {
+  match context.context.currentTexture.val {
     Some(texture) => {
       texture.release()
-      self.context.currentTexture.val = None
+      context.context.currentTexture.val = None
     }
     None => ()
   }
 }
 
 ///|
-pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
-  context.present()
-}
-
-///|
-pub fn WebGPUCanvasContext::release(self : WebGPUCanvasContext) -> Unit {
-  self.context.surface.unconfigure()
-  self.context.surface.release()
-}
-
-///|
 pub fn webgpu_canvas_context_release(context : WebGPUCanvasContext) -> Unit {
-  context.release()
+  context.context.surface.unconfigure()
+  context.context.surface.release()
 }

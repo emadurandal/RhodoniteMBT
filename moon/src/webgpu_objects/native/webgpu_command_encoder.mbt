@@ -11,8 +11,8 @@ pub fn WebGPUCommandEncoder::new(
 }
 
 ///|
-pub fn WebGPUCommandEncoder::beginRenderPass(
-  self : WebGPUCommandEncoder,
+pub fn webgpu_command_encoder_begin_render_pass(
+  encoder : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> WebGPURenderPassEncoder {
   let (color_attachments, _depth_stencil_attachment) = descriptor.get()
@@ -24,7 +24,7 @@ pub fn WebGPUCommandEncoder::beginRenderPass(
   let pass = match clear_value {
     Some(color) => {
       let (r, g, b, a) = color.get()
-      self.encoder.raw.begin_render_pass_color_clear(
+      encoder.encoder.raw.begin_render_pass_color_clear(
         view.raw,
         Float::from_double(r),
         Float::from_double(g),
@@ -32,39 +32,19 @@ pub fn WebGPUCommandEncoder::beginRenderPass(
         Float::from_double(a),
       )
     }
-    None => self.encoder.raw.begin_render_pass_color_load(view.raw)
+    None => encoder.encoder.raw.begin_render_pass_color_load(view.raw)
   }
   WebGPURenderPassEncoder::new(GPURenderPassEncoder::{ raw: pass })
-}
-
-///|
-pub fn webgpu_command_encoder_begin_render_pass(
-  encoder : WebGPUCommandEncoder,
-  descriptor : WebGPURenderPassDescriptor,
-) -> WebGPURenderPassEncoder {
-  encoder.beginRenderPass(descriptor)
-}
-
-///|
-pub fn WebGPUCommandEncoder::finish(
-  self : WebGPUCommandEncoder,
-) -> GPUCommandBuffer {
-  GPUCommandBuffer::{ raw: self.encoder.raw.finish() }
 }
 
 ///|
 pub fn webgpu_command_encoder_finish(
   encoder : WebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
-  encoder.finish()
-}
-
-///|
-pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
-  self.encoder.raw.release()
+  GPUCommandBuffer::{ raw: encoder.encoder.raw.finish() }
 }
 
 ///|
 pub fn webgpu_command_encoder_release(encoder : WebGPUCommandEncoder) -> Unit {
-  encoder.release()
+  encoder.encoder.raw.release()
 }

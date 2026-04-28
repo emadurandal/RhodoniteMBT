@@ -13,50 +13,23 @@ pub fn WebGPUCommandEncoder::new(
 }
 
 ///|
-pub fn WebGPUCommandEncoder::get(
-  self : WebGPUCommandEncoder,
-) -> GPUCommandEncoder {
-  self.encoder
-}
-
-///|
-pub fn WebGPUCommandEncoder::beginRenderPass(
-  self : WebGPUCommandEncoder,
-  descriptor : WebGPURenderPassDescriptor,
-) -> WebGPURenderPassEncoder {
-  WebGPURenderPassEncoder::new(
-    encoder_beginRenderPass(self.encoder, descriptor),
-  )
-}
-
-///|
 pub fn webgpu_command_encoder_begin_render_pass(
   encoder : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> WebGPURenderPassEncoder {
-  encoder.beginRenderPass(descriptor)
-}
-
-///|
-pub fn WebGPUCommandEncoder::finish(
-  self : WebGPUCommandEncoder,
-) -> GPUCommandBuffer {
-  encoder_finish(self.encoder)
+  WebGPURenderPassEncoder::new(
+    encoder_beginRenderPass(encoder.encoder, descriptor),
+  )
 }
 
 ///|
 pub fn webgpu_command_encoder_finish(
   encoder : WebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
-  encoder.finish()
-}
-
-///|
-pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
-  ignore(self)
+  encoder_finish(encoder.encoder)
 }
 
 ///|
 pub fn webgpu_command_encoder_release(encoder : WebGPUCommandEncoder) -> Unit {
-  encoder.release()
+  ignore(encoder)
 }

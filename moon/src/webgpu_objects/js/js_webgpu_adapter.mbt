@@ -11,19 +11,9 @@ pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
 }
 
 ///|
-pub fn WebGPUAdapter::get(self : WebGPUAdapter) -> GPUAdapter {
-  self.adapter
-}
-
-///|
-pub async fn WebGPUAdapter::requestDevice(self : WebGPUAdapter) -> WebGPUDevice {
-  let device = @js_async.Promise::wait(gpu_requestDevice(self.adapter))
-  WebGPUDevice::new(device)
-}
-
-///|
 pub async fn webgpu_adapter_request_device(
   adapter : WebGPUAdapter,
 ) -> WebGPUDevice {
-  adapter.requestDevice()
+  let device = @js_async.Promise::wait(gpu_requestDevice(adapter.adapter))
+  WebGPUDevice::new(device)
 }

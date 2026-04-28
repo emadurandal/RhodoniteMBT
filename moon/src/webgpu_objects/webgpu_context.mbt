@@ -8,8 +8,3 @@ pub fn create_webgpu_context(
   String,
   WebGPUQueue,
 ) -> WebGPUContext
-
-///|
-pub fn WebGPUContext::get(
-  Self,
-) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)

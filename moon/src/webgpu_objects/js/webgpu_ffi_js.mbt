@@ -46,14 +46,6 @@ extern "js" fn device_getQueue(device : GPUDevice) -> GPUQueue =
   #| (device) => device.queue
 
 ///|
-extern "js" fn device_createBuffer(
-  device : GPUDevice,
-  size : Int,
-  usage : Int,
-) -> GPUBuffer =
-  #| (device, size, usage) => device.createBuffer({ size, usage })
-
-///|
 extern "js" fn device_createShaderModule(
   device : GPUDevice,
   code : String,

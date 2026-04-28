@@ -27,15 +27,8 @@ pub fn create_webgpu_context(
 }
 
 ///|
-pub fn WebGPUContext::get(
-  self : WebGPUContext,
-) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) {
-  (self.device, self.context, self.format, self.queue)
-}
-
-///|
 pub fn webgpu_context_get(
   context : WebGPUContext,
 ) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) {
-  context.get()
+  (context.device, context.context, context.format, context.queue)
 }

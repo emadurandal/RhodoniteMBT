@@ -11,22 +11,9 @@ pub fn WebGPUQueue::new(queue : GPUQueue) -> WebGPUQueue {
 }
 
 ///|
-pub fn WebGPUQueue::get(self : WebGPUQueue) -> GPUQueue {
-  self.queue
-}
-
-///|
-pub fn WebGPUQueue::submit(
-  self : WebGPUQueue,
-  commandBuffer : GPUCommandBuffer,
-) -> Unit {
-  queue_submit(self.queue, commandBuffer)
-}
-
-///|
 pub fn webgpu_queue_submit(
   queue : WebGPUQueue,
   commandBuffer : GPUCommandBuffer,
 ) -> Unit {
-  queue.submit(commandBuffer)
+  queue_submit(queue.queue, commandBuffer)
 }
