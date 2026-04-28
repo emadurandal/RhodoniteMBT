@@ -1,7 +1,7 @@
 ///|
 pub struct WebGPURenderPassColorAttachment {
   view : GPUTextureView
-  clearValue : GPUColorDict?
+  clearValue : WebGPUColor?
   loadOp : String
   storeOp : String
 }
@@ -9,7 +9,7 @@ pub struct WebGPURenderPassColorAttachment {
 ///|
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
-  clearValue? : GPUColorDict,
+  clearValue? : WebGPUColor,
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment {
@@ -19,7 +19,7 @@ pub fn WebGPURenderPassColorAttachment::new(
 ///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
-  clearValue? : GPUColorDict,
+  clearValue? : WebGPUColor,
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment {
@@ -29,6 +29,6 @@ pub fn create_render_pass_color_attachment(
 ///|
 pub fn WebGPURenderPassColorAttachment::get(
   self : WebGPURenderPassColorAttachment,
-) -> (GPUTextureView, GPUColorDict?, String, String) {
+) -> (GPUTextureView, WebGPUColor?, String, String) {
   (self.view, self.clearValue, self.loadOp, self.storeOp)
 }
