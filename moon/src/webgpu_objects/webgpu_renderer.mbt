@@ -2,6 +2,8 @@
 
 ///|
 pub(all) struct WebGPURendererOps[Context, Device, Queue, Pipeline, Texture, TextureView, CommandEncoder, RenderPassEncoder, CommandBuffer, ShaderModule] {
+  getCurrentTexture : (Context) -> Texture
+  present : (Context) -> Unit
   createShaderModule : (Device, String) -> ShaderModule
   releaseShaderModule : (ShaderModule) -> Unit
   createRenderPipeline : (
@@ -12,7 +14,6 @@ pub(all) struct WebGPURendererOps[Context, Device, Queue, Pipeline, Texture, Tex
     Array[String],
   ) -> Pipeline
   releaseRenderPipeline : (Pipeline) -> Unit
-  getCurrentTexture : (Context) -> Texture
   createTextureView : (Texture) -> TextureView
   releaseTextureView : (TextureView) -> Unit
   createCommandEncoder : (Device) -> CommandEncoder
@@ -31,7 +32,6 @@ pub(all) struct WebGPURendererOps[Context, Device, Queue, Pipeline, Texture, Tex
   finishCommandEncoder : (CommandEncoder) -> CommandBuffer
   releaseCommandEncoder : (CommandEncoder) -> Unit
   submit : (Queue, CommandBuffer) -> Unit
-  present : (Context) -> Unit
 }
 
 ///|
@@ -56,16 +56,16 @@ pub(all) struct WebGPURenderer[Context, Device, Queue, Pipeline, Texture, Textur
 
 ///|
 pub fn[
-  Context : WebGPUCanvasContext,
-  Device : WebGPUDevice,
-  Queue : WebGPUQueue,
-  Pipeline : WebGPURenderPipeline,
+  Context,
+  Device,
+  Queue,
+  Pipeline,
   Texture,
   TextureView,
   CommandEncoder,
   RenderPassEncoder,
   CommandBuffer,
-  ShaderModule : WebGPUShaderModule,
+  ShaderModule,
 ] create_renderer_common(
   context : Context,
   device : Device,
@@ -95,37 +95,63 @@ pub fn[
   CommandBuffer,
   ShaderModule,
 ]? {
-  ignore(context as &WebGPUCanvasContext)
-  ignore(device as &WebGPUDevice)
-  ignore(queue as &WebGPUQueue)
-  let vertex_module = (ops.createShaderModule)(device, triangle_shader_code)
-  let fragment_module = (ops.createShaderModule)(device, triangle_shader_code)
-  ignore(vertex_module as &WebGPUShaderModule)
-  ignore(fragment_module as &WebGPUShaderModule)
-  let pipeline = (ops.createRenderPipeline)(
-    device,
-    vertex_module,
-    fragment_module,
-    "triangle-list",
-    [format],
-  )
-  ignore(pipeline as &WebGPURenderPipeline)
-  (ops.releaseShaderModule)(vertex_module)
-  (ops.releaseShaderModule)(fragment_module)
+  let pipeline = create_pipeline_common(device, format, ops)
   Some({ context, device, queue, pipeline, ops })
 }
 
 ///|
+fn[
+  Context,
+  Device,
+  Queue,
+  Pipeline,
+  Texture,
+  TextureView,
+  CommandEncoder,
+  RenderPassEncoder,
+  CommandBuffer,
+  ShaderModule,
+] create_pipeline_common(
+  device : Device,
+  format : String,
+  ops : WebGPURendererOps[
+    Context,
+    Device,
+    Queue,
+    Pipeline,
+    Texture,
+    TextureView,
+    CommandEncoder,
+    RenderPassEncoder,
+    CommandBuffer,
+    ShaderModule,
+  ],
+) -> Pipeline {
+  let vertex_shader = (ops.createShaderModule)(device, triangle_shader_code)
+  let fragment_shader = (ops.createShaderModule)(device, triangle_shader_code)
+  let pipeline = (ops.createRenderPipeline)(
+    device,
+    vertex_shader,
+    fragment_shader,
+    "triangle-list",
+    [format],
+  )
+  (ops.releaseShaderModule)(vertex_shader)
+  (ops.releaseShaderModule)(fragment_shader)
+  pipeline
+}
+
+///|
 pub fn[
-  Context : WebGPUCanvasContext,
-  Device : WebGPUDevice,
-  Queue : WebGPUQueue,
-  Pipeline : WebGPURenderPipeline,
-  Texture : WebGPUTexture,
-  TextureView : WebGPUTextureView,
-  CommandEncoder : WebGPUCommandEncoder,
-  RenderPassEncoder : WebGPURenderPassEncoder,
-  CommandBuffer : WebGPUCommandBuffer,
+  Context,
+  Device,
+  Queue,
+  Pipeline,
+  Texture,
+  TextureView,
+  CommandEncoder,
+  RenderPassEncoder,
+  CommandBuffer,
   ShaderModule,
 ] render_frame_common(
   renderer : WebGPURenderer[
@@ -144,28 +170,54 @@ pub fn[
   vertexCount : Int,
 ) -> Unit {
   let (r, g, b, a) = clearColor
-  ignore(renderer.context as &WebGPUCanvasContext)
-  ignore(renderer.device as &WebGPUDevice)
-  ignore(renderer.queue as &WebGPUQueue)
-  ignore(renderer.pipeline as &WebGPURenderPipeline)
   let texture = (renderer.ops.getCurrentTexture)(renderer.context)
-  ignore(texture as &WebGPUTexture)
   let view = (renderer.ops.createTextureView)(texture)
-  ignore(view as &WebGPUTextureView)
   let encoder = (renderer.ops.createCommandEncoder)(renderer.device)
-  ignore(encoder as &WebGPUCommandEncoder)
-  let render_pass = (renderer.ops.beginRenderPass)(encoder, view, r, g, b, a)
-  ignore(render_pass as &WebGPURenderPassEncoder)
+  let render_pass = begin_clear_pass_common(renderer, encoder, view, r, g, b, a)
   (renderer.ops.setPipeline)(render_pass, renderer.pipeline)
   (renderer.ops.draw)(render_pass, vertexCount)
   (renderer.ops.endRenderPass)(render_pass)
   (renderer.ops.releaseRenderPass)(render_pass)
   let command_buffer = (renderer.ops.finishCommandEncoder)(encoder)
-  ignore(command_buffer as &WebGPUCommandBuffer)
   (renderer.ops.submit)(renderer.queue, command_buffer)
   (renderer.ops.releaseCommandEncoder)(encoder)
   (renderer.ops.releaseTextureView)(view)
   (renderer.ops.present)(renderer.context)
+}
+
+///|
+fn[
+  Context,
+  Device,
+  Queue,
+  Pipeline,
+  Texture,
+  TextureView,
+  CommandEncoder,
+  RenderPassEncoder,
+  CommandBuffer,
+  ShaderModule,
+] begin_clear_pass_common(
+  renderer : WebGPURenderer[
+    Context,
+    Device,
+    Queue,
+    Pipeline,
+    Texture,
+    TextureView,
+    CommandEncoder,
+    RenderPassEncoder,
+    CommandBuffer,
+    ShaderModule,
+  ],
+  encoder : CommandEncoder,
+  view : TextureView,
+  r : Double,
+  g : Double,
+  b : Double,
+  a : Double,
+) -> RenderPassEncoder {
+  (renderer.ops.beginRenderPass)(encoder, view, r, g, b, a)
 }
 
 ///|
