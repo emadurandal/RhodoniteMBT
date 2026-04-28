@@ -22,9 +22,6 @@ pub type GPUTexture
 pub type GPUTextureView
 
 ///|
-pub type GPUBuffer
-
-///|
 pub type GPUShaderModule
 
 ///|

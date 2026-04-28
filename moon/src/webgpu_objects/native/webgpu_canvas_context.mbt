@@ -16,25 +16,6 @@ pub fn create_canvas_context(context : GPUCanvasContext) -> WebGPUCanvasContext 
 }
 
 ///|
-pub fn WebGPUCanvasContext::newMetalLayer(
-  instance : WebGPUInstance,
-  layer : @c.OpaquePtr,
-  width : Int,
-  height : Int,
-) -> WebGPUCanvasContext {
-  let desc = @wgpu.surface_descriptor_metal_layer_new(layer)
-  let surface = instance.instance.raw.create_surface(desc)
-  @wgpu.surface_descriptor_free(desc)
-  WebGPUCanvasContext::new(GPUCanvasContext::{
-    surface,
-    width: width.reinterpret_as_uint(),
-    height: height.reinterpret_as_uint(),
-    format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
-    currentTexture: @ref.new(None),
-  })
-}
-
-///|
 #borrow(layer)
 extern "C" fn surface_descriptor_metal_layer_new_html(
   layer : HTMLCanvasElement,

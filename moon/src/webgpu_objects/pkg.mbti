@@ -55,7 +55,6 @@ type GPUQueue
 type GPUCanvasContext
 type GPUTexture
 type GPUTextureView
-type GPUBuffer
 type GPUShaderModule
 type GPURenderPipeline
 type GPUCommandEncoder

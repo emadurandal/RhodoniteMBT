@@ -4,7 +4,6 @@ pub using @w {
   type GPU,
   type GPUAdapter,
   type GPURenderPipeline,
-  type GPUBuffer,
   type GPUCanvasContext,
   type GPUCommandBuffer,
   type GPUCommandEncoder,

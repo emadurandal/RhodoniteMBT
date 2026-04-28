@@ -41,11 +41,6 @@ pub struct GPUTextureView {
 }
 
 ///|
-pub struct GPUBuffer {
-  raw : @wgpu.Buffer
-}
-
-///|
 pub struct GPUShaderModule {
   raw : @wgpu.ShaderModule
 }
