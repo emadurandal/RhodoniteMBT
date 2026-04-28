@@ -26,4 +26,6 @@ else
   done
 fi
 
-exec moon run --target native src/cmd/wgpu/main "$@"
+moon build --target native
+
+exec "$ROOT/moon/_build/native/debug/build/cmd/wgpu/main/main.exe" "$@"

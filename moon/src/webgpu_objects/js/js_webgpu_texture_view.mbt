@@ -1,16 +1,16 @@
 // WebGPU texture view implementation
 
 ///|
-pub struct JsWebGPUTextureView {
+pub struct WebGPUTextureView {
   view : GPUTextureView
 }
 
 ///|
-pub fn JsWebGPUTextureView::new(view : GPUTextureView) -> JsWebGPUTextureView {
+pub fn WebGPUTextureView::new(view : GPUTextureView) -> WebGPUTextureView {
   { view, }
 }
 
 ///|
-pub fn JsWebGPUTextureView::get(self : JsWebGPUTextureView) -> GPUTextureView {
+pub fn WebGPUTextureView::get(self : WebGPUTextureView) -> GPUTextureView {
   self.view
 }

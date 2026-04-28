@@ -14,13 +14,18 @@ pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
 }
 
 ///|
+pub fn webgpu_device_get(device : WebGPUDevice) -> GPUDevice {
+  device.get()
+}
+
+///|
 pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
   WebGPUQueue::new(GPUQueue::{ raw: self.device.raw.queue() })
 }
 
 ///|
-pub impl @traits.WebGPUDevice for WebGPUDevice with getQueue(self) {
-  self.getQueue() as &@traits.WebGPUQueue
+pub fn webgpu_device_get_queue(device : WebGPUDevice) -> WebGPUQueue {
+  device.getQueue()
 }
 
 ///|
@@ -76,16 +81,21 @@ pub fn WebGPUDevice::createCommandEncoder(
 }
 
 ///|
-pub impl @traits.WebGPUDevice for WebGPUDevice with createCommandEncoder(self) {
-  self.createCommandEncoder() as &@traits.WebGPUCommandEncoder
-}
-
-///|
 pub fn WebGPUDevice::poll(self : WebGPUDevice, wait? : Bool = false) -> Bool {
   self.device.raw.poll(wait~)
 }
 
 ///|
+pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
+  device.poll(wait~)
+}
+
+///|
 pub fn WebGPUDevice::release(self : WebGPUDevice) -> Unit {
   self.device.raw.release()
+}
+
+///|
+pub fn webgpu_device_release(device : WebGPUDevice) -> Unit {
+  device.release()
 }

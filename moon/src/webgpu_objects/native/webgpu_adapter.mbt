@@ -25,14 +25,25 @@ pub fn WebGPUAdapter::requestDevice(
 }
 
 ///|
-pub impl @traits.WebGPUAdapter for WebGPUAdapter with requestDevice(self) {
-  let device = self.requestDevice() catch {
-    _ => abort("failed to request native WebGPU device")
-  }
-  device as &@traits.WebGPUDevice
+pub async fn webgpu_adapter_request_device(
+  adapter : WebGPUAdapter,
+) -> WebGPUDevice raise Error {
+  adapter.requestDevice()
+}
+
+///|
+pub fn native_webgpu_adapter_request_device(
+  adapter : WebGPUAdapter,
+) -> WebGPUDevice raise Error {
+  adapter.requestDevice()
 }
 
 ///|
 pub fn WebGPUAdapter::release(self : WebGPUAdapter) -> Unit {
   self.adapter.raw.release()
+}
+
+///|
+pub fn webgpu_adapter_release(adapter : WebGPUAdapter) -> Unit {
+  adapter.release()
 }

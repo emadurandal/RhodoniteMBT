@@ -1,4 +1,5 @@
-// WebGPU queue abstraction
+///|
+pub type WebGPUQueue
 
 ///|
-pub(open) trait WebGPUQueue {}
+pub fn WebGPUQueue::submit(Self, GPUCommandBuffer) -> Unit

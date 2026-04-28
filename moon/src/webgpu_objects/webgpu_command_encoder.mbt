@@ -1,6 +1,11 @@
-// WebGPU command encoder abstraction
+///|
+pub type WebGPUCommandEncoder
 
 ///|
-pub(open) trait WebGPUCommandEncoder {
-  release(self : Self) -> Unit
-}
+pub fn WebGPUCommandEncoder::beginRenderPass(Self, WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
+
+///|
+pub fn WebGPUCommandEncoder::finish(Self) -> GPUCommandBuffer
+
+///|
+pub fn WebGPUCommandEncoder::release(Self) -> Unit

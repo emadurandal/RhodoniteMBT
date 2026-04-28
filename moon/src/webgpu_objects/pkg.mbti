@@ -1,0 +1,65 @@
+package "emadurandal/WebGPU/webgpu_objects"
+
+// Values
+pub fn navigatorGPU() -> GPU
+pub fn canvas_getContext(HTMLCanvasElement) -> GPUCanvasContext
+pub fn create_webgpu_instance(GPU) -> WebGPUInstance
+pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error
+pub fn create_canvas_context(GPUCanvasContext) -> WebGPUCanvasContext
+pub fn create_metal_canvas_context(WebGPUInstance, HTMLCanvasElement, Int, Int) -> WebGPUCanvasContext
+pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) -> WebGPUContext
+pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
+pub async fn webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter
+pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter raise Error
+pub async fn webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice
+pub fn native_webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice raise Error
+pub fn webgpu_device_get(WebGPUDevice) -> GPUDevice
+pub fn webgpu_device_get_queue(WebGPUDevice) -> WebGPUQueue
+pub fn webgpu_device_poll(WebGPUDevice, wait? : Bool) -> Bool
+pub fn webgpu_device_release(WebGPUDevice) -> Unit
+pub fn webgpu_canvas_context_configure(WebGPUCanvasContext, GPUDevice, String) -> Unit
+pub fn webgpu_canvas_context_get_format(WebGPUCanvasContext) -> String
+pub fn webgpu_canvas_context_release(WebGPUCanvasContext) -> Unit
+pub fn webgpu_queue_release(WebGPUQueue) -> Unit
+pub fn webgpu_adapter_release(WebGPUAdapter) -> Unit
+pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
+pub fn webgpu_instance_release(WebGPUInstance) -> Unit
+pub fn create_renderer(WebGPUContext) -> WebGPURenderer?
+pub fn render_frame(WebGPURenderer) -> Unit
+pub fn render_frame_with_options(WebGPURenderer, clearColor~ : (Double, Double, Double, Double), vertexCount~ : Int) -> Unit
+pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+
+// Types and methods
+type GPU
+type GPUAdapter
+type GPUDevice
+type GPUQueue
+type GPUCanvasContext
+type GPUTexture
+type GPUTextureView
+type GPUBuffer
+type GPUShaderModule
+type GPURenderPipeline
+type GPUCommandEncoder
+type GPURenderPassEncoder
+type GPUCommandBuffer
+type HTMLCanvasElement
+type WebGPUInstance
+type WebGPUAdapter
+type WebGPUDevice
+type WebGPUQueue
+type WebGPUCanvasContext
+type WebGPUTexture
+type WebGPUCommandEncoder
+type WebGPURenderPassEncoder
+type WebGPUContext
+type WebGPUColor
+type WebGPURenderPassDepthStencilAttachment
+type WebGPURenderPassColorAttachment
+type WebGPURenderPassDescriptor
+type WebGPURenderPipelineDescriptor
+type WebGPURenderer
+
+// Type aliases
+
+// Traits

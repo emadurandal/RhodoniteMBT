@@ -1,10 +1,10 @@
 import {
-  "emadurandal/WebGPU/webgpu_objects" @traits,
-  "emadurandal/WebGPU/webgpu_objects/js" @w,
+  "emadurandal/WebGPU/webgpu_objects" @w,
 }
 
 supported_targets = "js"
 
 options(
+  overrides: [ "emadurandal/WebGPU/webgpu_objects/js" ],
   targets: { "webgpu_reexport.mbt": [ "js" ] },
 )

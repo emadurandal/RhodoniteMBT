@@ -1,8 +1,14 @@
-// WebGPU render pass encoder abstraction
+///|
+pub type WebGPURenderPassEncoder
 
 ///|
-pub(open) trait WebGPURenderPassEncoder {
-  draw(self : Self, vertexCount : Int) -> Unit
-  end(self : Self) -> Unit
-  release(self : Self) -> Unit
-}
+pub fn WebGPURenderPassEncoder::setPipeline(Self, GPURenderPipeline) -> Unit
+
+///|
+pub fn WebGPURenderPassEncoder::draw(Self, Int) -> Unit
+
+///|
+pub fn WebGPURenderPassEncoder::end(Self) -> Unit
+
+///|
+pub fn WebGPURenderPassEncoder::release(Self) -> Unit

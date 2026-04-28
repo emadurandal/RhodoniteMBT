@@ -12,4 +12,5 @@ supported_targets = "js"
 options(
   "is-main": true,
   link: { "js": { "exports": [ "create_webgpu_renderer" ], "format": "esm" } },
+  overrides: [ "emadurandal/WebGPU/webgpu_objects/js" ],
 )

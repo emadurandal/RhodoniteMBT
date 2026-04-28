@@ -1,4 +1,5 @@
-// WebGPU texture abstraction
+///|
+pub type WebGPUTexture
 
 ///|
-pub(open) trait WebGPUTexture {}
+pub fn WebGPUTexture::createView(Self) -> GPUTextureView

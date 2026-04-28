@@ -1,25 +1,28 @@
 ///|
-pub struct JsWebGPUCanvasContext {
+pub struct WebGPUCanvasContext {
   context : GPUCanvasContext
 }
 
 ///|
-pub fn JsWebGPUCanvasContext::new(
+pub fn WebGPUCanvasContext::new(
   context : GPUCanvasContext,
-) -> JsWebGPUCanvasContext {
+) -> WebGPUCanvasContext {
   { context, }
 }
 
 ///|
-pub fn JsWebGPUCanvasContext::get(
-  self : JsWebGPUCanvasContext,
-) -> GPUCanvasContext {
+pub fn create_canvas_context(context : GPUCanvasContext) -> WebGPUCanvasContext {
+  WebGPUCanvasContext::new(context)
+}
+
+///|
+pub fn WebGPUCanvasContext::get(self : WebGPUCanvasContext) -> GPUCanvasContext {
   self.context
 }
 
 ///|
-pub fn JsWebGPUCanvasContext::configure(
-  self : JsWebGPUCanvasContext,
+pub fn WebGPUCanvasContext::configure(
+  self : WebGPUCanvasContext,
   device : GPUDevice,
   format : String,
 ) -> Unit {
@@ -27,27 +30,22 @@ pub fn JsWebGPUCanvasContext::configure(
 }
 
 ///|
-pub fn JsWebGPUCanvasContext::getCurrentTexture(
-  self : JsWebGPUCanvasContext,
-) -> JsWebGPUTexture {
-  JsWebGPUTexture::new(context_getCurrentTexture(self.context))
+pub fn webgpu_canvas_context_configure(
+  context : WebGPUCanvasContext,
+  device : GPUDevice,
+  format : String,
+) -> Unit {
+  context.configure(device, format)
 }
 
 ///|
-pub impl @traits.WebGPUCanvasContext for JsWebGPUCanvasContext with getCurrentTexture(
-  self,
-) {
-  self.getCurrentTexture() as &@traits.WebGPUTexture
+pub fn WebGPUCanvasContext::getCurrentTexture(
+  self : WebGPUCanvasContext,
+) -> WebGPUTexture {
+  WebGPUTexture::new(context_getCurrentTexture(self.context))
 }
 
 ///|
-pub fn JsWebGPUCanvasContext::present(self : JsWebGPUCanvasContext) -> Unit {
+pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
   ignore(self)
-}
-
-///|
-pub impl @traits.WebGPUCanvasContext for JsWebGPUCanvasContext with present(
-  self,
-) {
-  self.present()
 }

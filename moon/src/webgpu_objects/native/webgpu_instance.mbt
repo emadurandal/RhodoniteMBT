@@ -9,8 +9,18 @@ pub fn WebGPUInstance::create() -> WebGPUInstance raise Error {
 }
 
 ///|
+pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error {
+  WebGPUInstance::create()
+}
+
+///|
 pub fn WebGPUInstance::new(instance : GPU) -> WebGPUInstance {
   { instance, }
+}
+
+///|
+pub fn create_webgpu_instance(instance : GPU) -> WebGPUInstance {
+  WebGPUInstance::new(instance)
 }
 
 ///|
@@ -24,6 +34,13 @@ pub fn WebGPUInstance::getPreferredCanvasFormat(
 ) -> String {
   ignore(self)
   "bgra8unorm"
+}
+
+///|
+pub fn webgpu_instance_get_preferred_canvas_format(
+  instance : WebGPUInstance,
+) -> String {
+  instance.getPreferredCanvasFormat()
 }
 
 ///|
@@ -44,18 +61,17 @@ pub fn WebGPUInstance::requestAdapter(
 }
 
 ///|
-pub impl @traits.WebGPUInstance for WebGPUInstance with getPreferredCanvasFormat(
-  self,
-) {
-  self.getPreferredCanvasFormat()
+pub async fn webgpu_instance_request_adapter(
+  instance : WebGPUInstance,
+) -> WebGPUAdapter raise Error {
+  instance.requestAdapter()
 }
 
 ///|
-pub impl @traits.WebGPUInstance for WebGPUInstance with requestAdapter(self) {
-  let adapter = request_native_webgpu_adapter(self) catch {
-    _ => abort("failed to request native WebGPU adapter")
-  }
-  adapter as &@traits.WebGPUAdapter
+pub fn native_webgpu_instance_request_adapter(
+  instance : WebGPUInstance,
+) -> WebGPUAdapter raise Error {
+  instance.requestAdapter()
 }
 
 ///|
@@ -64,6 +80,16 @@ pub fn WebGPUInstance::processEvents(self : WebGPUInstance) -> Unit {
 }
 
 ///|
+pub fn webgpu_instance_process_events(instance : WebGPUInstance) -> Unit {
+  instance.processEvents()
+}
+
+///|
 pub fn WebGPUInstance::release(self : WebGPUInstance) -> Unit {
   self.instance.raw.release()
+}
+
+///|
+pub fn webgpu_instance_release(instance : WebGPUInstance) -> Unit {
+  instance.release()
 }

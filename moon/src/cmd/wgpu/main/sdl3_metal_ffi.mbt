@@ -7,4 +7,7 @@ extern "C" fn sdl_metal_create_view(w : @lib.SDL_Window) -> @c.OpaquePtr = "SDL_
 extern "C" fn sdl_metal_destroy_view(v : @c.OpaquePtr) -> Unit = "SDL_Metal_DestroyView"
 
 ///|
-extern "C" fn sdl_metal_get_layer(v : @c.OpaquePtr) -> @c.OpaquePtr = "SDL_Metal_GetLayer"
+extern "C" fn sdl_metal_get_layer(v : @c.OpaquePtr) -> @w.HTMLCanvasElement = "SDL_Metal_GetLayer"
+
+///|
+extern "C" fn sdl_metal_get_layer_ptr(v : @c.OpaquePtr) -> @c.OpaquePtr = "SDL_Metal_GetLayer"

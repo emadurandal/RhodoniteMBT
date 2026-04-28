@@ -1,29 +1,26 @@
 // WebGPU texture implementation
 
 ///|
-pub struct JsWebGPUTexture {
+pub struct WebGPUTexture {
   texture : GPUTexture
 }
 
 ///|
-pub impl @traits.WebGPUTexture for JsWebGPUTexture
-
-///|
-pub fn JsWebGPUTexture::new(texture : GPUTexture) -> JsWebGPUTexture {
+pub fn WebGPUTexture::new(texture : GPUTexture) -> WebGPUTexture {
   { texture, }
 }
 
 ///|
-pub fn JsWebGPUTexture::get(self : JsWebGPUTexture) -> GPUTexture {
+pub fn WebGPUTexture::get(self : WebGPUTexture) -> GPUTexture {
   self.texture
 }
 
 ///|
-pub fn JsWebGPUTexture::createView(self : JsWebGPUTexture) -> GPUTextureView {
+pub fn WebGPUTexture::createView(self : WebGPUTexture) -> GPUTextureView {
   texture_createView(self.texture)
 }
 
 ///|
-pub fn textureView_release(view : GPUTextureView) -> Unit {
+fn textureView_release(view : GPUTextureView) -> Unit {
   ignore(view)
 }

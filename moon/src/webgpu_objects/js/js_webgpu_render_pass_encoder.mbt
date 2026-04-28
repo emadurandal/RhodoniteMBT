@@ -1,70 +1,46 @@
 // WebGPU render pass encoder implementation
 
 ///|
-pub struct JsWebGPURenderPassEncoder {
+pub struct WebGPURenderPassEncoder {
   encoder : GPURenderPassEncoder
 }
 
 ///|
-pub fn JsWebGPURenderPassEncoder::new(
+pub fn WebGPURenderPassEncoder::new(
   encoder : GPURenderPassEncoder,
-) -> JsWebGPURenderPassEncoder {
+) -> WebGPURenderPassEncoder {
   { encoder, }
 }
 
 ///|
-pub fn JsWebGPURenderPassEncoder::get(
-  self : JsWebGPURenderPassEncoder,
+pub fn WebGPURenderPassEncoder::get(
+  self : WebGPURenderPassEncoder,
 ) -> GPURenderPassEncoder {
   self.encoder
 }
 
 ///|
-pub fn JsWebGPURenderPassEncoder::setPipeline(
-  self : JsWebGPURenderPassEncoder,
+pub fn WebGPURenderPassEncoder::setPipeline(
+  self : WebGPURenderPassEncoder,
   pipeline : GPURenderPipeline,
 ) -> Unit {
   renderPass_setPipeline(self.encoder, pipeline)
 }
 
 ///|
-pub fn JsWebGPURenderPassEncoder::draw(
-  self : JsWebGPURenderPassEncoder,
+pub fn WebGPURenderPassEncoder::draw(
+  self : WebGPURenderPassEncoder,
   vertexCount : Int,
 ) -> Unit {
   renderPass_draw(self.encoder, vertexCount)
 }
 
 ///|
-pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with draw(
-  self,
-  vertexCount,
-) {
-  self.draw(vertexCount)
-}
-
-///|
-pub fn JsWebGPURenderPassEncoder::end(self : JsWebGPURenderPassEncoder) -> Unit {
+pub fn WebGPURenderPassEncoder::end(self : WebGPURenderPassEncoder) -> Unit {
   renderPass_end(self.encoder)
 }
 
 ///|
-pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with end(
-  self,
-) {
-  self.end()
-}
-
-///|
-pub fn JsWebGPURenderPassEncoder::release(
-  self : JsWebGPURenderPassEncoder,
-) -> Unit {
+pub fn WebGPURenderPassEncoder::release(self : WebGPURenderPassEncoder) -> Unit {
   ignore(self)
-}
-
-///|
-pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with release(
-  self,
-) {
-  self.release()
 }

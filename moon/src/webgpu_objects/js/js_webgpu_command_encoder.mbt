@@ -1,49 +1,42 @@
 // WebGPU command encoder implementation
 
 ///|
-pub struct JsWebGPUCommandEncoder {
+pub struct WebGPUCommandEncoder {
   encoder : GPUCommandEncoder
 }
 
 ///|
-pub fn JsWebGPUCommandEncoder::new(
+pub fn WebGPUCommandEncoder::new(
   encoder : GPUCommandEncoder,
-) -> JsWebGPUCommandEncoder {
+) -> WebGPUCommandEncoder {
   { encoder, }
 }
 
 ///|
-pub fn JsWebGPUCommandEncoder::get(
-  self : JsWebGPUCommandEncoder,
+pub fn WebGPUCommandEncoder::get(
+  self : WebGPUCommandEncoder,
 ) -> GPUCommandEncoder {
   self.encoder
 }
 
 ///|
-pub fn JsWebGPUCommandEncoder::beginRenderPass(
-  self : JsWebGPUCommandEncoder,
+pub fn WebGPUCommandEncoder::beginRenderPass(
+  self : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
-) -> JsWebGPURenderPassEncoder {
-  JsWebGPURenderPassEncoder::new(
+) -> WebGPURenderPassEncoder {
+  WebGPURenderPassEncoder::new(
     encoder_beginRenderPass(self.encoder, descriptor),
   )
 }
 
 ///|
-pub fn JsWebGPUCommandEncoder::finish(
-  self : JsWebGPUCommandEncoder,
+pub fn WebGPUCommandEncoder::finish(
+  self : WebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
   encoder_finish(self.encoder)
 }
 
 ///|
-pub fn JsWebGPUCommandEncoder::release(self : JsWebGPUCommandEncoder) -> Unit {
+pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
   ignore(self)
-}
-
-///|
-pub impl @traits.WebGPUCommandEncoder for JsWebGPUCommandEncoder with release(
-  self,
-) {
-  self.release()
 }

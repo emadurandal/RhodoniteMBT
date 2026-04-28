@@ -1,26 +1,23 @@
 // WebGPU queue implementation
 
 ///|
-pub struct JsWebGPUQueue {
+pub struct WebGPUQueue {
   queue : GPUQueue
 }
 
 ///|
-pub impl @traits.WebGPUQueue for JsWebGPUQueue
-
-///|
-pub fn JsWebGPUQueue::new(queue : GPUQueue) -> JsWebGPUQueue {
+pub fn WebGPUQueue::new(queue : GPUQueue) -> WebGPUQueue {
   { queue, }
 }
 
 ///|
-pub fn JsWebGPUQueue::get(self : JsWebGPUQueue) -> GPUQueue {
+pub fn WebGPUQueue::get(self : WebGPUQueue) -> GPUQueue {
   self.queue
 }
 
 ///|
-pub fn JsWebGPUQueue::submit(
-  self : JsWebGPUQueue,
+pub fn WebGPUQueue::submit(
+  self : WebGPUQueue,
   commandBuffer : GPUCommandBuffer,
 ) -> Unit {
   queue_submit(self.queue, commandBuffer)

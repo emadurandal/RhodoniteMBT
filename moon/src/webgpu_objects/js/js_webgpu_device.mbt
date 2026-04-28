@@ -1,33 +1,38 @@
 // WebGPU device implementation
 
 ///|
-pub struct JsWebGPUDevice {
+pub struct WebGPUDevice {
   device : GPUDevice
 }
 
 ///|
-pub fn JsWebGPUDevice::new(device : GPUDevice) -> JsWebGPUDevice {
+pub fn WebGPUDevice::new(device : GPUDevice) -> WebGPUDevice {
   { device, }
 }
 
 ///|
-pub fn JsWebGPUDevice::get(self : JsWebGPUDevice) -> GPUDevice {
+pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
   self.device
 }
 
 ///|
-pub fn JsWebGPUDevice::getQueue(self : JsWebGPUDevice) -> JsWebGPUQueue {
-  JsWebGPUQueue::new(device_getQueue(self.device))
+pub fn webgpu_device_get(device : WebGPUDevice) -> GPUDevice {
+  device.get()
 }
 
 ///|
-pub impl @traits.WebGPUDevice for JsWebGPUDevice with getQueue(self) {
-  self.getQueue() as &@traits.WebGPUQueue
+pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
+  WebGPUQueue::new(device_getQueue(self.device))
 }
 
 ///|
-pub fn JsWebGPUDevice::createBuffer(
-  self : JsWebGPUDevice,
+pub fn webgpu_device_get_queue(device : WebGPUDevice) -> WebGPUQueue {
+  device.getQueue()
+}
+
+///|
+pub fn WebGPUDevice::createBuffer(
+  self : WebGPUDevice,
   size : Int,
   usage : Int,
 ) -> GPUBuffer {
@@ -35,16 +40,16 @@ pub fn JsWebGPUDevice::createBuffer(
 }
 
 ///|
-pub fn JsWebGPUDevice::createShaderModule(
-  self : JsWebGPUDevice,
+pub fn WebGPUDevice::createShaderModule(
+  self : WebGPUDevice,
   code : String,
 ) -> GPUShaderModule {
   device_createShaderModule(self.device, code)
 }
 
 ///|
-pub fn JsWebGPUDevice::createRenderPipeline(
-  self : JsWebGPUDevice,
+pub fn WebGPUDevice::createRenderPipeline(
+  self : WebGPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
 ) -> GPURenderPipeline {
   let (vertex, fragment, topology, formats) = descriptor.get()
@@ -52,13 +57,8 @@ pub fn JsWebGPUDevice::createRenderPipeline(
 }
 
 ///|
-pub fn JsWebGPUDevice::createCommandEncoder(
-  self : JsWebGPUDevice,
-) -> JsWebGPUCommandEncoder {
-  JsWebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
-}
-
-///|
-pub impl @traits.WebGPUDevice for JsWebGPUDevice with createCommandEncoder(self) {
-  self.createCommandEncoder() as &@traits.WebGPUCommandEncoder
+pub fn WebGPUDevice::createCommandEncoder(
+  self : WebGPUDevice,
+) -> WebGPUCommandEncoder {
+  WebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
 }
