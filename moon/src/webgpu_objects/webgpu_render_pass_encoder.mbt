@@ -12,3 +12,6 @@ pub fn WebGPURenderPassEncoder::end(Self) -> Unit
 
 ///|
 pub fn WebGPURenderPassEncoder::release(Self) -> Unit
+
+///|
+pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit

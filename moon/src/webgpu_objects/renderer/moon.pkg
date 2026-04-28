@@ -1,0 +1,3 @@
+import {
+  "emadurandal/WebGPU/webgpu_objects" @w,
+}

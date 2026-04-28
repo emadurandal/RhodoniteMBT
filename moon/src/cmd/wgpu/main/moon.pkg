@@ -1,4 +1,5 @@
 import {
+  "emadurandal/WebGPU/webgpu_objects/renderer" @renderer,
   "emadurandal/WebGPU/webgpu_objects" @w,
   "Milky2018/wgpu_mbt/c" @c,
   "Kaida-Amethyst/sdl3" @sdl3,

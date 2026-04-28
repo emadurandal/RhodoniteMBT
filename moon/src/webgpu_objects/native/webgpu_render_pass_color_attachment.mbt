@@ -17,6 +17,16 @@ pub fn WebGPURenderPassColorAttachment::new(
 }
 
 ///|
+pub fn create_render_pass_color_attachment(
+  view~ : GPUTextureView,
+  clearValue? : WebGPUColor,
+  loadOp~ : String,
+  storeOp~ : String,
+) -> WebGPURenderPassColorAttachment {
+  WebGPURenderPassColorAttachment::new(view~, clearValue?, loadOp~, storeOp~)
+}
+
+///|
 pub fn WebGPURenderPassColorAttachment::get(
   self : WebGPURenderPassColorAttachment,
 ) -> (GPUTextureView, WebGPUColor?, String, String) {

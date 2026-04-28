@@ -19,6 +19,14 @@ pub fn WebGPURenderPassEncoder::setPipeline(
 }
 
 ///|
+pub fn webgpu_render_pass_encoder_set_pipeline(
+  renderPass : WebGPURenderPassEncoder,
+  pipeline : GPURenderPipeline,
+) -> Unit {
+  renderPass.setPipeline(pipeline)
+}
+
+///|
 pub fn WebGPURenderPassEncoder::draw(
   self : WebGPURenderPassEncoder,
   vertexCount : Int,
@@ -27,11 +35,33 @@ pub fn WebGPURenderPassEncoder::draw(
 }
 
 ///|
+pub fn webgpu_render_pass_encoder_draw(
+  renderPass : WebGPURenderPassEncoder,
+  vertexCount : Int,
+) -> Unit {
+  renderPass.draw(vertexCount)
+}
+
+///|
 pub fn WebGPURenderPassEncoder::end(self : WebGPURenderPassEncoder) -> Unit {
   self.encoder.raw.end()
 }
 
 ///|
+pub fn webgpu_render_pass_encoder_end(
+  renderPass : WebGPURenderPassEncoder,
+) -> Unit {
+  renderPass.end()
+}
+
+///|
 pub fn WebGPURenderPassEncoder::release(self : WebGPURenderPassEncoder) -> Unit {
   self.encoder.raw.release()
+}
+
+///|
+pub fn webgpu_render_pass_encoder_release(
+  renderPass : WebGPURenderPassEncoder,
+) -> Unit {
+  renderPass.release()
 }

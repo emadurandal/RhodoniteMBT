@@ -13,6 +13,14 @@ pub fn WebGPURenderPassDescriptor::new(
 }
 
 ///|
+pub fn create_render_pass_descriptor(
+  colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
+  depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
+) -> WebGPURenderPassDescriptor {
+  WebGPURenderPassDescriptor::new(colorAttachments~, depthStencilAttachment?)
+}
+
+///|
 pub fn WebGPURenderPassDescriptor::get(
   self : WebGPURenderPassDescriptor,
 ) -> (

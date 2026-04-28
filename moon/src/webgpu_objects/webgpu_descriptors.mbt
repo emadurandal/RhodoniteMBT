@@ -5,6 +5,9 @@ pub type WebGPUColor
 pub fn WebGPUColor::new(Double, Double, Double, Double) -> WebGPUColor
 
 ///|
+pub fn create_webgpu_color(Double, Double, Double, Double) -> WebGPUColor
+
+///|
 pub type WebGPURenderPassDepthStencilAttachment
 
 ///|
@@ -12,6 +15,14 @@ pub type WebGPURenderPassColorAttachment
 
 ///|
 pub fn WebGPURenderPassColorAttachment::new(
+  view~ : GPUTextureView,
+  clearValue? : WebGPUColor,
+  loadOp~ : String,
+  storeOp~ : String,
+) -> WebGPURenderPassColorAttachment
+
+///|
+pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,
   loadOp~ : String,
@@ -28,10 +39,24 @@ pub fn WebGPURenderPassDescriptor::new(
 ) -> WebGPURenderPassDescriptor
 
 ///|
+pub fn create_render_pass_descriptor(
+  colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
+  depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
+) -> WebGPURenderPassDescriptor
+
+///|
 pub type WebGPURenderPipelineDescriptor
 
 ///|
 pub fn WebGPURenderPipelineDescriptor::new(
+  vertex~ : GPUShaderModule,
+  fragment~ : GPUShaderModule,
+  topology~ : String,
+  formats~ : Array[String],
+) -> WebGPURenderPipelineDescriptor
+
+///|
+pub fn create_render_pipeline_descriptor(
   vertex~ : GPUShaderModule,
   fragment~ : GPUShaderModule,
   topology~ : String,

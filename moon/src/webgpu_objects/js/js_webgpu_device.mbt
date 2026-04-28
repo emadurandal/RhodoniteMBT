@@ -48,6 +48,14 @@ pub fn WebGPUDevice::createShaderModule(
 }
 
 ///|
+pub fn webgpu_device_create_shader_module(
+  device : WebGPUDevice,
+  code : String,
+) -> GPUShaderModule {
+  device.createShaderModule(code)
+}
+
+///|
 pub fn WebGPUDevice::createRenderPipeline(
   self : WebGPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
@@ -57,8 +65,23 @@ pub fn WebGPUDevice::createRenderPipeline(
 }
 
 ///|
+pub fn webgpu_device_create_render_pipeline(
+  device : WebGPUDevice,
+  descriptor : WebGPURenderPipelineDescriptor,
+) -> GPURenderPipeline {
+  device.createRenderPipeline(descriptor)
+}
+
+///|
 pub fn WebGPUDevice::createCommandEncoder(
   self : WebGPUDevice,
 ) -> WebGPUCommandEncoder {
   WebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
+}
+
+///|
+pub fn webgpu_device_create_command_encoder(
+  device : WebGPUDevice,
+) -> WebGPUCommandEncoder {
+  device.createCommandEncoder()
 }

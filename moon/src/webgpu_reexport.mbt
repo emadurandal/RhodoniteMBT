@@ -27,9 +27,7 @@ pub using @w {
   type WebGPURenderPipelineDescriptor,
   type WebGPURenderPassDescriptor,
   type WebGPUContext,
-  type WebGPURenderer,
   type HTMLCanvasElement,
-  create_renderer,
   create_webgpu_instance,
   create_canvas_context,
   create_webgpu_context,
@@ -39,9 +37,15 @@ pub using @w {
   webgpu_device_get,
   webgpu_device_get_queue,
   webgpu_canvas_context_configure,
-  webgpu_renderer_release,
-  render_frame,
-  render_frame_with_options,
   navigatorGPU,
   canvas_getContext,
+}
+
+///|
+pub using @renderer {
+  type WebGPURenderer,
+  create_renderer,
+  render_frame,
+  render_frame_with_options,
+  webgpu_renderer_release,
 }

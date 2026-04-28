@@ -18,6 +18,14 @@ pub fn WebGPUQueue::submit(
 }
 
 ///|
+pub fn webgpu_queue_submit(
+  queue : WebGPUQueue,
+  commandBuffer : GPUCommandBuffer,
+) -> Unit {
+  queue.submit(commandBuffer)
+}
+
+///|
 pub fn WebGPUQueue::release(self : WebGPUQueue) -> Unit {
   self.queue.raw.release()
 }

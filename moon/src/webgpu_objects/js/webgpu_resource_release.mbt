@@ -1,9 +1,9 @@
 ///|
-fn shaderModule_release(shaderModule : GPUShaderModule) -> Unit {
+pub fn shaderModule_release(shaderModule : GPUShaderModule) -> Unit {
   ignore(shaderModule)
 }
 
 ///|
-fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
+pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
   ignore(pipeline)
 }

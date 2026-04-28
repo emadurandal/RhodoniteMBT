@@ -38,6 +38,14 @@ pub fn WebGPUCommandEncoder::beginRenderPass(
 }
 
 ///|
+pub fn webgpu_command_encoder_begin_render_pass(
+  encoder : WebGPUCommandEncoder,
+  descriptor : WebGPURenderPassDescriptor,
+) -> WebGPURenderPassEncoder {
+  encoder.beginRenderPass(descriptor)
+}
+
+///|
 pub fn WebGPUCommandEncoder::finish(
   self : WebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
@@ -45,6 +53,18 @@ pub fn WebGPUCommandEncoder::finish(
 }
 
 ///|
+pub fn webgpu_command_encoder_finish(
+  encoder : WebGPUCommandEncoder,
+) -> GPUCommandBuffer {
+  encoder.finish()
+}
+
+///|
 pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
   self.encoder.raw.release()
+}
+
+///|
+pub fn webgpu_command_encoder_release(encoder : WebGPUCommandEncoder) -> Unit {
+  encoder.release()
 }

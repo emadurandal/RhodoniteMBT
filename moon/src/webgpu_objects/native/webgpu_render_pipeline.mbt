@@ -1,4 +1,4 @@
 ///|
-fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
+pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
   pipeline.raw.release()
 }

@@ -17,6 +17,16 @@ pub fn WebGPURenderPipelineDescriptor::new(
 }
 
 ///|
+pub fn create_render_pipeline_descriptor(
+  vertex~ : GPUShaderModule,
+  fragment~ : GPUShaderModule,
+  topology~ : String,
+  formats~ : Array[String],
+) -> WebGPURenderPipelineDescriptor {
+  WebGPURenderPipelineDescriptor::new(vertex~, fragment~, topology~, formats~)
+}
+
+///|
 pub fn WebGPURenderPipelineDescriptor::get(
   self : WebGPURenderPipelineDescriptor,
 ) -> (GPUShaderModule, GPUShaderModule, String, Array[String]) {

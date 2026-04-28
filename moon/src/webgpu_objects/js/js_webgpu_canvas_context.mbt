@@ -46,6 +46,18 @@ pub fn WebGPUCanvasContext::getCurrentTexture(
 }
 
 ///|
+pub fn webgpu_canvas_context_get_current_texture(
+  context : WebGPUCanvasContext,
+) -> WebGPUTexture {
+  context.getCurrentTexture()
+}
+
+///|
 pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
   ignore(self)
+}
+
+///|
+pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
+  context.present()
 }

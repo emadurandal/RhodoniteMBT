@@ -21,6 +21,11 @@ pub fn WebGPUTexture::createView(self : WebGPUTexture) -> GPUTextureView {
 }
 
 ///|
-fn textureView_release(view : GPUTextureView) -> Unit {
+pub fn webgpu_texture_create_view(texture : WebGPUTexture) -> GPUTextureView {
+  texture.createView()
+}
+
+///|
+pub fn textureView_release(view : GPUTextureView) -> Unit {
   ignore(view)
 }

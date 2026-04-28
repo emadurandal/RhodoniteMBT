@@ -22,3 +22,11 @@ pub fn WebGPUQueue::submit(
 ) -> Unit {
   queue_submit(self.queue, commandBuffer)
 }
+
+///|
+pub fn webgpu_queue_submit(
+  queue : WebGPUQueue,
+  commandBuffer : GPUCommandBuffer,
+) -> Unit {
+  queue.submit(commandBuffer)
+}

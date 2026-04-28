@@ -72,7 +72,7 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
     device, webgpu_canvas_context, render_format, queue,
   )
   println("native: creating renderer")
-  let renderer = match @w.create_renderer(webgpu_context) {
+  let renderer = match @renderer.create_renderer(webgpu_context) {
     Some(renderer) => renderer
     None => {
       @w.webgpu_canvas_context_release(webgpu_canvas_context)
@@ -98,12 +98,12 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
         _ => ()
       }
     }
-    @w.render_frame(renderer)
+    @renderer.render_frame(renderer)
     let _ = @w.webgpu_device_poll(device, wait=true)
     @w.webgpu_instance_process_events(instance)
     timer.delay(16)
   }
-  @w.webgpu_renderer_release(renderer)
+  @renderer.webgpu_renderer_release(renderer)
   @w.webgpu_canvas_context_release(webgpu_canvas_context)
   @w.webgpu_queue_release(queue)
   @w.webgpu_device_release(device)
