@@ -7,7 +7,7 @@ pub type WebGPURenderPassColorAttachment
 ///|
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
-  clearValue? : (Double, Double, Double, Double),
+  clearValue? : GPUColorDict,
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment
@@ -15,7 +15,7 @@ pub fn WebGPURenderPassColorAttachment::new(
 ///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
-  clearValue? : (Double, Double, Double, Double),
+  clearValue? : GPUColorDict,
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment

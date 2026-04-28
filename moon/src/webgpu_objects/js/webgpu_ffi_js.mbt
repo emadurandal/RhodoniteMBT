@@ -119,9 +119,7 @@ extern "js" fn encoder_beginRenderPass(
   encoder : GPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> GPURenderPassEncoder =
-  #| (encoder, descriptor) => {
-  #|   return encoder.beginRenderPass(descriptor)
-  #| }
+  #| (encoder, descriptor) => encoder.beginRenderPass(descriptor)
 
 ///|
 extern "js" fn encoder_finish(encoder : GPUCommandEncoder) -> GPUCommandBuffer =

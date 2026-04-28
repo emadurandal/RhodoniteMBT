@@ -151,7 +151,7 @@ pub fn create_render_pass_color_attachment(
   @raw.create_render_pass_color_attachment(
     view~,
     clearValue?=match clearValue {
-      Some(c) => Some((c.r, c.g, c.b, c.a))
+      Some(c) => Some(@raw.gpu_color_dict(c.r, c.g, c.b, c.a))
       None => None
     },
     loadOp~,

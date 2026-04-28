@@ -22,13 +22,13 @@ pub fn webgpu_command_encoder_begin_render_pass(
   }
   let (view, clear_value, _load_op, _store_op) = attachment.get()
   let pass = match clear_value {
-    Some((r, g, b, a)) =>
+    Some(c) =>
       encoder.encoder.raw.begin_render_pass_color_clear(
         view.raw,
-        Float::from_double(r),
-        Float::from_double(g),
-        Float::from_double(b),
-        Float::from_double(a),
+        Float::from_double(c.r),
+        Float::from_double(c.g),
+        Float::from_double(c.b),
+        Float::from_double(c.a),
       )
     None => encoder.encoder.raw.begin_render_pass_color_load(view.raw)
   }
