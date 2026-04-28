@@ -23,9 +23,23 @@ pub impl @traits.WebGPUInstance for JsWebGPUInstance with getPreferredCanvasForm
 }
 
 ///|
+async fn request_js_webgpu_adapter(
+  webgpu_instance : JsWebGPUInstance,
+) -> JsWebGPUAdapter {
+  let adapter = @js_async.Promise::wait(
+    gpu_requestAdapter(webgpu_instance.instance),
+  )
+  JsWebGPUAdapter::new(adapter)
+}
+
+///|
 pub async fn JsWebGPUInstance::requestAdapter(
   self : JsWebGPUInstance,
 ) -> JsWebGPUAdapter {
-  let adapter = @js_async.Promise::wait(gpu_requestAdapter(self.instance))
-  JsWebGPUAdapter::new(adapter)
+  request_js_webgpu_adapter(self)
+}
+
+///|
+pub impl @traits.WebGPUInstance for JsWebGPUInstance with requestAdapter(self) {
+  request_js_webgpu_adapter(self) as &@traits.WebGPUAdapter
 }

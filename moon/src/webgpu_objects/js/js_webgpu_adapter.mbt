@@ -6,6 +6,9 @@ pub struct JsWebGPUAdapter {
 }
 
 ///|
+pub impl @traits.WebGPUAdapter for JsWebGPUAdapter
+
+///|
 pub fn JsWebGPUAdapter::new(adapter : GPUAdapter) -> JsWebGPUAdapter {
   { adapter, }
 }
