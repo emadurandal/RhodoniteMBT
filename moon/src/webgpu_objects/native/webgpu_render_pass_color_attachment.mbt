@@ -1,0 +1,24 @@
+///|
+pub struct WebGPURenderPassColorAttachment {
+  view : GPUTextureView
+  clearValue : WebGPUColor?
+  loadOp : String
+  storeOp : String
+}
+
+///|
+pub fn WebGPURenderPassColorAttachment::new(
+  view~ : GPUTextureView,
+  clearValue? : WebGPUColor,
+  loadOp~ : String,
+  storeOp~ : String,
+) -> WebGPURenderPassColorAttachment {
+  { view, clearValue, loadOp, storeOp }
+}
+
+///|
+pub fn WebGPURenderPassColorAttachment::get(
+  self : WebGPURenderPassColorAttachment,
+) -> (GPUTextureView, WebGPUColor?, String, String) {
+  (self.view, self.clearValue, self.loadOp, self.storeOp)
+}
