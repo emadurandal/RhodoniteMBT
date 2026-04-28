@@ -17,7 +17,7 @@ async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
     @lib.webgpu_device_get(device),
     format,
   )
-  let queue = @lib.webgpu_device_get_queue(device)
+  let queue = device.get_queue()
   let webgpu_context = @lib.create_webgpu_context(
     device, webgpu_canvas_context, format, queue,
   )

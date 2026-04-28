@@ -67,7 +67,7 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
     format,
   )
   let render_format = @w.webgpu_canvas_context_get_format(webgpu_canvas_context)
-  let queue = @w.webgpu_device_get_queue(device)
+  let queue = device.get_queue()
   let webgpu_context = @w.create_webgpu_context(
     device, webgpu_canvas_context, render_format, queue,
   )

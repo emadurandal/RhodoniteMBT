@@ -52,7 +52,7 @@ pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
 }
 
 ///|
-pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
+pub fn WebGPUDevice::get_queue(self : WebGPUDevice) -> WebGPUQueue {
   webgpu_device_get_queue(self)
 }
 
