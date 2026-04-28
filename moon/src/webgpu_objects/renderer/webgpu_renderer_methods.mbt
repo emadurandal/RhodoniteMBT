@@ -1,4 +1,12 @@
 ///|
+pub struct WebGPURenderPipelineDescriptor {
+  vertex : @w.GPUShaderModule
+  fragment : @w.GPUShaderModule
+  topology : String
+  formats : Array[String]
+}
+
+///|
 fn @w.WebGPUContext::get(
   self : @w.WebGPUContext,
 ) -> (@w.WebGPUDevice, @w.WebGPUCanvasContext, String, @w.WebGPUQueue) {
@@ -16,17 +24,14 @@ fn @w.WebGPUDevice::createShaderModule(
 ///|
 fn @w.WebGPUDevice::createRenderPipeline(
   self : @w.WebGPUDevice,
-  vertex : @w.GPUShaderModule,
-  fragment : @w.GPUShaderModule,
-  topology~ : String,
-  formats~ : Array[String],
+  descriptor : WebGPURenderPipelineDescriptor,
 ) -> @w.GPURenderPipeline {
   @w.webgpu_device_create_render_pipeline(
     self,
-    vertex,
-    fragment,
-    topology~,
-    formats~,
+    descriptor.vertex,
+    descriptor.fragment,
+    topology=descriptor.topology,
+    formats=descriptor.formats,
   )
 }
 
