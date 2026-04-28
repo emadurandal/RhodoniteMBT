@@ -16,9 +16,9 @@ pub fn JsWebGPUInstance::get(self : JsWebGPUInstance) -> GPU {
 }
 
 ///|
-pub fn JsWebGPUInstance::getPreferredCanvasFormat(
-  self : JsWebGPUInstance,
-) -> String {
+pub impl @traits.WebGPUInstance for JsWebGPUInstance with getPreferredCanvasFormat(
+  self,
+) {
   gpu_getPreferredCanvasFormat(self.instance)
 }
 
