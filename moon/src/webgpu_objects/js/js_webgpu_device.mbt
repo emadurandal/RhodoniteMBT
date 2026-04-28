@@ -31,9 +31,11 @@ pub fn webgpu_device_create_shader_module(
 ///|
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
-  descriptor : WebGPURenderPipelineDescriptor,
+  vertex : GPUShaderModule,
+  fragment : GPUShaderModule,
+  topology~ : String,
+  formats~ : Array[String],
 ) -> GPURenderPipeline {
-  let (vertex, fragment, topology, formats) = descriptor.get()
   device_createRenderPipeline(
     device.device,
     vertex,

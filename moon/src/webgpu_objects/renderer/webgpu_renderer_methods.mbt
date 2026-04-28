@@ -16,9 +16,18 @@ fn @w.WebGPUDevice::createShaderModule(
 ///|
 fn @w.WebGPUDevice::createRenderPipeline(
   self : @w.WebGPUDevice,
-  descriptor : @w.WebGPURenderPipelineDescriptor,
+  vertex : @w.GPUShaderModule,
+  fragment : @w.GPUShaderModule,
+  topology~ : String,
+  formats~ : Array[String],
 ) -> @w.GPURenderPipeline {
-  @w.webgpu_device_create_render_pipeline(self, descriptor)
+  @w.webgpu_device_create_render_pipeline(
+    self,
+    vertex,
+    fragment,
+    topology~,
+    formats~,
+  )
 }
 
 ///|

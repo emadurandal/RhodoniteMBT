@@ -26,7 +26,7 @@ pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
 pub fn webgpu_instance_release(WebGPUInstance) -> Unit
 pub fn webgpu_context_get(WebGPUContext) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)
 pub fn webgpu_device_create_shader_module(WebGPUDevice, String) -> GPUShaderModule
-pub fn webgpu_device_create_render_pipeline(WebGPUDevice, WebGPURenderPipelineDescriptor) -> GPURenderPipeline
+pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : String, formats~ : Array[String]) -> GPURenderPipeline
 pub fn webgpu_device_create_command_encoder(WebGPUDevice) -> WebGPUCommandEncoder
 pub fn webgpu_canvas_context_get_current_texture(WebGPUCanvasContext) -> WebGPUTexture
 pub fn webgpu_canvas_context_present(WebGPUCanvasContext) -> Unit
@@ -45,7 +45,6 @@ pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit
 pub fn create_webgpu_color(Double, Double, Double, Double) -> WebGPUColor
 pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : WebGPUColor, loadOp~ : String, storeOp~ : String) -> WebGPURenderPassColorAttachment
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[WebGPURenderPassColorAttachment?], depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
-pub fn create_render_pipeline_descriptor(vertex~ : GPUShaderModule, fragment~ : GPUShaderModule, topology~ : String, formats~ : Array[String]) -> WebGPURenderPipelineDescriptor
 
 // Types and methods
 type GPU
@@ -74,7 +73,6 @@ type WebGPUColor
 type WebGPURenderPassDepthStencilAttachment
 type WebGPURenderPassColorAttachment
 type WebGPURenderPassDescriptor
-type WebGPURenderPipelineDescriptor
 
 // Type aliases
 

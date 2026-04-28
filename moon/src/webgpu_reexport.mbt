@@ -23,7 +23,6 @@ pub using @w {
   type WebGPUInstance,
   type WebGPURenderPassColorAttachment,
   type WebGPUColor,
-  type WebGPURenderPipelineDescriptor,
   type WebGPURenderPassDescriptor,
   type WebGPUContext,
   type HTMLCanvasElement,

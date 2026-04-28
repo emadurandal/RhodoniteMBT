@@ -29,9 +29,13 @@ pub fn webgpu_device_create_shader_module(
 ///|
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
-  descriptor : WebGPURenderPipelineDescriptor,
+  vertex : GPUShaderModule,
+  fragment : GPUShaderModule,
+  topology~ : String,
+  formats~ : Array[String],
 ) -> GPURenderPipeline {
-  let (vertex, _fragment, _topology, formats) = descriptor.get()
+  ignore(fragment)
+  ignore(topology)
   let format = if formats.length() > 0 {
     texture_format_from_string(formats[0])
   } else {
