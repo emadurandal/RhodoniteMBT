@@ -47,6 +47,9 @@ pub struct GPUTextureView {
 }
 
 ///|
+pub impl @traits.WebGPUTextureView for GPUTextureView
+
+///|
 pub struct GPUBuffer {
   raw : @wgpu.Buffer
 }
@@ -57,9 +60,15 @@ pub struct GPUShaderModule {
 }
 
 ///|
+pub impl @traits.WebGPUShaderModule for GPUShaderModule
+
+///|
 pub struct GPURenderPipeline {
   raw : @wgpu.RenderPipeline
 }
+
+///|
+pub impl @traits.WebGPURenderPipeline for GPURenderPipeline
 
 ///|
 pub struct GPUCommandEncoder {
@@ -75,3 +84,6 @@ pub struct GPURenderPassEncoder {
 pub struct GPUCommandBuffer {
   raw : @wgpu.CommandBuffer
 }
+
+///|
+pub impl @traits.WebGPUCommandBuffer for GPUCommandBuffer

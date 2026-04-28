@@ -1,93 +1,96 @@
 ///|
 pub struct Renderer {
-  context : WebGPUCanvasContext
-  device : WebGPUDevice
-  pipeline : GPURenderPipeline
-  queue : WebGPUQueue
+  renderer : @traits.WebGPURenderer[
+    WebGPUCanvasContext,
+    WebGPUDevice,
+    WebGPUQueue,
+    GPURenderPipeline,
+    WebGPUTexture,
+    GPUTextureView,
+    WebGPUCommandEncoder,
+    WebGPURenderPassEncoder,
+    GPUCommandBuffer,
+    GPUShaderModule,
+  ]
 }
 
 ///|
 pub fn create_renderer(context : WebGPUContext) -> Renderer? {
-  let shader_module = context.device.createShaderModule(
-    native_triangle_shader_code,
-  )
-  let pipeline = context.device.createRenderPipeline(
-    WebGPURenderPipelineDescriptor::new(
-      vertex=shader_module,
-      fragment=shader_module,
-      topology="triangle-list",
-      formats=[context.format],
-    ),
-  )
-  shader_module.raw.release()
-  Some({
-    context: context.context,
-    device: context.device,
-    pipeline,
-    queue: context.queue,
-  })
+  match
+    @traits.create_renderer_common(
+      context.context,
+      context.device,
+      context.format,
+      context.queue,
+      native_renderer_ops(),
+    ) {
+    Some(renderer) => Some({ renderer, })
+    None => None
+  }
 }
 
 ///|
 pub fn render_frame(renderer : Renderer) -> Unit {
-  let texture = renderer.context.getCurrentTexture()
-  let view = texture.createView()
-  let encoder = renderer.device.createCommandEncoder()
-  let render_pass = encoder.beginRenderPass(
-    WebGPURenderPassDescriptor::new(colorAttachments=[
-      Some(
-        WebGPURenderPassColorAttachment::new(
-          view~,
-          clearValue=WebGPUColor::new(0.0, 0.0, 0.2, 1.0),
-          loadOp="clear",
-          storeOp="store",
-        ),
-      ),
-    ]),
-  )
-  render_pass.setPipeline(renderer.pipeline)
-  render_pass.draw(3)
-  render_pass.end()
-  render_pass.release()
-  let command_buffer = encoder.finish()
-  renderer.queue.submit(command_buffer)
-  encoder.release()
-  textureView_release(view)
-  renderer.context.present()
+  @traits.render_frame_common(renderer.renderer, (0.0, 0.0, 0.2, 1.0), 3)
 }
 
 ///|
 pub fn Renderer::release(self : Renderer) -> Unit {
-  renderPipeline_release(self.pipeline)
+  self.renderer.release()
 }
 
 ///|
-let native_triangle_shader_code : String =
-  #|struct VertexOutput {
-  #|  @builtin(position) position: vec4<f32>,
-  #|  @location(0) color: vec3<f32>,
-  #|};
-  #|
-  #|@vertex
-  #|fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-  #|  var pos = array<vec2<f32>, 3>(
-  #|    vec2<f32>(0.0, 0.5),
-  #|    vec2<f32>(-0.5, -0.5),
-  #|    vec2<f32>(0.5, -0.5),
-  #|  );
-  #|  var colors = array<vec3<f32>, 3>(
-  #|    vec3<f32>(1.0, 0.0, 0.0),
-  #|    vec3<f32>(0.0, 1.0, 0.0),
-  #|    vec3<f32>(0.0, 0.0, 1.0),
-  #|  );
-  #|  var output: VertexOutput;
-  #|  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
-  #|  output.color = colors[vertexIndex];
-  #|  return output;
-  #|}
-  #|
-  #|@fragment
-  #|fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-  #|  return vec4<f32>(color, 1.0);
-  #|}
-  #|
+fn native_renderer_ops() -> @traits.WebGPURendererOps[
+  WebGPUCanvasContext,
+  WebGPUDevice,
+  WebGPUQueue,
+  GPURenderPipeline,
+  WebGPUTexture,
+  GPUTextureView,
+  WebGPUCommandEncoder,
+  WebGPURenderPassEncoder,
+  GPUCommandBuffer,
+  GPUShaderModule,
+] {
+  {
+    createShaderModule: fn(device, code) { device.createShaderModule(code) },
+    releaseShaderModule: fn(shaderModule) { shaderModule_release(shaderModule) },
+    createRenderPipeline: fn(device, vertex, fragment, topology, formats) {
+      device.createRenderPipeline(
+        WebGPURenderPipelineDescriptor::new(
+          vertex~,
+          fragment~,
+          topology~,
+          formats~,
+        ),
+      )
+    },
+    releaseRenderPipeline: fn(pipeline) { renderPipeline_release(pipeline) },
+    getCurrentTexture: fn(context) { context.getCurrentTexture() },
+    createTextureView: fn(texture) { texture.createView() },
+    releaseTextureView: fn(view) { textureView_release(view) },
+    createCommandEncoder: fn(device) { device.createCommandEncoder() },
+    beginRenderPass: fn(encoder, view, r, g, b, a) {
+      encoder.beginRenderPass(
+        WebGPURenderPassDescriptor::new(colorAttachments=[
+          Some(
+            WebGPURenderPassColorAttachment::new(
+              view~,
+              clearValue=WebGPUColor::new(r, g, b, a),
+              loadOp="clear",
+              storeOp="store",
+            ),
+          ),
+        ]),
+      )
+    },
+    setPipeline: fn(renderPass, pipeline) { renderPass.setPipeline(pipeline) },
+    draw: fn(renderPass, vertexCount) { renderPass.draw(vertexCount) },
+    endRenderPass: fn(renderPass) { renderPass.end() },
+    releaseRenderPass: fn(renderPass) { renderPass.release() },
+    finishCommandEncoder: fn(encoder) { encoder.finish() },
+    releaseCommandEncoder: fn(encoder) { encoder.release() },
+    submit: fn(queue, commandBuffer) { queue.submit(commandBuffer) },
+    present: fn(context) { context.present() },
+  }
+}

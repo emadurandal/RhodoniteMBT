@@ -2,74 +2,101 @@
 
 ///|
 pub struct Renderer {
-  context : JsWebGPUCanvasContext
-  device : JsWebGPUDevice
-  pipeline : GPURenderPipeline
-  queue : JsWebGPUQueue
+  renderer : @traits.WebGPURenderer[
+    JsWebGPUCanvasContext,
+    JsWebGPUDevice,
+    JsWebGPUQueue,
+    GPURenderPipeline,
+    JsWebGPUTexture,
+    GPUTextureView,
+    JsWebGPUCommandEncoder,
+    JsWebGPURenderPassEncoder,
+    GPUCommandBuffer,
+    GPUShaderModule,
+  ]
 }
 
 ///|
 pub fn create_renderer(context : WebGPUContext) -> Renderer? {
-
-  // Create shader modules
-  let vertex_module = context.device.createShaderModule(vertex_shader_code)
-  let fragment_module = context.device.createShaderModule(fragment_shader_code)
-
-  // Create render pipeline
-  let pipeline = context.device.createRenderPipeline(
-    WebGPURenderPipelineDescriptor::new(
-      vertex=vertex_module,
-      fragment=fragment_module,
-      topology="triangle-list",
-      formats=[context.format],
-    ),
-  )
-
-  Some({
-    context: context.context,
-    device: context.device,
-    pipeline,
-    queue: context.queue,
-  })
+  match
+    @traits.create_renderer_common(
+      context.context,
+      context.device,
+      context.format,
+      context.queue,
+      js_renderer_ops(),
+    ) {
+    Some(renderer) => Some({ renderer, })
+    None => None
+  }
 }
 
 ///|
 pub fn render_frame(renderer : Renderer) -> Unit {
-  // Get current texture from canvas context
-  let texture = renderer.context.getCurrentTexture()
-  let view = texture.createView()
-
-  // Create command encoder
-  let encoder = renderer.device.createCommandEncoder()
-
-  // Begin render pass with dark blue background
-  let render_pass = encoder.beginRenderPass(
-    WebGPURenderPassDescriptor::new(colorAttachments=[
-      Some(
-        WebGPURenderPassColorAttachment::new(
-          view~,
-          clearValue=WebGPUColor::new(1.0, 0.0, 0.2, 1.0),
-          loadOp="clear",
-          storeOp="store",
-        ),
-      ),
-    ]),
+  @traits.render_frame_common(
+    renderer.renderer,
+    (1.0, 0.0, 0.2, 1.0),
+    get_vertex_count(),
   )
+}
 
-  // Set pipeline
-  render_pass.setPipeline(renderer.pipeline)
+///|
+fn js_renderer_ops() -> @traits.WebGPURendererOps[
+  JsWebGPUCanvasContext,
+  JsWebGPUDevice,
+  JsWebGPUQueue,
+  GPURenderPipeline,
+  JsWebGPUTexture,
+  GPUTextureView,
+  JsWebGPUCommandEncoder,
+  JsWebGPURenderPassEncoder,
+  GPUCommandBuffer,
+  GPUShaderModule,
+] {
+  {
+    createShaderModule: fn(device, code) { device.createShaderModule(code) },
+    releaseShaderModule: fn(shaderModule) { ignore(shaderModule) },
+    createRenderPipeline: fn(device, vertex, fragment, topology, formats) {
+      device.createRenderPipeline(
+        WebGPURenderPipelineDescriptor::new(
+          vertex~,
+          fragment~,
+          topology~,
+          formats~,
+        ),
+      )
+    },
+    releaseRenderPipeline: fn(pipeline) { ignore(pipeline) },
+    getCurrentTexture: fn(context) { context.getCurrentTexture() },
+    createTextureView: fn(texture) { texture.createView() },
+    releaseTextureView: fn(view) { textureView_release(view) },
+    createCommandEncoder: fn(device) { device.createCommandEncoder() },
+    beginRenderPass: fn(encoder, view, r, g, b, a) {
+      encoder.beginRenderPass(
+        WebGPURenderPassDescriptor::new(colorAttachments=[
+          Some(
+            WebGPURenderPassColorAttachment::new(
+              view~,
+              clearValue=WebGPUColor::new(r, g, b, a),
+              loadOp="clear",
+              storeOp="store",
+            ),
+          ),
+        ]),
+      )
+    },
+    setPipeline: fn(renderPass, pipeline) { renderPass.setPipeline(pipeline) },
+    draw: fn(renderPass, vertexCount) { renderPass.draw(vertexCount) },
+    endRenderPass: fn(renderPass) { renderPass.end() },
+    releaseRenderPass: fn(renderPass) { renderPass.release() },
+    finishCommandEncoder: fn(encoder) { encoder.finish() },
+    releaseCommandEncoder: fn(encoder) { encoder.release() },
+    submit: fn(queue, commandBuffer) { queue.submit(commandBuffer) },
+    present: fn(context) { context.present() },
+  }
+}
 
-  // Draw triangle
-  render_pass.draw(get_vertex_count())
-
-  // End render pass
-  render_pass.end()
-  render_pass.release()
-
-  // Finish encoding and submit
-  let command_buffer = encoder.finish()
-  renderer.queue.submit(command_buffer)
-  encoder.release()
-  textureView_release(view)
-  renderer.context.present()
+///|
+pub fn Renderer::release(self : Renderer) -> Unit {
+  self.renderer.release()
 }

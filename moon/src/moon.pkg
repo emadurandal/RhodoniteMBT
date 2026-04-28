@@ -1,4 +1,5 @@
 import {
+  "emadurandal/WebGPU/webgpu_objects" @traits,
   "emadurandal/WebGPU/webgpu_objects/js" @w,
 }
 
