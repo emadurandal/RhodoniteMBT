@@ -58,7 +58,7 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   )
   println("native: requesting adapter and device")
   let adapter = instance.request_adapter()
-  let device = @w.native_webgpu_adapter_request_device(adapter)
+  let device = adapter.request_device()
   let format = @w.webgpu_instance_get_preferred_canvas_format(instance)
   println("native: configuring surface")
   @w.webgpu_canvas_context_configure(
