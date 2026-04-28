@@ -1,26 +1,26 @@
 ///|
-pub fn WebGPUInstance::getPreferredCanvasFormat(
+pub fn WebGPUInstance::get_preferred_canvas_format(
   self : WebGPUInstance,
 ) -> String {
   webgpu_instance_get_preferred_canvas_format(self)
 }
 
 ///|
-pub async fn WebGPUInstance::requestAdapter(
+pub async fn WebGPUInstance::request_adapter(
   self : WebGPUInstance,
 ) -> WebGPUAdapter {
   webgpu_instance_request_adapter(self)
 }
 
 ///|
-pub fn WebGPUInstance::requestNativeAdapter(
+pub fn WebGPUInstance::request_native_adapter(
   self : WebGPUInstance,
 ) -> WebGPUAdapter raise Error {
   native_webgpu_instance_request_adapter(self)
 }
 
 ///|
-pub fn WebGPUInstance::processEvents(self : WebGPUInstance) -> Unit {
+pub fn WebGPUInstance::process_events(self : WebGPUInstance) -> Unit {
   webgpu_instance_process_events(self)
 }
 
@@ -30,12 +30,14 @@ pub fn WebGPUInstance::release(self : WebGPUInstance) -> Unit {
 }
 
 ///|
-pub async fn WebGPUAdapter::requestDevice(self : WebGPUAdapter) -> WebGPUDevice {
+pub async fn WebGPUAdapter::request_device(
+  self : WebGPUAdapter,
+) -> WebGPUDevice {
   webgpu_adapter_request_device(self)
 }
 
 ///|
-pub fn WebGPUAdapter::requestNativeDevice(
+pub fn WebGPUAdapter::request_native_device(
   self : WebGPUAdapter,
 ) -> WebGPUDevice raise Error {
   native_webgpu_adapter_request_device(self)
@@ -57,7 +59,7 @@ pub fn WebGPUDevice::get_queue(self : WebGPUDevice) -> WebGPUQueue {
 }
 
 ///|
-pub fn WebGPUDevice::createShaderModule(
+pub fn WebGPUDevice::create_shader_module(
   self : WebGPUDevice,
   code : String,
 ) -> GPUShaderModule {
@@ -65,7 +67,7 @@ pub fn WebGPUDevice::createShaderModule(
 }
 
 ///|
-pub fn WebGPUDevice::createRenderPipeline(
+pub fn WebGPUDevice::create_render_pipeline(
   self : WebGPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
 ) -> GPURenderPipeline {
@@ -82,7 +84,7 @@ pub fn WebGPUDevice::createRenderPipeline(
 }
 
 ///|
-pub fn WebGPUDevice::createCommandEncoder(
+pub fn WebGPUDevice::create_command_encoder(
   self : WebGPUDevice,
 ) -> WebGPUCommandEncoder {
   { raw: @raw.webgpu_device_create_command_encoder(self.raw) }
@@ -108,12 +110,12 @@ pub fn WebGPUCanvasContext::configure(
 }
 
 ///|
-pub fn WebGPUCanvasContext::getFormat(self : WebGPUCanvasContext) -> String {
+pub fn WebGPUCanvasContext::get_format(self : WebGPUCanvasContext) -> String {
   webgpu_canvas_context_get_format(self)
 }
 
 ///|
-pub fn WebGPUCanvasContext::getCurrentTexture(
+pub fn WebGPUCanvasContext::get_current_texture(
   self : WebGPUCanvasContext,
 ) -> WebGPUTexture {
   { raw: @raw.webgpu_canvas_context_get_current_texture(self.raw) }
@@ -138,12 +140,12 @@ pub fn WebGPUContext::get(
 }
 
 ///|
-pub fn WebGPUTexture::createView(self : WebGPUTexture) -> GPUTextureView {
+pub fn WebGPUTexture::create_view(self : WebGPUTexture) -> GPUTextureView {
   @raw.webgpu_texture_create_view(self.raw)
 }
 
 ///|
-pub fn WebGPUCommandEncoder::beginRenderPass(
+pub fn WebGPUCommandEncoder::begin_render_pass(
   self : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> WebGPURenderPassEncoder {
@@ -165,9 +167,9 @@ pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
 ///|
 pub fn WebGPUQueue::submit(
   self : WebGPUQueue,
-  commandBuffer : GPUCommandBuffer,
+  command_buffer : GPUCommandBuffer,
 ) -> Unit {
-  @raw.webgpu_queue_submit(self.raw, commandBuffer)
+  @raw.webgpu_queue_submit(self.raw, command_buffer)
 }
 
 ///|
@@ -176,7 +178,7 @@ pub fn WebGPUQueue::release(self : WebGPUQueue) -> Unit {
 }
 
 ///|
-pub fn WebGPURenderPassEncoder::setPipeline(
+pub fn WebGPURenderPassEncoder::set_pipeline(
   self : WebGPURenderPassEncoder,
   pipeline : GPURenderPipeline,
 ) -> Unit {
@@ -186,9 +188,9 @@ pub fn WebGPURenderPassEncoder::setPipeline(
 ///|
 pub fn WebGPURenderPassEncoder::draw(
   self : WebGPURenderPassEncoder,
-  vertexCount : Int,
+  vertex_count : Int,
 ) -> Unit {
-  @raw.webgpu_render_pass_encoder_draw(self.raw, vertexCount)
+  @raw.webgpu_render_pass_encoder_draw(self.raw, vertex_count)
 }
 
 ///|

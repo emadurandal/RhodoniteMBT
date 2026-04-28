@@ -18,9 +18,9 @@ fn create_pipeline(
   device : @w.WebGPUDevice,
   format : String,
 ) -> @w.GPURenderPipeline {
-  let vertex_shader = device.createShaderModule(triangle_shader_code)
-  let fragment_shader = device.createShaderModule(triangle_shader_code)
-  let pipeline = device.createRenderPipeline(
+  let vertex_shader = device.create_shader_module(triangle_shader_code)
+  let fragment_shader = device.create_shader_module(triangle_shader_code)
+  let pipeline = device.create_render_pipeline(
     @w.create_render_pipeline_descriptor(
       vertex=vertex_shader,
       fragment=fragment_shader,
@@ -38,7 +38,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
     clearColor=(0.0, 0.0, 0.2, 1.0),
-    vertexCount=3,
+    vertex_count=3,
   )
 }
 
@@ -46,13 +46,13 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 pub fn render_frame_with_options(
   renderer : WebGPURenderer,
   clearColor~ : (Double, Double, Double, Double),
-  vertexCount~ : Int,
+  vertex_count~ : Int,
 ) -> Unit {
   let (r, g, b, a) = clearColor
-  let texture = renderer.context.getCurrentTexture()
-  let view = texture.createView()
-  let encoder = renderer.device.createCommandEncoder()
-  let render_pass = encoder.beginRenderPass(
+  let texture = renderer.context.get_current_texture()
+  let view = texture.create_view()
+  let encoder = renderer.device.create_command_encoder()
+  let render_pass = encoder.begin_render_pass(
     @w.create_render_pass_descriptor(colorAttachments=[
       Some(
         @w.create_render_pass_color_attachment(
@@ -64,8 +64,8 @@ pub fn render_frame_with_options(
       ),
     ]),
   )
-  render_pass.setPipeline(renderer.pipeline)
-  render_pass.draw(vertexCount)
+  render_pass.set_pipeline(renderer.pipeline)
+  render_pass.draw(vertex_count)
   render_pass.end()
   render_pass.release()
   let command_buffer = encoder.finish()
