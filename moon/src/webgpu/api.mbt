@@ -142,16 +142,6 @@ pub fn webgpu_instance_release(instance : WebGPUInstance) -> Unit {
 }
 
 ///|
-pub fn create_webgpu_color(
-  r : Double,
-  g : Double,
-  b : Double,
-  a : Double,
-) -> WebGPUColor {
-  @raw.create_webgpu_color(r, g, b, a)
-}
-
-///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,
@@ -160,7 +150,10 @@ pub fn create_render_pass_color_attachment(
 ) -> WebGPURenderPassColorAttachment {
   @raw.create_render_pass_color_attachment(
     view~,
-    clearValue?,
+    clearValue?=match clearValue {
+      Some(c) => Some((c.r, c.g, c.b, c.a))
+      None => None
+    },
     loadOp~,
     storeOp~,
   )

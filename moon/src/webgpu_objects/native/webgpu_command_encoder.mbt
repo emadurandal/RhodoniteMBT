@@ -22,8 +22,7 @@ pub fn webgpu_command_encoder_begin_render_pass(
   }
   let (view, clear_value, _load_op, _store_op) = attachment.get()
   let pass = match clear_value {
-    Some(color) => {
-      let (r, g, b, a) = color.get()
+    Some((r, g, b, a)) =>
       encoder.encoder.raw.begin_render_pass_color_clear(
         view.raw,
         Float::from_double(r),
@@ -31,7 +30,6 @@ pub fn webgpu_command_encoder_begin_render_pass(
         Float::from_double(b),
         Float::from_double(a),
       )
-    }
     None => encoder.encoder.raw.begin_render_pass_color_load(view.raw)
   }
   WebGPURenderPassEncoder::new(GPURenderPassEncoder::{ raw: pass })

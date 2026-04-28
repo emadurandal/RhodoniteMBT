@@ -44,7 +44,6 @@ pub using @w {
   webgpu_adapter_release,
   webgpu_instance_process_events,
   webgpu_instance_release,
-  create_webgpu_color,
   create_render_pass_color_attachment,
   create_render_pass_descriptor,
   create_render_pipeline_descriptor,

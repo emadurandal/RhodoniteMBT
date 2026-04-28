@@ -13,7 +13,6 @@ pub using @raw {
   type GPURenderPassEncoder,
   type GPUCommandBuffer,
   type HTMLCanvasElement,
-  type WebGPUColor,
   type WebGPURenderPassDepthStencilAttachment,
   type WebGPURenderPassColorAttachment,
   type WebGPURenderPassDescriptor,
@@ -63,4 +62,22 @@ pub(all) struct WebGPURenderPassEncoder {
 ///|
 pub(all) struct WebGPUContext {
   raw : @raw.WebGPUContext
+}
+
+///|
+pub(all) struct WebGPUColor {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+
+///|
+pub fn WebGPUColor::new(
+  r : Double,
+  g : Double,
+  b : Double,
+  a : Double,
+) -> WebGPUColor {
+  { r, g, b, a }
 }

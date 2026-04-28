@@ -57,7 +57,7 @@ pub fn render_frame_with_options(
       Some(
         @w.create_render_pass_color_attachment(
           view~,
-          clearValue=@w.create_webgpu_color(r, g, b, a),
+          clearValue=@w.WebGPUColor::new(r, g, b, a),
           loadOp="clear",
           storeOp="store",
         ),

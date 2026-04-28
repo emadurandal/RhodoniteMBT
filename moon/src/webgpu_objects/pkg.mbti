@@ -42,8 +42,7 @@ pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 pub fn textureView_release(GPUTextureView) -> Unit
 pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
 pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit
-pub fn create_webgpu_color(Double, Double, Double, Double) -> WebGPUColor
-pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : WebGPUColor, loadOp~ : String, storeOp~ : String) -> WebGPURenderPassColorAttachment
+pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : (Double, Double, Double, Double), loadOp~ : String, storeOp~ : String) -> WebGPURenderPassColorAttachment
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[WebGPURenderPassColorAttachment?], depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
 pub fn create_render_pipeline_descriptor(vertex~ : GPUShaderModule, fragment~ : GPUShaderModule, topology~ : String, formats~ : Array[String]) -> WebGPURenderPipelineDescriptor
 pub fn webgpu_render_pipeline_descriptor_get(WebGPURenderPipelineDescriptor) -> (GPUShaderModule, GPUShaderModule, String, Array[String])
@@ -71,7 +70,6 @@ type WebGPUTexture
 type WebGPUCommandEncoder
 type WebGPURenderPassEncoder
 type WebGPUContext
-type WebGPUColor
 type WebGPURenderPassDepthStencilAttachment
 type WebGPURenderPassColorAttachment
 type WebGPURenderPassDescriptor

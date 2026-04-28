@@ -1,13 +1,4 @@
 ///|
-pub type WebGPUColor
-
-///|
-pub fn WebGPUColor::new(Double, Double, Double, Double) -> WebGPUColor
-
-///|
-pub fn create_webgpu_color(Double, Double, Double, Double) -> WebGPUColor
-
-///|
 pub type WebGPURenderPassDepthStencilAttachment
 
 ///|
@@ -16,7 +7,7 @@ pub type WebGPURenderPassColorAttachment
 ///|
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
-  clearValue? : WebGPUColor,
+  clearValue? : (Double, Double, Double, Double),
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment
@@ -24,7 +15,7 @@ pub fn WebGPURenderPassColorAttachment::new(
 ///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
-  clearValue? : WebGPUColor,
+  clearValue? : (Double, Double, Double, Double),
   loadOp~ : String,
   storeOp~ : String,
 ) -> WebGPURenderPassColorAttachment
