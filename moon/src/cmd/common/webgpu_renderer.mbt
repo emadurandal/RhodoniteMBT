@@ -20,12 +20,14 @@ fn create_pipeline(
 ) -> @w.GPURenderPipeline {
   let vertex_shader = device.createShaderModule(triangle_shader_code)
   let fragment_shader = device.createShaderModule(triangle_shader_code)
-  let pipeline = device.createRenderPipeline({
-    vertex: vertex_shader,
-    fragment: fragment_shader,
-    topology: "triangle-list",
-    formats: [format],
-  })
+  let pipeline = device.createRenderPipeline(
+    @w.create_render_pipeline_descriptor(
+      vertex=vertex_shader,
+      fragment=fragment_shader,
+      topology="triangle-list",
+      formats=[format],
+    ),
+  )
   @w.shaderModule_release(vertex_shader)
   @w.shaderModule_release(fragment_shader)
   pipeline

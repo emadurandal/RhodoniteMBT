@@ -1,5 +1,5 @@
 ///|
-/// Re-export the selected `webgpu_objects` backend for the JS package API.
+/// Re-export the WebGPU facade for the JS package API.
 pub using @w {
   type GPU,
   type GPUAdapter,
@@ -24,6 +24,7 @@ pub using @w {
   type WebGPURenderPassColorAttachment,
   type WebGPUColor,
   type WebGPURenderPassDescriptor,
+  type WebGPURenderPipelineDescriptor,
   type WebGPUContext,
   type HTMLCanvasElement,
   create_webgpu_instance,
@@ -34,7 +35,22 @@ pub using @w {
   webgpu_adapter_request_device,
   webgpu_device_get,
   webgpu_device_get_queue,
+  webgpu_device_poll,
+  webgpu_device_release,
   webgpu_canvas_context_configure,
+  webgpu_canvas_context_get_format,
+  webgpu_canvas_context_release,
+  webgpu_queue_release,
+  webgpu_adapter_release,
+  webgpu_instance_process_events,
+  webgpu_instance_release,
+  create_webgpu_color,
+  create_render_pass_color_attachment,
+  create_render_pass_descriptor,
+  create_render_pipeline_descriptor,
+  shaderModule_release,
+  renderPipeline_release,
+  textureView_release,
   navigatorGPU,
   canvas_getContext,
 }
