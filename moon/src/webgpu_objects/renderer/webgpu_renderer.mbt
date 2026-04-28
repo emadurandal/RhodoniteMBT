@@ -8,7 +8,7 @@ pub(all) struct WebGPURenderer {
 
 ///|
 pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = @w.webgpu_context_get(context)
+  let (device, canvas_context, format, queue) = context.get()
   let pipeline = create_pipeline(device, format)
   Some({ context: canvas_context, device, queue, pipeline })
 }
@@ -18,14 +18,9 @@ fn create_pipeline(
   device : @w.WebGPUDevice,
   format : String,
 ) -> @w.GPURenderPipeline {
-  let vertex_shader = @w.webgpu_device_create_shader_module(
-    device, triangle_shader_code,
-  )
-  let fragment_shader = @w.webgpu_device_create_shader_module(
-    device, triangle_shader_code,
-  )
-  let pipeline = @w.webgpu_device_create_render_pipeline(
-    device,
+  let vertex_shader = device.createShaderModule(triangle_shader_code)
+  let fragment_shader = device.createShaderModule(triangle_shader_code)
+  let pipeline = device.createRenderPipeline(
     @w.create_render_pipeline_descriptor(
       vertex=vertex_shader,
       fragment=fragment_shader,
@@ -54,11 +49,10 @@ pub fn render_frame_with_options(
   vertexCount~ : Int,
 ) -> Unit {
   let (r, g, b, a) = clearColor
-  let texture = @w.webgpu_canvas_context_get_current_texture(renderer.context)
-  let view = @w.webgpu_texture_create_view(texture)
-  let encoder = @w.webgpu_device_create_command_encoder(renderer.device)
-  let render_pass = @w.webgpu_command_encoder_begin_render_pass(
-    encoder,
+  let texture = renderer.context.getCurrentTexture()
+  let view = texture.createView()
+  let encoder = renderer.device.createCommandEncoder()
+  let render_pass = encoder.beginRenderPass(
     @w.create_render_pass_descriptor(colorAttachments=[
       Some(
         @w.create_render_pass_color_attachment(
@@ -70,15 +64,15 @@ pub fn render_frame_with_options(
       ),
     ]),
   )
-  @w.webgpu_render_pass_encoder_set_pipeline(render_pass, renderer.pipeline)
-  @w.webgpu_render_pass_encoder_draw(render_pass, vertexCount)
-  @w.webgpu_render_pass_encoder_end(render_pass)
-  @w.webgpu_render_pass_encoder_release(render_pass)
-  let command_buffer = @w.webgpu_command_encoder_finish(encoder)
-  @w.webgpu_queue_submit(renderer.queue, command_buffer)
-  @w.webgpu_command_encoder_release(encoder)
+  render_pass.setPipeline(renderer.pipeline)
+  render_pass.draw(vertexCount)
+  render_pass.end()
+  render_pass.release()
+  let command_buffer = encoder.finish()
+  renderer.queue.submit(command_buffer)
+  encoder.release()
   @w.textureView_release(view)
-  @w.webgpu_canvas_context_present(renderer.context)
+  renderer.context.present()
 }
 
 ///|
