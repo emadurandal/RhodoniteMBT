@@ -1,4 +1,5 @@
-///| Mirror of `js/webgpu_color.mbt` for the native implement package.
+///|
+/// Mirror of `js/webgpu_color.mbt` for the native implement package.
 pub struct WebGPUColor {
   r : Double
   g : Double

@@ -9,7 +9,7 @@
 ///| `Kaida-Amethyst/sdl3/env.sh`（`CC_FLAGS` に `pkg-config --cflags sdl3`）。
 
 ///|
-fn run_sdl_wgpu_triangle() -> Unit raise Error {
+async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   let width = 800
   let height = 600
   println("native: initializing SDL3")
@@ -57,7 +57,7 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
     instance, cametal, width, height,
   )
   println("native: requesting adapter and device")
-  let adapter = @w.native_webgpu_instance_request_adapter(instance)
+  let adapter = instance.request_adapter()
   let device = @w.native_webgpu_adapter_request_device(adapter)
   let format = @w.webgpu_instance_get_preferred_canvas_format(instance)
   println("native: configuring surface")
@@ -115,7 +115,8 @@ fn run_sdl_wgpu_triangle() -> Unit raise Error {
 }
 
 ///|
-fn main {
+async fn main {
+  let _ = @async.now()
   run_sdl_wgpu_triangle() catch {
     _ =>
       println(

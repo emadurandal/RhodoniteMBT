@@ -6,7 +6,7 @@
 /// 
 async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
   let instance = @lib.create_webgpu_instance(@lib.navigatorGPU())
-  let adapter = @lib.webgpu_instance_request_adapter(instance)
+  let adapter = instance.request_adapter()
   let device = @lib.webgpu_adapter_request_device(adapter)
   let format = @lib.webgpu_instance_get_preferred_canvas_format(instance)
   let webgpu_canvas_context = @lib.create_canvas_context(

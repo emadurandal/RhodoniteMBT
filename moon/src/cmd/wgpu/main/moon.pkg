@@ -5,6 +5,7 @@ import {
   "Kaida-Amethyst/sdl3" @sdl3,
   "Kaida-Amethyst/sdl3/lib" @lib,
   "moonbitlang/core/ref" @ref,
+  "moonbitlang/async" @async,
 }
 
 supported_targets = "native"

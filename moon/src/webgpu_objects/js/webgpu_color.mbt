@@ -1,4 +1,5 @@
-///| RGBA clear color (`GPUColorDict` on JS). Mirrored in `native/` for MoonBit virtual implement packages.
+///|
+/// RGBA clear color (`GPUColorDict` on JS). Mirrored in `native/` for MoonBit virtual implement packages.
 pub struct WebGPUColor {
   r : Double
   g : Double
