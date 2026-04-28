@@ -40,3 +40,10 @@ pub fn JsWebGPUCommandEncoder::finish(
 pub fn JsWebGPUCommandEncoder::release(self : JsWebGPUCommandEncoder) -> Unit {
   ignore(self)
 }
+
+///|
+pub impl @traits.WebGPUCommandEncoder for JsWebGPUCommandEncoder with release(
+  self,
+) {
+  self.release()
+}

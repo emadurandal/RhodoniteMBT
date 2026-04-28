@@ -6,6 +6,9 @@ pub struct JsWebGPUTexture {
 }
 
 ///|
+pub impl @traits.WebGPUTexture for JsWebGPUTexture
+
+///|
 pub fn JsWebGPUTexture::new(texture : GPUTexture) -> JsWebGPUTexture {
   { texture, }
 }

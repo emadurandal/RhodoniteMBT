@@ -4,6 +4,9 @@ pub struct WebGPUQueue {
 }
 
 ///|
+pub impl @traits.WebGPUQueue for WebGPUQueue
+
+///|
 pub fn WebGPUQueue::new(queue : GPUQueue) -> WebGPUQueue {
   { queue, }
 }

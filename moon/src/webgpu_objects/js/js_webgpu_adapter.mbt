@@ -6,9 +6,6 @@ pub struct JsWebGPUAdapter {
 }
 
 ///|
-pub impl @traits.WebGPUAdapter for JsWebGPUAdapter
-
-///|
 pub fn JsWebGPUAdapter::new(adapter : GPUAdapter) -> JsWebGPUAdapter {
   { adapter, }
 }
@@ -24,4 +21,9 @@ pub async fn JsWebGPUAdapter::requestDevice(
 ) -> JsWebGPUDevice {
   let device = @js_async.Promise::wait(gpu_requestDevice(self.adapter))
   JsWebGPUDevice::new(device)
+}
+
+///|
+pub impl @traits.WebGPUAdapter for JsWebGPUAdapter with requestDevice(self) {
+  self.requestDevice() as &@traits.WebGPUDevice
 }

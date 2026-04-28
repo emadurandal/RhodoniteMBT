@@ -19,6 +19,11 @@ pub fn WebGPUDevice::getQueue(self : WebGPUDevice) -> WebGPUQueue {
 }
 
 ///|
+pub impl @traits.WebGPUDevice for WebGPUDevice with getQueue(self) {
+  self.getQueue() as &@traits.WebGPUQueue
+}
+
+///|
 pub fn WebGPUDevice::createShaderModule(
   self : WebGPUDevice,
   code : String,
@@ -68,6 +73,11 @@ pub fn WebGPUDevice::createCommandEncoder(
   WebGPUCommandEncoder::new(GPUCommandEncoder::{
     raw: self.device.raw.create_command_encoder(),
   })
+}
+
+///|
+pub impl @traits.WebGPUDevice for WebGPUDevice with createCommandEncoder(self) {
+  self.createCommandEncoder() as &@traits.WebGPUCommandEncoder
 }
 
 ///|

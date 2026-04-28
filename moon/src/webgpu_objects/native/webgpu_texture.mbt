@@ -4,6 +4,9 @@ pub struct WebGPUTexture {
 }
 
 ///|
+pub impl @traits.WebGPUTexture for WebGPUTexture
+
+///|
 pub fn WebGPUTexture::new(texture : GPUTexture) -> WebGPUTexture {
   { texture, }
 }

@@ -21,6 +21,11 @@ pub fn JsWebGPUDevice::getQueue(self : JsWebGPUDevice) -> JsWebGPUQueue {
 }
 
 ///|
+pub impl @traits.WebGPUDevice for JsWebGPUDevice with getQueue(self) {
+  self.getQueue() as &@traits.WebGPUQueue
+}
+
+///|
 pub fn JsWebGPUDevice::createBuffer(
   self : JsWebGPUDevice,
   size : Int,
@@ -51,4 +56,9 @@ pub fn JsWebGPUDevice::createCommandEncoder(
   self : JsWebGPUDevice,
 ) -> JsWebGPUCommandEncoder {
   JsWebGPUCommandEncoder::new(device_createCommandEncoder(self.device))
+}
+
+///|
+pub impl @traits.WebGPUDevice for JsWebGPUDevice with createCommandEncoder(self) {
+  self.createCommandEncoder() as &@traits.WebGPUCommandEncoder
 }

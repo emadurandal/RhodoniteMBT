@@ -34,6 +34,20 @@ pub fn JsWebGPUCanvasContext::getCurrentTexture(
 }
 
 ///|
+pub impl @traits.WebGPUCanvasContext for JsWebGPUCanvasContext with getCurrentTexture(
+  self,
+) {
+  self.getCurrentTexture() as &@traits.WebGPUTexture
+}
+
+///|
 pub fn JsWebGPUCanvasContext::present(self : JsWebGPUCanvasContext) -> Unit {
   ignore(self)
+}
+
+///|
+pub impl @traits.WebGPUCanvasContext for JsWebGPUCanvasContext with present(
+  self,
+) {
+  self.present()
 }

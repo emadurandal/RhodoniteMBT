@@ -36,8 +36,23 @@ pub fn JsWebGPURenderPassEncoder::draw(
 }
 
 ///|
+pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with draw(
+  self,
+  vertexCount,
+) {
+  self.draw(vertexCount)
+}
+
+///|
 pub fn JsWebGPURenderPassEncoder::end(self : JsWebGPURenderPassEncoder) -> Unit {
   renderPass_end(self.encoder)
+}
+
+///|
+pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with end(
+  self,
+) {
+  self.end()
 }
 
 ///|
@@ -45,4 +60,11 @@ pub fn JsWebGPURenderPassEncoder::release(
   self : JsWebGPURenderPassEncoder,
 ) -> Unit {
   ignore(self)
+}
+
+///|
+pub impl @traits.WebGPURenderPassEncoder for JsWebGPURenderPassEncoder with release(
+  self,
+) {
+  self.release()
 }

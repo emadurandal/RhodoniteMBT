@@ -75,6 +75,13 @@ pub fn WebGPUCanvasContext::getCurrentTexture(
 }
 
 ///|
+pub impl @traits.WebGPUCanvasContext for WebGPUCanvasContext with getCurrentTexture(
+  self,
+) {
+  self.getCurrentTexture() as &@traits.WebGPUTexture
+}
+
+///|
 pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
   self.context.surface.present_or_raise() catch {
     _ => ()
@@ -86,6 +93,11 @@ pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
     }
     None => ()
   }
+}
+
+///|
+pub impl @traits.WebGPUCanvasContext for WebGPUCanvasContext with present(self) {
+  self.present()
 }
 
 ///|

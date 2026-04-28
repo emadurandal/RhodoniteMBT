@@ -4,9 +4,6 @@ pub struct WebGPUAdapter {
 }
 
 ///|
-pub impl @traits.WebGPUAdapter for WebGPUAdapter
-
-///|
 pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
   { adapter, }
 }
@@ -25,6 +22,14 @@ pub fn WebGPUAdapter::requestDevice(
     adapter: self.adapter.raw,
     instance: self.adapter.instance,
   })
+}
+
+///|
+pub impl @traits.WebGPUAdapter for WebGPUAdapter with requestDevice(self) {
+  let device = self.requestDevice() catch {
+    _ => abort("failed to request native WebGPU device")
+  }
+  device as &@traits.WebGPUDevice
 }
 
 ///|

@@ -48,3 +48,10 @@ pub fn WebGPUCommandEncoder::finish(
 pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
   self.encoder.raw.release()
 }
+
+///|
+pub impl @traits.WebGPUCommandEncoder for WebGPUCommandEncoder with release(
+  self,
+) {
+  self.release()
+}
