@@ -3,6 +3,8 @@ fn texture_format_from_string(format : String) -> @wgpu.TextureFormat {
   match format {
     "rgba8unorm" | "rgba8-unorm" =>
       @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_RGBA8_UNORM)
+    "bgra8unorm" | "bgra8-unorm" =>
+      @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_BGRA8_UNORM)
     "bgra8unorm-srgb" | "bgra8-unorm-srgb" =>
       @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_BGRA8_UNORM_SRGB)
     "rgba8unorm-srgb" | "rgba8-unorm-srgb" =>
