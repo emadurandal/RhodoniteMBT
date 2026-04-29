@@ -6,8 +6,8 @@
       "type": "lldb",
       "request": "launch",
       "args": [],
-      "cwd": "/Users/emadurandal/ghq/github.com/emadurandal/MoonBit_WebGPU_ex/moon/.mooncakes/Kaida-Amethyst/sdl3/lib",
-      "program": "/Users/emadurandal/ghq/github.com/emadurandal/MoonBit_WebGPU_ex/moon/.mooncakes/Kaida-Amethyst/sdl3/lib/build/Debug/outDebug"
+      "cwd": "${workspaceFolder}/moon/.mooncakes/Kaida-Amethyst/sdl3/lib",
+      "program": "${workspaceFolder}/moon/.mooncakes/Kaida-Amethyst/sdl3/lib/build/Debug/outDebug"
     }
   ]
 }
