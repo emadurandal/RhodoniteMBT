@@ -3,7 +3,7 @@ pub(all) struct WebGPURenderer {
   context : @w.WebGPUCanvasContext
   device : @w.WebGPUDevice
   queue : @w.WebGPUQueue
-  pipeline : @w.GPURenderPipeline
+  pipeline : @w.RenderPipeline
 }
 
 ///|
@@ -17,10 +17,10 @@ pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
 fn create_pipeline(
   device : @w.WebGPUDevice,
   format : String,
-) -> @w.GPURenderPipeline {
+) -> @w.RenderPipeline {
   let vertex_shader = device.create_shader_module(triangle_shader_code)
   let fragment_shader = device.create_shader_module(triangle_shader_code)
-  let pipeline = device.create_render_pipeline(
+  let raw = device.create_render_pipeline(
     @w.create_render_pipeline_descriptor(
       vertex=vertex_shader,
       fragment=fragment_shader,
@@ -30,7 +30,7 @@ fn create_pipeline(
   )
   @w.shaderModule_release(vertex_shader)
   @w.shaderModule_release(fragment_shader)
-  pipeline
+  @w.RenderPipeline::new(raw)
 }
 
 ///|
@@ -64,7 +64,7 @@ pub fn render_frame_with_options(
       ),
     ]),
   )
-  render_pass.set_pipeline(renderer.pipeline)
+  render_pass.set_pipeline(renderer.pipeline.get())
   render_pass.draw(vertex_count)
   render_pass.end()
   render_pass.release()
@@ -77,7 +77,7 @@ pub fn render_frame_with_options(
 
 ///|
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
-  @w.renderPipeline_release(self.pipeline)
+  self.pipeline.release()
 }
 
 ///|

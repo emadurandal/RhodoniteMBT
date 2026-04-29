@@ -3,7 +3,6 @@ package "emadurandal/WebGPU/cmd/common"
 
 import {
   "emadurandal/WebGPU/webgpu",
-  "emadurandal/WebGPU/webgpu_objects",
 }
 
 // Values
@@ -22,7 +21,7 @@ pub(all) struct WebGPURenderer {
   context : @webgpu.WebGPUCanvasContext
   device : @webgpu.WebGPUDevice
   queue : @webgpu.WebGPUQueue
-  pipeline : @webgpu_objects.GPURenderPipeline
+  pipeline : @webgpu.RenderPipeline
 }
 pub fn WebGPURenderer::release(Self) -> Unit
 

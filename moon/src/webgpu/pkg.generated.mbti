@@ -69,6 +69,13 @@ pub fn webgpu_queue_release(WebGPUQueue) -> Unit
 // Errors
 
 // Types and methods
+pub struct RenderPipeline {
+  raw : @webgpu_objects.GPURenderPipeline
+}
+pub fn RenderPipeline::get(Self) -> @webgpu_objects.GPURenderPipeline
+pub fn RenderPipeline::new(@webgpu_objects.GPURenderPipeline) -> Self
+pub fn RenderPipeline::release(Self) -> Unit
+
 pub(all) struct WebGPUAdapter {
   raw : @webgpu_objects.WebGPUAdapter
 }
