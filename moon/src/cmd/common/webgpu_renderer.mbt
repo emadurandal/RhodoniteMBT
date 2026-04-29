@@ -18,18 +18,16 @@ fn create_pipeline(
   device : @w.WebGPUDevice,
   format : String,
 ) -> @w.GPURenderPipeline {
-  let vertex_shader = device.create_shader_module(triangle_shader_code)
-  let fragment_shader = device.create_shader_module(triangle_shader_code)
+  let shader = device.create_shader_module(triangle_shader_code)
   let pipeline = device.create_render_pipeline(
     @w.create_render_pipeline_descriptor(
-      vertex=vertex_shader,
-      fragment=fragment_shader,
+      vertex=shader,
+      fragment=shader,
       topology="triangle-list",
       formats=[format],
     ),
   )
-  @w.shaderModule_release(vertex_shader)
-  @w.shaderModule_release(fragment_shader)
+  @w.shaderModule_release(shader)
   pipeline
 }
 
