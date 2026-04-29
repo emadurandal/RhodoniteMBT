@@ -101,7 +101,7 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
     @wgpu.webgpu_instance_process_events(instance)
     timer.delay(16)
   }
-  @renderer.webgpu_renderer_release(renderer)
+  renderer.release()
   webgpu_canvas_context.release()
   queue.release()
   device.release()
