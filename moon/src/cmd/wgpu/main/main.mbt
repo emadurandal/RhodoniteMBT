@@ -52,8 +52,8 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   }
   let cametal = sdl_metal_get_layer(metal_view)
   println("native: creating WebGPU instance and surface")
-  let instance = @w.create_native_webgpu_instance()
-  let webgpu_canvas_context = @w.create_metal_canvas_context(
+  let instance = @wgpu.create_native_webgpu_instance()
+  let webgpu_canvas_context = @wgpu.create_metal_canvas_context(
     instance, cametal, width, height,
   )
   println("native: requesting adapter and device")
@@ -62,20 +62,22 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   let format = instance.get_preferred_canvas_format()
   println("native: configuring surface")
   webgpu_canvas_context.configure(device, format)
-  let render_format = @w.webgpu_canvas_context_get_format(webgpu_canvas_context)
+  let render_format = @wgpu.webgpu_canvas_context_get_format(
+    webgpu_canvas_context,
+  )
   let queue = device.get_queue()
-  let webgpu_context = @w.create_webgpu_context(
+  let webgpu_context = @wgpu.create_webgpu_context(
     device, webgpu_canvas_context, render_format, queue,
   )
   println("native: creating renderer")
   let renderer = match @renderer.create_renderer(webgpu_context) {
     Some(renderer) => renderer
     None => {
-      @w.webgpu_canvas_context_release(webgpu_canvas_context)
-      @w.webgpu_queue_release(queue)
-      @w.webgpu_device_release(device)
-      @w.webgpu_adapter_release(adapter)
-      @w.webgpu_instance_release(instance)
+      @wgpu.webgpu_canvas_context_release(webgpu_canvas_context)
+      @wgpu.webgpu_queue_release(queue)
+      @wgpu.webgpu_device_release(device)
+      @wgpu.webgpu_adapter_release(adapter)
+      @wgpu.webgpu_instance_release(instance)
       sdl_metal_destroy_view(metal_view)
       @lib.sdl_DestroyWindow(sdl_win)
       ctx.quit()
@@ -95,16 +97,16 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
       }
     }
     @renderer.render_frame(renderer)
-    let _ = @w.webgpu_device_poll(device, wait=true)
-    @w.webgpu_instance_process_events(instance)
+    let _ = @wgpu.webgpu_device_poll(device, wait=true)
+    @wgpu.webgpu_instance_process_events(instance)
     timer.delay(16)
   }
   @renderer.webgpu_renderer_release(renderer)
-  @w.webgpu_canvas_context_release(webgpu_canvas_context)
-  @w.webgpu_queue_release(queue)
-  @w.webgpu_device_release(device)
-  @w.webgpu_adapter_release(adapter)
-  @w.webgpu_instance_release(instance)
+  @wgpu.webgpu_canvas_context_release(webgpu_canvas_context)
+  @wgpu.webgpu_queue_release(queue)
+  @wgpu.webgpu_device_release(device)
+  @wgpu.webgpu_adapter_release(adapter)
+  @wgpu.webgpu_instance_release(instance)
   sdl_metal_destroy_view(metal_view)
   @lib.sdl_DestroyWindow(sdl_win)
   ctx.quit()

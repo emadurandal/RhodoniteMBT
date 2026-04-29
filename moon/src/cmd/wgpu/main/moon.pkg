@@ -1,6 +1,6 @@
 import {
   "emadurandal/WebGPU/cmd/common" @renderer,
-  "emadurandal/WebGPU/webgpu" @w,
+  "emadurandal/WebGPU/webgpu" @wgpu,
   "Milky2018/wgpu_mbt/c" @c,
   "Kaida-Amethyst/sdl3" @sdl3,
   "Kaida-Amethyst/sdl3/lib" @lib,
