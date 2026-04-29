@@ -1,31 +1,11 @@
-///
+///|
+pub type WebGPUInstance
 
 ///|
-pub struct WebGPUInstance {
-  instance : GPU
-}
+pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
 
 ///|
-pub fn WebGPUInstance::new(instance : GPU) -> WebGPUInstance {
-  { instance, }
-}
+pub async fn webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter
 
 ///|
-pub fn WebGPUInstance::get(self : WebGPUInstance) -> GPU {
-  self.instance
-}
-
-///|
-pub fn WebGPUInstance::getPreferredCanvasFormat(
-  self : WebGPUInstance,
-) -> String {
-  gpu_getPreferredCanvasFormat(self.instance)
-}
-
-///|
-pub async fn WebGPUInstance::requestAdapter(
-  self : WebGPUInstance,
-) -> WebGPUAdapter {
-  let adapter = @js_async.Promise::wait(gpu_requestAdapter(self.instance))
-  WebGPUAdapter::new(adapter)
-}
+pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter raise Error

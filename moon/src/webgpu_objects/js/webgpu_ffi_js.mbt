@@ -20,9 +20,7 @@ pub extern "js" fn canvas_getContext(
 /// Use `Promise[GPUAdapter]` (not optional): `GPUAdapter?` in the Promise layer
 /// can mis-classify valid handles as [None] at the JS boundary. On `null`, reject
 /// so [Promise::wait] fails instead of returning a bogus [None].
-pub extern "js" fn gpu_requestAdapter(
-  gpu : GPU,
-) -> @js_async.Promise[GPUAdapter] =
+extern "js" fn gpu_requestAdapter(gpu : GPU) -> @js_async.Promise[GPUAdapter] =
   #| (gpu) =>
   #|   gpu.requestAdapter().then((a) => {
   #|     if (a) return a;
@@ -30,7 +28,7 @@ pub extern "js" fn gpu_requestAdapter(
   #|   })
 
 ///|
-pub extern "js" fn gpu_requestDevice(
+extern "js" fn gpu_requestDevice(
   adapter : GPUAdapter,
 ) -> @js_async.Promise[GPUDevice] =
   #| (adapter) => adapter.requestDevice()
@@ -38,32 +36,24 @@ pub extern "js" fn gpu_requestDevice(
 // Synchronous getter methods (these are called after async init in JS)
 
 ///|
-pub extern "js" fn gpu_getPreferredCanvasFormat(gpu : GPU) -> String =
+extern "js" fn gpu_getPreferredCanvasFormat(gpu : GPU) -> String =
   #| (gpu) => gpu.getPreferredCanvasFormat()
 
 // GPUDevice methods
 
 ///|
-pub extern "js" fn device_getQueue(device : GPUDevice) -> GPUQueue =
+extern "js" fn device_getQueue(device : GPUDevice) -> GPUQueue =
   #| (device) => device.queue
 
 ///|
-pub extern "js" fn device_createBuffer(
-  device : GPUDevice,
-  size : Int,
-  usage : Int,
-) -> GPUBuffer =
-  #| (device, size, usage) => device.createBuffer({ size, usage })
-
-///|
-pub extern "js" fn device_createShaderModule(
+extern "js" fn device_createShaderModule(
   device : GPUDevice,
   code : String,
 ) -> GPUShaderModule =
   #| (device, code) => device.createShaderModule({ code })
 
 ///|
-pub extern "js" fn device_createRenderPipeline(
+extern "js" fn device_createRenderPipeline(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
@@ -89,7 +79,7 @@ pub extern "js" fn device_createRenderPipeline(
   #| }
 
 ///|
-pub extern "js" fn device_createCommandEncoder(
+extern "js" fn device_createCommandEncoder(
   device : GPUDevice,
 ) -> GPUCommandEncoder =
   #| (device) => device.createCommandEncoder()
@@ -97,14 +87,7 @@ pub extern "js" fn device_createCommandEncoder(
 // Canvas context methods
 
 ///|
-extern "js" fn getCanvasContext(canvasId : String) -> GPUCanvasContext =
-  #| (canvasId) => {
-  #|   const canvas = document.getElementById(canvasId);
-  #|   return canvas.getContext('webgpu');
-  #| }
-
-///|
-pub extern "js" fn context_configure(
+extern "js" fn context_configure(
   context : GPUCanvasContext,
   device : GPUDevice,
   format : String,
@@ -118,7 +101,7 @@ pub extern "js" fn context_configure(
   #| }
 
 ///|
-pub extern "js" fn context_getCurrentTexture(
+extern "js" fn context_getCurrentTexture(
   context : GPUCanvasContext,
 ) -> GPUTexture =
   #| (context) => context.getCurrentTexture()
@@ -126,50 +109,46 @@ pub extern "js" fn context_getCurrentTexture(
 // GPUTexture methods
 
 ///|
-pub extern "js" fn texture_createView(texture : GPUTexture) -> GPUTextureView =
+extern "js" fn texture_createView(texture : GPUTexture) -> GPUTextureView =
   #| (texture) => texture.createView()
 
 // Command encoder methods
 
 ///|
-pub extern "js" fn encoder_beginRenderPass(
+extern "js" fn encoder_beginRenderPass(
   encoder : GPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> GPURenderPassEncoder =
-  #| (encoder, descriptor) => {
-  #|   return encoder.beginRenderPass(descriptor)
-  #| }
+  #| (encoder, descriptor) => encoder.beginRenderPass(descriptor)
 
 ///|
-pub extern "js" fn encoder_finish(
-  encoder : GPUCommandEncoder,
-) -> GPUCommandBuffer =
+extern "js" fn encoder_finish(encoder : GPUCommandEncoder) -> GPUCommandBuffer =
   #| (encoder) => encoder.finish()
 
 // Render pass encoder methods
 
 ///|
-pub extern "js" fn renderPass_setPipeline(
+extern "js" fn renderPass_setPipeline(
   pass : GPURenderPassEncoder,
   pipeline : GPURenderPipeline,
 ) -> Unit =
   #| (pass, pipeline) => pass.setPipeline(pipeline)
 
 ///|
-pub extern "js" fn renderPass_draw(
+extern "js" fn renderPass_draw(
   pass : GPURenderPassEncoder,
   vertexCount : Int,
 ) -> Unit =
   #| (pass, vertexCount) => pass.draw(vertexCount)
 
 ///|
-pub extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
+extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
   #| (pass) => pass.end()
 
 // Queue methods
 
 ///|
-pub extern "js" fn queue_submit(
+extern "js" fn queue_submit(
   queue : GPUQueue,
   commandBuffer : GPUCommandBuffer,
 ) -> Unit =

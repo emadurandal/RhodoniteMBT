@@ -1,5 +1,6 @@
 import {
-  "moonbitlang/async/js_async",
 }
 
-supported_targets = "js"
+options(
+  "virtual": { "has-default": false },
+)

@@ -1,0 +1,4 @@
+{
+  "private": true,
+  "description": "Scopes MoonBit/mooncake prebuilds so CommonJS build.js in dependencies is not forced to ESM by the parent repo."
+}

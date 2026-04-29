@@ -1,4 +1,5 @@
 ///|
+/// Mirror of `js/webgpu_color.mbt` for the native implement package.
 pub struct WebGPUColor {
   r : Double
   g : Double
@@ -7,16 +8,11 @@ pub struct WebGPUColor {
 }
 
 ///|
-pub fn WebGPUColor::new(
+pub fn webgpu_color_new(
   r : Double,
   g : Double,
   b : Double,
   a : Double,
 ) -> WebGPUColor {
   { r, g, b, a }
-}
-
-///|
-pub fn WebGPUColor::get(self : WebGPUColor) -> (Double, Double, Double, Double) {
-  (self.r, self.g, self.b, self.a)
 }

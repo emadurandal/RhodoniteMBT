@@ -1,3 +1,5 @@
+// WebGPU JS FFI type definitions for MoonBit.
+
 ///|
 pub type GPU
 
@@ -33,3 +35,6 @@ pub type GPURenderPassEncoder
 
 ///|
 pub type GPUCommandBuffer
+
+///|
+pub type HTMLCanvasElement

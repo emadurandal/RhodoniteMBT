@@ -1,22 +1,8 @@
-// WebGPU adapter implementation
+///|
+pub type WebGPUAdapter
 
 ///|
-pub struct WebGPUAdapter {
-  adapter : GPUAdapter
-}
+pub async fn webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice
 
 ///|
-pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
-  { adapter, }
-}
-
-///|
-pub fn WebGPUAdapter::get(self : WebGPUAdapter) -> GPUAdapter {
-  self.adapter
-}
-
-///|
-pub async fn WebGPUAdapter::requestDevice(self : WebGPUAdapter) -> WebGPUDevice {
-  let device = @js_async.Promise::wait(gpu_requestDevice(self.adapter))
-  WebGPUDevice::new(device)
-}
+pub fn native_webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice raise Error

@@ -1,5 +1,0 @@
-import {
-  "emadurandal/WebGPU/webgpu_objects" @w,
-}
-
-supported_targets = "js"

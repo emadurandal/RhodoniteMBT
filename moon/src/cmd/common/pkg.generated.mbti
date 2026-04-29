@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/WebGPU/cmd/common"
+
+import {
+  "emadurandal/WebGPU/webgpu",
+}
+
+// Values
+pub fn create_renderer(@webgpu.WebGPUContext) -> WebGPURenderer?
+
+pub fn render_frame(WebGPURenderer) -> Unit
+
+pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct WebGPURenderer {
+  context : @webgpu.WebGPUCanvasContext
+  device : @webgpu.WebGPUDevice
+  queue : @webgpu.WebGPUQueue
+  pipeline : @webgpu.GPURenderPipeline
+}
+pub fn WebGPURenderer::release(Self) -> Unit
+
+// Type aliases
+
+// Traits
+

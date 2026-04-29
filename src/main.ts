@@ -1,5 +1,5 @@
 import "./style.css";
-import { create_webgpu_renderer } from "../moon/_build/js/debug/build/cmd/main/main.js";
+import { create_webgpu_renderer } from "../moon/_build/js/debug/build/cmd/js/main/main.js";
 
 if (!navigator.gpu) {
 	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";

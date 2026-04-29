@@ -1,32 +1,9 @@
 ///|
-pub struct WebGPUCanvasContext {
-  context : GPUCanvasContext
-}
+pub type WebGPUCanvasContext
 
 ///|
-pub fn WebGPUCanvasContext::new(
-  context : GPUCanvasContext,
-) -> WebGPUCanvasContext {
-  { context, }
-}
-
-///|
-pub fn WebGPUCanvasContext::get(self : WebGPUCanvasContext) -> GPUCanvasContext {
-  self.context
-}
-
-///|
-pub fn WebGPUCanvasContext::configure(
-  self : WebGPUCanvasContext,
-  device : GPUDevice,
-  format : String,
-) -> Unit {
-  context_configure(self.context, device, format)
-}
-
-///|
-pub fn WebGPUCanvasContext::getCurrentTexture(
-  self : WebGPUCanvasContext,
-) -> WebGPUTexture {
-  WebGPUTexture::new(context_getCurrentTexture(self.context))
-}
+pub fn webgpu_canvas_context_configure(
+  WebGPUCanvasContext,
+  GPUDevice,
+  String,
+) -> Unit
