@@ -74,13 +74,15 @@ pub fn WebGPUDevice::create_render_pipeline(
   let (vertex, fragment, topology, formats) = @raw.webgpu_render_pipeline_descriptor_get(
     descriptor,
   )
-  @raw.webgpu_device_create_render_pipeline(
-    self.raw,
-    vertex,
-    fragment,
-    topology~,
-    formats~,
-  )
+  {
+    raw: @raw.webgpu_device_create_render_pipeline(
+      self.raw,
+      vertex,
+      fragment,
+      topology~,
+      formats~,
+    ),
+  }
 }
 
 ///|
@@ -182,7 +184,12 @@ pub fn WebGPURenderPassEncoder::set_pipeline(
   self : WebGPURenderPassEncoder,
   pipeline : GPURenderPipeline,
 ) -> Unit {
-  @raw.webgpu_render_pass_encoder_set_pipeline(self.raw, pipeline)
+  @raw.webgpu_render_pass_encoder_set_pipeline(self.raw, pipeline.raw)
+}
+
+///|
+pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
+  renderPipeline_release(self)
 }
 
 ///|

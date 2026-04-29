@@ -196,7 +196,7 @@ pub fn shaderModule_release(shaderModule : GPUShaderModule) -> Unit {
 
 ///|
 pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
-  @raw.renderPipeline_release(pipeline)
+  @raw.renderPipeline_release(pipeline.raw)
 }
 
 ///|

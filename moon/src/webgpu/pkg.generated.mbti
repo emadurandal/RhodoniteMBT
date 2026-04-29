@@ -30,7 +30,7 @@ pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter r
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
-pub fn renderPipeline_release(@webgpu_objects.GPURenderPipeline) -> Unit
+pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 
 pub fn shaderModule_release(@webgpu_objects.GPUShaderModule) -> Unit
 
@@ -69,12 +69,10 @@ pub fn webgpu_queue_release(WebGPUQueue) -> Unit
 // Errors
 
 // Types and methods
-pub struct RenderPipeline {
+pub(all) struct GPURenderPipeline {
   raw : @webgpu_objects.GPURenderPipeline
 }
-pub fn RenderPipeline::get(Self) -> @webgpu_objects.GPURenderPipeline
-pub fn RenderPipeline::new(@webgpu_objects.GPURenderPipeline) -> Self
-pub fn RenderPipeline::release(Self) -> Unit
+pub fn GPURenderPipeline::release(Self) -> Unit
 
 pub(all) struct WebGPUAdapter {
   raw : @webgpu_objects.WebGPUAdapter
@@ -108,7 +106,7 @@ pub(all) struct WebGPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
 pub fn WebGPUDevice::create_command_encoder(Self) -> WebGPUCommandEncoder
-pub fn WebGPUDevice::create_render_pipeline(Self, @webgpu_objects.WebGPURenderPipelineDescriptor) -> @webgpu_objects.GPURenderPipeline
+pub fn WebGPUDevice::create_render_pipeline(Self, @webgpu_objects.WebGPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn WebGPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
 pub fn WebGPUDevice::get(Self) -> @webgpu_objects.GPUDevice
 pub fn WebGPUDevice::get_queue(Self) -> WebGPUQueue
@@ -136,7 +134,7 @@ pub(all) struct WebGPURenderPassEncoder {
 pub fn WebGPURenderPassEncoder::draw(Self, Int) -> Unit
 pub fn WebGPURenderPassEncoder::end(Self) -> Unit
 pub fn WebGPURenderPassEncoder::release(Self) -> Unit
-pub fn WebGPURenderPassEncoder::set_pipeline(Self, @webgpu_objects.GPURenderPipeline) -> Unit
+pub fn WebGPURenderPassEncoder::set_pipeline(Self, GPURenderPipeline) -> Unit
 
 pub(all) struct WebGPUTexture {
   raw : @webgpu_objects.WebGPUTexture
@@ -159,8 +157,6 @@ pub using @webgpu_objects {type GPUDevice}
 pub using @webgpu_objects {type GPUQueue}
 
 pub using @webgpu_objects {type GPURenderPassEncoder}
-
-pub using @webgpu_objects {type GPURenderPipeline}
 
 pub using @webgpu_objects {type GPUShaderModule}
 

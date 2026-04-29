@@ -21,7 +21,7 @@ pub(all) struct WebGPURenderer {
   context : @webgpu.WebGPUCanvasContext
   device : @webgpu.WebGPUDevice
   queue : @webgpu.WebGPUQueue
-  pipeline : @webgpu.RenderPipeline
+  pipeline : @webgpu.GPURenderPipeline
 }
 pub fn WebGPURenderer::release(Self) -> Unit
 

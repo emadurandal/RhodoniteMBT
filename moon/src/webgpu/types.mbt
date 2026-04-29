@@ -8,7 +8,6 @@ pub using @raw {
   type GPUTexture,
   type GPUTextureView,
   type GPUShaderModule,
-  type GPURenderPipeline,
   type GPUCommandEncoder,
   type GPURenderPassEncoder,
   type GPUCommandBuffer,
@@ -48,6 +47,11 @@ pub(all) struct WebGPUCanvasContext {
 ///|
 pub(all) struct WebGPUTexture {
   raw : @raw.WebGPUTexture
+}
+
+///|
+pub(all) struct GPURenderPipeline {
+  raw : @raw.GPURenderPipeline
 }
 
 ///|
