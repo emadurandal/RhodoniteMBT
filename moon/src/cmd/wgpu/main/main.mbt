@@ -73,7 +73,7 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   let renderer = match @renderer.create_renderer(webgpu_context) {
     Some(renderer) => renderer
     None => {
-      @wgpu.webgpu_canvas_context_release(webgpu_canvas_context)
+      webgpu_canvas_context.release()
       queue.release()
       device.release()
       adapter.release()
@@ -102,7 +102,7 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
     timer.delay(16)
   }
   @renderer.webgpu_renderer_release(renderer)
-  @wgpu.webgpu_canvas_context_release(webgpu_canvas_context)
+  webgpu_canvas_context.release()
   queue.release()
   device.release()
   adapter.release()
