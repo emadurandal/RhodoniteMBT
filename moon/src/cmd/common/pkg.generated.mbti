@@ -10,8 +10,6 @@ pub fn create_renderer(@webgpu.WebGPUContext) -> WebGPURenderer?
 
 pub fn render_frame(WebGPURenderer) -> Unit
 
-pub fn render_frame_with_options(WebGPURenderer, clearColor~ : (Double, Double, Double, Double), vertex_count~ : Int) -> Unit
-
 pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 
 // Errors

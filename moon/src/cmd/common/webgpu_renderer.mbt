@@ -43,7 +43,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
-pub fn render_frame_with_options(
+fn render_frame_with_options(
   renderer : WebGPURenderer,
   clearColor~ : (Double, Double, Double, Double),
   vertex_count~ : Int,

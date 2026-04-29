@@ -2,21 +2,14 @@
 pub fn WebGPUInstance::get_preferred_canvas_format(
   self : WebGPUInstance,
 ) -> String {
-  webgpu_instance_get_preferred_canvas_format(self)
+  @raw.webgpu_instance_get_preferred_canvas_format(self.raw)
 }
 
 ///|
 pub async fn WebGPUInstance::request_adapter(
   self : WebGPUInstance,
 ) -> WebGPUAdapter {
-  webgpu_instance_request_adapter(self)
-}
-
-///|
-pub fn WebGPUInstance::request_native_adapter(
-  self : WebGPUInstance,
-) -> WebGPUAdapter raise Error {
-  native_webgpu_instance_request_adapter(self)
+  { raw: @raw.webgpu_instance_request_adapter(self.raw) }
 }
 
 ///|
@@ -33,14 +26,7 @@ pub fn WebGPUInstance::release(self : WebGPUInstance) -> Unit {
 pub async fn WebGPUAdapter::request_device(
   self : WebGPUAdapter,
 ) -> WebGPUDevice {
-  webgpu_adapter_request_device(self)
-}
-
-///|
-pub fn WebGPUAdapter::request_native_device(
-  self : WebGPUAdapter,
-) -> WebGPUDevice raise Error {
-  native_webgpu_adapter_request_device(self)
+  { raw: @raw.webgpu_adapter_request_device(self.raw) }
 }
 
 ///|
@@ -50,12 +36,12 @@ pub fn WebGPUAdapter::release(self : WebGPUAdapter) -> Unit {
 
 ///|
 pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
-  webgpu_device_get(self)
+  @raw.webgpu_device_get(self.raw)
 }
 
 ///|
 pub fn WebGPUDevice::get_queue(self : WebGPUDevice) -> WebGPUQueue {
-  webgpu_device_get_queue(self)
+  { raw: @raw.webgpu_device_get_queue(self.raw) }
 }
 
 ///|
@@ -108,7 +94,11 @@ pub fn WebGPUCanvasContext::configure(
   device : WebGPUDevice,
   format : String,
 ) -> Unit {
-  webgpu_canvas_context_configure(self, device.get(), format)
+  @raw.webgpu_canvas_context_configure(
+    self.raw,
+    @raw.webgpu_device_get(device.raw),
+    format,
+  )
 }
 
 ///|

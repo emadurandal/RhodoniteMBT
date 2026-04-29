@@ -24,10 +24,6 @@ pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQu
 
 pub fn create_webgpu_instance(@webgpu_objects.GPU) -> WebGPUInstance
 
-pub fn native_webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice raise
-
-pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter raise
-
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
@@ -38,31 +34,19 @@ pub fn textureView_release(@webgpu_objects.GPUTextureView) -> Unit
 
 pub fn webgpu_adapter_release(WebGPUAdapter) -> Unit
 
-pub async fn webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice
-
-pub fn webgpu_canvas_context_configure(WebGPUCanvasContext, @webgpu_objects.GPUDevice, String) -> Unit
-
 pub fn webgpu_canvas_context_get_format(WebGPUCanvasContext) -> String
 
 pub fn webgpu_canvas_context_release(WebGPUCanvasContext) -> Unit
 
 pub fn webgpu_color_new(Double, Double, Double, Double) -> @webgpu_objects.WebGPUColor
 
-pub fn webgpu_device_get(WebGPUDevice) -> @webgpu_objects.GPUDevice
-
-pub fn webgpu_device_get_queue(WebGPUDevice) -> WebGPUQueue
-
 pub fn webgpu_device_poll(WebGPUDevice, wait? : Bool) -> Bool
 
 pub fn webgpu_device_release(WebGPUDevice) -> Unit
 
-pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
-
 pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
 
 pub fn webgpu_instance_release(WebGPUInstance) -> Unit
-
-pub async fn webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter
 
 pub fn webgpu_queue_release(WebGPUQueue) -> Unit
 
@@ -79,7 +63,6 @@ pub(all) struct WebGPUAdapter {
 }
 pub fn WebGPUAdapter::release(Self) -> Unit
 pub async fn WebGPUAdapter::request_device(Self) -> WebGPUDevice
-pub fn WebGPUAdapter::request_native_device(Self) -> WebGPUDevice raise
 
 pub(all) struct WebGPUCanvasContext {
   raw : @webgpu_objects.WebGPUCanvasContext
@@ -120,7 +103,6 @@ pub fn WebGPUInstance::get_preferred_canvas_format(Self) -> String
 pub fn WebGPUInstance::process_events(Self) -> Unit
 pub fn WebGPUInstance::release(Self) -> Unit
 pub async fn WebGPUInstance::request_adapter(Self) -> WebGPUAdapter
-pub fn WebGPUInstance::request_native_adapter(Self) -> WebGPUAdapter raise
 
 pub(all) struct WebGPUQueue {
   raw : @webgpu_objects.WebGPUQueue

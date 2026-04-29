@@ -46,51 +46,6 @@ pub fn create_webgpu_context(
 }
 
 ///|
-pub fn webgpu_instance_get_preferred_canvas_format(
-  instance : WebGPUInstance,
-) -> String {
-  @raw.webgpu_instance_get_preferred_canvas_format(instance.raw)
-}
-
-///|
-pub async fn webgpu_instance_request_adapter(
-  instance : WebGPUInstance,
-) -> WebGPUAdapter {
-  { raw: @raw.webgpu_instance_request_adapter(instance.raw) }
-}
-
-///|
-pub fn native_webgpu_instance_request_adapter(
-  instance : WebGPUInstance,
-) -> WebGPUAdapter raise Error {
-  { raw: @raw.native_webgpu_instance_request_adapter(instance.raw) }
-}
-
-///|
-pub async fn webgpu_adapter_request_device(
-  adapter : WebGPUAdapter,
-) -> WebGPUDevice {
-  { raw: @raw.webgpu_adapter_request_device(adapter.raw) }
-}
-
-///|
-pub fn native_webgpu_adapter_request_device(
-  adapter : WebGPUAdapter,
-) -> WebGPUDevice raise Error {
-  { raw: @raw.native_webgpu_adapter_request_device(adapter.raw) }
-}
-
-///|
-pub fn webgpu_device_get(device : WebGPUDevice) -> GPUDevice {
-  @raw.webgpu_device_get(device.raw)
-}
-
-///|
-pub fn webgpu_device_get_queue(device : WebGPUDevice) -> WebGPUQueue {
-  { raw: @raw.webgpu_device_get_queue(device.raw) }
-}
-
-///|
 pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
   @raw.webgpu_device_poll(device.raw, wait~)
 }
@@ -98,15 +53,6 @@ pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
 ///|
 pub fn webgpu_device_release(device : WebGPUDevice) -> Unit {
   @raw.webgpu_device_release(device.raw)
-}
-
-///|
-pub fn webgpu_canvas_context_configure(
-  context : WebGPUCanvasContext,
-  device : GPUDevice,
-  format : String,
-) -> Unit {
-  @raw.webgpu_canvas_context_configure(context.raw, device, format)
 }
 
 ///|
