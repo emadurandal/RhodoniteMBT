@@ -1,9 +1,6 @@
-// import {
-//   "emadurandal/WebGPU" @lib,
-// }
-
 import {
-  "emadurandal/WebGPU" @lib,
+  "emadurandal/WebGPU/cmd/common" @renderer,
+  "emadurandal/WebGPU/webgpu" @wgpu,
   "moonbitlang/async/js_async",
 }
 

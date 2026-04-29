@@ -4,22 +4,22 @@
 /// Run with `moon run src/cmd/main` from the project root.
 /// 
 /// 
-async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
-  let instance = @lib.create_webgpu_instance(@lib.navigatorGPU())
+async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+  let instance = @wgpu.create_webgpu_instance(@wgpu.navigatorGPU())
   let adapter = instance.request_adapter()
   let device = adapter.request_device()
   let format = instance.get_preferred_canvas_format()
-  let webgpu_canvas_context = @lib.create_canvas_context(
-    @lib.canvas_getContext(canvas),
+  let webgpu_canvas_context = @wgpu.create_canvas_context(
+    @wgpu.canvas_getContext(canvas),
   )
   webgpu_canvas_context.configure(device, format)
   let queue = device.get_queue()
-  let webgpu_context = @lib.create_webgpu_context(
+  let webgpu_context = @wgpu.create_webgpu_context(
     device, webgpu_canvas_context, format, queue,
   )
-  match @lib.create_renderer(webgpu_context) {
+  match @renderer.create_renderer(webgpu_context) {
     Some(renderer) => {
-      @lib.render_frame(renderer)
+      @renderer.render_frame(renderer)
       println("WebGPU triangle rendered successfully!")
     }
     None => println("Failed to create renderer")
@@ -28,7 +28,7 @@ async fn create_webgpu_renderer_async(canvas : @lib.HTMLCanvasElement) -> Unit {
 
 ///|
 pub fn create_webgpu_renderer(
-  canvas : @lib.HTMLCanvasElement,
+  canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
   @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
 }
