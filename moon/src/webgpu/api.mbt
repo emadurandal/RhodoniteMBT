@@ -158,7 +158,7 @@ pub fn create_render_pass_descriptor(
 pub fn create_render_pipeline_descriptor(
   vertex~ : GPUShaderModule,
   fragment~ : GPUShaderModule,
-  topology~ : String,
+  topology~ : @enums.GPUPrimitiveTopology,
   formats~ : Array[String],
 ) -> WebGPURenderPipelineDescriptor {
   @raw.create_render_pipeline_descriptor(
@@ -175,7 +175,7 @@ pub fn shaderModule_release(shaderModule : GPUShaderModule) -> Unit {
 }
 
 ///|
-pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
+pub fn renderPipeline_release(pipeline : WebGPURenderPipeline) -> Unit {
   @raw.renderPipeline_release(pipeline.raw)
 }
 

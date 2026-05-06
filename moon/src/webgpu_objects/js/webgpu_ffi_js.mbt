@@ -57,10 +57,13 @@ extern "js" fn device_createRenderPipeline(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
-  topology : String,
+  topologyTag : Int,
   formats : Array[String],
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topology, formats) => {
+  #| (device, vertex, fragment, topologyTag, formats) => {
+  #|   const TOPOLOGY_NAMES = [
+  #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
+  #|   ];
   #|   return device.createRenderPipeline({
   #|     layout: 'auto',
   #|     vertex: {
@@ -73,7 +76,7 @@ extern "js" fn device_createRenderPipeline(
   #|       targets: formats.map(format => ({ format }))
   #|     },
   #|     primitive: {
-  #|       topology
+  #|       topology: TOPOLOGY_NAMES[topologyTag]
   #|     }
   #|   });
   #| }

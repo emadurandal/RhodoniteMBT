@@ -3,7 +3,7 @@ pub(all) struct WebGPURenderer {
   context : @w.WebGPUCanvasContext
   device : @w.WebGPUDevice
   queue : @w.WebGPUQueue
-  pipeline : @w.GPURenderPipeline
+  pipeline : @w.WebGPURenderPipeline
 }
 
 ///|
@@ -17,13 +17,13 @@ pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
 fn create_pipeline(
   device : @w.WebGPUDevice,
   format : String,
-) -> @w.GPURenderPipeline {
+) -> @w.WebGPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
   let pipeline = device.create_render_pipeline(
     @w.create_render_pipeline_descriptor(
       vertex=shader,
       fragment=shader,
-      topology="triangle-list",
+      topology=@w.GPUPrimitiveTopology::TriangleList,
       formats=[format],
     ),
   )

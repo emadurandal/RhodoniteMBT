@@ -33,14 +33,14 @@ pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
-  topology~ : String,
+  topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
 ) -> GPURenderPipeline {
   device_createRenderPipeline(
     device.device,
     vertex,
     fragment,
-    topology,
+    topology.to_js_tag(),
     formats,
   )
 }

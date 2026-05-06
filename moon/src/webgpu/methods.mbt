@@ -56,7 +56,7 @@ pub fn WebGPUDevice::create_shader_module(
 pub fn WebGPUDevice::create_render_pipeline(
   self : WebGPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
-) -> GPURenderPipeline {
+) -> WebGPURenderPipeline {
   let (vertex, fragment, topology, formats) = @raw.webgpu_render_pipeline_descriptor_get(
     descriptor,
   )
@@ -173,13 +173,13 @@ pub fn WebGPUQueue::release(self : WebGPUQueue) -> Unit {
 ///|
 pub fn WebGPURenderPassEncoder::set_pipeline(
   self : WebGPURenderPassEncoder,
-  pipeline : GPURenderPipeline,
+  pipeline : WebGPURenderPipeline,
 ) -> Unit {
   @raw.webgpu_render_pass_encoder_set_pipeline(self.raw, pipeline.raw)
 }
 
 ///|
-pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
+pub fn WebGPURenderPipeline::release(self : WebGPURenderPipeline) -> Unit {
   renderPipeline_release(self)
 }
 

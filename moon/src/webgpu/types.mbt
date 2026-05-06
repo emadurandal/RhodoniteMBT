@@ -1,5 +1,10 @@
 ///|
-pub using @enums {type GPULoadOp, type GPUStoreOp, type GPUColor}
+pub using @enums {
+  type GPULoadOp,
+  type GPUStoreOp,
+  type GPUColor,
+  type GPUPrimitiveTopology,
+}
 
 ///|
 pub using @raw {
@@ -64,7 +69,7 @@ pub(all) struct WebGPUTexture {
 }
 
 ///|
-pub(all) struct GPURenderPipeline {
+pub(all) struct WebGPURenderPipeline {
   raw : @raw.GPURenderPipeline
 }
 

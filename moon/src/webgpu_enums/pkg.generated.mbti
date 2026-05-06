@@ -18,6 +18,15 @@ pub(all) enum GPULoadOp {
   Clear
 } derive(Eq)
 
+pub(all) enum GPUPrimitiveTopology {
+  PointList
+  LineList
+  LineStrip
+  TriangleList
+  TriangleStrip
+} derive(Eq)
+pub fn GPUPrimitiveTopology::to_js_tag(Self) -> Int
+
 pub(all) enum GPUStoreOp {
   Store
   Discard
