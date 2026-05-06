@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build:moon": "cd moon && moon build --target js",
+    "build:moon": "cd moon-examples && moon build --target js",
     "run:wgpu": "bash scripts/run-wgpu-sdl3.sh",
     "dev": "npm run build:moon && vite",
     "build": "npm run build:moon && tsc && vite build",

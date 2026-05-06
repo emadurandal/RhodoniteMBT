@@ -1,7 +1,7 @@
 ///|
 /// Entry point for the CLI or runnable program in this template.
 /// Keep main focused; move logic into the library package.
-/// Run with `moon run src/cmd/main` from the project root.
+/// Run with `moon run src/js/main` from the moon-examples module root.
 /// 
 /// 
 async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
