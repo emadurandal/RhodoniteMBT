@@ -2,5 +2,5 @@
 
 ///|
 fn main {
-  println("emadurandal/WebGPU wasm")
+  println("emadurandal/WebGPU-examples wasm")
 }

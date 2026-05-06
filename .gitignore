@@ -35,3 +35,4 @@ moon/target/js/release/*
 moon/target/js/release/build/*
 !moon/target/js/release/build/main/
 moon/_build
+moon-examples/_build

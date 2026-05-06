@@ -1,5 +1,5 @@
 import {
-  "emadurandal/WebGPU/cmd/common" @renderer,
+  "emadurandal/WebGPU-examples/common" @renderer,
   "emadurandal/WebGPU/webgpu" @wgpu,
   "moonbitlang/async/js_async",
 }
