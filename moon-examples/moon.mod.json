@@ -6,7 +6,7 @@
       "path": "../moon"
     },
     "moonbitlang/async": "0.18.1",
-    "Milky2018/wgpu_mbt": "0.12.4",
+    "Milky2018/wgpu_mbt": "0.12.6",
     "Kaida-Amethyst/sdl3": "0.1.1"
   },
   "readme": "README.mbt.md",
