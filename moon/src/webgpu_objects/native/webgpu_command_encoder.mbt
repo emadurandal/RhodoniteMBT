@@ -20,17 +20,27 @@ pub fn webgpu_command_encoder_begin_render_pass(
     Some(attachment) => attachment
     None => abort("native render pass requires a color attachment")
   }
-  let (view, clear_value, _load_op, _store_op) = attachment.get()
-  let pass = match clear_value {
-    Some(c) =>
-      encoder.encoder.raw.begin_render_pass_color_clear(
-        view.raw,
-        Float::from_double(c.r),
-        Float::from_double(c.g),
-        Float::from_double(c.b),
-        Float::from_double(c.a),
+  let (view, clear_value, load_op, store_op) = attachment.get()
+  let pass = match (load_op, store_op) {
+    (GPULoadOp::Load, GPUStoreOp::Store) =>
+      encoder.encoder.raw.begin_render_pass_color_load(view.raw)
+    (GPULoadOp::Clear, GPUStoreOp::Store) => {
+      let (r, g, b, a) = match clear_value {
+        Some(c) =>
+          (
+            Float::from_double(c.r),
+            Float::from_double(c.g),
+            Float::from_double(c.b),
+            Float::from_double(c.a),
+          )
+        None => (0.0, 0.0, 0.0, 1.0)
+      }
+      encoder.encoder.raw.begin_render_pass_color_clear(view.raw, r, g, b, a)
+    }
+    (_, GPUStoreOp::Discard) =>
+      abort(
+        "native WebGPU: GPUStoreOp::Discard for a color attachment is not implemented yet",
       )
-    None => encoder.encoder.raw.begin_render_pass_color_load(view.raw)
   }
   WebGPURenderPassEncoder::new(GPURenderPassEncoder::{ raw: pass })
 }

@@ -13,6 +13,8 @@ pub using @raw {
   type GPUCommandBuffer,
   type HTMLCanvasElement,
   type WebGPUColor,
+  type GPULoadOp,
+  type GPUStoreOp,
   type WebGPURenderPassDepthStencilAttachment,
   type WebGPURenderPassColorAttachment,
   type WebGPURenderPassDescriptor,
