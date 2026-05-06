@@ -17,7 +17,7 @@ pub fn create_native_webgpu_instance() -> WebGPUInstance raise
 
 pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_enums.GPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
 
-pub fn create_render_pass_descriptor(colorAttachments~ : Array[RenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> @webgpu_objects.WebGPURenderPassDescriptor
+pub fn create_render_pass_descriptor(colorAttachments~ : Array[RenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
 
 pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : String, formats~ : Array[String]) -> @webgpu_objects.WebGPURenderPipelineDescriptor
 
@@ -82,7 +82,7 @@ pub fn WebGPUCanvasContext::release(Self) -> Unit
 pub(all) struct WebGPUCommandEncoder {
   raw : @webgpu_objects.WebGPUCommandEncoder
 }
-pub fn WebGPUCommandEncoder::begin_render_pass(Self, @webgpu_objects.WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
+pub fn WebGPUCommandEncoder::begin_render_pass(Self, WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
 pub fn WebGPUCommandEncoder::finish(Self) -> @webgpu_objects.GPUCommandBuffer
 pub fn WebGPUCommandEncoder::release(Self) -> Unit
 
@@ -115,6 +115,11 @@ pub(all) struct WebGPUQueue {
 }
 pub fn WebGPUQueue::release(Self) -> Unit
 pub fn WebGPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
+
+pub(all) struct WebGPURenderPassDescriptor {
+  color_attachments : Array[RenderPassColorAttachment?]
+  depth_stencil_attachment : @webgpu_objects.WebGPURenderPassDepthStencilAttachment?
+}
 
 pub(all) struct WebGPURenderPassEncoder {
   raw : @webgpu_objects.WebGPURenderPassEncoder
@@ -163,8 +168,6 @@ pub using @webgpu_objects {type HTMLCanvasElement}
 pub using @webgpu_objects {type WebGPURenderPassColorAttachment}
 
 pub using @webgpu_objects {type WebGPURenderPassDepthStencilAttachment}
-
-pub using @webgpu_objects {type WebGPURenderPassDescriptor}
 
 pub using @webgpu_objects {type WebGPURenderPipelineDescriptor}
 

@@ -49,16 +49,17 @@ fn render_frame_with_options(
   let texture = renderer.context.get_current_texture()
   let view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
-  let render_pass = encoder.begin_render_pass(
-    @w.create_render_pass_descriptor(colorAttachments=[
+  let render_pass = encoder.begin_render_pass({
+    color_attachments: [
       Some({
         view,
         clear_value: Some(clearColor),
         load_op: @w.GPULoadOp::Clear,
         store_op: @w.GPUStoreOp::Store,
       }),
-    ]),
-  )
+    ],
+    depth_stencil_attachment: None,
+  })
   render_pass.set_pipeline(renderer.pipeline)
   render_pass.draw(vertex_count)
   render_pass.end()

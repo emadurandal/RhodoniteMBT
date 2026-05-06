@@ -17,7 +17,6 @@ pub using @raw {
   type HTMLCanvasElement,
   type WebGPURenderPassDepthStencilAttachment,
   type WebGPURenderPassColorAttachment,
-  type WebGPURenderPassDescriptor,
   type WebGPURenderPipelineDescriptor,
 }
 
@@ -27,6 +26,12 @@ pub(all) struct RenderPassColorAttachment {
   clear_value : GPUColor?
   load_op : GPULoadOp
   store_op : GPUStoreOp
+}
+
+///|
+pub(all) struct WebGPURenderPassDescriptor {
+  color_attachments : Array[RenderPassColorAttachment?]
+  depth_stencil_attachment : WebGPURenderPassDepthStencilAttachment?
 }
 
 ///|

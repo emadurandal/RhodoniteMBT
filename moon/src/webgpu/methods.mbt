@@ -141,7 +141,8 @@ pub fn WebGPUCommandEncoder::begin_render_pass(
   self : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> WebGPURenderPassEncoder {
-  { raw: @raw.webgpu_command_encoder_begin_render_pass(self.raw, descriptor) }
+  let raw_desc = render_pass_descriptor_to_raw(descriptor)
+  { raw: @raw.webgpu_command_encoder_begin_render_pass(self.raw, raw_desc) }
 }
 
 ///|

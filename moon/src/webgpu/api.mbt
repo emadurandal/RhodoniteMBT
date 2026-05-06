@@ -124,20 +124,34 @@ fn render_pass_color_attachment_from_desc(
 }
 
 ///|
-pub fn create_render_pass_descriptor(
-  colorAttachments~ : Array[RenderPassColorAttachment?],
-  depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
-) -> WebGPURenderPassDescriptor {
-  let mapped = colorAttachments.map(fn(opt) {
+fn render_pass_descriptor_to_raw(
+  desc : WebGPURenderPassDescriptor,
+) -> @raw.WebGPURenderPassDescriptor {
+  let mapped = desc.color_attachments.map(fn(opt) {
     match opt {
       Some(att) => Some(render_pass_color_attachment_from_desc(att))
       None => None
     }
   })
-  @raw.create_render_pass_descriptor(
-    colorAttachments=mapped,
-    depthStencilAttachment?,
-  )
+  match desc.depth_stencil_attachment {
+    Some(ds) =>
+      @raw.create_render_pass_descriptor(
+        colorAttachments=mapped,
+        depthStencilAttachment=ds,
+      )
+    None => @raw.create_render_pass_descriptor(colorAttachments=mapped)
+  }
+}
+
+///|
+pub fn create_render_pass_descriptor(
+  colorAttachments~ : Array[RenderPassColorAttachment?],
+  depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
+) -> WebGPURenderPassDescriptor {
+  {
+    color_attachments: colorAttachments,
+    depth_stencil_attachment: depthStencilAttachment,
+  }
 }
 
 ///|
