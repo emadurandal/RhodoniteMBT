@@ -51,14 +51,12 @@ fn render_frame_with_options(
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass(
     @w.create_render_pass_descriptor(colorAttachments=[
-      Some(
-        @w.create_render_pass_color_attachment(
-          view~,
-          clearValue=clearColor,
-          loadOp=@w.GPULoadOp::Clear,
-          storeOp=@w.GPUStoreOp::Store,
-        ),
-      ),
+      Some({
+        view,
+        clearValue: Some(clearColor),
+        loadOp: @w.GPULoadOp::Clear,
+        storeOp: @w.GPUStoreOp::Store,
+      }),
     ]),
   )
   render_pass.set_pipeline(renderer.pipeline)

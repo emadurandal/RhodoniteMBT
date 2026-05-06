@@ -17,7 +17,7 @@ pub fn create_native_webgpu_instance() -> WebGPUInstance raise
 
 pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_enums.GPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
 
-pub fn create_render_pass_descriptor(colorAttachments~ : Array[@webgpu_objects.WebGPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> @webgpu_objects.WebGPURenderPassDescriptor
+pub fn create_render_pass_descriptor(colorAttachments~ : Array[RenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> @webgpu_objects.WebGPURenderPassDescriptor
 
 pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : String, formats~ : Array[String]) -> @webgpu_objects.WebGPURenderPipelineDescriptor
 
@@ -56,6 +56,13 @@ pub(all) struct GPURenderPipeline {
   raw : @webgpu_objects.GPURenderPipeline
 }
 pub fn GPURenderPipeline::release(Self) -> Unit
+
+pub(all) struct RenderPassColorAttachment {
+  view : @webgpu_objects.GPUTextureView
+  clearValue : @webgpu_enums.GPUColor?
+  loadOp : @webgpu_enums.GPULoadOp
+  storeOp : @webgpu_enums.GPUStoreOp
+}
 
 pub(all) struct WebGPUAdapter {
   raw : @webgpu_objects.WebGPUAdapter

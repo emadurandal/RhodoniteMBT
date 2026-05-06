@@ -22,6 +22,14 @@ pub using @raw {
 }
 
 ///|
+pub(all) struct RenderPassColorAttachment {
+  view : GPUTextureView
+  clearValue : GPUColor?
+  loadOp : GPULoadOp
+  storeOp : GPUStoreOp
+}
+
+///|
 pub(all) struct WebGPUInstance {
   raw : @raw.WebGPUInstance
 }
