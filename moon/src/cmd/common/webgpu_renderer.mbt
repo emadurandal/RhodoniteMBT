@@ -1,13 +1,13 @@
 ///|
 pub(all) struct WebGPURenderer {
-  context : @w.WebGPUCanvasContext
-  device : @w.WebGPUDevice
-  queue : @w.WebGPUQueue
-  pipeline : @w.WebGPURenderPipeline
+  context : @w.GPUCanvasContext
+  device : @w.GPUDevice
+  queue : @w.GPUQueue
+  pipeline : @w.GPURenderPipeline
 }
 
 ///|
-pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
+pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let pipeline = create_pipeline(device, format)
   Some({ context: canvas_context, device, queue, pipeline })
@@ -15,9 +15,9 @@ pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
 
 ///|
 fn create_pipeline(
-  device : @w.WebGPUDevice,
+  device : @w.GPUDevice,
   format : String,
-) -> @w.WebGPURenderPipeline {
+) -> @w.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
   let pipeline = device.create_render_pipeline(
     @w.create_render_pipeline_descriptor(

@@ -1,62 +1,56 @@
 ///|
-pub fn WebGPUInstance::get_preferred_canvas_format(
-  self : WebGPUInstance,
-) -> String {
+pub fn GPUInstance::get_preferred_canvas_format(self : GPUInstance) -> String {
   @raw.webgpu_instance_get_preferred_canvas_format(self.raw)
 }
 
 ///|
-pub async fn WebGPUInstance::request_adapter(
-  self : WebGPUInstance,
-) -> WebGPUAdapter {
+pub async fn GPUInstance::request_adapter(self : GPUInstance) -> GPUAdapter {
   { raw: @raw.webgpu_instance_request_adapter(self.raw) }
 }
 
 ///|
-pub fn WebGPUInstance::process_events(self : WebGPUInstance) -> Unit {
+pub fn GPUInstance::process_events(self : GPUInstance) -> Unit {
   webgpu_instance_process_events(self)
 }
 
 ///|
-pub fn WebGPUInstance::release(self : WebGPUInstance) -> Unit {
+pub fn GPUInstance::release(self : GPUInstance) -> Unit {
   webgpu_instance_release(self)
 }
 
 ///|
-pub async fn WebGPUAdapter::request_device(
-  self : WebGPUAdapter,
-) -> WebGPUDevice {
+pub async fn GPUAdapter::request_device(self : GPUAdapter) -> GPUDevice {
   { raw: @raw.webgpu_adapter_request_device(self.raw) }
 }
 
 ///|
-pub fn WebGPUAdapter::release(self : WebGPUAdapter) -> Unit {
+pub fn GPUAdapter::release(self : GPUAdapter) -> Unit {
   webgpu_adapter_release(self)
 }
 
 ///|
-pub fn WebGPUDevice::get(self : WebGPUDevice) -> GPUDevice {
+pub fn GPUDevice::get(self : GPUDevice) -> @raw.GPUDevice {
   @raw.webgpu_device_get(self.raw)
 }
 
 ///|
-pub fn WebGPUDevice::get_queue(self : WebGPUDevice) -> WebGPUQueue {
+pub fn GPUDevice::get_queue(self : GPUDevice) -> GPUQueue {
   { raw: @raw.webgpu_device_get_queue(self.raw) }
 }
 
 ///|
-pub fn WebGPUDevice::create_shader_module(
-  self : WebGPUDevice,
+pub fn GPUDevice::create_shader_module(
+  self : GPUDevice,
   code : String,
 ) -> GPUShaderModule {
   @raw.webgpu_device_create_shader_module(self.raw, code)
 }
 
 ///|
-pub fn WebGPUDevice::create_render_pipeline(
-  self : WebGPUDevice,
+pub fn GPUDevice::create_render_pipeline(
+  self : GPUDevice,
   descriptor : WebGPURenderPipelineDescriptor,
-) -> WebGPURenderPipeline {
+) -> GPURenderPipeline {
   let (vertex, fragment, topology, formats) = @raw.webgpu_render_pipeline_descriptor_get(
     descriptor,
   )
@@ -72,26 +66,24 @@ pub fn WebGPUDevice::create_render_pipeline(
 }
 
 ///|
-pub fn WebGPUDevice::create_command_encoder(
-  self : WebGPUDevice,
-) -> WebGPUCommandEncoder {
+pub fn GPUDevice::create_command_encoder(self : GPUDevice) -> GPUCommandEncoder {
   { raw: @raw.webgpu_device_create_command_encoder(self.raw) }
 }
 
 ///|
-pub fn WebGPUDevice::poll(self : WebGPUDevice, wait? : Bool = false) -> Bool {
+pub fn GPUDevice::poll(self : GPUDevice, wait? : Bool = false) -> Bool {
   webgpu_device_poll(self, wait~)
 }
 
 ///|
-pub fn WebGPUDevice::release(self : WebGPUDevice) -> Unit {
+pub fn GPUDevice::release(self : GPUDevice) -> Unit {
   webgpu_device_release(self)
 }
 
 ///|
-pub fn WebGPUCanvasContext::configure(
-  self : WebGPUCanvasContext,
-  device : WebGPUDevice,
+pub fn GPUCanvasContext::configure(
+  self : GPUCanvasContext,
+  device : GPUDevice,
   format : String,
 ) -> Unit {
   @raw.webgpu_canvas_context_configure(
@@ -102,101 +94,99 @@ pub fn WebGPUCanvasContext::configure(
 }
 
 ///|
-pub fn WebGPUCanvasContext::get_format(self : WebGPUCanvasContext) -> String {
+pub fn GPUCanvasContext::get_format(self : GPUCanvasContext) -> String {
   webgpu_canvas_context_get_format(self)
 }
 
 ///|
-pub fn WebGPUCanvasContext::get_current_texture(
-  self : WebGPUCanvasContext,
-) -> WebGPUTexture {
+pub fn GPUCanvasContext::get_current_texture(
+  self : GPUCanvasContext,
+) -> GPUTexture {
   { raw: @raw.webgpu_canvas_context_get_current_texture(self.raw) }
 }
 
 ///|
-pub fn WebGPUCanvasContext::present(self : WebGPUCanvasContext) -> Unit {
+pub fn GPUCanvasContext::present(self : GPUCanvasContext) -> Unit {
   @raw.webgpu_canvas_context_present(self.raw)
 }
 
 ///|
-pub fn WebGPUCanvasContext::release(self : WebGPUCanvasContext) -> Unit {
+pub fn GPUCanvasContext::release(self : GPUCanvasContext) -> Unit {
   webgpu_canvas_context_release(self)
 }
 
 ///|
-pub fn WebGPUContext::get(
-  self : WebGPUContext,
-) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) {
+pub fn GPUContext::get(
+  self : GPUContext,
+) -> (GPUDevice, GPUCanvasContext, String, GPUQueue) {
   let (device, context, format, queue) = @raw.webgpu_context_get(self.raw)
   ({ raw: device }, { raw: context }, format, { raw: queue })
 }
 
 ///|
-pub fn WebGPUTexture::create_view(self : WebGPUTexture) -> GPUTextureView {
+pub fn GPUTexture::create_view(self : GPUTexture) -> GPUTextureView {
   @raw.webgpu_texture_create_view(self.raw)
 }
 
 ///|
-pub fn WebGPUCommandEncoder::begin_render_pass(
-  self : WebGPUCommandEncoder,
-  descriptor : WebGPURenderPassDescriptor,
-) -> WebGPURenderPassEncoder {
+pub fn GPUCommandEncoder::begin_render_pass(
+  self : GPUCommandEncoder,
+  descriptor : GPURenderPassDescriptor,
+) -> GPURenderPassEncoder {
   let raw_desc = render_pass_descriptor_to_raw(descriptor)
   { raw: @raw.webgpu_command_encoder_begin_render_pass(self.raw, raw_desc) }
 }
 
 ///|
-pub fn WebGPUCommandEncoder::finish(
-  self : WebGPUCommandEncoder,
-) -> GPUCommandBuffer {
+pub fn GPUCommandEncoder::finish(self : GPUCommandEncoder) -> GPUCommandBuffer {
   @raw.webgpu_command_encoder_finish(self.raw)
 }
 
 ///|
-pub fn WebGPUCommandEncoder::release(self : WebGPUCommandEncoder) -> Unit {
+pub fn GPUCommandEncoder::release(self : GPUCommandEncoder) -> Unit {
   @raw.webgpu_command_encoder_release(self.raw)
 }
 
 ///|
-pub fn WebGPUQueue::submit(
-  self : WebGPUQueue,
+pub fn GPUQueue::submit(
+  self : GPUQueue,
   command_buffer : GPUCommandBuffer,
 ) -> Unit {
   @raw.webgpu_queue_submit(self.raw, command_buffer)
 }
 
 ///|
-pub fn WebGPUQueue::release(self : WebGPUQueue) -> Unit {
+pub fn GPUQueue::release(self : GPUQueue) -> Unit {
   webgpu_queue_release(self)
 }
 
 ///|
-pub fn WebGPURenderPassEncoder::set_pipeline(
-  self : WebGPURenderPassEncoder,
-  pipeline : WebGPURenderPipeline,
+pub fn GPURenderPassEncoder::set_pipeline(
+  self : GPURenderPassEncoder,
+  pipeline : GPURenderPipeline,
 ) -> Unit {
   @raw.webgpu_render_pass_encoder_set_pipeline(self.raw, pipeline.raw)
 }
 
 ///|
-pub fn WebGPURenderPipeline::release(self : WebGPURenderPipeline) -> Unit {
+pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
   renderPipeline_release(self)
 }
 
 ///|
-pub fn WebGPURenderPassEncoder::draw(
-  self : WebGPURenderPassEncoder,
+pub fn GPURenderPassEncoder::draw(
+  self : GPURenderPassEncoder,
   vertex_count : Int,
 ) -> Unit {
   @raw.webgpu_render_pass_encoder_draw(self.raw, vertex_count)
 }
 
 ///|
-pub fn WebGPURenderPassEncoder::end(self : WebGPURenderPassEncoder) -> Unit {
+pub fn GPURenderPassEncoder::end(self : GPURenderPassEncoder) -> Unit {
   @raw.webgpu_render_pass_encoder_end(self.raw)
 }
 
 ///|
-pub fn WebGPURenderPassEncoder::release(self : WebGPURenderPassEncoder) -> Unit {
+pub fn GPURenderPassEncoder::release(self : GPURenderPassEncoder) -> Unit {
   @raw.webgpu_render_pass_encoder_release(self.raw)
 }

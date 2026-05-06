@@ -9,159 +9,145 @@ import {
 // Values
 pub fn canvas_getContext(@webgpu_objects.HTMLCanvasElement) -> @webgpu_objects.GPUCanvasContext
 
-pub fn create_canvas_context(@webgpu_objects.GPUCanvasContext) -> WebGPUCanvasContext
+pub fn create_canvas_context(@webgpu_objects.GPUCanvasContext) -> GPUCanvasContext
 
-pub fn create_metal_canvas_context(WebGPUInstance, @webgpu_objects.HTMLCanvasElement, Int, Int) -> WebGPUCanvasContext
+pub fn create_metal_canvas_context(GPUInstance, @webgpu_objects.HTMLCanvasElement, Int, Int) -> GPUCanvasContext
 
-pub fn create_native_webgpu_instance() -> WebGPUInstance raise
+pub fn create_native_webgpu_instance() -> GPUInstance raise
 
 pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_enums.GPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
 
-pub fn create_render_pass_descriptor(colorAttachments~ : Array[WebGPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
+pub fn create_render_pass_descriptor(colorAttachments~ : Array[GPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> GPURenderPassDescriptor
 
 pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String]) -> @webgpu_objects.WebGPURenderPipelineDescriptor
 
-pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) -> WebGPUContext
+pub fn create_webgpu_context(GPUDevice, GPUCanvasContext, String, GPUQueue) -> GPUContext
 
-pub fn create_webgpu_instance(@webgpu_objects.GPU) -> WebGPUInstance
+pub fn create_webgpu_instance(@webgpu_objects.GPU) -> GPUInstance
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
-pub fn renderPipeline_release(WebGPURenderPipeline) -> Unit
+pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 
 pub fn shaderModule_release(@webgpu_objects.GPUShaderModule) -> Unit
 
 pub fn textureView_release(@webgpu_objects.GPUTextureView) -> Unit
 
-pub fn webgpu_adapter_release(WebGPUAdapter) -> Unit
+pub fn webgpu_adapter_release(GPUAdapter) -> Unit
 
-pub fn webgpu_canvas_context_get_format(WebGPUCanvasContext) -> String
+pub fn webgpu_canvas_context_get_format(GPUCanvasContext) -> String
 
-pub fn webgpu_canvas_context_release(WebGPUCanvasContext) -> Unit
+pub fn webgpu_canvas_context_release(GPUCanvasContext) -> Unit
 
-pub fn webgpu_device_poll(WebGPUDevice, wait? : Bool) -> Bool
+pub fn webgpu_device_poll(GPUDevice, wait? : Bool) -> Bool
 
-pub fn webgpu_device_release(WebGPUDevice) -> Unit
+pub fn webgpu_device_release(GPUDevice) -> Unit
 
-pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
+pub fn webgpu_instance_process_events(GPUInstance) -> Unit
 
-pub fn webgpu_instance_release(WebGPUInstance) -> Unit
+pub fn webgpu_instance_release(GPUInstance) -> Unit
 
-pub fn webgpu_queue_release(WebGPUQueue) -> Unit
+pub fn webgpu_queue_release(GPUQueue) -> Unit
 
 // Errors
 
 // Types and methods
-pub(all) struct WebGPUAdapter {
+pub(all) struct GPUAdapter {
   raw : @webgpu_objects.WebGPUAdapter
 }
-pub fn WebGPUAdapter::release(Self) -> Unit
-pub async fn WebGPUAdapter::request_device(Self) -> WebGPUDevice
+pub fn GPUAdapter::release(Self) -> Unit
+pub async fn GPUAdapter::request_device(Self) -> GPUDevice
 
-pub(all) struct WebGPUCanvasContext {
+pub(all) struct GPUCanvasContext {
   raw : @webgpu_objects.WebGPUCanvasContext
 }
-pub fn WebGPUCanvasContext::configure(Self, WebGPUDevice, String) -> Unit
-pub fn WebGPUCanvasContext::get_current_texture(Self) -> WebGPUTexture
-pub fn WebGPUCanvasContext::get_format(Self) -> String
-pub fn WebGPUCanvasContext::present(Self) -> Unit
-pub fn WebGPUCanvasContext::release(Self) -> Unit
+pub fn GPUCanvasContext::configure(Self, GPUDevice, String) -> Unit
+pub fn GPUCanvasContext::get_current_texture(Self) -> GPUTexture
+pub fn GPUCanvasContext::get_format(Self) -> String
+pub fn GPUCanvasContext::present(Self) -> Unit
+pub fn GPUCanvasContext::release(Self) -> Unit
 
-pub(all) struct WebGPUCommandEncoder {
+pub(all) struct GPUCommandEncoder {
   raw : @webgpu_objects.WebGPUCommandEncoder
 }
-pub fn WebGPUCommandEncoder::begin_render_pass(Self, WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
-pub fn WebGPUCommandEncoder::finish(Self) -> @webgpu_objects.GPUCommandBuffer
-pub fn WebGPUCommandEncoder::release(Self) -> Unit
+pub fn GPUCommandEncoder::begin_render_pass(Self, GPURenderPassDescriptor) -> GPURenderPassEncoder
+pub fn GPUCommandEncoder::finish(Self) -> @webgpu_objects.GPUCommandBuffer
+pub fn GPUCommandEncoder::release(Self) -> Unit
 
-pub(all) struct WebGPUContext {
+pub(all) struct GPUContext {
   raw : @webgpu_objects.WebGPUContext
 }
-pub fn WebGPUContext::get(Self) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)
+pub fn GPUContext::get(Self) -> (GPUDevice, GPUCanvasContext, String, GPUQueue)
 
-pub(all) struct WebGPUDevice {
+pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
-pub fn WebGPUDevice::create_command_encoder(Self) -> WebGPUCommandEncoder
-pub fn WebGPUDevice::create_render_pipeline(Self, @webgpu_objects.WebGPURenderPipelineDescriptor) -> WebGPURenderPipeline
-pub fn WebGPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
-pub fn WebGPUDevice::get(Self) -> @webgpu_objects.GPUDevice
-pub fn WebGPUDevice::get_queue(Self) -> WebGPUQueue
-pub fn WebGPUDevice::poll(Self, wait? : Bool) -> Bool
-pub fn WebGPUDevice::release(Self) -> Unit
+pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
+pub fn GPUDevice::create_render_pipeline(Self, @webgpu_objects.WebGPURenderPipelineDescriptor) -> GPURenderPipeline
+pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
+pub fn GPUDevice::get(Self) -> @webgpu_objects.GPUDevice
+pub fn GPUDevice::get_queue(Self) -> GPUQueue
+pub fn GPUDevice::poll(Self, wait? : Bool) -> Bool
+pub fn GPUDevice::release(Self) -> Unit
 
-pub(all) struct WebGPUInstance {
+pub(all) struct GPUInstance {
   raw : @webgpu_objects.WebGPUInstance
 }
-pub fn WebGPUInstance::get_preferred_canvas_format(Self) -> String
-pub fn WebGPUInstance::process_events(Self) -> Unit
-pub fn WebGPUInstance::release(Self) -> Unit
-pub async fn WebGPUInstance::request_adapter(Self) -> WebGPUAdapter
+pub fn GPUInstance::get_preferred_canvas_format(Self) -> String
+pub fn GPUInstance::process_events(Self) -> Unit
+pub fn GPUInstance::release(Self) -> Unit
+pub async fn GPUInstance::request_adapter(Self) -> GPUAdapter
 
-pub(all) struct WebGPUQueue {
+pub(all) struct GPUQueue {
   raw : @webgpu_objects.WebGPUQueue
 }
-pub fn WebGPUQueue::release(Self) -> Unit
-pub fn WebGPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
+pub fn GPUQueue::release(Self) -> Unit
+pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
 
-pub(all) struct WebGPURenderPassColorAttachment {
+pub(all) struct GPURenderPassColorAttachment {
   view : @webgpu_objects.GPUTextureView
   clear_value : @webgpu_enums.GPUColor?
   load_op : @webgpu_enums.GPULoadOp
   store_op : @webgpu_enums.GPUStoreOp
 }
 
-pub(all) struct WebGPURenderPassDescriptor {
-  color_attachments : Array[WebGPURenderPassColorAttachment?]
+pub(all) struct GPURenderPassDescriptor {
+  color_attachments : Array[GPURenderPassColorAttachment?]
   depth_stencil_attachment : @webgpu_objects.WebGPURenderPassDepthStencilAttachment?
 }
 
-pub(all) struct WebGPURenderPassEncoder {
+pub(all) struct GPURenderPassEncoder {
   raw : @webgpu_objects.WebGPURenderPassEncoder
 }
-pub fn WebGPURenderPassEncoder::draw(Self, Int) -> Unit
-pub fn WebGPURenderPassEncoder::end(Self) -> Unit
-pub fn WebGPURenderPassEncoder::release(Self) -> Unit
-pub fn WebGPURenderPassEncoder::set_pipeline(Self, WebGPURenderPipeline) -> Unit
+pub fn GPURenderPassEncoder::draw(Self, Int) -> Unit
+pub fn GPURenderPassEncoder::end(Self) -> Unit
+pub fn GPURenderPassEncoder::release(Self) -> Unit
+pub fn GPURenderPassEncoder::set_pipeline(Self, GPURenderPipeline) -> Unit
 
-pub(all) struct WebGPURenderPipeline {
+pub(all) struct GPURenderPipeline {
   raw : @webgpu_objects.GPURenderPipeline
 }
-pub fn WebGPURenderPipeline::release(Self) -> Unit
+pub fn GPURenderPipeline::release(Self) -> Unit
 
-pub(all) struct WebGPUTexture {
+pub(all) struct GPUTexture {
   raw : @webgpu_objects.WebGPUTexture
 }
-pub fn WebGPUTexture::create_view(Self) -> @webgpu_objects.GPUTextureView
+pub fn GPUTexture::create_view(Self) -> @webgpu_objects.GPUTextureView
 
 // Type aliases
 pub using @webgpu_objects {type GPU}
-
-pub using @webgpu_objects {type GPUAdapter}
-
-pub using @webgpu_objects {type GPUCanvasContext}
 
 pub using @webgpu_enums {type GPUColor}
 
 pub using @webgpu_objects {type GPUCommandBuffer}
 
-pub using @webgpu_objects {type GPUCommandEncoder}
-
-pub using @webgpu_objects {type GPUDevice}
-
 pub using @webgpu_enums {type GPULoadOp}
 
 pub using @webgpu_enums {type GPUPrimitiveTopology}
 
-pub using @webgpu_objects {type GPUQueue}
-
-pub using @webgpu_objects {type GPURenderPassEncoder}
-
 pub using @webgpu_objects {type GPUShaderModule}
 
 pub using @webgpu_enums {type GPUStoreOp}
-
-pub using @webgpu_objects {type GPUTexture}
 
 pub using @webgpu_objects {type GPUTextureView}
 

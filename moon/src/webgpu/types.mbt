@@ -9,15 +9,8 @@ pub using @enums {
 ///|
 pub using @raw {
   type GPU,
-  type GPUAdapter,
-  type GPUDevice,
-  type GPUQueue,
-  type GPUCanvasContext,
-  type GPUTexture,
   type GPUTextureView,
   type GPUShaderModule,
-  type GPUCommandEncoder,
-  type GPURenderPassEncoder,
   type GPUCommandBuffer,
   type HTMLCanvasElement,
   type WebGPURenderPassDepthStencilAttachment,
@@ -25,7 +18,7 @@ pub using @raw {
 }
 
 ///|
-pub(all) struct WebGPURenderPassColorAttachment {
+pub(all) struct GPURenderPassColorAttachment {
   view : GPUTextureView
   clear_value : GPUColor?
   load_op : GPULoadOp
@@ -33,57 +26,57 @@ pub(all) struct WebGPURenderPassColorAttachment {
 }
 
 ///|
-pub(all) struct WebGPURenderPassDescriptor {
-  color_attachments : Array[WebGPURenderPassColorAttachment?]
+pub(all) struct GPURenderPassDescriptor {
+  color_attachments : Array[GPURenderPassColorAttachment?]
   depth_stencil_attachment : WebGPURenderPassDepthStencilAttachment?
 }
 
 ///|
-pub(all) struct WebGPUInstance {
+pub(all) struct GPUInstance {
   raw : @raw.WebGPUInstance
 }
 
 ///|
-pub(all) struct WebGPUAdapter {
+pub(all) struct GPUAdapter {
   raw : @raw.WebGPUAdapter
 }
 
 ///|
-pub(all) struct WebGPUDevice {
+pub(all) struct GPUDevice {
   raw : @raw.WebGPUDevice
 }
 
 ///|
-pub(all) struct WebGPUQueue {
+pub(all) struct GPUQueue {
   raw : @raw.WebGPUQueue
 }
 
 ///|
-pub(all) struct WebGPUCanvasContext {
+pub(all) struct GPUCanvasContext {
   raw : @raw.WebGPUCanvasContext
 }
 
 ///|
-pub(all) struct WebGPUTexture {
+pub(all) struct GPUTexture {
   raw : @raw.WebGPUTexture
 }
 
 ///|
-pub(all) struct WebGPURenderPipeline {
+pub(all) struct GPURenderPipeline {
   raw : @raw.GPURenderPipeline
 }
 
 ///|
-pub(all) struct WebGPUCommandEncoder {
+pub(all) struct GPUCommandEncoder {
   raw : @raw.WebGPUCommandEncoder
 }
 
 ///|
-pub(all) struct WebGPURenderPassEncoder {
+pub(all) struct GPURenderPassEncoder {
   raw : @raw.WebGPURenderPassEncoder
 }
 
 ///|
-pub(all) struct WebGPUContext {
+pub(all) struct GPUContext {
   raw : @raw.WebGPUContext
 }
