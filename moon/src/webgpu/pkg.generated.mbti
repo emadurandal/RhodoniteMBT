@@ -19,7 +19,7 @@ pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureVie
 
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[GPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> GPURenderPassDescriptor
 
-pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String]) -> @webgpu_objects.WebGPURenderPipelineDescriptor
+pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String]) -> GPURenderPipelineDescriptor
 
 pub fn create_webgpu_context(GPUDevice, GPUCanvasContext, String, GPUQueue) -> GPUContext
 
@@ -83,7 +83,7 @@ pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
-pub fn GPUDevice::create_render_pipeline(Self, @webgpu_objects.WebGPURenderPipelineDescriptor) -> GPURenderPipeline
+pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
 pub fn GPUDevice::get(Self) -> @webgpu_objects.GPUDevice
 pub fn GPUDevice::get_queue(Self) -> GPUQueue
@@ -129,6 +129,13 @@ pub(all) struct GPURenderPipeline {
 }
 pub fn GPURenderPipeline::release(Self) -> Unit
 
+pub(all) struct GPURenderPipelineDescriptor {
+  vertex : @webgpu_objects.GPUShaderModule
+  fragment : @webgpu_objects.GPUShaderModule
+  topology : @webgpu_enums.GPUPrimitiveTopology
+  formats : Array[String]
+}
+
 pub(all) struct GPUTexture {
   raw : @webgpu_objects.WebGPUTexture
 }
@@ -154,8 +161,6 @@ pub using @webgpu_objects {type GPUTextureView}
 pub using @webgpu_objects {type HTMLCanvasElement}
 
 pub using @webgpu_objects {type WebGPURenderPassDepthStencilAttachment}
-
-pub using @webgpu_objects {type WebGPURenderPipelineDescriptor}
 
 // Traits
 

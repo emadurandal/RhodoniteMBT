@@ -49,18 +49,15 @@ pub fn GPUDevice::create_shader_module(
 ///|
 pub fn GPUDevice::create_render_pipeline(
   self : GPUDevice,
-  descriptor : WebGPURenderPipelineDescriptor,
+  descriptor : GPURenderPipelineDescriptor,
 ) -> GPURenderPipeline {
-  let (vertex, fragment, topology, formats) = @raw.webgpu_render_pipeline_descriptor_get(
-    descriptor,
-  )
   {
     raw: @raw.webgpu_device_create_render_pipeline(
       self.raw,
-      vertex,
-      fragment,
-      topology~,
-      formats~,
+      descriptor.vertex,
+      descriptor.fragment,
+      topology=descriptor.topology,
+      formats=descriptor.formats,
     ),
   }
 }

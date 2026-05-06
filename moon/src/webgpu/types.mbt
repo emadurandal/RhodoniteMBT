@@ -14,7 +14,6 @@ pub using @raw {
   type GPUCommandBuffer,
   type HTMLCanvasElement,
   type WebGPURenderPassDepthStencilAttachment,
-  type WebGPURenderPipelineDescriptor,
 }
 
 ///|
@@ -59,6 +58,14 @@ pub(all) struct GPUCanvasContext {
 ///|
 pub(all) struct GPUTexture {
   raw : @raw.WebGPUTexture
+}
+
+///|
+pub(all) struct GPURenderPipelineDescriptor {
+  vertex : GPUShaderModule
+  fragment : GPUShaderModule
+  topology : GPUPrimitiveTopology
+  formats : Array[String]
 }
 
 ///|

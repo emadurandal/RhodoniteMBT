@@ -19,14 +19,13 @@ fn create_pipeline(
   format : String,
 ) -> @w.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
-  let pipeline = device.create_render_pipeline(
-    @w.create_render_pipeline_descriptor(
-      vertex=shader,
-      fragment=shader,
-      topology=@w.GPUPrimitiveTopology::TriangleList,
-      formats=[format],
-    ),
-  )
+  let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
+    vertex: shader,
+    fragment: shader,
+    topology: @w.GPUPrimitiveTopology::TriangleList,
+    formats: [format],
+  }
+  let pipeline = device.create_render_pipeline(pipeline_descriptor)
   @w.shaderModule_release(shader)
   pipeline
 }
