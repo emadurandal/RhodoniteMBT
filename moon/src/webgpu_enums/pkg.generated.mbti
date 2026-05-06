@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/WebGPU/webgpu_enums"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum GPULoadOp {
+  Load
+  Clear
+} derive(Eq)
+
+pub(all) enum GPUStoreOp {
+  Store
+  Discard
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+

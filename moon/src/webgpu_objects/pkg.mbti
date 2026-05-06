@@ -1,5 +1,9 @@
 package "emadurandal/WebGPU/webgpu_objects"
 
+import {
+  "emadurandal/WebGPU/webgpu_enums",
+}
+
 // Values
 pub fn navigatorGPU() -> GPU
 pub fn canvas_getContext(HTMLCanvasElement) -> GPUCanvasContext
@@ -43,11 +47,7 @@ pub fn textureView_release(GPUTextureView) -> Unit
 pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
 pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit
 pub fn webgpu_color_new(Double, Double, Double, Double) -> WebGPUColor
-pub fn gpu_load_op_load() -> GPULoadOp
-pub fn gpu_load_op_clear() -> GPULoadOp
-pub fn gpu_store_op_store() -> GPUStoreOp
-pub fn gpu_store_op_discard() -> GPUStoreOp
-pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : WebGPUColor, loadOp~ : GPULoadOp, storeOp~ : GPUStoreOp) -> WebGPURenderPassColorAttachment
+pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : WebGPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> WebGPURenderPassColorAttachment
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[WebGPURenderPassColorAttachment?], depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
 pub fn create_render_pipeline_descriptor(vertex~ : GPUShaderModule, fragment~ : GPUShaderModule, topology~ : String, formats~ : Array[String]) -> WebGPURenderPipelineDescriptor
 pub fn webgpu_render_pipeline_descriptor_get(WebGPURenderPipelineDescriptor) -> (GPUShaderModule, GPUShaderModule, String, Array[String])
@@ -76,8 +76,6 @@ type WebGPUCommandEncoder
 type WebGPURenderPassEncoder
 type WebGPUContext
 type WebGPUColor
-type GPULoadOp
-type GPUStoreOp
 type WebGPURenderPassDepthStencilAttachment
 type WebGPURenderPassColorAttachment
 type WebGPURenderPassDescriptor

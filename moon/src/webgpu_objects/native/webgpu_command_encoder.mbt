@@ -22,9 +22,9 @@ pub fn webgpu_command_encoder_begin_render_pass(
   }
   let (view, clear_value, load_op, store_op) = attachment.get()
   let pass = match (load_op, store_op) {
-    (GPULoadOp::Load, GPUStoreOp::Store) =>
+    (@webgpu_enums.GPULoadOp::Load, @webgpu_enums.GPUStoreOp::Store) =>
       encoder.encoder.raw.begin_render_pass_color_load(view.raw)
-    (GPULoadOp::Clear, GPUStoreOp::Store) => {
+    (@webgpu_enums.GPULoadOp::Clear, @webgpu_enums.GPUStoreOp::Store) => {
       let (r, g, b, a) = match clear_value {
         Some(c) =>
           (
@@ -37,7 +37,7 @@ pub fn webgpu_command_encoder_begin_render_pass(
       }
       encoder.encoder.raw.begin_render_pass_color_clear(view.raw, r, g, b, a)
     }
-    (_, GPUStoreOp::Discard) =>
+    (_, @webgpu_enums.GPUStoreOp::Discard) =>
       abort(
         "native WebGPU: GPUStoreOp::Discard for a color attachment is not implemented yet",
       )

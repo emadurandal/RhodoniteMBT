@@ -2,6 +2,7 @@
 package "emadurandal/WebGPU/webgpu"
 
 import {
+  "emadurandal/WebGPU/webgpu_enums",
   "emadurandal/WebGPU/webgpu_objects",
 }
 
@@ -14,7 +15,7 @@ pub fn create_metal_canvas_context(WebGPUInstance, @webgpu_objects.HTMLCanvasEle
 
 pub fn create_native_webgpu_instance() -> WebGPUInstance raise
 
-pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_objects.WebGPUColor, loadOp~ : @webgpu_objects.GPULoadOp, storeOp~ : @webgpu_objects.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
+pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_objects.WebGPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
 
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[@webgpu_objects.WebGPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> @webgpu_objects.WebGPURenderPassDescriptor
 
@@ -23,14 +24,6 @@ pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModu
 pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) -> WebGPUContext
 
 pub fn create_webgpu_instance(@webgpu_objects.GPU) -> WebGPUInstance
-
-pub fn gpu_load_op_clear() -> @webgpu_objects.GPULoadOp
-
-pub fn gpu_load_op_load() -> @webgpu_objects.GPULoadOp
-
-pub fn gpu_store_op_discard() -> @webgpu_objects.GPUStoreOp
-
-pub fn gpu_store_op_store() -> @webgpu_objects.GPUStoreOp
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
@@ -144,7 +137,7 @@ pub using @webgpu_objects {type GPUCommandEncoder}
 
 pub using @webgpu_objects {type GPUDevice}
 
-pub using @webgpu_objects {type GPULoadOp}
+pub using @webgpu_enums {type GPULoadOp}
 
 pub using @webgpu_objects {type GPUQueue}
 
@@ -152,7 +145,7 @@ pub using @webgpu_objects {type GPURenderPassEncoder}
 
 pub using @webgpu_objects {type GPUShaderModule}
 
-pub using @webgpu_objects {type GPUStoreOp}
+pub using @webgpu_enums {type GPUStoreOp}
 
 pub using @webgpu_objects {type GPUTexture}
 

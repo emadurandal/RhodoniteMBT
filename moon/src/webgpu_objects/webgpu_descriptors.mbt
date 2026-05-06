@@ -8,16 +8,16 @@ pub type WebGPURenderPassColorAttachment
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,
-  loadOp~ : GPULoadOp,
-  storeOp~ : GPUStoreOp,
+  loadOp~ : @webgpu_enums.GPULoadOp,
+  storeOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassColorAttachment
 
 ///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,
-  loadOp~ : GPULoadOp,
-  storeOp~ : GPUStoreOp,
+  loadOp~ : @webgpu_enums.GPULoadOp,
+  storeOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassColorAttachment
 
 ///|

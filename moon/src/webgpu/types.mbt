@@ -1,4 +1,7 @@
 ///|
+pub using @enums {type GPULoadOp, type GPUStoreOp}
+
+///|
 pub using @raw {
   type GPU,
   type GPUAdapter,
@@ -13,8 +16,6 @@ pub using @raw {
   type GPUCommandBuffer,
   type HTMLCanvasElement,
   type WebGPUColor,
-  type GPULoadOp,
-  type GPUStoreOp,
   type WebGPURenderPassDepthStencilAttachment,
   type WebGPURenderPassColorAttachment,
   type WebGPURenderPassDescriptor,

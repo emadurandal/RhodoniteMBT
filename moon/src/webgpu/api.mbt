@@ -98,26 +98,6 @@ pub fn webgpu_color_new(
 }
 
 ///|
-pub fn gpu_load_op_load() -> GPULoadOp {
-  @raw.gpu_load_op_load()
-}
-
-///|
-pub fn gpu_load_op_clear() -> GPULoadOp {
-  @raw.gpu_load_op_clear()
-}
-
-///|
-pub fn gpu_store_op_store() -> GPUStoreOp {
-  @raw.gpu_store_op_store()
-}
-
-///|
-pub fn gpu_store_op_discard() -> GPUStoreOp {
-  @raw.gpu_store_op_discard()
-}
-
-///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
   clearValue? : WebGPUColor,

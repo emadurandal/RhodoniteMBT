@@ -56,8 +56,8 @@ fn render_frame_with_options(
         @w.create_render_pass_color_attachment(
           view~,
           clearValue=@w.webgpu_color_new(r, g, b, a),
-          loadOp=@w.gpu_load_op_clear(),
-          storeOp=@w.gpu_store_op_store(),
+          loadOp=@w.GPULoadOp::Clear,
+          storeOp=@w.GPUStoreOp::Store,
         ),
       ),
     ]),
