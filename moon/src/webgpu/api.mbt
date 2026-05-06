@@ -93,7 +93,7 @@ pub fn create_render_pass_color_attachment(
   clearValue? : GPUColor,
   loadOp~ : GPULoadOp,
   storeOp~ : GPUStoreOp,
-) -> WebGPURenderPassColorAttachment {
+) -> @raw.WebGPURenderPassColorAttachment {
   @raw.create_render_pass_color_attachment(
     view~,
     clearValue?,
@@ -104,8 +104,8 @@ pub fn create_render_pass_color_attachment(
 
 ///|
 fn render_pass_color_attachment_from_desc(
-  att : RenderPassColorAttachment,
-) -> WebGPURenderPassColorAttachment {
+  att : WebGPURenderPassColorAttachment,
+) -> @raw.WebGPURenderPassColorAttachment {
   match att.clear_value {
     Some(c) =>
       @raw.create_render_pass_color_attachment(
@@ -145,7 +145,7 @@ fn render_pass_descriptor_to_raw(
 
 ///|
 pub fn create_render_pass_descriptor(
-  colorAttachments~ : Array[RenderPassColorAttachment?],
+  colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
   depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
 ) -> WebGPURenderPassDescriptor {
   {
