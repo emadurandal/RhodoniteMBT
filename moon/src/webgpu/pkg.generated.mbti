@@ -15,12 +15,6 @@ pub fn create_metal_canvas_context(GPUInstance, @webgpu_objects.HTMLCanvasElemen
 
 pub fn create_native_webgpu_instance() -> GPUInstance raise
 
-pub fn create_render_pass_color_attachment(view~ : @webgpu_objects.GPUTextureView, clearValue? : @webgpu_enums.GPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> @webgpu_objects.WebGPURenderPassColorAttachment
-
-pub fn create_render_pass_descriptor(colorAttachments~ : Array[GPURenderPassColorAttachment?], depthStencilAttachment? : @webgpu_objects.WebGPURenderPassDepthStencilAttachment) -> GPURenderPassDescriptor
-
-pub fn create_render_pipeline_descriptor(vertex~ : @webgpu_objects.GPUShaderModule, fragment~ : @webgpu_objects.GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String]) -> GPURenderPipelineDescriptor
-
 pub fn create_webgpu_context(GPUDevice, GPUCanvasContext, String, GPUQueue) -> GPUContext
 
 pub fn create_webgpu_instance(@webgpu_objects.GPU) -> GPUInstance

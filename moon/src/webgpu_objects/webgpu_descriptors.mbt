@@ -39,22 +39,12 @@ pub fn create_render_pass_descriptor(
 pub type WebGPURenderPipelineDescriptor
 
 ///|
-pub fn create_render_pipeline_descriptor(
+pub fn WebGPURenderPipelineDescriptor::new(
   vertex~ : GPUShaderModule,
   fragment~ : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
 ) -> WebGPURenderPipelineDescriptor
-
-///|
-pub fn webgpu_render_pipeline_descriptor_get(
-  WebGPURenderPipelineDescriptor,
-) -> (
-  GPUShaderModule,
-  GPUShaderModule,
-  @webgpu_enums.GPUPrimitiveTopology,
-  Array[String],
-)
 
 ///|
 pub fn shaderModule_release(GPUShaderModule) -> Unit

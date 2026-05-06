@@ -1,7 +1,13 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "emadurandal/WebGPU/cmd/main"
+package "emadurandal/WebGPU/cmd/js/main"
+
+import {
+  "emadurandal/WebGPU/webgpu_objects",
+  "moonbitlang/async/js_async",
+}
 
 // Values
+pub fn create_webgpu_renderer(@webgpu_objects.HTMLCanvasElement) -> @js_async.Promise[Unit]
 
 // Errors
 

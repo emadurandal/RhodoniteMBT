@@ -88,21 +88,6 @@ pub fn webgpu_instance_release(instance : GPUInstance) -> Unit {
 }
 
 ///|
-pub fn create_render_pass_color_attachment(
-  view~ : GPUTextureView,
-  clearValue? : GPUColor,
-  loadOp~ : GPULoadOp,
-  storeOp~ : GPUStoreOp,
-) -> @raw.WebGPURenderPassColorAttachment {
-  @raw.create_render_pass_color_attachment(
-    view~,
-    clearValue?,
-    loadOp~,
-    storeOp~,
-  )
-}
-
-///|
 fn render_pass_color_attachment_from_desc(
   att : GPURenderPassColorAttachment,
 ) -> @raw.WebGPURenderPassColorAttachment {
@@ -141,27 +126,6 @@ fn render_pass_descriptor_to_raw(
       )
     None => @raw.create_render_pass_descriptor(colorAttachments=mapped)
   }
-}
-
-///|
-pub fn create_render_pass_descriptor(
-  colorAttachments~ : Array[GPURenderPassColorAttachment?],
-  depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
-) -> GPURenderPassDescriptor {
-  {
-    color_attachments: colorAttachments,
-    depth_stencil_attachment: depthStencilAttachment,
-  }
-}
-
-///|
-pub fn create_render_pipeline_descriptor(
-  vertex~ : GPUShaderModule,
-  fragment~ : GPUShaderModule,
-  topology~ : @enums.GPUPrimitiveTopology,
-  formats~ : Array[String],
-) -> GPURenderPipelineDescriptor {
-  { vertex, fragment, topology, formats }
 }
 
 ///|
