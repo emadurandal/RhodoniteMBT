@@ -6,6 +6,13 @@ package "emadurandal/WebGPU/webgpu_enums"
 // Errors
 
 // Types and methods
+pub(all) struct GPUColor {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+
 pub(all) enum GPULoadOp {
   Load
   Clear

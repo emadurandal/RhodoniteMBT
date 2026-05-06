@@ -35,7 +35,7 @@ fn create_pipeline(
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
-    clearColor=(0.0, 0.0, 0.2, 1.0),
+    clearColor={ r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
     vertex_count=3,
   )
 }
@@ -43,10 +43,9 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 ///|
 fn render_frame_with_options(
   renderer : WebGPURenderer,
-  clearColor~ : (Double, Double, Double, Double),
+  clearColor~ : @w.GPUColor,
   vertex_count~ : Int,
 ) -> Unit {
-  let (r, g, b, a) = clearColor
   let texture = renderer.context.get_current_texture()
   let view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
@@ -55,7 +54,7 @@ fn render_frame_with_options(
       Some(
         @w.create_render_pass_color_attachment(
           view~,
-          clearValue=@w.webgpu_color_new(r, g, b, a),
+          clearValue=clearColor,
           loadOp=@w.GPULoadOp::Clear,
           storeOp=@w.GPUStoreOp::Store,
         ),

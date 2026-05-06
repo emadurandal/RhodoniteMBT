@@ -1,5 +1,5 @@
 ///|
-pub using @enums {type GPULoadOp, type GPUStoreOp}
+pub using @enums {type GPULoadOp, type GPUStoreOp, type GPUColor}
 
 ///|
 pub using @raw {
@@ -15,7 +15,6 @@ pub using @raw {
   type GPURenderPassEncoder,
   type GPUCommandBuffer,
   type HTMLCanvasElement,
-  type WebGPUColor,
   type WebGPURenderPassDepthStencilAttachment,
   type WebGPURenderPassColorAttachment,
   type WebGPURenderPassDescriptor,
