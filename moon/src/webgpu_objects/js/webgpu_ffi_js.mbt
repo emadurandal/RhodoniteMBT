@@ -57,10 +57,13 @@ extern "js" fn device_createRenderPipeline(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
-  topology : String,
+  topologyTag : Int,
   formats : Array[String],
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topology, formats) => {
+  #| (device, vertex, fragment, topologyTag, formats) => {
+  #|   const TOPOLOGY_NAMES = [
+  #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
+  #|   ];
   #|   return device.createRenderPipeline({
   #|     layout: 'auto',
   #|     vertex: {
@@ -73,7 +76,7 @@ extern "js" fn device_createRenderPipeline(
   #|       targets: formats.map(format => ({ format }))
   #|     },
   #|     primitive: {
-  #|       topology
+  #|       topology: TOPOLOGY_NAMES[topologyTag]
   #|     }
   #|   });
   #| }
@@ -119,7 +122,27 @@ extern "js" fn encoder_beginRenderPass(
   encoder : GPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
 ) -> GPURenderPassEncoder =
-  #| (encoder, descriptor) => encoder.beginRenderPass(descriptor)
+  #| (encoder, descriptor) => {
+  #|   const LOAD_LOAD = 0;
+  #|   const LOAD_CLEAR = 1;
+  #|   const STORE_STORE = 0;
+  #|   const STORE_DISCARD = 1;
+  #|   const mapLoad = (x) => (x === LOAD_CLEAR ? 'clear' : 'load');
+  #|   const mapStore = (x) => (x === STORE_DISCARD ? 'discard' : 'store');
+  #|   const colorAttachments = descriptor.colorAttachments.map((a) => {
+  #|     if (!a) return a;
+  #|     return {
+  #|       view: a.view,
+  #|       clearValue: a.clearValue,
+  #|       loadOp: mapLoad(a.loadOp),
+  #|       storeOp: mapStore(a.storeOp),
+  #|     };
+  #|   });
+  #|   return encoder.beginRenderPass({
+  #|     ...descriptor,
+  #|     colorAttachments,
+  #|   });
+  #| }
 
 ///|
 extern "js" fn encoder_finish(encoder : GPUCommandEncoder) -> GPUCommandBuffer =

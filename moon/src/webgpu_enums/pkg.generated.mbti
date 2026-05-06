@@ -1,0 +1,38 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/WebGPU/webgpu_enums"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct GPUColor {
+  r : Double
+  g : Double
+  b : Double
+  a : Double
+}
+
+pub(all) enum GPULoadOp {
+  Load
+  Clear
+} derive(Eq)
+
+pub(all) enum GPUPrimitiveTopology {
+  PointList
+  LineList
+  LineStrip
+  TriangleList
+  TriangleStrip
+} derive(Eq)
+pub fn GPUPrimitiveTopology::to_js_tag(Self) -> Int
+
+pub(all) enum GPUStoreOp {
+  Store
+  Discard
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+

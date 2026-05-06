@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn create_renderer(@webgpu.WebGPUContext) -> WebGPURenderer?
+pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
 
 pub fn render_frame(WebGPURenderer) -> Unit
 
@@ -16,9 +16,9 @@ pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 
 // Types and methods
 pub(all) struct WebGPURenderer {
-  context : @webgpu.WebGPUCanvasContext
-  device : @webgpu.WebGPUDevice
-  queue : @webgpu.WebGPUQueue
+  context : @webgpu.GPUCanvasContext
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
   pipeline : @webgpu.GPURenderPipeline
 }
 pub fn WebGPURenderer::release(Self) -> Unit

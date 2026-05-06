@@ -1,13 +1,13 @@
 ///|
 pub(all) struct WebGPURenderer {
-  context : @w.WebGPUCanvasContext
-  device : @w.WebGPUDevice
-  queue : @w.WebGPUQueue
+  context : @w.GPUCanvasContext
+  device : @w.GPUDevice
+  queue : @w.GPUQueue
   pipeline : @w.GPURenderPipeline
 }
 
 ///|
-pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
+pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let pipeline = create_pipeline(device, format)
   Some({ context: canvas_context, device, queue, pipeline })
@@ -15,18 +15,17 @@ pub fn create_renderer(context : @w.WebGPUContext) -> WebGPURenderer? {
 
 ///|
 fn create_pipeline(
-  device : @w.WebGPUDevice,
+  device : @w.GPUDevice,
   format : String,
 ) -> @w.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
-  let pipeline = device.create_render_pipeline(
-    @w.create_render_pipeline_descriptor(
-      vertex=shader,
-      fragment=shader,
-      topology="triangle-list",
-      formats=[format],
-    ),
-  )
+  let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
+    vertex: shader,
+    fragment: shader,
+    topology: @w.GPUPrimitiveTopology::TriangleList,
+    formats: [format],
+  }
+  let pipeline = device.create_render_pipeline(pipeline_descriptor)
   @w.shaderModule_release(shader)
   pipeline
 }
@@ -35,7 +34,7 @@ fn create_pipeline(
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
-    clearColor=(0.0, 0.0, 0.2, 1.0),
+    clearColor={ r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
     vertex_count=3,
   )
 }
@@ -43,25 +42,23 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 ///|
 fn render_frame_with_options(
   renderer : WebGPURenderer,
-  clearColor~ : (Double, Double, Double, Double),
+  clearColor~ : @w.GPUColor,
   vertex_count~ : Int,
 ) -> Unit {
-  let (r, g, b, a) = clearColor
   let texture = renderer.context.get_current_texture()
   let view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
-  let render_pass = encoder.begin_render_pass(
-    @w.create_render_pass_descriptor(colorAttachments=[
-      Some(
-        @w.create_render_pass_color_attachment(
-          view~,
-          clearValue=@w.webgpu_color_new(r, g, b, a),
-          loadOp="clear",
-          storeOp="store",
-        ),
-      ),
-    ]),
-  )
+  let render_pass = encoder.begin_render_pass({
+    color_attachments: [
+      Some({
+        view,
+        clear_value: Some(clearColor),
+        load_op: @w.GPULoadOp::Clear,
+        store_op: @w.GPUStoreOp::Store,
+      }),
+    ],
+    depth_stencil_attachment: None,
+  })
   render_pass.set_pipeline(renderer.pipeline)
   render_pass.draw(vertex_count)
   render_pass.end()

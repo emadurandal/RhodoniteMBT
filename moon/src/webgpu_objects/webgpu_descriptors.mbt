@@ -7,17 +7,17 @@ pub type WebGPURenderPassColorAttachment
 ///|
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
-  clearValue? : WebGPUColor,
-  loadOp~ : String,
-  storeOp~ : String,
+  clearValue? : @webgpu_enums.GPUColor,
+  loadOp~ : @webgpu_enums.GPULoadOp,
+  storeOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassColorAttachment
 
 ///|
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
-  clearValue? : WebGPUColor,
-  loadOp~ : String,
-  storeOp~ : String,
+  clearValue? : @webgpu_enums.GPUColor,
+  loadOp~ : @webgpu_enums.GPULoadOp,
+  storeOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassColorAttachment
 
 ///|
@@ -39,17 +39,12 @@ pub fn create_render_pass_descriptor(
 pub type WebGPURenderPipelineDescriptor
 
 ///|
-pub fn create_render_pipeline_descriptor(
+pub fn WebGPURenderPipelineDescriptor::new(
   vertex~ : GPUShaderModule,
   fragment~ : GPUShaderModule,
-  topology~ : String,
+  topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
 ) -> WebGPURenderPipelineDescriptor
-
-///|
-pub fn webgpu_render_pipeline_descriptor_get(
-  WebGPURenderPipelineDescriptor,
-) -> (GPUShaderModule, GPUShaderModule, String, Array[String])
 
 ///|
 pub fn shaderModule_release(GPUShaderModule) -> Unit

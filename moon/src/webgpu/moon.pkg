@@ -1,3 +1,4 @@
 import {
   "emadurandal/WebGPU/webgpu_objects" @raw,
+  "emadurandal/WebGPU/webgpu_enums" @enums,
 }

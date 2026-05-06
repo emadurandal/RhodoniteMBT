@@ -1,52 +1,71 @@
 ///|
-pub using @raw {
-  type GPU,
-  type GPUAdapter,
-  type GPUDevice,
-  type GPUQueue,
-  type GPUCanvasContext,
-  type GPUTexture,
-  type GPUTextureView,
-  type GPUShaderModule,
-  type GPUCommandEncoder,
-  type GPURenderPassEncoder,
-  type GPUCommandBuffer,
-  type HTMLCanvasElement,
-  type WebGPUColor,
-  type WebGPURenderPassDepthStencilAttachment,
-  type WebGPURenderPassColorAttachment,
-  type WebGPURenderPassDescriptor,
-  type WebGPURenderPipelineDescriptor,
+pub using @enums {
+  type GPULoadOp,
+  type GPUStoreOp,
+  type GPUColor,
+  type GPUPrimitiveTopology,
 }
 
 ///|
-pub(all) struct WebGPUInstance {
+pub using @raw {
+  type GPU,
+  type GPUTextureView,
+  type GPUShaderModule,
+  type GPUCommandBuffer,
+  type HTMLCanvasElement,
+  type WebGPURenderPassDepthStencilAttachment,
+}
+
+///|
+pub(all) struct GPURenderPassColorAttachment {
+  view : GPUTextureView
+  clear_value : GPUColor?
+  load_op : GPULoadOp
+  store_op : GPUStoreOp
+}
+
+///|
+pub(all) struct GPURenderPassDescriptor {
+  color_attachments : Array[GPURenderPassColorAttachment?]
+  depth_stencil_attachment : WebGPURenderPassDepthStencilAttachment?
+}
+
+///|
+pub(all) struct GPUInstance {
   raw : @raw.WebGPUInstance
 }
 
 ///|
-pub(all) struct WebGPUAdapter {
+pub(all) struct GPUAdapter {
   raw : @raw.WebGPUAdapter
 }
 
 ///|
-pub(all) struct WebGPUDevice {
+pub(all) struct GPUDevice {
   raw : @raw.WebGPUDevice
 }
 
 ///|
-pub(all) struct WebGPUQueue {
+pub(all) struct GPUQueue {
   raw : @raw.WebGPUQueue
 }
 
 ///|
-pub(all) struct WebGPUCanvasContext {
+pub(all) struct GPUCanvasContext {
   raw : @raw.WebGPUCanvasContext
 }
 
 ///|
-pub(all) struct WebGPUTexture {
+pub(all) struct GPUTexture {
   raw : @raw.WebGPUTexture
+}
+
+///|
+pub(all) struct GPURenderPipelineDescriptor {
+  vertex : GPUShaderModule
+  fragment : GPUShaderModule
+  topology : GPUPrimitiveTopology
+  formats : Array[String]
 }
 
 ///|
@@ -55,16 +74,16 @@ pub(all) struct GPURenderPipeline {
 }
 
 ///|
-pub(all) struct WebGPUCommandEncoder {
+pub(all) struct GPUCommandEncoder {
   raw : @raw.WebGPUCommandEncoder
 }
 
 ///|
-pub(all) struct WebGPURenderPassEncoder {
+pub(all) struct GPURenderPassEncoder {
   raw : @raw.WebGPURenderPassEncoder
 }
 
 ///|
-pub(all) struct WebGPUContext {
+pub(all) struct GPUContext {
   raw : @raw.WebGPUContext
 }

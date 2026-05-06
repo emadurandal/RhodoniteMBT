@@ -27,15 +27,16 @@ pub fn webgpu_device_create_shader_module(
 }
 
 ///|
-/// Maps WebGPU-style primitive topology strings to wgpu `PRIMITIVE_TOPOLOGY_*`.
-fn topology_string_to_primitive_u32(topology : String) -> UInt {
+/// Maps [`GPUPrimitiveTopology`] to wgpu `PRIMITIVE_TOPOLOGY_*`.
+fn topology_to_primitive_u32(
+  topology : @webgpu_enums.GPUPrimitiveTopology,
+) -> UInt {
   match topology {
-    "point-list" => @wgpu.PRIMITIVE_TOPOLOGY_POINT_LIST
-    "line-list" => @wgpu.PRIMITIVE_TOPOLOGY_LINE_LIST
-    "line-strip" => @wgpu.PRIMITIVE_TOPOLOGY_LINE_STRIP
-    "triangle-list" => @wgpu.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-    "triangle-strip" => @wgpu.PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
-    _ => @wgpu.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+    PointList => @wgpu.PRIMITIVE_TOPOLOGY_POINT_LIST
+    LineList => @wgpu.PRIMITIVE_TOPOLOGY_LINE_LIST
+    LineStrip => @wgpu.PRIMITIVE_TOPOLOGY_LINE_STRIP
+    TriangleList => @wgpu.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+    TriangleStrip => @wgpu.PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
   }
 }
 
@@ -47,7 +48,7 @@ pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
-  topology~ : String,
+  topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
 ) -> GPURenderPipeline {
   if !physical_equal(vertex.raw, fragment.raw) {
@@ -60,7 +61,7 @@ pub fn webgpu_device_create_render_pipeline(
   } else {
     @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_BGRA8_UNORM)
   }
-  let topology_u = topology_string_to_primitive_u32(topology)
+  let topology_u = topology_to_primitive_u32(topology)
   try {
     let builder = @wgpu.RenderPipelineDescBuilder::new(vertex.raw)
     let pipeline = try {
