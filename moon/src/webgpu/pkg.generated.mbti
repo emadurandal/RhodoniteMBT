@@ -59,9 +59,9 @@ pub fn GPURenderPipeline::release(Self) -> Unit
 
 pub(all) struct RenderPassColorAttachment {
   view : @webgpu_objects.GPUTextureView
-  clearValue : @webgpu_enums.GPUColor?
-  loadOp : @webgpu_enums.GPULoadOp
-  storeOp : @webgpu_enums.GPUStoreOp
+  clear_value : @webgpu_enums.GPUColor?
+  load_op : @webgpu_enums.GPULoadOp
+  store_op : @webgpu_enums.GPUStoreOp
 }
 
 pub(all) struct WebGPUAdapter {

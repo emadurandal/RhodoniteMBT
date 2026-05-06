@@ -24,9 +24,9 @@ pub using @raw {
 ///|
 pub(all) struct RenderPassColorAttachment {
   view : GPUTextureView
-  clearValue : GPUColor?
-  loadOp : GPULoadOp
-  storeOp : GPUStoreOp
+  clear_value : GPUColor?
+  load_op : GPULoadOp
+  store_op : GPUStoreOp
 }
 
 ///|

@@ -106,19 +106,19 @@ pub fn create_render_pass_color_attachment(
 fn render_pass_color_attachment_from_desc(
   att : RenderPassColorAttachment,
 ) -> WebGPURenderPassColorAttachment {
-  match att.clearValue {
+  match att.clear_value {
     Some(c) =>
       @raw.create_render_pass_color_attachment(
         view=att.view,
         clearValue=c,
-        loadOp=att.loadOp,
-        storeOp=att.storeOp,
+        loadOp=att.load_op,
+        storeOp=att.store_op,
       )
     None =>
       @raw.create_render_pass_color_attachment(
         view=att.view,
-        loadOp=att.loadOp,
-        storeOp=att.storeOp,
+        loadOp=att.load_op,
+        storeOp=att.store_op,
       )
   }
 }

@@ -53,9 +53,9 @@ fn render_frame_with_options(
     @w.create_render_pass_descriptor(colorAttachments=[
       Some({
         view,
-        clearValue: Some(clearColor),
-        loadOp: @w.GPULoadOp::Clear,
-        storeOp: @w.GPUStoreOp::Store,
+        clear_value: Some(clearColor),
+        load_op: @w.GPULoadOp::Clear,
+        store_op: @w.GPUStoreOp::Store,
       }),
     ]),
   )
