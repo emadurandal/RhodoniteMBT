@@ -88,6 +88,7 @@ pub(all) struct GPUInstance {
   raw : @webgpu_objects.WebGPUInstance
 }
 pub fn GPUInstance::get_preferred_canvas_format(Self) -> String
+pub fn GPUInstance::get_preferred_canvas_format_for_surface(Self, GPUAdapter, GPUCanvasContext) -> String
 pub fn GPUInstance::process_events(Self) -> Unit
 pub fn GPUInstance::release(Self) -> Unit
 pub async fn GPUInstance::request_adapter(Self) -> GPUAdapter

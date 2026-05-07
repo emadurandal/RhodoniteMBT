@@ -23,7 +23,69 @@ pub fn webgpu_instance_get_preferred_canvas_format(
   instance : WebGPUInstance,
 ) -> String {
   ignore(instance)
+  // ブラウザの getPreferredCanvasFormat が線形を返す環境と揃えるための既定ヒント。
+  // 実際のスワップ形式は webgpu_instance_get_preferred_canvas_format_for_surface で解決する。
   "bgra8unorm"
+}
+
+///|
+/// webgpu_instance_get_preferred_canvas_format のヒントに対し、スワップチェーンで
+/// sRGB 形式をより優先するか（Surface::configure_best_effort の辞書順と一致）。
+fn webgpu_instance_surface_hint_prefers_srgb(hint : String) -> Bool {
+  match hint {
+    "bgra8unorm-srgb"
+    | "bgra8-unorm-srgb"
+    | "rgba8unorm-srgb"
+    | "rgba8-unorm-srgb" => true
+    _ => false
+  }
+}
+
+///|
+/// サーフェスがサポートする形式一覧から、`prefer_srgb` に応じて1つ選ぶ。
+fn webgpu_instance_surface_pick_texture_format(
+  formats : Array[@wgpu.TextureFormat],
+  prefer_srgb : Bool,
+) -> @wgpu.TextureFormat {
+  let srgb_bgra = @wgpu.TextureFormat::from_u32(
+    @wgpu.TEXTURE_FORMAT_BGRA8_UNORM_SRGB,
+  )
+  let srgb_rgba = @wgpu.TextureFormat::from_u32(
+    @wgpu.TEXTURE_FORMAT_RGBA8_UNORM_SRGB,
+  )
+  let lin_bgra = @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_BGRA8_UNORM)
+  let lin_rgba = @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_RGBA8_UNORM)
+  let prefs = if prefer_srgb {
+    [srgb_bgra, srgb_rgba, lin_bgra, lin_rgba]
+  } else {
+    [lin_bgra, lin_rgba, srgb_bgra, srgb_rgba]
+  }
+  for pi = 0; pi < prefs.length(); pi = pi + 1 {
+    let pu = prefs[pi].to_u32()
+    for fi = 0; fi < formats.length(); fi = fi + 1 {
+      if formats[fi].to_u32() == pu {
+        return formats[fi]
+      }
+    }
+  }
+  if formats.length() > 0 {
+    formats[0]
+  } else {
+    lin_bgra
+  }
+}
+
+///|
+pub fn webgpu_instance_get_preferred_canvas_format_for_surface(
+  instance : WebGPUInstance,
+  adapter : WebGPUAdapter,
+  canvas : WebGPUCanvasContext,
+) -> String {
+  let hint = webgpu_instance_get_preferred_canvas_format(instance)
+  let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(hint)
+  let fmts = canvas.context.surface.capabilities_formats(adapter.adapter.raw)
+  let chosen = webgpu_instance_surface_pick_texture_format(fmts, prefer_srgb)
+  texture_format_to_string(chosen)
 }
 
 ///|

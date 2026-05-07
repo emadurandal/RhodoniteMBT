@@ -99,7 +99,7 @@ extern "js" fn context_configure(
   #|   context.configure({
   #|     device,
   #|     format,
-  #|     alphaMode: 'premultiplied'
+  #|     alphaMode: 'opaque'
   #|   });
   #| }
 

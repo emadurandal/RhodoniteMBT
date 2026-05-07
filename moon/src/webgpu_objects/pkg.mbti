@@ -13,6 +13,7 @@ pub fn create_canvas_context(GPUCanvasContext) -> WebGPUCanvasContext
 pub fn create_metal_canvas_context(WebGPUInstance, HTMLCanvasElement, Int, Int) -> WebGPUCanvasContext
 pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) -> WebGPUContext
 pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
+pub fn webgpu_instance_get_preferred_canvas_format_for_surface(WebGPUInstance, WebGPUAdapter, WebGPUCanvasContext) -> String
 pub async fn webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter
 pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter raise Error
 pub async fn webgpu_adapter_request_device(WebGPUAdapter) -> WebGPUDevice

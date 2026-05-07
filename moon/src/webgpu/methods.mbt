@@ -4,6 +4,19 @@ pub fn GPUInstance::get_preferred_canvas_format(self : GPUInstance) -> String {
 }
 
 ///|
+pub fn GPUInstance::get_preferred_canvas_format_for_surface(
+  self : GPUInstance,
+  adapter : GPUAdapter,
+  canvas : GPUCanvasContext,
+) -> String {
+  @raw.webgpu_instance_get_preferred_canvas_format_for_surface(
+    self.raw,
+    adapter.raw,
+    canvas.raw,
+  )
+}
+
+///|
 pub async fn GPUInstance::request_adapter(self : GPUInstance) -> GPUAdapter {
   { raw: @raw.webgpu_instance_request_adapter(self.raw) }
 }

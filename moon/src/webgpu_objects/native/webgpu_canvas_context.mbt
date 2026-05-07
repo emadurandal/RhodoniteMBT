@@ -49,14 +49,30 @@ pub fn webgpu_canvas_context_configure(
   let usage = @wgpu.TextureUsage::from_u64(
     @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
   )
-  let configured_format = context.context.surface.configure_default(
+  let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(format)
+  let ok = context.context.surface.configure_best_effort(
     device.adapter,
     device.raw,
     context.context.width,
     context.context.height,
     usage,
+    prefer_srgb~,
+    vsync=true,
   )
-  context.context.format.val = texture_format_to_string(configured_format)
+  if ok {
+    let fmts = context.context.surface.capabilities_formats(device.adapter)
+    let chosen = webgpu_instance_surface_pick_texture_format(fmts, prefer_srgb)
+    context.context.format.val = texture_format_to_string(chosen)
+  } else {
+    let configured_format = context.context.surface.configure_default(
+      device.adapter,
+      device.raw,
+      context.context.width,
+      context.context.height,
+      usage,
+    )
+    context.context.format.val = texture_format_to_string(configured_format)
+  }
   if context.context.format.val == "" {
     context.context.format.val = format
   }
