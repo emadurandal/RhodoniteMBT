@@ -1,0 +1,9 @@
+import {
+  "emadurandal/WebGPU/webgpu" @wgpu,
+}
+
+supported_targets = "js"
+
+options(
+  overrides: [ "emadurandal/WebGPU/webgpu_objects/js" ],
+)

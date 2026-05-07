@@ -1,0 +1,31 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/WebGPU-examples/triangle-with-buffer/common"
+
+import {
+  "emadurandal/WebGPU/webgpu",
+}
+
+// Values
+pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
+
+pub fn render_frame(WebGPURenderer) -> Unit
+
+pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct WebGPURenderer {
+  context : @webgpu.GPUCanvasContext
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
+  pipeline : @webgpu.GPURenderPipeline
+  vertex_buffer : @webgpu.GPUBuffer
+  index_buffer : @webgpu.GPUBuffer
+}
+pub fn WebGPURenderer::release(Self) -> Unit
+
+// Type aliases
+
+// Traits
+

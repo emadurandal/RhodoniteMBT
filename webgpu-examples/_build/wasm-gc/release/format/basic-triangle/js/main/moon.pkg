@@ -1,0 +1,14 @@
+import {
+  "emadurandal/WebGPU-examples/common/browser" @html_ctx,
+  "emadurandal/WebGPU-examples/basic-triangle/common" @renderer,
+  "emadurandal/WebGPU/webgpu" @wgpu,
+  "moonbitlang/async/js_async",
+}
+
+supported_targets = "js"
+
+options(
+  "is-main": true,
+  link: { "js": { "exports": [ "create_webgpu_renderer" ], "format": "esm" } },
+  overrides: [ "emadurandal/WebGPU/webgpu_objects/js" ],
+)

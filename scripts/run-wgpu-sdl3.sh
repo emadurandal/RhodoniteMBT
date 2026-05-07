@@ -4,7 +4,7 @@
 # Kaida-Amethyst/sdl3 の env.sh と同様に、pkg-config または Homebrew の include を通す。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/moon-examples"
+cd "$ROOT/webgpu-examples"
 
 # Moon の mooncake C スタブ（例: sdl3 の wrap.c）は CC_FLAGS を必ずしも参照しないため、
 # ヘッダ探索用に CPATH / C_INCLUDE_PATH も設定する。
@@ -36,4 +36,4 @@ else
   SAMPLE="basic-triangle"
 fi
 
-exec "$ROOT/moon-examples/_build/native/debug/build/${SAMPLE}/wgpu/main/main.exe" "$@"
+exec "$ROOT/webgpu-examples/_build/native/debug/build/${SAMPLE}/wgpu/main/main.exe" "$@"
