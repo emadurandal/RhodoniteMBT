@@ -9,3 +9,10 @@ pub fn WebGPURenderPassDepthStencilAttachment::new(
 ) -> WebGPURenderPassDepthStencilAttachment {
   { view, }
 }
+
+///|
+pub fn create_render_pass_depth_stencil_attachment(
+  view~ : GPUTextureView,
+) -> WebGPURenderPassDepthStencilAttachment {
+  WebGPURenderPassDepthStencilAttachment::new(view~)
+}

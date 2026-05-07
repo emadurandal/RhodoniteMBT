@@ -147,3 +147,8 @@ pub fn buffer_release(buffer : GPUBuffer) -> Unit {
 pub fn textureView_release(view : GPUTextureView) -> Unit {
   @raw.textureView_release(view)
 }
+
+///|
+pub fn texture_release(texture : GPUTexture) -> Unit {
+  @raw.webgpu_texture_release(texture.raw)
+}

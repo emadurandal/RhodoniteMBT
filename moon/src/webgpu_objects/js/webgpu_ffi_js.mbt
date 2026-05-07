@@ -74,8 +74,9 @@ extern "js" fn device_createRenderPipeline(
   topologyTag : Int,
   formats : Array[String],
   vertexBuffers : Array[VertexBufferLayoutFFI],
+  depthStencilFormat : String,
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers) => {
+  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) => {
   #|   const TOPOLOGY_NAMES = [
   #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
   #|   ];
@@ -90,7 +91,7 @@ extern "js" fn device_createRenderPipeline(
   #|       shaderLocation: a.shaderLocation,
   #|     })),
   #|   }));
-  #|   return device.createRenderPipeline({
+  #|   const desc = {
   #|     layout: 'auto',
   #|     vertex: {
   #|       module: vertex,
@@ -105,8 +106,31 @@ extern "js" fn device_createRenderPipeline(
   #|     primitive: {
   #|       topology: TOPOLOGY_NAMES[topologyTag]
   #|     }
-  #|   });
+  #|   };
+  #|   if (depthStencilFormat && depthStencilFormat.length > 0) {
+  #|     desc.depthStencil = {
+  #|       format: depthStencilFormat,
+  #|       depthWriteEnabled: true,
+  #|       depthCompare: 'less',
+  #|     };
+  #|   }
+  #|   return device.createRenderPipeline(desc);
   #| }
+
+///|
+extern "js" fn device_createTexture(
+  device : GPUDevice,
+  width : Int,
+  height : Int,
+  format : String,
+  usage : Double,
+) -> GPUTexture =
+  #| (device, width, height, format, usage) =>
+  #|   device.createTexture({
+  #|     size: { width, height },
+  #|     format,
+  #|     usage: usage >>> 0,
+  #|   })
 
 ///|
 extern "js" fn device_createBuffer(
@@ -174,9 +198,32 @@ extern "js" fn encoder_beginRenderPass(
   #|       storeOp: mapStore(a.storeOp),
   #|     };
   #|   });
+  #|   const ds = descriptor.depthStencilAttachment;
+  #|   let depthStencilAttachment = undefined;
+  #|   if (ds && ds.view) {
+  #|     const dv = ds.depthClearValue;
+  #|     let depthClearValue = 1.0;
+  #|     if (dv !== undefined && dv !== null && typeof dv === 'number' && Number.isFinite(dv)) {
+  #|       depthClearValue = dv;
+  #|     }
+  #|     const loadOp =
+  #|       typeof ds.depthLoadOp === 'string' && ds.depthLoadOp.length > 0
+  #|         ? ds.depthLoadOp
+  #|         : 'clear';
+  #|     const storeOp =
+  #|       typeof ds.depthStoreOp === 'string' && ds.depthStoreOp.length > 0
+  #|         ? ds.depthStoreOp
+  #|         : 'store';
+  #|     depthStencilAttachment = {
+  #|       view: ds.view,
+  #|       depthClearValue,
+  #|       depthLoadOp: loadOp,
+  #|       depthStoreOp: storeOp,
+  #|     };
+  #|   }
   #|   return encoder.beginRenderPass({
-  #|     ...descriptor,
   #|     colorAttachments,
+  #|     depthStencilAttachment,
   #|   });
   #| }
 

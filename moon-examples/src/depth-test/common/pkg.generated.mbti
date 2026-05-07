@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/WebGPU-examples/depth-test/common"
+
+import {
+  "emadurandal/WebGPU/webgpu",
+  "emadurandal/WebGPU/webgpu_objects",
+  "moonbitlang/core/ref",
+}
+
+// Values
+pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
+
+pub fn render_frame(WebGPURenderer) -> Unit
+
+pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct WebGPURenderer {
+  context : @webgpu.GPUCanvasContext
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
+  pipeline : @webgpu.GPURenderPipeline
+  depth_texture : @webgpu.GPUTexture
+  depth_view : @webgpu_objects.GPUTextureView
+  vertex_buffer_a : @webgpu.GPUBuffer
+  vertex_buffer_b : @webgpu.GPUBuffer
+  index_buffer : @webgpu.GPUBuffer
+  frame : @ref.Ref[Int]
+}
+pub fn WebGPURenderer::release(Self) -> Unit
+
+// Type aliases
+
+// Traits
+

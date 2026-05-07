@@ -64,3 +64,16 @@ pub fn WebGPURenderPassDepthStencilAttachment::get(
     self.stencilReadOnly,
   )
 }
+
+///|
+pub fn create_render_pass_depth_stencil_attachment(
+  view~ : GPUTextureView,
+) -> WebGPURenderPassDepthStencilAttachment {
+  WebGPURenderPassDepthStencilAttachment::new(
+    view~,
+    depthClearValue=1.0,
+    depthLoadOp="clear",
+    depthStoreOp="store",
+    depthReadOnly=false,
+  )
+}

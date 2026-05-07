@@ -68,6 +68,7 @@ pub fn webgpu_device_create_render_pipeline(
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
   vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout],
+  depth_stencil_format~ : String,
 ) -> GPURenderPipeline {
   if !physical_equal(vertex.raw, fragment.raw) {
     abort(
@@ -106,6 +107,10 @@ pub fn webgpu_device_create_render_pipeline(
           }
         }
       }
+      if depth_stencil_format != "" {
+        let df = texture_format_from_string(depth_stencil_format)
+        let _ = builder.set_depth_stencil(df)
+      }
       let desc = builder.finish_descriptor_ptr()
       let raw = device.device.raw.create_render_pipeline_ptr(desc)
       @c.render_pipeline_descriptor_free(desc)
@@ -131,6 +136,22 @@ pub fn webgpu_device_create_buffer(
 ) -> GPUBuffer {
   let usage_flags = @wgpu.BufferUsage::from_u64(usage)
   GPUBuffer::{ raw: device.device.raw.create_buffer(size~, usage=usage_flags) }
+}
+
+///|
+pub fn webgpu_device_create_texture(
+  device : WebGPUDevice,
+  width : UInt,
+  height : UInt,
+  format : String,
+  usage : UInt64,
+) -> WebGPUTexture {
+  ignore(usage)
+  if format != "depth24plus" {
+    abort("native WebGPU: create_texture supports only depth24plus")
+  }
+  let tex = device.device.raw.create_texture_depth24plus_2d(width, height)
+  WebGPUTexture::new(GPUTexture::{ raw: tex })
 }
 
 ///|

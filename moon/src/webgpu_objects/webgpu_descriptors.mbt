@@ -30,6 +30,11 @@ pub fn WebGPURenderPassDescriptor::new(
 ) -> WebGPURenderPassDescriptor
 
 ///|
+pub fn create_render_pass_depth_stencil_attachment(
+  view~ : GPUTextureView,
+) -> WebGPURenderPassDepthStencilAttachment
+
+///|
 pub fn create_render_pass_descriptor(
   colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
   depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,

@@ -25,6 +25,7 @@ fn create_pipeline(
     topology: @w.GPUPrimitiveTopology::TriangleList,
     formats: [format],
     vertex_buffers: [],
+    depth_stencil_format: None,
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
   @w.shaderModule_release(shader)
