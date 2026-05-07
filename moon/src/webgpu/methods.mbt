@@ -72,9 +72,17 @@ pub fn GPUDevice::create_render_pipeline(
       topology=descriptor.topology,
       formats=descriptor.formats,
       vertex_buffers=descriptor.vertex_buffers,
+      depth_stencil_format=match descriptor.depth_stencil_format {
+        Some(s) => s
+        None => ""
+      },
     ),
   }
 }
+
+///|
+/// WebGPU `GPUTextureUsage.RENDER_ATTACHMENT`（0x10）。
+pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16UL
 
 ///|
 /// WebGPU `GPUBufferUsage.VERTEX`（0x20）。
@@ -95,6 +103,25 @@ pub fn GPUDevice::create_buffer(
   usage : UInt64,
 ) -> GPUBuffer {
   { raw: @raw.webgpu_device_create_buffer(self.raw, size, usage) }
+}
+
+///|
+pub fn GPUDevice::create_texture(
+  self : GPUDevice,
+  width : UInt,
+  height : UInt,
+  format : String,
+  usage : UInt64,
+) -> GPUTexture {
+  {
+    raw: @raw.webgpu_device_create_texture(
+      self.raw,
+      width,
+      height,
+      format,
+      usage,
+    ),
+  }
 }
 
 ///|
@@ -207,6 +234,11 @@ pub fn GPUContext::get(
 ///|
 pub fn GPUTexture::create_view(self : GPUTexture) -> GPUTextureView {
   @raw.webgpu_texture_create_view(self.raw)
+}
+
+///|
+pub fn GPUTexture::release(self : GPUTexture) -> Unit {
+  @raw.webgpu_texture_release(self.raw)
 }
 
 ///|

@@ -13,6 +13,8 @@ pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16
 
 pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32
 
+pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16
+
 pub fn buffer_release(GPUBuffer) -> Unit
 
 pub fn canvas_getContext(@webgpu_objects.HTMLCanvasElement) -> @webgpu_objects.GPUCanvasContext
@@ -34,6 +36,8 @@ pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 pub fn shaderModule_release(@webgpu_objects.GPUShaderModule) -> Unit
 
 pub fn textureView_release(@webgpu_objects.GPUTextureView) -> Unit
+
+pub fn texture_release(GPUTexture) -> Unit
 
 pub fn webgpu_adapter_release(GPUAdapter) -> Unit
 
@@ -93,6 +97,7 @@ pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
+pub fn GPUDevice::create_texture(Self, UInt, UInt, String, UInt64) -> GPUTexture
 pub fn GPUDevice::get(Self) -> @webgpu_objects.GPUDevice
 pub fn GPUDevice::get_queue(Self) -> GPUQueue
 pub fn GPUDevice::poll(Self, wait? : Bool) -> Bool
@@ -148,12 +153,14 @@ pub(all) struct GPURenderPipelineDescriptor {
   topology : @webgpu_enums.GPUPrimitiveTopology
   formats : Array[String]
   vertex_buffers : Array[@webgpu_enums.GPUVertexBufferLayout]
+  depth_stencil_format : String?
 }
 
 pub(all) struct GPUTexture {
   raw : @webgpu_objects.WebGPUTexture
 }
 pub fn GPUTexture::create_view(Self) -> @webgpu_objects.GPUTextureView
+pub fn GPUTexture::release(Self) -> Unit
 
 // Type aliases
 pub using @webgpu_objects {type GPU}

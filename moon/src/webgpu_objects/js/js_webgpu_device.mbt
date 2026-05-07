@@ -54,6 +54,7 @@ pub fn webgpu_device_create_render_pipeline(
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
   vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout],
+  depth_stencil_format~ : String,
 ) -> GPURenderPipeline {
   let vffi = vertex_buffers.map(fn(lb) { vertex_layout_to_ffi(lb) })
   device_createRenderPipeline(
@@ -63,6 +64,26 @@ pub fn webgpu_device_create_render_pipeline(
     topology.to_js_tag(),
     formats,
     vffi,
+    depth_stencil_format,
+  )
+}
+
+///|
+pub fn webgpu_device_create_texture(
+  device : WebGPUDevice,
+  width : UInt,
+  height : UInt,
+  format : String,
+  usage : UInt64,
+) -> WebGPUTexture {
+  WebGPUTexture::new(
+    device_createTexture(
+      device.device,
+      width.reinterpret_as_int(),
+      height.reinterpret_as_int(),
+      format,
+      js_u64_to_double(usage),
+    ),
   )
 }
 

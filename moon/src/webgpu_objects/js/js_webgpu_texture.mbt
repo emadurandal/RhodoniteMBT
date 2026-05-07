@@ -19,3 +19,8 @@ pub fn webgpu_texture_create_view(texture : WebGPUTexture) -> GPUTextureView {
 pub fn textureView_release(view : GPUTextureView) -> Unit {
   ignore(view)
 }
+
+///|
+pub fn webgpu_texture_release(texture : WebGPUTexture) -> Unit {
+  ignore(texture)
+}
