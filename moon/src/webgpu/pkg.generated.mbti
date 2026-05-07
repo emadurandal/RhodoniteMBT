@@ -7,6 +7,12 @@ import {
 }
 
 // Values
+pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8
+
+pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32
+
+pub fn buffer_release(GPUBuffer) -> Unit
+
 pub fn canvas_getContext(@webgpu_objects.HTMLCanvasElement) -> @webgpu_objects.GPUCanvasContext
 
 pub fn create_canvas_context(@webgpu_objects.GPUCanvasContext) -> GPUCanvasContext
@@ -52,6 +58,11 @@ pub(all) struct GPUAdapter {
 pub fn GPUAdapter::release(Self) -> Unit
 pub async fn GPUAdapter::request_device(Self) -> GPUDevice
 
+pub(all) struct GPUBuffer {
+  raw : @webgpu_objects.GPUBuffer
+}
+pub fn GPUBuffer::release(Self) -> Unit
+
 pub(all) struct GPUCanvasContext {
   raw : @webgpu_objects.WebGPUCanvasContext
 }
@@ -76,6 +87,7 @@ pub fn GPUContext::get(Self) -> (GPUDevice, GPUCanvasContext, String, GPUQueue)
 pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
+pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
@@ -98,6 +110,7 @@ pub(all) struct GPUQueue {
 }
 pub fn GPUQueue::release(Self) -> Unit
 pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
+pub fn GPUQueue::write_buffer(Self, GPUBuffer, UInt64, Array[Byte]) -> Unit
 
 pub(all) struct GPURenderPassColorAttachment {
   view : @webgpu_objects.GPUTextureView
@@ -118,6 +131,7 @@ pub fn GPURenderPassEncoder::draw(Self, Int) -> Unit
 pub fn GPURenderPassEncoder::end(Self) -> Unit
 pub fn GPURenderPassEncoder::release(Self) -> Unit
 pub fn GPURenderPassEncoder::set_pipeline(Self, GPURenderPipeline) -> Unit
+pub fn GPURenderPassEncoder::set_vertex_buffer(Self, Int, GPUBuffer, UInt64, UInt64) -> Unit
 
 pub(all) struct GPURenderPipeline {
   raw : @webgpu_objects.GPURenderPipeline
@@ -129,6 +143,7 @@ pub(all) struct GPURenderPipelineDescriptor {
   fragment : @webgpu_objects.GPUShaderModule
   topology : @webgpu_enums.GPUPrimitiveTopology
   formats : Array[String]
+  vertex_buffers : Array[@webgpu_enums.GPUVertexBufferLayout]
 }
 
 pub(all) struct GPUTexture {
@@ -152,6 +167,14 @@ pub using @webgpu_objects {type GPUShaderModule}
 pub using @webgpu_enums {type GPUStoreOp}
 
 pub using @webgpu_objects {type GPUTextureView}
+
+pub using @webgpu_enums {type GPUVertexAttribute}
+
+pub using @webgpu_enums {type GPUVertexBufferLayout}
+
+pub using @webgpu_enums {type GPUVertexFormat}
+
+pub using @webgpu_enums {type GPUVertexStepMode}
 
 pub using @webgpu_objects {type HTMLCanvasElement}
 

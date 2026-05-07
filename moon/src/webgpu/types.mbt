@@ -4,6 +4,10 @@ pub using @enums {
   type GPUStoreOp,
   type GPUColor,
   type GPUPrimitiveTopology,
+  type GPUVertexAttribute,
+  type GPUVertexBufferLayout,
+  type GPUVertexFormat,
+  type GPUVertexStepMode,
 }
 
 ///|
@@ -14,6 +18,11 @@ pub using @raw {
   type GPUCommandBuffer,
   type HTMLCanvasElement,
   type WebGPURenderPassDepthStencilAttachment,
+}
+
+///|
+pub(all) struct GPUBuffer {
+  raw : @raw.GPUBuffer
 }
 
 ///|
@@ -66,6 +75,7 @@ pub(all) struct GPURenderPipelineDescriptor {
   fragment : GPUShaderModule
   topology : GPUPrimitiveTopology
   formats : Array[String]
+  vertex_buffers : Array[GPUVertexBufferLayout]
 }
 
 ///|

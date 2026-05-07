@@ -27,6 +27,22 @@ pub fn webgpu_render_pass_encoder_draw(
 }
 
 ///|
+pub fn webgpu_render_pass_encoder_set_vertex_buffer(
+  renderPass : WebGPURenderPassEncoder,
+  slot : Int,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  size : UInt64,
+) -> Unit {
+  renderPass.encoder.raw.set_vertex_buffer(
+    slot.reinterpret_as_uint(),
+    buffer.raw,
+    offset,
+    size,
+  )
+}
+
+///|
 pub fn webgpu_render_pass_encoder_end(
   renderPass : WebGPURenderPassEncoder,
 ) -> Unit {

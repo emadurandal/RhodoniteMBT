@@ -71,8 +71,58 @@ pub fn GPUDevice::create_render_pipeline(
       descriptor.fragment,
       topology=descriptor.topology,
       formats=descriptor.formats,
+      vertex_buffers=descriptor.vertex_buffers,
     ),
   }
+}
+
+///|
+/// WebGPU `GPUBufferUsage.VERTEX`（0x20）。
+pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32UL
+
+///|
+/// WebGPU `GPUBufferUsage.COPY_DST`（0x8）。
+pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8UL
+
+///|
+pub fn GPUDevice::create_buffer(
+  self : GPUDevice,
+  size : UInt64,
+  usage : UInt64,
+) -> GPUBuffer {
+  { raw: @raw.webgpu_device_create_buffer(self.raw, size, usage) }
+}
+
+///|
+pub fn GPUQueue::write_buffer(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  data : Array[Byte],
+) -> Unit {
+  @raw.webgpu_queue_write_buffer(self.raw, buffer.raw, offset, data)
+}
+
+///|
+pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
+  buffer_release(self)
+}
+
+///|
+pub fn GPURenderPassEncoder::set_vertex_buffer(
+  self : GPURenderPassEncoder,
+  slot : Int,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  size : UInt64,
+) -> Unit {
+  @raw.webgpu_render_pass_encoder_set_vertex_buffer(
+    self.raw,
+    slot,
+    buffer.raw,
+    offset,
+    size,
+  )
 }
 
 ///|

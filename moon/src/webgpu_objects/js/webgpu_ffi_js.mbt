@@ -53,22 +53,49 @@ extern "js" fn device_createShaderModule(
   #| (device, code) => device.createShaderModule({ code })
 
 ///|
+pub(all) struct VertexAttributeFFI {
+  formatTag : Int
+  offset : Int
+  shaderLocation : UInt
+}
+
+///|
+pub(all) struct VertexBufferLayoutFFI {
+  arrayStride : Int
+  stepModeTag : Int
+  attributes : Array[VertexAttributeFFI]
+}
+
+///|
 extern "js" fn device_createRenderPipeline(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
   topologyTag : Int,
   formats : Array[String],
+  vertexBuffers : Array[VertexBufferLayoutFFI],
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topologyTag, formats) => {
+  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers) => {
   #|   const TOPOLOGY_NAMES = [
   #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
   #|   ];
+  #|   const VERTEX_FORMAT_NAMES = ['float32x2', 'float32x3', 'float32x4'];
+  #|   const STEP_NAMES = ['vertex', 'instance'];
+  #|   const vbuf = vertexBuffers.map((b) => ({
+  #|     arrayStride: b.arrayStride,
+  #|     stepMode: STEP_NAMES[b.stepModeTag] ?? 'vertex',
+  #|     attributes: b.attributes.map((a) => ({
+  #|       format: VERTEX_FORMAT_NAMES[a.formatTag] ?? 'float32x2',
+  #|       offset: a.offset,
+  #|       shaderLocation: a.shaderLocation,
+  #|     })),
+  #|   }));
   #|   return device.createRenderPipeline({
   #|     layout: 'auto',
   #|     vertex: {
   #|       module: vertex,
-  #|       entryPoint: 'vertexMain'
+  #|       entryPoint: 'vertexMain',
+  #|       buffers: vbuf,
   #|     },
   #|     fragment: {
   #|       module: fragment,
@@ -80,6 +107,15 @@ extern "js" fn device_createRenderPipeline(
   #|     }
   #|   });
   #| }
+
+///|
+extern "js" fn device_createBuffer(
+  device : GPUDevice,
+  size : Double,
+  usage : Double,
+) -> GPUBuffer =
+  #| (device, size, usage) =>
+  #|   device.createBuffer({ size, usage: usage >>> 0 })
 
 ///|
 extern "js" fn device_createCommandEncoder(
@@ -165,10 +201,31 @@ extern "js" fn renderPass_draw(
   #| (pass, vertexCount) => pass.draw(vertexCount)
 
 ///|
+extern "js" fn renderPass_setVertexBuffer(
+  pass : GPURenderPassEncoder,
+  slot : Int,
+  buffer : GPUBuffer,
+  offset : Double,
+  size : Double,
+) -> Unit =
+  #| (pass, slot, buffer, offset, size) =>
+  #|   pass.setVertexBuffer(slot, buffer, offset, size)
+
+///|
 extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
   #| (pass) => pass.end()
 
 // Queue methods
+
+///|
+extern "js" fn queue_writeBuffer(
+  queue : GPUQueue,
+  buffer : GPUBuffer,
+  offset : Double,
+  data : Array[Byte],
+) -> Unit =
+  #| (queue, buffer, offset, data) =>
+  #|   queue.writeBuffer(buffer, offset, new Uint8Array(data))
 
 ///|
 extern "js" fn queue_submit(

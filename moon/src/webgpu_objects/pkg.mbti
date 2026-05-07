@@ -31,7 +31,8 @@ pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
 pub fn webgpu_instance_release(WebGPUInstance) -> Unit
 pub fn webgpu_context_get(WebGPUContext) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)
 pub fn webgpu_device_create_shader_module(WebGPUDevice, String) -> GPUShaderModule
-pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String]) -> GPURenderPipeline
+pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String], vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout]) -> GPURenderPipeline
+pub fn webgpu_device_create_buffer(WebGPUDevice, UInt64, UInt64) -> GPUBuffer
 pub fn webgpu_device_create_command_encoder(WebGPUDevice) -> WebGPUCommandEncoder
 pub fn webgpu_canvas_context_get_current_texture(WebGPUCanvasContext) -> WebGPUTexture
 pub fn webgpu_canvas_context_present(WebGPUCanvasContext) -> Unit
@@ -39,11 +40,14 @@ pub fn webgpu_texture_create_view(WebGPUTexture) -> GPUTextureView
 pub fn webgpu_command_encoder_begin_render_pass(WebGPUCommandEncoder, WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
 pub fn webgpu_command_encoder_finish(WebGPUCommandEncoder) -> GPUCommandBuffer
 pub fn webgpu_queue_submit(WebGPUQueue, GPUCommandBuffer) -> Unit
+pub fn webgpu_queue_write_buffer(WebGPUQueue, GPUBuffer, UInt64, Array[Byte]) -> Unit
 pub fn webgpu_render_pass_encoder_set_pipeline(WebGPURenderPassEncoder, GPURenderPipeline) -> Unit
 pub fn webgpu_render_pass_encoder_draw(WebGPURenderPassEncoder, Int) -> Unit
+pub fn webgpu_render_pass_encoder_set_vertex_buffer(WebGPURenderPassEncoder, Int, GPUBuffer, UInt64, UInt64) -> Unit
 pub fn webgpu_render_pass_encoder_end(WebGPURenderPassEncoder) -> Unit
 pub fn shaderModule_release(GPUShaderModule) -> Unit
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
+pub fn buffer_release(GPUBuffer) -> Unit
 pub fn textureView_release(GPUTextureView) -> Unit
 pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
 pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit
@@ -64,6 +68,7 @@ type GPURenderPipeline
 type GPUCommandEncoder
 type GPURenderPassEncoder
 type GPUCommandBuffer
+type GPUBuffer
 type HTMLCanvasElement
 type WebGPUInstance
 type WebGPUAdapter

@@ -1,6 +1,24 @@
 // WebGPU device implementation
 
 ///|
+fn vertex_layout_to_ffi(
+  lb : @webgpu_enums.GPUVertexBufferLayout,
+) -> VertexBufferLayoutFFI {
+  let attrs = lb.attributes.map(fn(a) {
+    VertexAttributeFFI::{
+      formatTag: a.format.to_js_tag(),
+      offset: a.offset.to_uint().to_int(),
+      shaderLocation: a.shader_location,
+    }
+  })
+  VertexBufferLayoutFFI::{
+    arrayStride: lb.array_stride.to_uint().to_int(),
+    stepModeTag: lb.step_mode.to_js_tag(),
+    attributes: attrs,
+  }
+}
+
+///|
 pub struct WebGPUDevice {
   device : GPUDevice
 }
@@ -35,13 +53,29 @@ pub fn webgpu_device_create_render_pipeline(
   fragment : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
+  vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout],
 ) -> GPURenderPipeline {
+  let vffi = vertex_buffers.map(fn(lb) { vertex_layout_to_ffi(lb) })
   device_createRenderPipeline(
     device.device,
     vertex,
     fragment,
     topology.to_js_tag(),
     formats,
+    vffi,
+  )
+}
+
+///|
+pub fn webgpu_device_create_buffer(
+  device : WebGPUDevice,
+  size : UInt64,
+  usage : UInt64,
+) -> GPUBuffer {
+  device_createBuffer(
+    device.device,
+    js_u64_to_double(size),
+    js_u64_to_double(usage),
   )
 }
 

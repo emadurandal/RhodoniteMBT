@@ -1,16 +1,61 @@
 ///|
+/// 頂点1つあたり 32 バイト × 3 頂点。
+let vertex_buffer_byte_length : UInt64 = 96UL
+
+///|
+fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+  buf[off] = (u & 0xFFU).to_byte()
+  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
+  buf[off + 2] = ((u >> 16) & 0xFFU).to_byte()
+  buf[off + 3] = ((u >> 24) & 0xFFU).to_byte()
+}
+
+///|
+/// インターリーブ頂点: `vec2 pos` @ offset 0, `vec3 color` @ offset 8, stride 32。
+fn vertex_triangle_interleaved_bytes() -> Array[Byte] {
+  let stride = 32
+  let n = 3
+  let total = stride * n
+  let buf = Array::make(total, (0 : Byte))
+  fn put_vertex(
+    base : Int,
+    px : UInt,
+    py : UInt,
+    cr : UInt,
+    cg : UInt,
+    cb : UInt,
+  ) -> Unit {
+    put_u32_le(buf, base + 0, px)
+    put_u32_le(buf, base + 4, py)
+    put_u32_le(buf, base + 8, cr)
+    put_u32_le(buf, base + 12, cg)
+    put_u32_le(buf, base + 16, cb)
+  }
+  // float ビット: 0.0=0, 0.5=0x3f000000, -0.5=0xbf000000, 1.0=0x3f800000
+  put_vertex(0, 0U, 0x3F000000U, 0x3F800000U, 0U, 0U)
+  put_vertex(stride, 0xBF000000U, 0xBF000000U, 0U, 0x3F800000U, 0U)
+  put_vertex(stride * 2, 0x3F000000U, 0xBF000000U, 0U, 0U, 0x3F800000U)
+  buf
+}
+
+///|
 pub(all) struct WebGPURenderer {
   context : @w.GPUCanvasContext
   device : @w.GPUDevice
   queue : @w.GPUQueue
   pipeline : @w.GPURenderPipeline
+  vertex_buffer : @w.GPUBuffer
 }
 
 ///|
 pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
+  let vertex_bytes = vertex_triangle_interleaved_bytes()
+  let usage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let vbuf = device.create_buffer(vertex_buffer_byte_length, usage)
+  queue.write_buffer(vbuf, 0UL, vertex_bytes)
   let pipeline = create_pipeline(device, format)
-  Some({ context: canvas_context, device, queue, pipeline })
+  Some({ context: canvas_context, device, queue, pipeline, vertex_buffer: vbuf })
 }
 
 ///|
@@ -19,12 +64,28 @@ fn create_pipeline(
   format : String,
 ) -> @w.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
+  let vertex_layout : @w.GPUVertexBufferLayout = {
+    array_stride: 32UL,
+    step_mode: @w.GPUVertexStepMode::Vertex,
+    attributes: [
+      {
+        format: @w.GPUVertexFormat::Float32x2,
+        offset: 0UL,
+        shader_location: 0U,
+      },
+      {
+        format: @w.GPUVertexFormat::Float32x3,
+        offset: 8UL,
+        shader_location: 1U,
+      },
+    ],
+  }
   let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
     topology: @w.GPUPrimitiveTopology::TriangleList,
     formats: [format],
-    vertex_buffers: [],
+    vertex_buffers: [vertex_layout],
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
   @w.shaderModule_release(shader)
@@ -61,6 +122,12 @@ fn render_frame_with_options(
     depth_stencil_attachment: None,
   })
   render_pass.set_pipeline(renderer.pipeline)
+  render_pass.set_vertex_buffer(
+    0,
+    renderer.vertex_buffer,
+    0UL,
+    vertex_buffer_byte_length,
+  )
   render_pass.draw(vertex_count)
   render_pass.end()
   render_pass.release()
@@ -73,6 +140,7 @@ fn render_frame_with_options(
 
 ///|
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
+  self.vertex_buffer.release()
   self.pipeline.release()
 }
 
@@ -89,21 +157,14 @@ let triangle_shader_code : String =
   #|};
   #|
   #|@vertex
-  #|fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-  #|  var pos = array<vec2<f32>, 3>(
-  #|    vec2<f32>(0.0, 0.5),
-  #|    vec2<f32>(-0.5, -0.5),
-  #|    vec2<f32>(0.5, -0.5),
-  #|  );
-  #|  var colors = array<vec3<f32>, 3>(
-  #|    vec3<f32>(1.0, 0.0, 0.0),
-  #|    vec3<f32>(0.0, 1.0, 0.0),
-  #|    vec3<f32>(0.0, 0.0, 1.0),
-  #|  );
-  #|  var output: VertexOutput;
-  #|  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
-  #|  output.color = colors[vertexIndex];
-  #|  return output;
+  #|fn vertexMain(
+  #|  @location(0) pos: vec2<f32>,
+  #|  @location(1) color: vec3<f32>,
+  #|) -> VertexOutput {
+  #|  var out: VertexOutput;
+  #|  out.position = vec4<f32>(pos, 0.0, 1.0);
+  #|  out.color = color;
+  #|  return out;
   #|}
   #|
   #|@fragment

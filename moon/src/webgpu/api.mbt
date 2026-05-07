@@ -139,6 +139,11 @@ pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
 }
 
 ///|
+pub fn buffer_release(buffer : GPUBuffer) -> Unit {
+  @raw.buffer_release(buffer.raw)
+}
+
+///|
 pub fn textureView_release(view : GPUTextureView) -> Unit {
   @raw.textureView_release(view)
 }
