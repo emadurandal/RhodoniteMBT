@@ -21,6 +21,7 @@ pub impl[T : Add] Add for Vector4[T]
 pub impl[T : Eq] Eq for Vector4[T]
 pub impl[T : Mul] Mul for Vector4[T]
 pub impl[T : Neg] Neg for Vector4[T]
+pub impl[T : Show] Show for Vector4[T]
 pub impl[T : Sub] Sub for Vector4[T]
 
 // Type aliases

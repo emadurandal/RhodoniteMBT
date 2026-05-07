@@ -20,6 +20,7 @@ pub impl[T : Add] Add for Vector3[T]
 pub impl[T : Eq] Eq for Vector3[T]
 pub impl[T : Mul] Mul for Vector3[T]
 pub impl[T : Neg] Neg for Vector3[T]
+pub impl[T : Show] Show for Vector3[T]
 pub impl[T : Sub] Sub for Vector3[T]
 
 // Type aliases
