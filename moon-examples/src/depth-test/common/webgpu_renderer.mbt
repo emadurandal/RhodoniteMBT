@@ -25,7 +25,7 @@ let index_u16_count : Int = 36
 let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 
 ///|
-/// 真横投影を避け、立方体の奥行きが分かるようわずかに上から見下ろす（ラジアン・約 22°）。
+/// 真横投影を避け、立方体の奥行きが分かるようわずかに上から見上げる（ラジアン・約 22°）。
 let camera_elevation_rad : Double = 0.38
 
 ///|
