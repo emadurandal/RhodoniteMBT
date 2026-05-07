@@ -122,7 +122,7 @@ fn mat4_rotate_y(c : Double, s : Double) -> Array[Double] {
 }
 
 ///|
-/// 右手・クリップ Z ∈ [0,1] の直交投影。
+/// 右手・OpenGL 系クリップ Z ∈ [-1,1] の直交投影（XY はそのまま WebGPU と整合）。
 fn mat4_ortho(
   l : Double,
   r : Double,
@@ -138,6 +138,18 @@ fn mat4_ortho(
   m[12] = -(r + l) / (r - l)
   m[13] = -(t + b) / (t - b)
   m[14] = -n / (f - n)
+  m[15] = 1.0
+  m
+}
+
+///|
+/// GL 系クリップ座標の Z を WebGPU NDC の Z ∈ [0,1] に合わせる（`z' = 0.5*z + 0.5*w`）。
+fn mat4_clip_gl_depth_to_webgpu() -> Array[Double] {
+  let m = Array::make(16, 0.0)
+  m[0] = 1.0
+  m[5] = 1.0
+  m[10] = 0.5
+  m[14] = 0.5
   m[15] = 1.0
   m
 }
@@ -293,8 +305,9 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let view = mat4_translate(0.0, 0.0, -8.0)
   let proj = mat4_ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
   let pv = mat4_mul(proj, view)
-  let mvp_a = mat4_mul(pv, ma)
-  let mvp_b = mat4_mul(pv, mb)
+  let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
+  let mvp_a = mat4_mul(z_ndc_webgpu, mat4_mul(pv, ma))
+  let mvp_b = mat4_mul(z_ndc_webgpu, mat4_mul(pv, mb))
   let bytes_a = Array::make(verts_per_cube * vertex_stride_bytes, (0 : Byte))
   let bytes_b = Array::make(verts_per_cube * vertex_stride_bytes, (0 : Byte))
   write_cube_interleaved(bytes_a, mvp_a, 0.85, 0.35, 0.25)
