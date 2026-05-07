@@ -36,3 +36,4 @@ moon/webgpu/target/js/release/build/*
 !moon/webgpu/target/js/release/build/main/
 moon/webgpu/_build
 moon/webgpu-examples/_build
+moon/math/_build
