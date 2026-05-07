@@ -7,4 +7,6 @@ import {
 
 supported_targets = "native"
 
-options(implement: "emadurandal/WebGPU/webgpu_objects")
+options(
+  implement: "emadurandal/WebGPU/webgpu_objects",
+)
