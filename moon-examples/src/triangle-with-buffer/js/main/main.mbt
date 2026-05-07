@@ -4,7 +4,7 @@ async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit 
   match @renderer.create_renderer(ctx) {
     Some(renderer) => {
       @renderer.render_frame(renderer)
-      println("WebGPU triangle (vertex buffer) rendered successfully!")
+      println("WebGPU triangle (vertex + index buffer) rendered successfully!")
     }
     None => println("Failed to create renderer")
   }

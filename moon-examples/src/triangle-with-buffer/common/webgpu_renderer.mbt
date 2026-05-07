@@ -3,6 +3,21 @@
 let vertex_buffer_byte_length : UInt64 = 96UL
 
 ///|
+/// インデックス uint16 × 3（0, 1, 2）＝ 6 バイト。`GPUQueue.writeBuffer` は
+/// ブラウザ実装でコピー長が 4 の倍数であることが求められるため、GPU 上は 8 バイト確保し末尾をパディングする。
+let index_buffer_allocation_byte_length : UInt64 = 8UL
+
+///|
+/// `setIndexBuffer` に渡すインデックス領域のバイト数（実データのみ）。
+let index_buffer_index_range_byte_length : UInt64 = 6UL
+
+///|
+fn put_u16_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+  buf[off] = (u & 0xFFU).to_byte()
+  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
+}
+
+///|
 fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
@@ -39,23 +54,45 @@ fn vertex_triangle_interleaved_bytes() -> Array[Byte] {
 }
 
 ///|
+/// 6 バイトのインデックス + 2 バイトパディング（`writeBuffer` の 4 バイト境界用）。
+fn index_triangle_u16_bytes() -> Array[Byte] {
+  let buf = Array::make(8, (0 : Byte))
+  put_u16_le(buf, 0, 0U)
+  put_u16_le(buf, 2, 1U)
+  put_u16_le(buf, 4, 2U)
+  buf
+}
+
+///|
 pub(all) struct WebGPURenderer {
   context : @w.GPUCanvasContext
   device : @w.GPUDevice
   queue : @w.GPUQueue
   pipeline : @w.GPURenderPipeline
   vertex_buffer : @w.GPUBuffer
+  index_buffer : @w.GPUBuffer
 }
 
 ///|
 pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let vertex_bytes = vertex_triangle_interleaved_bytes()
-  let usage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
-  let vbuf = device.create_buffer(vertex_buffer_byte_length, usage)
+  let vusage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let vbuf = device.create_buffer(vertex_buffer_byte_length, vusage)
   queue.write_buffer(vbuf, 0UL, vertex_bytes)
+  let index_bytes = index_triangle_u16_bytes()
+  let iusage = @w.GPU_BUFFER_USAGE_INDEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let ibuf = device.create_buffer(index_buffer_allocation_byte_length, iusage)
+  queue.write_buffer(ibuf, 0UL, index_bytes)
   let pipeline = create_pipeline(device, format)
-  Some({ context: canvas_context, device, queue, pipeline, vertex_buffer: vbuf })
+  Some({
+    context: canvas_context,
+    device,
+    queue,
+    pipeline,
+    vertex_buffer: vbuf,
+    index_buffer: ibuf,
+  })
 }
 
 ///|
@@ -97,7 +134,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
     clearColor={ r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
-    vertex_count=3,
+    index_count=3,
   )
 }
 
@@ -105,7 +142,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 fn render_frame_with_options(
   renderer : WebGPURenderer,
   clearColor~ : @w.GPUColor,
-  vertex_count~ : Int,
+  index_count~ : Int,
 ) -> Unit {
   let texture = renderer.context.get_current_texture()
   let view = texture.create_view()
@@ -128,7 +165,13 @@ fn render_frame_with_options(
     0UL,
     vertex_buffer_byte_length,
   )
-  render_pass.draw(vertex_count)
+  render_pass.set_index_buffer(
+    renderer.index_buffer,
+    @w.GPUIndexFormat::Uint16,
+    0UL,
+    index_buffer_index_range_byte_length,
+  )
+  render_pass.draw_indexed(index_count)
   render_pass.end()
   render_pass.release()
   let command_buffer = encoder.finish()
@@ -140,6 +183,7 @@ fn render_frame_with_options(
 
 ///|
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
+  self.index_buffer.release()
   self.vertex_buffer.release()
   self.pipeline.release()
 }

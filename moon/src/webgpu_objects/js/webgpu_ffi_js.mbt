@@ -212,6 +212,35 @@ extern "js" fn renderPass_setVertexBuffer(
   #|   pass.setVertexBuffer(slot, buffer, offset, size)
 
 ///|
+extern "js" fn renderPass_setIndexBuffer(
+  pass : GPURenderPassEncoder,
+  buffer : GPUBuffer,
+  formatStr : String,
+  offset : Double,
+  size : Double,
+) -> Unit =
+  #| (pass, buffer, formatStr, offset, size) =>
+  #|   pass.setIndexBuffer(buffer, formatStr, offset, size)
+
+///|
+extern "js" fn renderPass_drawIndexed(
+  pass : GPURenderPassEncoder,
+  indexCount : Int,
+  instanceCount : Int,
+  firstIndex : Int,
+  baseVertex : Int,
+  firstInstance : Int,
+) -> Unit =
+  #| (pass, indexCount, instanceCount, firstIndex, baseVertex, firstInstance) =>
+  #|   pass.drawIndexed(
+  #|     indexCount,
+  #|     instanceCount,
+  #|     firstIndex,
+  #|     baseVertex,
+  #|     firstInstance,
+  #|   )
+
+///|
 extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
   #| (pass) => pass.end()
 

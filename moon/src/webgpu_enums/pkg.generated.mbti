@@ -13,6 +13,12 @@ pub(all) struct GPUColor {
   a : Double
 }
 
+pub(all) enum GPUIndexFormat {
+  Uint16
+  Uint32
+} derive(Eq)
+pub fn GPUIndexFormat::to_js_tag(Self) -> String
+
 pub(all) enum GPULoadOp {
   Load
   Clear

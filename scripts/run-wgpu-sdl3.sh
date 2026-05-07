@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Native wgpu + SDL3 三角デモ。SDL3 の開発用ヘッダが必要（例: brew install sdl3）。
-# 第1引数でサンプル名（省略時 basic-triangle）。例: scripts/run-wgpu-sdl3.sh triangle-with-vertexbuffer
+# 第1引数でサンプル名（省略時 basic-triangle）。例: scripts/run-wgpu-sdl3.sh triangle-with-buffer
 # Kaida-Amethyst/sdl3 の env.sh と同様に、pkg-config または Homebrew の include を通す。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,6 +1,6 @@
 import {
   "emadurandal/WebGPU-examples/common/browser" @html_ctx,
-  "emadurandal/WebGPU-examples/triangle-with-vertexbuffer/common" @renderer,
+  "emadurandal/WebGPU-examples/triangle-with-buffer/common" @renderer,
   "emadurandal/WebGPU/webgpu" @wgpu,
   "moonbitlang/async/js_async",
 }

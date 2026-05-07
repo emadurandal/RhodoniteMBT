@@ -1,4 +1,4 @@
-///| SDL3 ウィンドウ（`SDL_WINDOW_METAL`）＋ `SDL_Metal_*` の `CAMetalLayer` → wgpu サーフェス（頂点バッファ版）。
+///| SDL3 ウィンドウ（`SDL_WINDOW_METAL`）＋ `SDL_Metal_*` の `CAMetalLayer` → wgpu サーフェス（頂点バッファ + インデックスバッファ版）。
 
 ///| ドキュメント: [Kaida-Amethyst/sdl3@0.1.1](https://mooncakes.io/docs/Kaida-Amethyst/sdl3@0.1.1)、[sdl3.mbt リポジトリ](https://github.com/moonbit-community/sdl3.mbt)
 
@@ -9,10 +9,10 @@
 ///| `Kaida-Amethyst/sdl3/env.sh`（`CC_FLAGS` に `pkg-config --cflags sdl3`）。
 
 ///|
-async fn run_sdl_wgpu_triangle_vertex_buffer() -> Unit raise Error {
+async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
   match
     @sdl_wgpu.init_sdl_metal_webgpu_native(
-      "MoonBit wgpu + SDL3 (vertex buffer)", 800, 600, "native: initializing SDL3 (vertex buffer demo)",
+      "MoonBit wgpu + SDL3 (vertex + index buffer)", 800, 600, "native: initializing SDL3 (triangle-with-buffer demo)",
     ) {
     None => ()
     Some(session) => {
@@ -35,7 +35,7 @@ async fn run_sdl_wgpu_triangle_vertex_buffer() -> Unit raise Error {
 ///|
 async fn main {
   let _ = @async.now()
-  run_sdl_wgpu_triangle_vertex_buffer() catch {
+  run_sdl_wgpu_triangle_with_buffer() catch {
     _ =>
       println(
         "wgpu+SDL3 起動失敗: macOS+Metal か、SDL3/wgpu のリンク・ヘッダを確認してください。",

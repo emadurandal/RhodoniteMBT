@@ -4,6 +4,7 @@ pub using @enums {
   type GPUStoreOp,
   type GPUColor,
   type GPUPrimitiveTopology,
+  type GPUIndexFormat,
   type GPUVertexAttribute,
   type GPUVertexBufferLayout,
   type GPUVertexFormat,

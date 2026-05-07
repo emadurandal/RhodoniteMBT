@@ -9,6 +9,8 @@ import {
 // Values
 pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8
 
+pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16
+
 pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32
 
 pub fn buffer_release(GPUBuffer) -> Unit
@@ -128,8 +130,10 @@ pub(all) struct GPURenderPassEncoder {
   raw : @webgpu_objects.WebGPURenderPassEncoder
 }
 pub fn GPURenderPassEncoder::draw(Self, Int) -> Unit
+pub fn GPURenderPassEncoder::draw_indexed(Self, Int, instance_count? : Int, first_index? : Int, base_vertex? : Int, first_instance? : Int) -> Unit
 pub fn GPURenderPassEncoder::end(Self) -> Unit
 pub fn GPURenderPassEncoder::release(Self) -> Unit
+pub fn GPURenderPassEncoder::set_index_buffer(Self, GPUBuffer, @webgpu_enums.GPUIndexFormat, UInt64, UInt64) -> Unit
 pub fn GPURenderPassEncoder::set_pipeline(Self, GPURenderPipeline) -> Unit
 pub fn GPURenderPassEncoder::set_vertex_buffer(Self, Int, GPUBuffer, UInt64, UInt64) -> Unit
 
@@ -157,6 +161,8 @@ pub using @webgpu_objects {type GPU}
 pub using @webgpu_enums {type GPUColor}
 
 pub using @webgpu_objects {type GPUCommandBuffer}
+
+pub using @webgpu_enums {type GPUIndexFormat}
 
 pub using @webgpu_enums {type GPULoadOp}
 

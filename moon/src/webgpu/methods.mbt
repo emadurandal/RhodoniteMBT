@@ -85,6 +85,10 @@ pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32UL
 pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8UL
 
 ///|
+/// WebGPU `GPUBufferUsage.INDEX`（0x10）。
+pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16UL
+
+///|
 pub fn GPUDevice::create_buffer(
   self : GPUDevice,
   size : UInt64,
@@ -120,6 +124,23 @@ pub fn GPURenderPassEncoder::set_vertex_buffer(
     self.raw,
     slot,
     buffer.raw,
+    offset,
+    size,
+  )
+}
+
+///|
+pub fn GPURenderPassEncoder::set_index_buffer(
+  self : GPURenderPassEncoder,
+  buffer : GPUBuffer,
+  format : GPUIndexFormat,
+  offset : UInt64,
+  size : UInt64,
+) -> Unit {
+  @raw.webgpu_render_pass_encoder_set_index_buffer(
+    self.raw,
+    buffer.raw,
+    format,
     offset,
     size,
   )
@@ -239,6 +260,25 @@ pub fn GPURenderPassEncoder::draw(
   vertex_count : Int,
 ) -> Unit {
   @raw.webgpu_render_pass_encoder_draw(self.raw, vertex_count)
+}
+
+///|
+pub fn GPURenderPassEncoder::draw_indexed(
+  self : GPURenderPassEncoder,
+  index_count : Int,
+  instance_count? : Int = 1,
+  first_index? : Int = 0,
+  base_vertex? : Int = 0,
+  first_instance? : Int = 0,
+) -> Unit {
+  @raw.webgpu_render_pass_encoder_draw_indexed(
+    self.raw,
+    index_count,
+    instance_count,
+    first_index,
+    base_vertex,
+    first_instance,
+  )
 }
 
 ///|

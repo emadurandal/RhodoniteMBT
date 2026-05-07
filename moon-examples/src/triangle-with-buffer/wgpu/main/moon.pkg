@@ -1,6 +1,6 @@
 import {
   "emadurandal/WebGPU-examples/common" @sdl_wgpu,
-  "emadurandal/WebGPU-examples/triangle-with-vertexbuffer/common" @renderer,
+  "emadurandal/WebGPU-examples/triangle-with-buffer/common" @renderer,
   "moonbitlang/async" @async,
 }
 

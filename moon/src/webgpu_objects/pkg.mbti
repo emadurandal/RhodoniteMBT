@@ -44,6 +44,8 @@ pub fn webgpu_queue_write_buffer(WebGPUQueue, GPUBuffer, UInt64, Array[Byte]) ->
 pub fn webgpu_render_pass_encoder_set_pipeline(WebGPURenderPassEncoder, GPURenderPipeline) -> Unit
 pub fn webgpu_render_pass_encoder_draw(WebGPURenderPassEncoder, Int) -> Unit
 pub fn webgpu_render_pass_encoder_set_vertex_buffer(WebGPURenderPassEncoder, Int, GPUBuffer, UInt64, UInt64) -> Unit
+pub fn webgpu_render_pass_encoder_set_index_buffer(WebGPURenderPassEncoder, GPUBuffer, @webgpu_enums.GPUIndexFormat, UInt64, UInt64) -> Unit
+pub fn webgpu_render_pass_encoder_draw_indexed(WebGPURenderPassEncoder, Int, Int, Int, Int, Int) -> Unit
 pub fn webgpu_render_pass_encoder_end(WebGPURenderPassEncoder) -> Unit
 pub fn shaderModule_release(GPUShaderModule) -> Unit
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit

@@ -5,7 +5,7 @@ export default defineConfig({
 		rollupOptions: {
 			input: {
 				basicTriangle: "demos/basic-triangle.html",
-				triangleWithVertexBuffer: "demos/triangle-with-vertexbuffer.html",
+				triangleWithBuffer: "demos/triangle-with-buffer.html",
 			},
 		},
 	},

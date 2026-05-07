@@ -6,10 +6,10 @@
   "scripts": {
     "build:moon": "cd moon-examples && moon build --target js",
     "dev:basic-triangle": "npm run build:moon && vite --open /demos/basic-triangle.html",
-    "dev:triangle-with-vertexbuffer": "npm run build:moon && vite --open /demos/triangle-with-vertexbuffer.html",
+    "dev:triangle-with-buffer": "npm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev": "npm run dev:basic-triangle",
     "run:wgpu:basic-triangle": "bash scripts/run-wgpu-sdl3.sh basic-triangle",
-    "run:wgpu:triangle-with-vertexbuffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-vertexbuffer",
+    "run:wgpu:triangle-with-buffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-buffer",
     "run:wgpu": "npm run run:wgpu:basic-triangle",
     "build": "npm run build:moon && tsc && vite build",
     "preview": "vite preview"
