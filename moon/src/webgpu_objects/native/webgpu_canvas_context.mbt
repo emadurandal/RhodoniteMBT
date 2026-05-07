@@ -41,6 +41,50 @@ pub fn create_metal_canvas_context(
 }
 
 ///|
+/// `configure` に渡す形式ヒント（多くはブラウザの `getPreferredCanvasFormat()` と同じ文字列）に合わせ、
+/// 能力から選ぶときの sRGB 優先を切り替える。ヒントが線形 `bgra8unorm` のときに
+/// ネイティブだけ `bgra8unorm-srgb` を選ぶとガンマがズレる。
+fn native_surface_configure_prefer_srgb_from_hint(hint : String) -> Bool {
+  match hint {
+    "bgra8unorm-srgb" | "bgra8-unorm-srgb" | "rgba8unorm-srgb" | "rgba8-unorm-srgb" => true
+    _ => false
+  }
+}
+
+///|
+fn pick_native_surface_format(
+  formats : Array[@wgpu.TextureFormat],
+  prefer_srgb : Bool,
+) -> @wgpu.TextureFormat {
+  let srgb_bgra = @wgpu.TextureFormat::from_u32(
+    @wgpu.TEXTURE_FORMAT_BGRA8_UNORM_SRGB,
+  )
+  let srgb_rgba = @wgpu.TextureFormat::from_u32(
+    @wgpu.TEXTURE_FORMAT_RGBA8_UNORM_SRGB,
+  )
+  let lin_bgra = @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_BGRA8_UNORM)
+  let lin_rgba = @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_RGBA8_UNORM)
+  let prefs = if prefer_srgb {
+    [srgb_bgra, srgb_rgba, lin_bgra, lin_rgba]
+  } else {
+    [lin_bgra, lin_rgba, srgb_bgra, srgb_rgba]
+  }
+  for pi = 0; pi < prefs.length(); pi = pi + 1 {
+    let pu = prefs[pi].to_u32()
+    for fi = 0; fi < formats.length(); fi = fi + 1 {
+      if formats[fi].to_u32() == pu {
+        return formats[fi]
+      }
+    }
+  }
+  if formats.length() > 0 {
+    formats[0]
+  } else {
+    lin_bgra
+  }
+}
+
+///|
 pub fn webgpu_canvas_context_configure(
   context : WebGPUCanvasContext,
   device : GPUDevice,
@@ -49,14 +93,30 @@ pub fn webgpu_canvas_context_configure(
   let usage = @wgpu.TextureUsage::from_u64(
     @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
   )
-  let configured_format = context.context.surface.configure_default(
+  let prefer_srgb = native_surface_configure_prefer_srgb_from_hint(format)
+  let ok = context.context.surface.configure_best_effort(
     device.adapter,
     device.raw,
     context.context.width,
     context.context.height,
     usage,
+    prefer_srgb=prefer_srgb,
+    vsync=true,
   )
-  context.context.format.val = texture_format_to_string(configured_format)
+  if ok {
+    let fmts = context.context.surface.capabilities_formats(device.adapter)
+    let chosen = pick_native_surface_format(fmts, prefer_srgb)
+    context.context.format.val = texture_format_to_string(chosen)
+  } else {
+    let configured_format = context.context.surface.configure_default(
+      device.adapter,
+      device.raw,
+      context.context.width,
+      context.context.height,
+      usage,
+    )
+    context.context.format.val = texture_format_to_string(configured_format)
+  }
   if context.context.format.val == "" {
     context.context.format.val = format
   }

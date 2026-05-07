@@ -23,6 +23,8 @@ pub fn webgpu_instance_get_preferred_canvas_format(
   instance : WebGPUInstance,
 ) -> String {
   ignore(instance)
+  // 実ブラウザは `getPreferredCanvasFormat()` が `bgra8unorm` のこともある（ログ H5）。
+  // ここを常に sRGB に固定すると `configure` のヒントと実際の能力選択が食い違いやすい。
   "bgra8unorm"
 }
 

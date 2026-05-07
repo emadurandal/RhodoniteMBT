@@ -34,7 +34,7 @@ fn create_pipeline(
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
-    clearColor={ r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
+    clearColor={ r: 1.0, g: 0.0, b: 0.2, a: 1.0 },
     vertex_count=3,
   )
 }
