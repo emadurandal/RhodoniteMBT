@@ -1,8 +1,0 @@
-import {
-}
-
-supported_targets = "wasm"
-
-options(
-  "is-main": true,
-)
