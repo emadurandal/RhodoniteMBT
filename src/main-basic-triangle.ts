@@ -1,5 +1,5 @@
 import "./style.css";
-import { create_webgpu_renderer } from "../webgpu-examples/_build/js/debug/build/basic-triangle/js/main/main.js";
+import { create_webgpu_renderer } from "../moon/webgpu-examples/_build/js/debug/build/basic-triangle/js/main/main.js";
 
 if (!navigator.gpu) {
 	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";

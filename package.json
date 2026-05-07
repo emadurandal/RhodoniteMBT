@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build:moon": "cd webgpu-examples && moon build --target js",
+    "build:moon": "cd moon/webgpu-examples && moon build --target js",
     "dev:basic-triangle": "npm run build:moon && vite --open /demos/basic-triangle.html",
     "dev:triangle-with-buffer": "npm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev:depth-test": "npm run build:moon && vite --open /demos/depth-test.html",

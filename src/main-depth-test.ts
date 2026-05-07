@@ -2,7 +2,7 @@ import "./style.css";
 import {
 	create_webgpu_renderer,
 	depth_test_render_tick,
-} from "../webgpu-examples/_build/js/debug/build/depth-test/js/main/main.js";
+} from "../moon/webgpu-examples/_build/js/debug/build/depth-test/js/main/main.js";
 
 if (!navigator.gpu) {
 	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
