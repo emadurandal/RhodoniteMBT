@@ -28,4 +28,4 @@ fi
 
 moon build --target native
 
-exec "$ROOT/moon-examples/_build/native/debug/build/wgpu/main/main.exe" "$@"
+exec "$ROOT/moon-examples/_build/native/debug/build/basic-triangle/wgpu/main/main.exe" "$@"
