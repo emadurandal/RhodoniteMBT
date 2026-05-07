@@ -6,14 +6,14 @@ package "emadurandal/math"
 // Errors
 
 // Types and methods
-pub(all) struct Vector3 {
-  data : FixedArray[Float]
+pub(all) struct Vector3[T] {
+  data : FixedArray[T]
 }
-pub fn Vector3::new(Float, Float, Float) -> Self
-pub fn Vector3::x(Self) -> Float
-pub fn Vector3::y(Self) -> Float
-pub fn Vector3::z(Self) -> Float
-pub fn Vector3::zero() -> Self
+pub fn[T] Vector3::new(T, T, T) -> Self[T]
+pub fn[T] Vector3::x(Self[T]) -> T
+pub fn[T] Vector3::y(Self[T]) -> T
+pub fn[T] Vector3::z(Self[T]) -> T
+pub fn[T : Default] Vector3::zero() -> Self[T]
 
 // Type aliases
 

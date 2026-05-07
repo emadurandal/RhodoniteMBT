@@ -1,30 +1,31 @@
 ///|
-/// 3 次元ベクトル。成分は `FixedArray[Float]` に保持する。
-pub(all) struct Vector3 {
-  data : FixedArray[Float]
+/// 3 次元ベクトル。成分は `FixedArray[T]` に保持する。
+/// `T` は浮動小数点（`Float` / `Double` など）を想定する。
+pub(all) struct Vector3[T] {
+  data : FixedArray[T]
 }
 
 ///|
-pub fn Vector3::new(x : Float, y : Float, z : Float) -> Vector3 {
-  Vector3::{ data: ([x, y, z] : FixedArray[Float]) }
+pub fn[T] Vector3::new(x : T, y : T, z : T) -> Vector3[T] {
+  Vector3::{ data: ([x, y, z] : FixedArray[T]) }
 }
 
 ///|
-pub fn Vector3::zero() -> Vector3 {
-  Vector3::new(0.0, 0.0, 0.0)
+pub fn[T : Default] Vector3::zero() -> Vector3[T] {
+  Vector3::new(T::default(), T::default(), T::default())
 }
 
 ///|
-pub fn Vector3::x(self : Self) -> Float {
+pub fn[T] Vector3::x(self : Self[T]) -> T {
   self.data[0]
 }
 
 ///|
-pub fn Vector3::y(self : Self) -> Float {
+pub fn[T] Vector3::y(self : Self[T]) -> T {
   self.data[1]
 }
 
 ///|
-pub fn Vector3::z(self : Self) -> Float {
+pub fn[T] Vector3::z(self : Self[T]) -> T {
   self.data[2]
 }
