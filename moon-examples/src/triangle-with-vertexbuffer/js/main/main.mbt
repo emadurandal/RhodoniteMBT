@@ -1,20 +1,7 @@
 ///|
 async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
-  let instance = @wgpu.create_webgpu_instance(@wgpu.navigatorGPU())
-  let adapter = instance.request_adapter()
-  let device = adapter.request_device()
-  let webgpu_canvas_context = @wgpu.create_canvas_context(
-    @wgpu.canvas_getContext(canvas),
-  )
-  let format = instance.get_preferred_canvas_format_for_surface(
-    adapter, webgpu_canvas_context,
-  )
-  webgpu_canvas_context.configure(device, format)
-  let queue = device.get_queue()
-  let webgpu_context = @wgpu.create_webgpu_context(
-    device, webgpu_canvas_context, format, queue,
-  )
-  match @renderer.create_renderer(webgpu_context) {
+  let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
+  match @renderer.create_renderer(ctx) {
     Some(renderer) => {
       @renderer.render_frame(renderer)
       println("WebGPU triangle (vertex buffer) rendered successfully!")

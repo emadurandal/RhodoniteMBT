@@ -1,10 +1,6 @@
 import {
+  "emadurandal/WebGPU-examples/common" @sdl_wgpu,
   "emadurandal/WebGPU-examples/basic-triangle/common" @renderer,
-  "emadurandal/WebGPU/webgpu" @wgpu,
-  "Milky2018/wgpu_mbt/c" @c,
-  "Kaida-Amethyst/sdl3" @sdl3,
-  "Kaida-Amethyst/sdl3/lib" @lib,
-  "moonbitlang/core/ref" @ref,
   "moonbitlang/async" @async,
 }
 
