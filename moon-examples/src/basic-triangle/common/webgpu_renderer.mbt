@@ -24,6 +24,7 @@ fn create_pipeline(
     fragment: shader,
     topology: @w.GPUPrimitiveTopology::TriangleList,
     formats: [format],
+    vertex_buffers: [],
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
   @w.shaderModule_release(shader)

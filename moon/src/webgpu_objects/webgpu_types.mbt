@@ -33,3 +33,6 @@ pub type GPURenderPassEncoder
 
 ///|
 pub type GPUCommandBuffer
+
+///|
+pub type GPUBuffer

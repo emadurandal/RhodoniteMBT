@@ -64,3 +64,8 @@ pub struct GPURenderPassEncoder {
 pub struct GPUCommandBuffer {
   raw : @wgpu.CommandBuffer
 }
+
+///|
+pub struct GPUBuffer {
+  raw : @wgpu.Buffer
+}

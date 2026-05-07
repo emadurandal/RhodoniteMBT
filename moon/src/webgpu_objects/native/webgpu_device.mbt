@@ -41,6 +41,23 @@ fn topology_to_primitive_u32(
 }
 
 ///|
+fn vertex_step_to_u32(mode : @webgpu_enums.GPUVertexStepMode) -> UInt {
+  match mode {
+    Vertex => @wgpu.VERTEX_STEP_MODE_VERTEX
+    Instance => @wgpu.VERTEX_STEP_MODE_INSTANCE
+  }
+}
+
+///|
+fn vertex_format_to_u32(f : @webgpu_enums.GPUVertexFormat) -> UInt {
+  match f {
+    Float32x2 => @wgpu.VERTEX_FORMAT_FLOAT32X2
+    Float32x3 => @wgpu.VERTEX_FORMAT_FLOAT32X3
+    Float32x4 => @wgpu.VERTEX_FORMAT_FLOAT32X4
+  }
+}
+
+///|
 /// Native は `Milky2018/wgpu_mbt` の `RenderPipelineDescBuilder` 経由のみ組み立て可能で、
 /// 頂点・フラグメントで **別ハンドルの ShaderModule** を正しく割り当てる API が無い。
 /// 別 WGSL モジュールが必要な場合は wgpu_mbt 側の拡張か C からの記述子構築が必要。
@@ -50,6 +67,7 @@ pub fn webgpu_device_create_render_pipeline(
   fragment : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
   formats~ : Array[String],
+  vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout],
 ) -> GPURenderPipeline {
   if !physical_equal(vertex.raw, fragment.raw) {
     abort(
@@ -68,6 +86,26 @@ pub fn webgpu_device_create_render_pipeline(
       let _ = builder.set_entry_points("vertexMain", "fragmentMain")
       let _ = builder.set_color_target_format(format)
       let _ = builder.set_topology_u32(topology_u)
+      if vertex_buffers.length() > 0 {
+        for i = 0; i < vertex_buffers.length(); i = i + 1 {
+          let vb = vertex_buffers[i]
+          let step_u = vertex_step_to_u32(vb.step_mode)
+          if i == 0 {
+            let _ = builder.set_vertex_buffer_layout(vb.array_stride, step_u)
+          } else {
+            ignore(builder.add_vertex_buffer_layout(vb.array_stride, step_u))
+          }
+          for j = 0; j < vb.attributes.length(); j = j + 1 {
+            let a = vb.attributes[j]
+            let fmt_u = vertex_format_to_u32(a.format)
+            let _ = builder.add_vertex_attribute(
+              fmt_u,
+              a.offset,
+              a.shader_location,
+            )
+          }
+        }
+      }
       let desc = builder.finish_descriptor_ptr()
       let raw = device.device.raw.create_render_pipeline_ptr(desc)
       @c.render_pipeline_descriptor_free(desc)
@@ -83,6 +121,16 @@ pub fn webgpu_device_create_render_pipeline(
   } catch {
     _ => abort("native WebGPU: render pipeline builder allocation failed")
   }
+}
+
+///|
+pub fn webgpu_device_create_buffer(
+  device : WebGPUDevice,
+  size : UInt64,
+  usage : UInt64,
+) -> GPUBuffer {
+  let usage_flags = @wgpu.BufferUsage::from_u64(usage)
+  GPUBuffer::{ raw: device.device.raw.create_buffer(size~, usage=usage_flags) }
 }
 
 ///|

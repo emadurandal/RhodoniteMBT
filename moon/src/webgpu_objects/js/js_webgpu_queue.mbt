@@ -17,3 +17,13 @@ pub fn webgpu_queue_submit(
 ) -> Unit {
   queue_submit(queue.queue, commandBuffer)
 }
+
+///|
+pub fn webgpu_queue_write_buffer(
+  queue : WebGPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  data : Array[Byte],
+) -> Unit {
+  queue_writeBuffer(queue.queue, buffer, js_u64_to_double(offset), data)
+}

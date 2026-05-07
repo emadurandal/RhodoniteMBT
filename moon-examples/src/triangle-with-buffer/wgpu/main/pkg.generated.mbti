@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "emadurandal/WebGPU-examples/wasm/main"
+package "emadurandal/WebGPU-examples/triangle-with-buffer/wgpu/main"
 
 // Values
 
