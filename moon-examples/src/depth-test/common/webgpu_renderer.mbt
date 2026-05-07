@@ -25,6 +25,10 @@ let index_u16_count : Int = 36
 let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 
 ///|
+/// 真横投影を避け、立方体の奥行きが分かるようわずかに上から見下ろす（ラジアン・約 22°）。
+let camera_elevation_rad : Double = 0.38
+
+///|
 fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
@@ -95,6 +99,29 @@ fn mat4_translate(tx : Double, ty : Double, tz : Double) -> Array[Double] {
   m[12] = tx
   m[13] = ty
   m[14] = tz
+  m[15] = 1.0
+  m
+}
+
+///|
+/// 右手座標系・+X 軸周り（`c = cos θ`, `s = sin θ`）。
+fn mat4_rotate_x(c : Double, s : Double) -> Array[Double] {
+  let m = Array::make(16, 0.0)
+  m[0] = 1.0
+  m[1] = 0.0
+  m[2] = 0.0
+  m[3] = 0.0
+  m[4] = 0.0
+  m[5] = c
+  m[6] = s
+  m[7] = 0.0
+  m[8] = 0.0
+  m[9] = -s
+  m[10] = c
+  m[11] = 0.0
+  m[12] = 0.0
+  m[13] = 0.0
+  m[14] = 0.0
   m[15] = 1.0
   m
 }
@@ -302,7 +329,12 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let tb = mat4_translate(half_separation, 0.0, 0.0)
   let ma = mat4_mul(r, ta)
   let mb = mat4_mul(r, tb)
-  let view = mat4_translate(0.0, 0.0, -8.0)
+  let v_cos = cos_approx(camera_elevation_rad)
+  let v_sin = sin_approx(camera_elevation_rad)
+  let view = mat4_mul(
+    mat4_rotate_x(v_cos, v_sin),
+    mat4_translate(0.0, 0.0, -8.0),
+  )
   let proj = mat4_ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
   let pv = mat4_mul(proj, view)
   let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
