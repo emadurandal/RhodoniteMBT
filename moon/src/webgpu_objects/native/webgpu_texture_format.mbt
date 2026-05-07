@@ -14,7 +14,7 @@ fn texture_format_from_string(format : String) -> @wgpu.TextureFormat {
 }
 
 ///|
-pub fn texture_format_to_string(format : @wgpu.TextureFormat) -> String {
+fn texture_format_to_string(format : @wgpu.TextureFormat) -> String {
   match format.to_u32() {
     @wgpu.TEXTURE_FORMAT_BGRA8_UNORM => "bgra8unorm"
     @wgpu.TEXTURE_FORMAT_BGRA8_UNORM_SRGB => "bgra8unorm-srgb"
