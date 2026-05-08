@@ -22,7 +22,7 @@ export class Vector3F {
 		this.inner = inner;
 	}
 
-	static of(x: number, y: number, z: number): Vector3F {
+	static new(x: number, y: number, z: number): Vector3F {
 		return new Vector3F(v3f_new(x, y, z));
 	}
 
@@ -73,12 +73,4 @@ export class Vector3F {
 	toString(): string {
 		return v3f_to_string(this.inner);
 	}
-}
-
-export function vec3f(x: number, y: number, z: number): Vector3F {
-	return Vector3F.of(x, y, z);
-}
-
-export function vec3fZero(): Vector3F {
-	return Vector3F.zero();
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { vec4f, vec4fZero } from "./vector4.ts";
+import { Vector4F } from "./vector4.ts";
 
 describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	it("Vector4::new and x y z w", () => {
-		const v = vec4f(1, 2, 3, 4);
+		const v = Vector4F.new(1, 2, 3, 4);
 		expect(v.x()).toBeCloseTo(1);
 		expect(v.y()).toBeCloseTo(2);
 		expect(v.z()).toBeCloseTo(3);
@@ -11,7 +11,7 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("Vector4::zero", () => {
-		const z = vec4fZero();
+		const z = Vector4F.zero();
 		expect(z.x()).toBeCloseTo(0);
 		expect(z.y()).toBeCloseTo(0);
 		expect(z.z()).toBeCloseTo(0);
@@ -19,8 +19,8 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("Vector4 add sub neg", () => {
-		const a = vec4f(10, 20, 30, 40);
-		const b = vec4f(1, 2, 3, 4);
+		const a = Vector4F.new(10, 20, 30, 40);
+		const b = Vector4F.new(1, 2, 3, 4);
 		const sum = a.add(b);
 		expect(sum.x()).toBeCloseTo(11);
 		expect(sum.y()).toBeCloseTo(22);
@@ -39,8 +39,8 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("Vector4 Hadamard mul", () => {
-		const a = vec4f(2, 3, 4, 5);
-		const b = vec4f(6, 7, 8, 9);
+		const a = Vector4F.new(2, 3, 4, 5);
+		const b = Vector4F.new(6, 7, 8, 9);
 		const h = a.mul(b);
 		expect(h.x()).toBeCloseTo(12);
 		expect(h.y()).toBeCloseTo(21);
@@ -49,7 +49,7 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("Vector4 scale div_scalar", () => {
-		const v = vec4f(8, 12, 16, 20);
+		const v = Vector4F.new(8, 12, 16, 20);
 		const s = v.scale(2);
 		expect(s.x()).toBeCloseTo(16);
 		expect(s.y()).toBeCloseTo(24);
@@ -63,12 +63,16 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("Vector4 Eq", () => {
-		expect(vec4f(1, 2, 3, 4).eq(vec4f(1, 2, 3, 4))).toBe(true);
-		expect(vec4f(1, 2, 3, 4).eq(vec4f(1, 2, 3, 5))).toBe(false);
+		expect(Vector4F.new(1, 2, 3, 4).eq(Vector4F.new(1, 2, 3, 4))).toBe(
+			true,
+		);
+		expect(Vector4F.new(1, 2, 3, 4).eq(Vector4F.new(1, 2, 3, 5))).toBe(
+			false,
+		);
 	});
 
 	it("Vector4 Show", () => {
-		expect(vec4f(1, 2, 3, 4).toString()).toBe(
+		expect(Vector4F.new(1, 2, 3, 4).toString()).toBe(
 			"Vector4::new(1, 2, 3, 4)",
 		);
 	});

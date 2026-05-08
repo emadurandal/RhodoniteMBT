@@ -23,7 +23,7 @@ export class Vector4F {
 		this.inner = inner;
 	}
 
-	static of(x: number, y: number, z: number, w: number): Vector4F {
+	static new(x: number, y: number, z: number, w: number): Vector4F {
 		return new Vector4F(v4f_new(x, y, z, w));
 	}
 
@@ -78,12 +78,4 @@ export class Vector4F {
 	toString(): string {
 		return v4f_to_string(this.inner);
 	}
-}
-
-export function vec4f(x: number, y: number, z: number, w: number): Vector4F {
-	return Vector4F.of(x, y, z, w);
-}
-
-export function vec4fZero(): Vector4F {
-	return Vector4F.zero();
 }
