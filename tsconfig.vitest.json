@@ -8,5 +8,5 @@
 			]
 		}
 	},
-	"include": ["moon/math/ts/**/*.ts"]
+	"include": ["moon/math/ts/**/*.ts", "moon/math/ts/math-bridge.d.ts"]
 }
