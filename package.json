@@ -8,13 +8,11 @@
     "dev:basic-triangle": "npm run build:moon && vite --open /demos/basic-triangle.html",
     "dev:triangle-with-buffer": "npm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev:depth-test": "npm run build:moon && vite --open /demos/depth-test.html",
-    "dev": "npm run dev:basic-triangle",
     "run:wgpu:basic-triangle": "bash scripts/run-wgpu-sdl3.sh basic-triangle",
     "run:wgpu:triangle-with-buffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-buffer",
     "run:wgpu:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "run:wgpu": "npm run run:wgpu:basic-triangle",
     "build": "npm run build:moon && tsc && vite build",
-    "preview": "vite preview",
     "build:math:js": "cd moon/math && moon build --target js --release",
     "test:math:js": "npm run build:math:js && vitest run moon/math/ts",
     "test:math:mbt": "cd moon/math && moon test"
