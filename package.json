@@ -16,7 +16,8 @@
     "build": "npm run build:moon && tsc && vite build",
     "preview": "vite preview",
     "build:math:js": "cd moon/math && moon build --target js --release",
-    "test:math:js": "npm run build:math:js && vitest run moon/math/ts"
+    "test:math:js": "npm run build:math:js && vitest run moon/math/ts",
+    "test:math:mbt": "cd moon/math && moon test"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
