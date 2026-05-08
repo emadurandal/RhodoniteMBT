@@ -8,6 +8,17 @@ test "Vector4::new and x y z w" {
 }
 
 ///|
+test "Vector4::data matches field and components" {
+  let v = Vector4::new(1, 2, 3, 4)
+  let d = v.data()
+  assert_eq(d, v.data)
+  assert_eq(d[0], v.x())
+  assert_eq(d[1], v.y())
+  assert_eq(d[2], v.z())
+  assert_eq(d[3], v.w())
+}
+
+///|
 test "Vector4::zero" {
   let z : Vector4[Int] = Vector4::zero()
   assert_eq(z.x(), 0)

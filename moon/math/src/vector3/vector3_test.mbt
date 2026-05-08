@@ -7,6 +7,16 @@ test "Vector3::new and x y z" {
 }
 
 ///|
+test "Vector3::data matches field and components" {
+  let v = Vector3::new(1, 2, 3)
+  let d = v.data()
+  assert_eq(d, v.data)
+  assert_eq(d[0], v.x())
+  assert_eq(d[1], v.y())
+  assert_eq(d[2], v.z())
+}
+
+///|
 test "Vector3::zero" {
   let z : Vector3[Int] = Vector3::zero()
   assert_eq(z.x(), 0)

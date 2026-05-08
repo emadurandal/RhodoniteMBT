@@ -24,6 +24,12 @@ pub fn[T] Vector3::z(self : Self[T]) -> T {
 }
 
 ///|
+/// 内部の `FixedArray` をそのまま返す。ストレージの共有参照であり、要素のコピーは行わない。
+pub fn[T] Vector3::data(self : Self[T]) -> FixedArray[T] {
+  self.data
+}
+
+///|
 /// スカラー倍。`*` は `Mul` がベクトル同士（Hadamard）用のためこちらを使う。
 pub fn[T : Mul] Vector3::scale(self : Self[T], s : T) -> Vector3[T] {
   Vector3::new(self.data[0] * s, self.data[1] * s, self.data[2] * s)

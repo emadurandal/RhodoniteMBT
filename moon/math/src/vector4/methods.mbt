@@ -29,6 +29,12 @@ pub fn[T] Vector4::w(self : Self[T]) -> T {
 }
 
 ///|
+/// 内部の `FixedArray` をそのまま返す。ストレージの共有参照であり、要素のコピーは行わない。
+pub fn[T] Vector4::data(self : Self[T]) -> FixedArray[T] {
+  self.data
+}
+
+///|
 /// スカラー倍。`*` は `Mul` がベクトル同士（Hadamard）用のためこちらを使う。
 pub fn[T : Mul] Vector4::scale(self : Self[T], s : T) -> Vector4[T] {
   Vector4::new(

@@ -26,6 +26,11 @@ pub fn v3f_z(v : @v3.Vector3F) -> Float {
 }
 
 ///|
+pub fn v3f_data(v : @v3.Vector3F) -> FixedArray[Float] {
+  v.data()
+}
+
+///|
 pub fn v3f_add(a : @v3.Vector3F, b : @v3.Vector3F) -> @v3.Vector3F {
   a + b
 }
@@ -95,6 +100,11 @@ pub fn v4f_z(v : @v4.Vector4F) -> Float {
 ///|
 pub fn v4f_w(v : @v4.Vector4F) -> Float {
   v.w()
+}
+
+///|
+pub fn v4f_data(v : @v4.Vector4F) -> FixedArray[Float] {
+  v.data()
 }
 
 ///|

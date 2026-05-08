@@ -9,6 +9,7 @@ package "emadurandal/math/vector3"
 pub(all) struct Vector3[T] {
   data : FixedArray[T]
 }
+pub fn[T] Vector3::data(Self[T]) -> FixedArray[T]
 pub fn[T : Div] Vector3::div_scalar(Self[T], T) -> Self[T]
 pub fn[T] Vector3::new(T, T, T) -> Self[T]
 pub fn[T : Mul] Vector3::scale(Self[T], T) -> Self[T]

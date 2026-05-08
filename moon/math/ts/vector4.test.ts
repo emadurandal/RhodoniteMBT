@@ -18,6 +18,16 @@ describe("Vector4F (MoonBit js_bridge wrapper)", () => {
 		expect(z.w()).toBeCloseTo(0);
 	});
 
+	it("Vector4 data() は inner.data と同一参照", () => {
+		const v = Vector4F.new(1, 2, 3, 4);
+		const a = v.data();
+		expect(a).toBe(v.inner.data);
+		expect(a[0]).toBeCloseTo(1);
+		expect(a[1]).toBeCloseTo(2);
+		expect(a[2]).toBeCloseTo(3);
+		expect(a[3]).toBeCloseTo(4);
+	});
+
 	it("Vector4 add sub neg", () => {
 		const a = Vector4F.new(10, 20, 30, 40);
 		const b = Vector4F.new(1, 2, 3, 4);

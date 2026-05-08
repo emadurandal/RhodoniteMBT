@@ -9,6 +9,7 @@ import {
 	v4f_scale,
 	v4f_sub,
 	v4f_to_string,
+	v4f_data,
 	v4f_w,
 	v4f_x,
 	v4f_y,
@@ -45,6 +46,11 @@ export class Vector4F {
 
 	w(): number {
 		return v4f_w(this.inner);
+	}
+
+	/** 内部ストレージと同一の配列（コピーなし）。 */
+	data(): number[] {
+		return v4f_data(this.inner);
 	}
 
 	add(other: Vector4F): Vector4F {

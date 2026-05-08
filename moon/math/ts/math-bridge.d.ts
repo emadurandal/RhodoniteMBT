@@ -7,6 +7,8 @@ declare module "@moon/math/js_bridge" {
 	export function v3f_x(v: MoonVecF): number;
 	export function v3f_y(v: MoonVecF): number;
 	export function v3f_z(v: MoonVecF): number;
+	/** ベクトル内部の `FixedArray` と同一の `number[]`（コピーなし）。 */
+	export function v3f_data(v: MoonVecF): number[];
 	export function v3f_add(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v3f_sub(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v3f_neg(v: MoonVecF): MoonVecF;
@@ -28,6 +30,8 @@ declare module "@moon/math/js_bridge" {
 	export function v4f_y(v: MoonVecF): number;
 	export function v4f_z(v: MoonVecF): number;
 	export function v4f_w(v: MoonVecF): number;
+	/** ベクトル内部の `FixedArray` と同一の `number[]`（コピーなし）。 */
+	export function v4f_data(v: MoonVecF): number[];
 	export function v4f_add(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v4f_sub(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v4f_neg(v: MoonVecF): MoonVecF;

@@ -9,6 +9,7 @@ import {
 	v3f_scale,
 	v3f_sub,
 	v3f_to_string,
+	v3f_data,
 	v3f_x,
 	v3f_y,
 	v3f_z,
@@ -40,6 +41,11 @@ export class Vector3F {
 
 	z(): number {
 		return v3f_z(this.inner);
+	}
+
+	/** 内部ストレージと同一の配列（コピーなし）。 */
+	data(): number[] {
+		return v3f_data(this.inner);
 	}
 
 	add(other: Vector3F): Vector3F {
