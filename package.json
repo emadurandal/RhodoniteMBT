@@ -14,11 +14,15 @@
     "run:wgpu:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "run:wgpu": "npm run run:wgpu:basic-triangle",
     "build": "npm run build:moon && tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:math:js": "cd moon/math && moon build --target js --release",
+    "test:math:js": "npm run build:math:js && vitest run moon/math/ts"
   },
   "devDependencies": {
+    "@types/node": "^22.15.21",
     "@webgpu/types": "^0.1.64",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   }
 }
