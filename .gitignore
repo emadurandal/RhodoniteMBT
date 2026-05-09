@@ -26,13 +26,15 @@ dist-ssr
 .mooncakes
 
 # MoonBit build artifacts - ignore everything in target except the JS build output
-moon/target/*
-!moon/target/js/
-moon/target/js/*
-!moon/target/js/release/
-moon/target/js/release/*
-!moon/target/js/release/build/
-moon/target/js/release/build/*
-!moon/target/js/release/build/main/
-moon/_build
-moon-examples/_build
+moon/webgpu/target/*
+!moon/webgpu/target/js/
+moon/webgpu/target/js/*
+!moon/webgpu/target/js/release/
+moon/webgpu/target/js/release/*
+!moon/webgpu/target/js/release/build/
+moon/webgpu/target/js/release/build/*
+!moon/webgpu/target/js/release/build/main/
+moon/webgpu/_build
+moon/webgpu-examples/_build
+moon/math/_build
+moon/math/target

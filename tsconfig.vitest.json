@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@moon/math/js_bridge": [
+				"./moon/math/_build/js/release/build/js_bridge/js_bridge.js"
+			]
+		}
+	},
+	"include": ["moon/math/ts/**/*.ts", "moon/math/ts/math-bridge.d.ts"]
+}

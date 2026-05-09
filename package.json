@@ -4,21 +4,24 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build:moon": "cd moon-examples && moon build --target js",
+    "build:moon": "cd moon/webgpu-examples && moon build --target js",
     "dev:basic-triangle": "npm run build:moon && vite --open /demos/basic-triangle.html",
     "dev:triangle-with-buffer": "npm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev:depth-test": "npm run build:moon && vite --open /demos/depth-test.html",
-    "dev": "npm run dev:basic-triangle",
     "run:wgpu:basic-triangle": "bash scripts/run-wgpu-sdl3.sh basic-triangle",
     "run:wgpu:triangle-with-buffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-buffer",
     "run:wgpu:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "run:wgpu": "npm run run:wgpu:basic-triangle",
     "build": "npm run build:moon && tsc && vite build",
-    "preview": "vite preview"
+    "build:math:js": "cd moon/math && moon build --target js --release",
+    "test:math:js": "npm run build:math:js && vitest run moon/math/ts",
+    "test:math:mbt": "cd moon/math && moon test"
   },
   "devDependencies": {
+    "@types/node": "^22.15.21",
     "@webgpu/types": "^0.1.64",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   }
 }
