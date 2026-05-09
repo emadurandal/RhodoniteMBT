@@ -198,7 +198,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
     6U, 6U, 2U, 1U, 0U, 1U, 5U, 5U, 4U, 0U, 3U, 2U, 6U, 6U, 7U, 3U,
   ]
   for i = 0; i < index_u16_count; i = i + 1 {
-    @w.put_u16_le(buf, i * 2, idx[i])
+    @writes.put_u16_le(buf, i * 2, idx[i])
   }
   buf
 }
@@ -216,13 +216,13 @@ fn write_cube_interleaved(
     let (lx, ly, lz) = corners[vi]
     let (cx, cy, cz, cw) = transform_hom(mvp, lx, ly, lz)
     let base = vi * vertex_stride_bytes
-    @w.put_f32_le(buf, base + 0, cx)
-    @w.put_f32_le(buf, base + 4, cy)
-    @w.put_f32_le(buf, base + 8, cz)
-    @w.put_f32_le(buf, base + 12, cw)
-    @w.put_f32_le(buf, base + 16, color_r)
-    @w.put_f32_le(buf, base + 20, color_g)
-    @w.put_f32_le(buf, base + 24, color_b)
+    @writes.put_f32_le(buf, base + 0, cx)
+    @writes.put_f32_le(buf, base + 4, cy)
+    @writes.put_f32_le(buf, base + 8, cz)
+    @writes.put_f32_le(buf, base + 12, cw)
+    @writes.put_f32_le(buf, base + 16, color_r)
+    @writes.put_f32_le(buf, base + 20, color_g)
+    @writes.put_f32_le(buf, base + 24, color_b)
   }
 }
 

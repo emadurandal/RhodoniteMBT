@@ -26,11 +26,11 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
     cg : Double,
     cb : Double,
   ) -> Unit {
-    @w.put_f32_le(buf, base + 0, px)
-    @w.put_f32_le(buf, base + 4, py)
-    @w.put_f32_le(buf, base + 8, cr)
-    @w.put_f32_le(buf, base + 12, cg)
-    @w.put_f32_le(buf, base + 16, cb)
+    @writes.put_f32_le(buf, base + 0, px)
+    @writes.put_f32_le(buf, base + 4, py)
+    @writes.put_f32_le(buf, base + 8, cr)
+    @writes.put_f32_le(buf, base + 12, cg)
+    @writes.put_f32_le(buf, base + 16, cb)
   }
   put_vertex(0, 0.0, 0.5, 1.0, 0.0, 0.0)
   put_vertex(stride, -0.5, -0.5, 0.0, 1.0, 0.0)
@@ -42,9 +42,9 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
 /// 6 バイトのインデックス + 2 バイトパディング（`writeBuffer` の 4 バイト境界用）。
 fn index_triangle_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(8, (0 : Byte))
-  @w.put_u16_le(buf, 0, 0U)
-  @w.put_u16_le(buf, 2, 1U)
-  @w.put_u16_le(buf, 4, 2U)
+  @writes.put_u16_le(buf, 0, 0U)
+  @writes.put_u16_le(buf, 2, 1U)
+  @writes.put_u16_le(buf, 4, 2U)
   buf
 }
 

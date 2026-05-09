@@ -38,3 +38,4 @@ moon/webgpu/_build
 moon/webgpu-examples/_build
 moon/math/_build
 moon/math/target
+moon/binary/_build

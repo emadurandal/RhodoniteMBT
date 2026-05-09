@@ -1,5 +1,5 @@
 ///|
-/// `FixedArray[Byte]` の `off` から uint16 をリトルエンディアンで書き込む（頂点・インデックスバッファ組み立て用）。
+/// `FixedArray[Byte]` の `off` から uint16 をリトルエンディアンで書き込む。
 pub fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
