@@ -29,26 +29,6 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-fn put_u32_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
-  buf[off] = (u & 0xFFU).to_byte()
-  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
-  buf[off + 2] = ((u >> 16) & 0xFFU).to_byte()
-  buf[off + 3] = ((u >> 24) & 0xFFU).to_byte()
-}
-
-///|
-fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
-  buf[off] = (u & 0xFFU).to_byte()
-  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
-}
-
-///|
-fn put_f32_le(buf : FixedArray[Byte], off : Int, d : Double) -> Unit {
-  let u = Float::from_double(d).reinterpret_as_uint()
-  put_u32_le(buf, off, u)
-}
-
-///|
 /// \([-π, π]\) 向けのテイラー近似。
 fn sin_approx(a : Double) -> Double {
   let two_pi = 6.283185307179586
@@ -218,7 +198,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
     6U, 6U, 2U, 1U, 0U, 1U, 5U, 5U, 4U, 0U, 3U, 2U, 6U, 6U, 7U, 3U,
   ]
   for i = 0; i < index_u16_count; i = i + 1 {
-    put_u16_le(buf, i * 2, idx[i])
+    @w.put_u16_le(buf, i * 2, idx[i])
   }
   buf
 }
@@ -236,13 +216,13 @@ fn write_cube_interleaved(
     let (lx, ly, lz) = corners[vi]
     let (cx, cy, cz, cw) = transform_hom(mvp, lx, ly, lz)
     let base = vi * vertex_stride_bytes
-    put_f32_le(buf, base + 0, cx)
-    put_f32_le(buf, base + 4, cy)
-    put_f32_le(buf, base + 8, cz)
-    put_f32_le(buf, base + 12, cw)
-    put_f32_le(buf, base + 16, color_r)
-    put_f32_le(buf, base + 20, color_g)
-    put_f32_le(buf, base + 24, color_b)
+    @w.put_f32_le(buf, base + 0, cx)
+    @w.put_f32_le(buf, base + 4, cy)
+    @w.put_f32_le(buf, base + 8, cz)
+    @w.put_f32_le(buf, base + 12, cw)
+    @w.put_f32_le(buf, base + 16, color_r)
+    @w.put_f32_le(buf, base + 20, color_g)
+    @w.put_f32_le(buf, base + 24, color_b)
   }
 }
 

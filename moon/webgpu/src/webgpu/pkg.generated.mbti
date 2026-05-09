@@ -31,6 +31,12 @@ pub fn create_webgpu_instance(@webgpu_objects.GPU) -> GPUInstance
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
+pub fn put_f32_le(FixedArray[Byte], Int, Double) -> Unit
+
+pub fn put_u16_le(FixedArray[Byte], Int, UInt) -> Unit
+
+pub fn put_u32_le(FixedArray[Byte], Int, UInt) -> Unit
+
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 
 pub fn shaderModule_release(@webgpu_objects.GPUShaderModule) -> Unit
