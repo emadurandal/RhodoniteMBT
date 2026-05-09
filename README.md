@@ -5,11 +5,13 @@
 ### Web
 
 ```bash
-npm run dev
+pnpm install
+pnpm run dev:basic-triangle
 ```
 
 ### Native
 
 ```bash
-npm run run:wgpu
+pnpm install
+pnpm run run:wgpu:basic-triangle
 ```
