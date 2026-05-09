@@ -23,7 +23,7 @@ pub fn webgpu_queue_write_buffer(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
   offset : UInt64,
-  data : Array[Byte],
+  data : Bytes,
 ) -> Unit {
   queue_writeBuffer(queue.queue, buffer, js_u64_to_double(offset), data)
 }

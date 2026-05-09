@@ -117,7 +117,8 @@ pub(all) struct GPUQueue {
 }
 pub fn GPUQueue::release(Self) -> Unit
 pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
-pub fn GPUQueue::write_buffer(Self, GPUBuffer, UInt64, Array[Byte]) -> Unit
+pub fn GPUQueue::write_buffer(Self, GPUBuffer, UInt64, Bytes) -> Unit
+pub fn GPUQueue::write_buffer_from_fixed_array(Self, GPUBuffer, UInt64, FixedArray[Byte]) -> Unit
 
 pub(all) struct GPURenderPassColorAttachment {
   view : @webgpu_objects.GPUTextureView

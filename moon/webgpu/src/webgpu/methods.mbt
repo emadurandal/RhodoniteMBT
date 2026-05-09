@@ -129,8 +129,36 @@ pub fn GPUQueue::write_buffer(
   self : GPUQueue,
   buffer : GPUBuffer,
   offset : UInt64,
-  data : Array[Byte],
+  data : Bytes,
 ) -> Unit {
+  @raw.webgpu_queue_write_buffer(self.raw, buffer.raw, offset, data)
+}
+
+///|
+/// `FixedArray[Byte]` をヒープコピーせず `Bytes` として解釈してから `write_buffer` へ渡す。
+///
+/// `FixedArray::unsafe_reinterpret_as_bytes` は同一ストレージを `Bytes` として
+/// 見せるだけなので、`Bytes::from_array` のような全面コピーは発生しない。
+///
+/// # 注意（利用者向け）
+///
+/// - **unsafe の意味**: 標準ライブラリが `#internal` としている reinterpret と同じ意味で、
+///   `Bytes` は元のバイト列とエイリアスになる（`Bytes` を経由した変更は `FixedArray` と同一メモリに反映される）。
+///   本関数は引数の `FixedArray` を所有権移動で受け取り、内部で `Bytes` に変換して転送するため、
+///   呼び出し側では **渡した後に同じバッファを別参照しない**こと。
+/// - **ライフサイム**: `webgpu_queue_write_buffer` は FFI でデータを借用する。呼び出しが返るまで
+///   バッファは有効であること（通常は関数スコープ内で満たされる）。
+/// - **ネイティブ（wgpu）**: 依存する `wgpu_mbt` の `Queue::write_buffer` は、データ長が 4 バイト境界でない場合、
+///   パディング用に別バッファへコピーする経路がある。不要なコピーを避けるには長さを 4 の倍数にしておくこと。
+/// - **JS**: `Bytes` は JS FFI で `Uint8Array` に対応するため、そのまま `GPUQueue.writeBuffer` に渡る。
+///
+pub fn GPUQueue::write_buffer_from_fixed_array(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  arr : FixedArray[Byte],
+) -> Unit {
+  let data = FixedArray::unsafe_reinterpret_as_bytes(arr)
   @raw.webgpu_queue_write_buffer(self.raw, buffer.raw, offset, data)
 }
 

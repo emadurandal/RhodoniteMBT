@@ -298,10 +298,10 @@ extern "js" fn queue_writeBuffer(
   queue : GPUQueue,
   buffer : GPUBuffer,
   offset : Double,
-  data : Array[Byte],
+  data : Bytes,
 ) -> Unit =
   #| (queue, buffer, offset, data) =>
-  #|   queue.writeBuffer(buffer, offset, new Uint8Array(data))
+  #|   queue.writeBuffer(buffer, offset, data)
 
 ///|
 extern "js" fn queue_submit(

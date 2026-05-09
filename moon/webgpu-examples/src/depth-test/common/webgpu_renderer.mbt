@@ -29,7 +29,7 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+fn put_u32_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
   buf[off + 2] = ((u >> 16) & 0xFFU).to_byte()
@@ -37,13 +37,13 @@ fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
 }
 
 ///|
-fn put_u16_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
 }
 
 ///|
-fn put_f32_le(buf : Array[Byte], off : Int, d : Double) -> Unit {
+fn put_f32_le(buf : FixedArray[Byte], off : Int, d : Double) -> Unit {
   let u = Float::from_double(d).reinterpret_as_uint()
   put_u32_le(buf, off, u)
 }
@@ -211,8 +211,8 @@ fn cube_local_corners() -> Array[(Double, Double, Double)] {
 }
 
 ///|
-fn index_cube_u16_bytes() -> Array[Byte] {
-  let buf = Array::make(72, (0 : Byte))
+fn index_cube_u16_bytes() -> FixedArray[Byte] {
+  let buf = FixedArray::make(72, (0 : Byte))
   let idx : Array[UInt] = [
     0U, 1U, 2U, 2U, 3U, 0U, 4U, 5U, 6U, 6U, 7U, 4U, 0U, 4U, 7U, 7U, 3U, 0U, 1U, 5U,
     6U, 6U, 2U, 1U, 0U, 1U, 5U, 5U, 4U, 0U, 3U, 2U, 6U, 6U, 7U, 3U,
@@ -225,7 +225,7 @@ fn index_cube_u16_bytes() -> Array[Byte] {
 
 ///|
 fn write_cube_interleaved(
-  buf : Array[Byte],
+  buf : FixedArray[Byte],
   mvp : Array[Double],
   color_r : Double,
   color_g : Double,
@@ -296,7 +296,7 @@ pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let iusage = @w.GPU_BUFFER_USAGE_INDEX | @w.GPU_BUFFER_USAGE_COPY_DST
   let index_buffer = device.create_buffer(index_buffer_byte_length, iusage)
   let index_bytes = index_cube_u16_bytes()
-  queue.write_buffer(index_buffer, 0UL, index_bytes)
+  queue.write_buffer_from_fixed_array(index_buffer, 0UL, index_bytes)
   let depth_texture = device.create_texture(
     canvas_width,
     canvas_height,
@@ -340,12 +340,26 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
   let mvp_a = mat4_mul(z_ndc_webgpu, mat4_mul(pv, ma))
   let mvp_b = mat4_mul(z_ndc_webgpu, mat4_mul(pv, mb))
-  let bytes_a = Array::make(verts_per_cube * vertex_stride_bytes, (0 : Byte))
-  let bytes_b = Array::make(verts_per_cube * vertex_stride_bytes, (0 : Byte))
+  let bytes_a = FixedArray::make(
+    verts_per_cube * vertex_stride_bytes,
+    (0 : Byte),
+  )
+  let bytes_b = FixedArray::make(
+    verts_per_cube * vertex_stride_bytes,
+    (0 : Byte),
+  )
   write_cube_interleaved(bytes_a, mvp_a, 0.85, 0.35, 0.25)
   write_cube_interleaved(bytes_b, mvp_b, 0.25, 0.55, 0.95)
-  renderer.queue.write_buffer(renderer.vertex_buffer_a, 0UL, bytes_a)
-  renderer.queue.write_buffer(renderer.vertex_buffer_b, 0UL, bytes_b)
+  renderer.queue.write_buffer_from_fixed_array(
+    renderer.vertex_buffer_a,
+    0UL,
+    bytes_a,
+  )
+  renderer.queue.write_buffer_from_fixed_array(
+    renderer.vertex_buffer_b,
+    0UL,
+    bytes_b,
+  )
   let texture = renderer.context.get_current_texture()
   let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
