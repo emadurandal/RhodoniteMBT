@@ -14,7 +14,7 @@
     "build": "pnpm run build:moon && tsc && vite build",
     "build:math:js": "cd moon/rhodonite_math && moon build --target js --release",
     "test:math:js": "pnpm run build:math:js && vitest run moon/rhodonite_math/ts",
-    "test:math:mbt": "moon test --target wasm-gc moon/rhodonite_math/src/vector3 moon/rhodonite_math/src/vector4"
+    "test:math:mbt": "bash scripts/test-rhodonite-math-mbt.sh"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

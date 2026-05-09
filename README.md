@@ -62,7 +62,7 @@ pnpm run test:math:js
 pnpm run test:math:mbt
 ```
 
-ルートに [`moon.work`](moon.work) があると、`moon/rhodonite_math` に移動して単に `moon test` するとワークスペース全体のビルド計画に `rhodonite_webgpu` が含まれ、`webgpu_objects` が仮想パッケージのまま解決できずエラーになることがあります。上記スクリプトは **リポジトリルートから** `vector3` / `vector4` パッケージだけを対象にします。別パッケージにテストを追加したら、`package.json` の `test:math:mbt` にそのディレクトリを足してください。
+ルートに [`moon.work`](moon.work) があると、`moon/rhodonite_math` に移動して単に `moon test` するとワークスペース全体のビルド計画に `rhodonite_webgpu` が含まれ、`webgpu_objects` が仮想パッケージのまま解決できずエラーになることがあります。そのため [`scripts/test-rhodonite-math-mbt.sh`](scripts/test-rhodonite-math-mbt.sh) がリポジトリルートから実行し、`moon/rhodonite_math/src` 以下の `*_test.mbt` があるパッケージだけを `moon test` に渡します（新しいパッケージを追加しても `package.json` を編集する必要はありません）。
 
 ## Publish の順序（目安）
 
