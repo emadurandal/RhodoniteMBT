@@ -1,9 +1,0 @@
-import {
-  "emadurandal/WebGPU/webgpu" @wgpu,
-  "Milky2018/wgpu_mbt/c" @c,
-  "Kaida-Amethyst/sdl3" @sdl3,
-  "Kaida-Amethyst/sdl3/lib" @lib,
-  "moonbitlang/core/ref" @ref,
-}
-
-supported_targets = "native"
