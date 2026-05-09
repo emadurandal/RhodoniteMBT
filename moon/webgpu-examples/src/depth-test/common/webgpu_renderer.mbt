@@ -343,9 +343,6 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let texture = renderer.context.get_current_texture()
   let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
-  let depth_att = @wo.create_render_pass_depth_stencil_attachment(
-    view=renderer.depth_view,
-  )
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
       Some({
@@ -355,7 +352,12 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
         store_op: @w.GPUStoreOp::Store,
       }),
     ],
-    depth_stencil_attachment: Some(depth_att),
+    depth_stencil_attachment: Some({
+      view: renderer.depth_view,
+      depth_clear_value: Some(1.0),
+      depth_load_op: @w.GPULoadOp::Clear,
+      depth_store_op: @w.GPUStoreOp::Store,
+    }),
   })
   render_pass.set_pipeline(renderer.pipeline)
   render_pass.set_index_buffer(

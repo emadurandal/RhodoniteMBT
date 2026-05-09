@@ -68,12 +68,23 @@ pub fn WebGPURenderPassDepthStencilAttachment::get(
 ///|
 pub fn create_render_pass_depth_stencil_attachment(
   view~ : GPUTextureView,
+  depthClearValue~ : Double?,
+  depthLoadOp~ : @webgpu_enums.GPULoadOp,
+  depthStoreOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassDepthStencilAttachment {
+  let load_str = match depthLoadOp {
+    @webgpu_enums.GPULoadOp::Clear => "clear"
+    @webgpu_enums.GPULoadOp::Load => "load"
+  }
+  let store_str = match depthStoreOp {
+    @webgpu_enums.GPUStoreOp::Store => "store"
+    @webgpu_enums.GPUStoreOp::Discard => "discard"
+  }
   WebGPURenderPassDepthStencilAttachment::new(
     view~,
-    depthClearValue=1.0,
-    depthLoadOp="clear",
-    depthStoreOp="store",
+    depthClearValue~,
+    depthLoadOp=load_str,
+    depthStoreOp=store_str,
     depthReadOnly=false,
   )
 }

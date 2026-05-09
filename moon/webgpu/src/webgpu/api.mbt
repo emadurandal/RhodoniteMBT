@@ -109,6 +109,18 @@ fn render_pass_color_attachment_from_desc(
 }
 
 ///|
+fn render_pass_depth_stencil_attachment_from_desc(
+  att : GPURenderPassDepthStencilAttachment,
+) -> @raw.WebGPURenderPassDepthStencilAttachment {
+  @raw.create_render_pass_depth_stencil_attachment(
+    view=att.view,
+    depthClearValue=att.depth_clear_value,
+    depthLoadOp=att.depth_load_op,
+    depthStoreOp=att.depth_store_op,
+  )
+}
+
+///|
 fn render_pass_descriptor_to_raw(
   desc : GPURenderPassDescriptor,
 ) -> @raw.WebGPURenderPassDescriptor {
@@ -122,7 +134,9 @@ fn render_pass_descriptor_to_raw(
     Some(ds) =>
       @raw.create_render_pass_descriptor(
         colorAttachments=mapped,
-        depthStencilAttachment=ds,
+        depthStencilAttachment=render_pass_depth_stencil_attachment_from_desc(
+          ds,
+        ),
       )
     None => @raw.create_render_pass_descriptor(colorAttachments=mapped)
   }
