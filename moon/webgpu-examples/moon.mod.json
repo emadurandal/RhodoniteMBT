@@ -2,6 +2,9 @@
   "name": "emadurandal/WebGPU-examples",
   "version": "0.1.0",
   "deps": {
+    "emadurandal/binary": {
+      "path": "../binary"
+    },
     "emadurandal/WebGPU": {
       "path": "../webgpu"
     },

@@ -12,20 +12,6 @@ let index_buffer_allocation_byte_length : UInt64 = 8UL
 let index_buffer_index_range_byte_length : UInt64 = 6UL
 
 ///|
-fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
-  buf[off] = (u & 0xFFU).to_byte()
-  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
-}
-
-///|
-fn put_u32_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
-  buf[off] = (u & 0xFFU).to_byte()
-  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
-  buf[off + 2] = ((u >> 16) & 0xFFU).to_byte()
-  buf[off + 3] = ((u >> 24) & 0xFFU).to_byte()
-}
-
-///|
 /// インターリーブ頂点: `vec2 pos` @ offset 0, `vec3 color` @ offset 8, stride 32。
 fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
   let stride = 32
@@ -34,22 +20,21 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(total, (0 : Byte))
   fn put_vertex(
     base : Int,
-    px : UInt,
-    py : UInt,
-    cr : UInt,
-    cg : UInt,
-    cb : UInt,
+    px : Double,
+    py : Double,
+    cr : Double,
+    cg : Double,
+    cb : Double,
   ) -> Unit {
-    put_u32_le(buf, base + 0, px)
-    put_u32_le(buf, base + 4, py)
-    put_u32_le(buf, base + 8, cr)
-    put_u32_le(buf, base + 12, cg)
-    put_u32_le(buf, base + 16, cb)
+    @writes.put_f32_le(buf, base + 0, px)
+    @writes.put_f32_le(buf, base + 4, py)
+    @writes.put_f32_le(buf, base + 8, cr)
+    @writes.put_f32_le(buf, base + 12, cg)
+    @writes.put_f32_le(buf, base + 16, cb)
   }
-  // float ビット: 0.0=0, 0.5=0x3f000000, -0.5=0xbf000000, 1.0=0x3f800000
-  put_vertex(0, 0U, 0x3F000000U, 0x3F800000U, 0U, 0U)
-  put_vertex(stride, 0xBF000000U, 0xBF000000U, 0U, 0x3F800000U, 0U)
-  put_vertex(stride * 2, 0x3F000000U, 0xBF000000U, 0U, 0U, 0x3F800000U)
+  put_vertex(0, 0.0, 0.5, 1.0, 0.0, 0.0)
+  put_vertex(stride, -0.5, -0.5, 0.0, 1.0, 0.0)
+  put_vertex(stride * 2, 0.5, -0.5, 0.0, 0.0, 1.0)
   buf
 }
 
@@ -57,9 +42,9 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
 /// 6 バイトのインデックス + 2 バイトパディング（`writeBuffer` の 4 バイト境界用）。
 fn index_triangle_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(8, (0 : Byte))
-  put_u16_le(buf, 0, 0U)
-  put_u16_le(buf, 2, 1U)
-  put_u16_le(buf, 4, 2U)
+  @writes.put_u16_le(buf, 0, 0U)
+  @writes.put_u16_le(buf, 2, 1U)
+  @writes.put_u16_le(buf, 4, 2U)
   buf
 }
 
