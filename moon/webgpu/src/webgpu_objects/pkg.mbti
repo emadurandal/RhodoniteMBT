@@ -57,7 +57,7 @@ pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
 pub fn webgpu_render_pass_encoder_release(WebGPURenderPassEncoder) -> Unit
 
 pub fn create_render_pass_color_attachment(view~ : GPUTextureView, clearValue? : @webgpu_enums.GPUColor, loadOp~ : @webgpu_enums.GPULoadOp, storeOp~ : @webgpu_enums.GPUStoreOp) -> WebGPURenderPassColorAttachment
-pub fn create_render_pass_depth_stencil_attachment(view~ : GPUTextureView) -> WebGPURenderPassDepthStencilAttachment
+pub fn create_render_pass_depth_stencil_attachment(view~ : GPUTextureView, depthClearValue~ : Double?, depthLoadOp~ : @webgpu_enums.GPULoadOp, depthStoreOp~ : @webgpu_enums.GPUStoreOp) -> WebGPURenderPassDepthStencilAttachment
 pub fn create_render_pass_descriptor(colorAttachments~ : Array[WebGPURenderPassColorAttachment?], depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment) -> WebGPURenderPassDescriptor
 
 // Types and methods

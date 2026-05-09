@@ -32,6 +32,9 @@ pub fn WebGPURenderPassDescriptor::new(
 ///|
 pub fn create_render_pass_depth_stencil_attachment(
   view~ : GPUTextureView,
+  depthClearValue~ : Double?,
+  depthLoadOp~ : @webgpu_enums.GPULoadOp,
+  depthStoreOp~ : @webgpu_enums.GPUStoreOp,
 ) -> WebGPURenderPassDepthStencilAttachment
 
 ///|

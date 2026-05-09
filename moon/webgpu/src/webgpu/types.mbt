@@ -18,7 +18,6 @@ pub using @raw {
   type GPUShaderModule,
   type GPUCommandBuffer,
   type HTMLCanvasElement,
-  type WebGPURenderPassDepthStencilAttachment,
 }
 
 ///|
@@ -35,9 +34,17 @@ pub(all) struct GPURenderPassColorAttachment {
 }
 
 ///|
+pub(all) struct GPURenderPassDepthStencilAttachment {
+  view : GPUTextureView
+  depth_clear_value : Double?
+  depth_load_op : GPULoadOp
+  depth_store_op : GPUStoreOp
+}
+
+///|
 pub(all) struct GPURenderPassDescriptor {
   color_attachments : Array[GPURenderPassColorAttachment?]
-  depth_stencil_attachment : WebGPURenderPassDepthStencilAttachment?
+  depth_stencil_attachment : GPURenderPassDepthStencilAttachment?
 }
 
 ///|

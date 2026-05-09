@@ -228,52 +228,52 @@ fn write_cube_interleaved(
 
 ///|
 pub(all) struct WebGPURenderer {
-  context : @w.GPUCanvasContext
-  device : @w.GPUDevice
-  queue : @w.GPUQueue
-  pipeline : @w.GPURenderPipeline
-  depth_texture : @w.GPUTexture
-  depth_view : @w.GPUTextureView
-  vertex_buffer_a : @w.GPUBuffer
-  vertex_buffer_b : @w.GPUBuffer
-  index_buffer : @w.GPUBuffer
+  context : @wgpu.GPUCanvasContext
+  device : @wgpu.GPUDevice
+  queue : @wgpu.GPUQueue
+  pipeline : @wgpu.GPURenderPipeline
+  depth_texture : @wgpu.GPUTexture
+  depth_view : @wgpu.GPUTextureView
+  vertex_buffer_a : @wgpu.GPUBuffer
+  vertex_buffer_b : @wgpu.GPUBuffer
+  index_buffer : @wgpu.GPUBuffer
   frame : @ref.Ref[Int]
 }
 
 ///|
-pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
+pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let shader = device.create_shader_module(depth_shader_code)
-  let vertex_layout : @w.GPUVertexBufferLayout = {
+  let vertex_layout : @wgpu.GPUVertexBufferLayout = {
     array_stride: 32UL,
-    step_mode: @w.GPUVertexStepMode::Vertex,
+    step_mode: @wgpu.GPUVertexStepMode::Vertex,
     attributes: [
       {
-        format: @w.GPUVertexFormat::Float32x4,
+        format: @wgpu.GPUVertexFormat::Float32x4,
         offset: 0UL,
         shader_location: 0U,
       },
       {
-        format: @w.GPUVertexFormat::Float32x3,
+        format: @wgpu.GPUVertexFormat::Float32x3,
         offset: 16UL,
         shader_location: 1U,
       },
     ],
   }
-  let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
+  let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
-    topology: @w.GPUPrimitiveTopology::TriangleList,
+    topology: @wgpu.GPUPrimitiveTopology::TriangleList,
     formats: [format],
     vertex_buffers: [vertex_layout],
     depth_stencil_format: Some("depth24plus"),
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
-  @w.shaderModule_release(shader)
-  let vusage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  @wgpu.shaderModule_release(shader)
+  let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vertex_buffer_a = device.create_buffer(vertex_bytes_per_cube, vusage)
   let vertex_buffer_b = device.create_buffer(vertex_bytes_per_cube, vusage)
-  let iusage = @w.GPU_BUFFER_USAGE_INDEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let iusage = @wgpu.GPU_BUFFER_USAGE_INDEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let index_buffer = device.create_buffer(index_buffer_byte_length, iusage)
   let index_bytes = index_cube_u16_bytes()
   queue.write_buffer_from_fixed_array(index_buffer, 0UL, index_bytes)
@@ -281,7 +281,7 @@ pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
     canvas_width,
     canvas_height,
     "depth24plus",
-    @w.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
   )
   let depth_view = depth_texture.create_view()
   Some({
@@ -343,24 +343,26 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let texture = renderer.context.get_current_texture()
   let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
-  let depth_att = @wo.create_render_pass_depth_stencil_attachment(
-    view=renderer.depth_view,
-  )
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
       Some({
         view: color_view,
         clear_value: Some({ r: 0.08, g: 0.08, b: 0.12, a: 1.0 }),
-        load_op: @w.GPULoadOp::Clear,
-        store_op: @w.GPUStoreOp::Store,
+        load_op: @wgpu.GPULoadOp::Clear,
+        store_op: @wgpu.GPUStoreOp::Store,
       }),
     ],
-    depth_stencil_attachment: Some(depth_att),
+    depth_stencil_attachment: Some({
+      view: renderer.depth_view,
+      depth_clear_value: Some(1.0),
+      depth_load_op: @wgpu.GPULoadOp::Clear,
+      depth_store_op: @wgpu.GPUStoreOp::Store,
+    }),
   })
   render_pass.set_pipeline(renderer.pipeline)
   render_pass.set_index_buffer(
     renderer.index_buffer,
-    @w.GPUIndexFormat::Uint16,
+    @wgpu.GPUIndexFormat::Uint16,
     0UL,
     index_buffer_byte_length,
   )
@@ -383,7 +385,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @w.textureView_release(color_view)
+  @wgpu.textureView_release(color_view)
   renderer.context.present()
 }
 
@@ -392,7 +394,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   self.index_buffer.release()
   self.vertex_buffer_a.release()
   self.vertex_buffer_b.release()
-  @w.textureView_release(self.depth_view)
+  @wgpu.textureView_release(self.depth_view)
   self.depth_texture.release()
   self.pipeline.release()
 }

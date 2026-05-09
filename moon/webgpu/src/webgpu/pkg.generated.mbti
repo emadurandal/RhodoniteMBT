@@ -127,9 +127,16 @@ pub(all) struct GPURenderPassColorAttachment {
   store_op : @webgpu_enums.GPUStoreOp
 }
 
+pub(all) struct GPURenderPassDepthStencilAttachment {
+  view : @webgpu_objects.GPUTextureView
+  depth_clear_value : Double?
+  depth_load_op : @webgpu_enums.GPULoadOp
+  depth_store_op : @webgpu_enums.GPUStoreOp
+}
+
 pub(all) struct GPURenderPassDescriptor {
   color_attachments : Array[GPURenderPassColorAttachment?]
-  depth_stencil_attachment : @webgpu_objects.WebGPURenderPassDepthStencilAttachment?
+  depth_stencil_attachment : GPURenderPassDepthStencilAttachment?
 }
 
 pub(all) struct GPURenderPassEncoder {
@@ -191,8 +198,6 @@ pub using @webgpu_enums {type GPUVertexFormat}
 pub using @webgpu_enums {type GPUVertexStepMode}
 
 pub using @webgpu_objects {type HTMLCanvasElement}
-
-pub using @webgpu_objects {type WebGPURenderPassDepthStencilAttachment}
 
 // Traits
 
