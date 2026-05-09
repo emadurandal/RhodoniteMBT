@@ -16,7 +16,7 @@ pub struct WebGPURenderPassDepthStencilAttachment {
 ///|
 pub fn WebGPURenderPassDepthStencilAttachment::new(
   view~ : GPUTextureView,
-  depthClearValue? : Double,
+  depthClearValue? : Double? = None,
   depthLoadOp? : String,
   depthStoreOp? : String,
   depthReadOnly? : Bool,
