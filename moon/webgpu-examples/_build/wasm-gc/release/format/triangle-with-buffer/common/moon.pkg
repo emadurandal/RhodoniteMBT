@@ -1,3 +1,0 @@
-import {
-  "emadurandal/WebGPU/webgpu" @w,
-}

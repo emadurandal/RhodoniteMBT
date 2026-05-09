@@ -1,5 +1,0 @@
-import {
-  "emadurandal/WebGPU/webgpu" @w,
-  "emadurandal/WebGPU/webgpu_objects" @wo,
-  "moonbitlang/core/ref" @ref,
-}
