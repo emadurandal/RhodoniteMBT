@@ -12,6 +12,12 @@ pub type Vector3F = Vector3[Float]
 pub type Vector3D = Vector3[Double]
 
 ///|
+pub type Vector3I = Vector3[Int]
+
+///|
+pub type Vector3U = Vector3[UInt]
+
+///|
 /// `T : Show` のとき、MoonBit 上で再構築可能な `Vector3::new(...)` 形式で出力する。
 pub impl[T : Show] Show for Vector3[T] with output(self, logger) {
   logger.write_string("Vector3::new(")

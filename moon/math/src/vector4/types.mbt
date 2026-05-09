@@ -12,6 +12,12 @@ pub type Vector4F = Vector4[Float]
 pub type Vector4D = Vector4[Double]
 
 ///|
+pub type Vector4I = Vector4[Int]
+
+///|
+pub type Vector4U = Vector4[UInt]
+
+///|
 /// `T : Show` のとき、MoonBit 上で再構築可能な `Vector4::new(...)` 形式で出力する。
 pub impl[T : Show] Show for Vector4[T] with output(self, logger) {
   logger.write_string("Vector4::new(")
