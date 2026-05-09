@@ -1,4 +1,4 @@
-# MoonBit_WebGPU_ex
+# RhodoniteMBT
 
 ## Build & Run
 
