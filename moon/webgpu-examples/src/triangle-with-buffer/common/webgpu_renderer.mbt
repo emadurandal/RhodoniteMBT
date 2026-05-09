@@ -50,23 +50,23 @@ fn index_triangle_u16_bytes() -> FixedArray[Byte] {
 
 ///|
 pub(all) struct WebGPURenderer {
-  context : @w.GPUCanvasContext
-  device : @w.GPUDevice
-  queue : @w.GPUQueue
-  pipeline : @w.GPURenderPipeline
-  vertex_buffer : @w.GPUBuffer
-  index_buffer : @w.GPUBuffer
+  context : @wgpu.GPUCanvasContext
+  device : @wgpu.GPUDevice
+  queue : @wgpu.GPUQueue
+  pipeline : @wgpu.GPURenderPipeline
+  vertex_buffer : @wgpu.GPUBuffer
+  index_buffer : @wgpu.GPUBuffer
 }
 
 ///|
-pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
+pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let vertex_bytes = vertex_triangle_interleaved_bytes()
-  let vusage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vbuf = device.create_buffer(vertex_buffer_byte_length, vusage)
   queue.write_buffer_from_fixed_array(vbuf, 0UL, vertex_bytes)
   let index_bytes = index_triangle_u16_bytes()
-  let iusage = @w.GPU_BUFFER_USAGE_INDEX | @w.GPU_BUFFER_USAGE_COPY_DST
+  let iusage = @wgpu.GPU_BUFFER_USAGE_INDEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let ibuf = device.create_buffer(index_buffer_allocation_byte_length, iusage)
   queue.write_buffer_from_fixed_array(ibuf, 0UL, index_bytes)
   let pipeline = create_pipeline(device, format)
@@ -82,36 +82,36 @@ pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
 
 ///|
 fn create_pipeline(
-  device : @w.GPUDevice,
+  device : @wgpu.GPUDevice,
   format : String,
-) -> @w.GPURenderPipeline {
+) -> @wgpu.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
-  let vertex_layout : @w.GPUVertexBufferLayout = {
+  let vertex_layout : @wgpu.GPUVertexBufferLayout = {
     array_stride: 32UL,
-    step_mode: @w.GPUVertexStepMode::Vertex,
+    step_mode: @wgpu.GPUVertexStepMode::Vertex,
     attributes: [
       {
-        format: @w.GPUVertexFormat::Float32x2,
+        format: @wgpu.GPUVertexFormat::Float32x2,
         offset: 0UL,
         shader_location: 0U,
       },
       {
-        format: @w.GPUVertexFormat::Float32x3,
+        format: @wgpu.GPUVertexFormat::Float32x3,
         offset: 8UL,
         shader_location: 1U,
       },
     ],
   }
-  let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
+  let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
-    topology: @w.GPUPrimitiveTopology::TriangleList,
+    topology: @wgpu.GPUPrimitiveTopology::TriangleList,
     formats: [format],
     vertex_buffers: [vertex_layout],
     depth_stencil_format: None,
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
-  @w.shaderModule_release(shader)
+  @wgpu.shaderModule_release(shader)
   pipeline
 }
 
@@ -127,7 +127,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 ///|
 fn render_frame_with_options(
   renderer : WebGPURenderer,
-  clearColor~ : @w.GPUColor,
+  clearColor~ : @wgpu.GPUColor,
   index_count~ : Int,
 ) -> Unit {
   let texture = renderer.context.get_current_texture()
@@ -138,8 +138,8 @@ fn render_frame_with_options(
       Some({
         view,
         clear_value: Some(clearColor),
-        load_op: @w.GPULoadOp::Clear,
-        store_op: @w.GPUStoreOp::Store,
+        load_op: @wgpu.GPULoadOp::Clear,
+        store_op: @wgpu.GPUStoreOp::Store,
       }),
     ],
     depth_stencil_attachment: None,
@@ -153,7 +153,7 @@ fn render_frame_with_options(
   )
   render_pass.set_index_buffer(
     renderer.index_buffer,
-    @w.GPUIndexFormat::Uint16,
+    @wgpu.GPUIndexFormat::Uint16,
     0UL,
     index_buffer_index_range_byte_length,
   )
@@ -163,7 +163,7 @@ fn render_frame_with_options(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @w.textureView_release(view)
+  @wgpu.textureView_release(view)
   renderer.context.present()
 }
 

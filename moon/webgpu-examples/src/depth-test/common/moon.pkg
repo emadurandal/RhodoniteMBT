@@ -1,5 +1,5 @@
 import {
   "emadurandal/binary/writes" @writes,
-  "emadurandal/WebGPU/webgpu" @w,
+  "emadurandal/WebGPU/webgpu" @wgpu,
   "moonbitlang/core/ref" @ref,
 }

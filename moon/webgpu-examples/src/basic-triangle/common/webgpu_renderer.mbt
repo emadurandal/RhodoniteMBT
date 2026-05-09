@@ -1,13 +1,13 @@
 ///|
 pub(all) struct WebGPURenderer {
-  context : @w.GPUCanvasContext
-  device : @w.GPUDevice
-  queue : @w.GPUQueue
-  pipeline : @w.GPURenderPipeline
+  context : @wgpu.GPUCanvasContext
+  device : @wgpu.GPUDevice
+  queue : @wgpu.GPUQueue
+  pipeline : @wgpu.GPURenderPipeline
 }
 
 ///|
-pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
+pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   let pipeline = create_pipeline(device, format)
   Some({ context: canvas_context, device, queue, pipeline })
@@ -15,20 +15,20 @@ pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
 
 ///|
 fn create_pipeline(
-  device : @w.GPUDevice,
+  device : @wgpu.GPUDevice,
   format : String,
-) -> @w.GPURenderPipeline {
+) -> @wgpu.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
-  let pipeline_descriptor : @w.GPURenderPipelineDescriptor = {
+  let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
-    topology: @w.GPUPrimitiveTopology::TriangleList,
+    topology: @wgpu.GPUPrimitiveTopology::TriangleList,
     formats: [format],
     vertex_buffers: [],
     depth_stencil_format: None,
   }
   let pipeline = device.create_render_pipeline(pipeline_descriptor)
-  @w.shaderModule_release(shader)
+  @wgpu.shaderModule_release(shader)
   pipeline
 }
 
@@ -44,7 +44,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 ///|
 fn render_frame_with_options(
   renderer : WebGPURenderer,
-  clearColor~ : @w.GPUColor,
+  clearColor~ : @wgpu.GPUColor,
   vertex_count~ : Int,
 ) -> Unit {
   let texture = renderer.context.get_current_texture()
@@ -55,8 +55,8 @@ fn render_frame_with_options(
       Some({
         view,
         clear_value: Some(clearColor),
-        load_op: @w.GPULoadOp::Clear,
-        store_op: @w.GPUStoreOp::Store,
+        load_op: @wgpu.GPULoadOp::Clear,
+        store_op: @wgpu.GPUStoreOp::Store,
       }),
     ],
     depth_stencil_attachment: None,
@@ -68,7 +68,7 @@ fn render_frame_with_options(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @w.textureView_release(view)
+  @wgpu.textureView_release(view)
   renderer.context.present()
 }
 
