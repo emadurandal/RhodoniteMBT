@@ -12,13 +12,13 @@ let index_buffer_allocation_byte_length : UInt64 = 8UL
 let index_buffer_index_range_byte_length : UInt64 = 6UL
 
 ///|
-fn put_u16_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
 }
 
 ///|
-fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
+fn put_u32_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
   buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
   buf[off + 2] = ((u >> 16) & 0xFFU).to_byte()
@@ -27,11 +27,11 @@ fn put_u32_le(buf : Array[Byte], off : Int, u : UInt) -> Unit {
 
 ///|
 /// インターリーブ頂点: `vec2 pos` @ offset 0, `vec3 color` @ offset 8, stride 32。
-fn vertex_triangle_interleaved_bytes() -> Array[Byte] {
+fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
   let stride = 32
   let n = 3
   let total = stride * n
-  let buf = Array::make(total, (0 : Byte))
+  let buf = FixedArray::make(total, (0 : Byte))
   fn put_vertex(
     base : Int,
     px : UInt,
@@ -55,8 +55,8 @@ fn vertex_triangle_interleaved_bytes() -> Array[Byte] {
 
 ///|
 /// 6 バイトのインデックス + 2 バイトパディング（`writeBuffer` の 4 バイト境界用）。
-fn index_triangle_u16_bytes() -> Array[Byte] {
-  let buf = Array::make(8, (0 : Byte))
+fn index_triangle_u16_bytes() -> FixedArray[Byte] {
+  let buf = FixedArray::make(8, (0 : Byte))
   put_u16_le(buf, 0, 0U)
   put_u16_le(buf, 2, 1U)
   put_u16_le(buf, 4, 2U)
@@ -79,11 +79,11 @@ pub fn create_renderer(context : @w.GPUContext) -> WebGPURenderer? {
   let vertex_bytes = vertex_triangle_interleaved_bytes()
   let vusage = @w.GPU_BUFFER_USAGE_VERTEX | @w.GPU_BUFFER_USAGE_COPY_DST
   let vbuf = device.create_buffer(vertex_buffer_byte_length, vusage)
-  queue.write_buffer(vbuf, 0UL, vertex_bytes)
+  queue.write_buffer_from_fixed_array(vbuf, 0UL, vertex_bytes)
   let index_bytes = index_triangle_u16_bytes()
   let iusage = @w.GPU_BUFFER_USAGE_INDEX | @w.GPU_BUFFER_USAGE_COPY_DST
   let ibuf = device.create_buffer(index_buffer_allocation_byte_length, iusage)
-  queue.write_buffer(ibuf, 0UL, index_bytes)
+  queue.write_buffer_from_fixed_array(ibuf, 0UL, index_bytes)
   let pipeline = create_pipeline(device, format)
   Some({
     context: canvas_context,

@@ -22,11 +22,9 @@ pub fn webgpu_queue_write_buffer(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
   offset : UInt64,
-  data : Array[Byte],
+  data : Bytes,
 ) -> Unit {
-  let len = data.length()
-  let bs = Bytes::makei(len, fn(i) { data[i] })
-  queue.queue.raw.write_buffer(buffer.raw, offset, bs)
+  queue.queue.raw.write_buffer(buffer.raw, offset, data)
 }
 
 ///|
