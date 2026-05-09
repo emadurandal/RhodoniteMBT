@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite/lib"
+
+import {
+  "emadurandal/rhodonite_webgpu/webgpu_objects",
+}
+
+// Values
+pub fn navigatorGPU() -> @webgpu_objects.GPU
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

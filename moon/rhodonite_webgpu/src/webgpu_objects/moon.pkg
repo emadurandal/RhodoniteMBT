@@ -1,0 +1,7 @@
+import {
+  "emadurandal/rhodonite_webgpu/webgpu_enums" @webgpu_enums,
+}
+
+options(
+  "virtual": { "has-default": false },
+)

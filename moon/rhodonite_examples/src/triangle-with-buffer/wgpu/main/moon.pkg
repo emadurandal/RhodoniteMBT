@@ -1,0 +1,15 @@
+import {
+  "emadurandal/rhodonite_examples/common" @sdl_wgpu,
+  "emadurandal/rhodonite_examples/triangle-with-buffer/common" @renderer,
+  "moonbitlang/async" @async,
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": true,
+  link: {
+    "native": { "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3" },
+  },
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
+)

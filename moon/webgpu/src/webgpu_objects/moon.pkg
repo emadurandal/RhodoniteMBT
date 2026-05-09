@@ -1,7 +1,0 @@
-import {
-  "emadurandal/WebGPU/webgpu_enums" @webgpu_enums,
-}
-
-options(
-  "virtual": { "has-default": false },
-)

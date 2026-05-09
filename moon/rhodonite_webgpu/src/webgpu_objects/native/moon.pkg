@@ -1,0 +1,12 @@
+import {
+  "moonbitlang/core/ref",
+  "Milky2018/wgpu_mbt" @wgpu,
+  "Milky2018/wgpu_mbt/c" @c,
+  "emadurandal/rhodonite_webgpu/webgpu_enums" @webgpu_enums,
+}
+
+supported_targets = "native"
+
+options(
+  implement: "emadurandal/rhodonite_webgpu/webgpu_objects",
+)

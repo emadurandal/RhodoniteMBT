@@ -2,10 +2,9 @@
   "name": "rhodonite-mbt",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "build:moon": "cd moon/webgpu-examples && moon build --target js",
+    "build:moon": "cd moon/rhodonite_examples && moon build --target js",
     "dev:basic-triangle": "pnpm run build:moon && vite --open /demos/basic-triangle.html",
     "dev:triangle-with-buffer": "pnpm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev:depth-test": "pnpm run build:moon && vite --open /demos/depth-test.html",
@@ -13,9 +12,9 @@
     "run:wgpu:triangle-with-buffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-buffer",
     "run:wgpu:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "build": "pnpm run build:moon && tsc && vite build",
-    "build:math:js": "cd moon/math && moon build --target js --release",
-    "test:math:js": "pnpm run build:math:js && vitest run moon/math/ts",
-    "test:math:mbt": "cd moon/math && moon test"
+    "build:math:js": "cd moon/rhodonite_math && moon build --target js --release",
+    "test:math:js": "pnpm run build:math:js && vitest run moon/rhodonite_math/ts",
+    "test:math:mbt": "moon test --target wasm-gc moon/rhodonite_math/src/vector3 moon/rhodonite_math/src/vector4"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_binary/writes"
+
+// Values
+pub fn put_f32_le(FixedArray[Byte], Int, Double) -> Unit
+
+pub fn put_u16_le(FixedArray[Byte], Int, UInt) -> Unit
+
+pub fn put_u32_le(FixedArray[Byte], Int, UInt) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+
