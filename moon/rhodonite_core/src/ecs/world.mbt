@@ -782,9 +782,8 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
   entity : EntityId,
   archetype_components : Array[ComponentTypeId],
   leaf_tf : @comp.Transform3D,
-  gt_gpu_row : MutArrayView[Byte],
+  gt : @comp.GlobalTransform,
 ) -> Bool {
-  let gt = @comp.GlobalTransform::view_std140_gpu_row(gt_gpu_row)
   let co_id = self.child_of_component_id
   if !component_array_contains(archetype_components, co_id) {
     matrix44f_copy_to_ref(gt.matrix, leaf_tf.to_local_matrix())
@@ -898,11 +897,9 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let required : Array[ComponentTypeId] = [tf, gt]
   self.for_each_entity_with_components(required, (e, sig, payloads) => {
     let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
+    let global_tf = @comp.GlobalTransform::view_std140_gpu_row(payloads[1])
     if self.compute_global_transform_for_tf_gt_bulk_row(
-        e,
-        sig,
-        local_tf,
-        payloads[1],
+        e, sig, local_tf, global_tf,
       ) {
       let _ = self.mark_gpu_component_dirty(e, gt)
     }
