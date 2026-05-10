@@ -8,5 +8,5 @@
 			]
 		}
 	},
-	"include": ["moon/rhodonite_core/math/ts/**/*.ts", "moon/rhodonite_core/math/ts/math-bridge.d.ts"]
+	"include": ["moon/rhodonite_core/src/math/ts/**/*.ts", "moon/rhodonite_core/src/math/ts/math-bridge.d.ts"]
 }

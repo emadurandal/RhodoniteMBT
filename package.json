@@ -13,7 +13,7 @@
     "dev:native:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "build": "pnpm run build:moon && tsc && vite build",
     "build:core:js": "cd moon/rhodonite_core && moon build --target js --release",
-    "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/math/ts",
+    "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/src/math/ts",
     "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh",
     "publish:moon": "bash scripts/publish-rhodonite-mooncakes.sh"
   },
