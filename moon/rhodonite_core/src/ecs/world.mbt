@@ -682,13 +682,26 @@ fn World::build_child_of_ancestor_chain(
 }
 
 ///|
+/// Copies column-major [`@m44.Matrix44F`] components into a [`@m44ref.Matrix44RefF`] (same layout).
+fn matrix44f_copy_to_ref(
+  dst : @m44ref.Matrix44RefF,
+  m : @m44.Matrix44F,
+) -> Unit {
+  for c = 0; c < 4; c = c + 1 {
+    for r = 0; r < 4; r = r + 1 {
+      dst.set_at(r, c, m.data[c * 4 + r])
+    }
+  }
+}
+
+///|
 /// `leaf_tf`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
-fn World::multiply_world_from_chain(
+fn World::multiply_world_chain_matrix(
   self : World,
   leaf : EntityId,
   chain : Array[EntityId],
   leaf_tf : @comp.Transform3D?,
-) -> @comp.GlobalTransform? {
+) -> @m44.Matrix44F? {
   let mut world_m = @m44.Matrix44F::identity()
   let mut i = chain.length() - 1
   while i >= 0 {
@@ -711,7 +724,21 @@ fn World::multiply_world_from_chain(
     world_m = world_m.mat_mul(tf.to_local_matrix())
     i = i - 1
   }
-  Some(@comp.GlobalTransform::from_matrix44(world_m))
+  Some(world_m)
+}
+
+///|
+/// `leaf_tf`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
+fn World::multiply_world_from_chain(
+  self : World,
+  leaf : EntityId,
+  chain : Array[EntityId],
+  leaf_tf : @comp.Transform3D?,
+) -> @comp.GlobalTransform? {
+  match self.multiply_world_chain_matrix(leaf, chain, leaf_tf) {
+    None => None
+    Some(world_m) => Some(@comp.GlobalTransform::from_local_matrix(world_m))
+  }
 }
 
 ///|
@@ -738,7 +765,7 @@ pub fn World::compute_global_transform(
         match self.get_transform(entity) {
           None => None
           Some(tf) =>
-            Some(@comp.GlobalTransform::from_matrix44(tf.to_local_matrix()))
+            Some(@comp.GlobalTransform::from_local_matrix(tf.to_local_matrix()))
         }
       } else {
         match self.build_child_of_ancestor_chain(entity) {
@@ -753,20 +780,32 @@ pub fn World::compute_global_transform(
 ///|
 /// Used only by [`update_global_transforms_from_transforms`]: entity comes from a TF+GT query row and
 /// `leaf_tf` was decoded from that row's Transform SoA view (no [`get_transform`] on the leaf).
+/// Writes the world matrix into `gt_gpu_row` and returns whether a matrix was written.
 fn World::compute_global_transform_for_tf_gt_bulk_row(
   self : World,
   entity : EntityId,
   archetype_components : Array[ComponentTypeId],
   leaf_tf : @comp.Transform3D,
-) -> @comp.GlobalTransform? {
+  gt_gpu_row : MutArrayView[Byte],
+) -> Bool {
+  let out = @comp.GlobalTransform::from_gpu_row_mut_view(gt_gpu_row)
   let co_id = self.child_of_component_id
   if !component_array_contains(archetype_components, co_id) {
-    Some(@comp.GlobalTransform::from_matrix44(leaf_tf.to_local_matrix()))
+    matrix44f_copy_to_ref(out.matrix, leaf_tf.to_local_matrix())
+    out.commit_gpu_row()
+    true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
-      None => None
+      None => false
       Some(chain) =>
-        self.multiply_world_from_chain(entity, chain, Some(leaf_tf))
+        match self.multiply_world_chain_matrix(entity, chain, Some(leaf_tf)) {
+          None => false
+          Some(world_m) => {
+            matrix44f_copy_to_ref(out.matrix, world_m)
+            out.commit_gpu_row()
+            true
+          }
+        }
     }
   }
 }
@@ -776,10 +815,16 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 /// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
 ///
 /// The callback receives the entity, that row's **full sorted archetype component list**, and one
-/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into
-/// `required[k]`'s SoA bytes at this row. **GPU-visible** components register `cpu_stride`
-/// `0`, so their archetype column has **no row bytes** — the view length is `0`; update payloads via
-/// [`set_gpu_component_bytes`] / [`set_global_transform`] or write the [`GpuComponentStore`] slot directly.
+/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into that
+/// component's payload at this entity.
+///
+/// * **`CpuOnly`**: view over archetype SoA column bytes (`stride` bytes per row).
+/// * **`GpuVisible`**: view over this entity's row in [`GpuComponentStore`] (`gpu_layout.stride`
+///   bytes; **not** archetype SoA bytes). After the callback returns, the world persists each
+///   touched GPU store with `replace_gpu_store` only (no automatic dirty queue). If you mutate a
+///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
+///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
+///   [`ensure_gpu_capacity`]).
 pub fn World::for_each_entity_with_components(
   self : World,
   required : Array[ComponentTypeId],
@@ -794,17 +839,57 @@ pub fn World::for_each_entity_with_components(
       let arch = self.archetypes[ai]
       let ents = arch.entities
       for j = 0; j < ents.length(); j = j + 1 {
+        let entity = ents[j]
         let payloads : Array[MutArrayView[Byte]] = []
+        let gpu_flush : Array[GpuComponentStore] = []
         for k = 0; k < required.length(); k = k + 1 {
-          match arch.component_byte_mut_view(j, required[k]) {
-            Some(v) => payloads.push(v)
+          match self.registry.get(required[k]) {
             None =>
               abort(
-                "for_each_entity_with_components: required component missing from archetype",
+                "for_each_entity_with_components: unknown component type id",
               )
+            Some(rc) =>
+              match rc.kind {
+                CpuOnly =>
+                  match arch.component_byte_mut_view(j, required[k]) {
+                    Some(v) => payloads.push(v)
+                    None =>
+                      abort(
+                        "for_each_entity_with_components: required component missing from archetype",
+                      )
+                  }
+                GpuVisible =>
+                  match self.gpu_store(required[k]) {
+                    Some(store) => {
+                      let grew = store.ensure_capacity(entity.index + 1)
+                      if grew {
+                        self.resize_events.push({
+                          component: store.component,
+                          required_capacity: entity.index + 1,
+                          needs_full_upload: true,
+                        })
+                      }
+                      let base = entity.index * store.stride
+                      let view = store.bytes.mut_view(
+                        start=base,
+                        end=base + store.stride,
+                      )
+                      payloads.push(view)
+                      gpu_flush.push(store)
+                    }
+                    None =>
+                      abort(
+                        "for_each_entity_with_components: GpuVisible component has no gpu store",
+                      )
+                  }
+              }
           }
         }
-        f(ents[j], sig, payloads)
+        f(entity, sig, payloads)
+        for gi = 0; gi < gpu_flush.length(); gi = gi + 1 {
+          let st = gpu_flush[gi]
+          self.replace_gpu_store(st)
+        }
       }
     }
   }
@@ -819,11 +904,13 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let required : Array[ComponentTypeId] = [tf, gt]
   self.for_each_entity_with_components(required, (e, sig, payloads) => {
     let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
-    match self.compute_global_transform_for_tf_gt_bulk_row(e, sig, local_tf) {
-      Some(g) => {
-        let _ = self.set_global_transform(e, g)
-      }
-      None => ()
+    if self.compute_global_transform_for_tf_gt_bulk_row(
+        e,
+        sig,
+        local_tf,
+        payloads[1],
+      ) {
+      let _ = self.mark_gpu_component_dirty(e, gt)
     }
   })
 }

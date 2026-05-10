@@ -225,7 +225,7 @@ test "GlobalTransform identity roundtrip and GPU drain" {
   let gt_id = world.global_transform_component()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
-  let g = @comp.GlobalTransform::identity()
+  let g = @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity())
   let expected = g.matrix.to_matrix44()
   assert_true(world.set_global_transform(entity, g))
   match world.get_global_transform(entity) {
@@ -353,6 +353,26 @@ test "for_each_entity_with_components matches supersets and skips empty required
 }
 
 ///|
+test "for_each_entity_with_components gives full GpuComponentStore row for GpuVisible" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryA", 4)
+  let gpu16 = world.register_gpu_component("Gpu16", @comp.GpuLayout::empty(16))
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  let mut got0 = -1
+  let mut got1 = -1
+  world.for_each_entity_with_components([qa, gpu16], (_ent, _sig, payloads) => {
+    got0 = payloads[0].length()
+    got1 = payloads[1].length()
+  })
+  assert_eq(got0, 4)
+  assert_eq(got1, 16)
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()
@@ -378,7 +398,7 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
   assert_true(world.set_child_of(child, parent))
-  let g0 = @comp.GlobalTransform::identity()
+  let g0 = @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity())
   assert_true(world.set_global_transform(parent, g0))
   assert_true(world.set_global_transform(child, g0))
   let _ = world.drain_gpu_writes(world.global_transform_component())
@@ -407,7 +427,12 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
     buf.mut_view(start=0, end=n),
   )
   assert_true(world.set_transform(e, tf))
-  assert_true(world.set_global_transform(e, @comp.GlobalTransform::identity()))
+  assert_true(
+    world.set_global_transform(
+      e,
+      @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity()),
+    ),
+  )
   let _ = world.drain_gpu_writes(world.global_transform_component())
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(e) {

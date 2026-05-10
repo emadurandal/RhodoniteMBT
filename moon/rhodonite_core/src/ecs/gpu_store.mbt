@@ -266,6 +266,28 @@ pub fn World::set_gpu_component_bytes(
 }
 
 ///|
+/// After mutating a [`GpuVisible`] row through a [`MutArrayView`] from [`World::for_each_entity_with_components`]
+/// (or any path that writes GPU bytes without going through [`World::set_gpu_component_bytes`]), call this
+/// so [`World::drain_gpu_writes`] includes that entity slot.
+pub fn World::mark_gpu_component_dirty(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  if !self.is_alive(entity) {
+    return false
+  }
+  match self.gpu_store(component) {
+    Some(store) => {
+      store.mark_dirty(entity.index)
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Clears one GPU slot to zeros and marks it dirty (same as destroy-side scrubbing but callable explicitly).
 pub fn World::clear_gpu_component(
   self : World,
