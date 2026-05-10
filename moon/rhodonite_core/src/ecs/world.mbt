@@ -711,7 +711,7 @@ fn World::multiply_world_from_chain(
     world_m = world_m.mat_mul(tf.to_local_matrix())
     i = i - 1
   }
-  Some({ matrix: world_m })
+  Some(@comp.GlobalTransform::from_matrix44(world_m))
 }
 
 ///|
@@ -737,7 +737,8 @@ pub fn World::compute_global_transform(
       if !component_array_contains(sig, co_id) {
         match self.get_transform(entity) {
           None => None
-          Some(tf) => Some({ matrix: tf.to_local_matrix() })
+          Some(tf) =>
+            Some(@comp.GlobalTransform::from_matrix44(tf.to_local_matrix()))
         }
       } else {
         match self.build_child_of_ancestor_chain(entity) {
@@ -760,7 +761,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 ) -> @comp.GlobalTransform? {
   let co_id = self.child_of_component_id
   if !component_array_contains(archetype_components, co_id) {
-    Some({ matrix: leaf_tf.to_local_matrix() })
+    Some(@comp.GlobalTransform::from_matrix44(leaf_tf.to_local_matrix()))
   } else {
     match self.build_child_of_ancestor_chain(entity) {
       None => None

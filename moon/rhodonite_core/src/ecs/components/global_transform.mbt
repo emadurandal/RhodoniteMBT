@@ -2,13 +2,27 @@
 /// World-space matrix for rendering; stored in flat [`GpuComponentStore`] (column-major `f32`, matches WGSL `mat4x4<f32>`).
 
 ///|
+/// `matrix` is a column-major view over [`backing`] (16 `Float`s); keep them in sync by building via [`GlobalTransform::from_matrix44`], [`GlobalTransform::identity`], or [`GlobalTransform::from_gpu_bytes`].
 pub(all) struct GlobalTransform {
-  matrix : @m44.Matrix44F
+  backing : Array[Float]
+  matrix : @m44ref.Matrix44RefF
+}
+
+///|
+pub fn GlobalTransform::from_matrix44(m : @m44.Matrix44F) -> GlobalTransform {
+  let backing = Array::make(16, (0.0 : Float))
+  for i = 0; i < 16; i = i + 1 {
+    backing[i] = m.data[i]
+  }
+  let matrix = @m44ref.Matrix44Ref::from_mut_view(
+    backing.mut_view(start=0, end=16),
+  )
+  { backing, matrix }
 }
 
 ///|
 pub fn GlobalTransform::identity() -> GlobalTransform {
-  { matrix: @m44.Matrix44::identity() }
+  GlobalTransform::from_matrix44(@m44.Matrix44::identity())
 }
 
 ///|
@@ -68,9 +82,12 @@ pub fn GlobalTransform::from_gpu_bytes(
     abort("global_transform_gpu_layout: expected 1 field")
   }
   let base = layout.fields[0].offset
-  let cols : FixedArray[Float] = FixedArray::make(16, (0.0 : Float))
+  let backing = Array::make(16, (0.0 : Float))
   for i = 0; i < 16; i = i + 1 {
-    cols[i] = get_gpu_f32(bytes, base + i * 4)
+    backing[i] = get_gpu_f32(bytes, base + i * 4)
   }
-  { matrix: @m44.Matrix44::{ data: cols } }
+  let matrix = @m44ref.Matrix44Ref::from_mut_view(
+    backing.mut_view(start=0, end=16),
+  )
+  { backing, matrix }
 }

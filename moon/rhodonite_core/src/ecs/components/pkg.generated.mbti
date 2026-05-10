@@ -3,6 +3,7 @@ package "emadurandal/rhodonite_core/ecs/components"
 
 import {
   "emadurandal/rhodonite_core/math/matrix44",
+  "emadurandal/rhodonite_core/math/matrix44ref",
   "emadurandal/rhodonite_core/math/vector3",
   "emadurandal/rhodonite_core/math/vector4",
 }
@@ -40,9 +41,11 @@ pub fn ChildOf::new(Int, Int) -> Self
 pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
 
 pub(all) struct GlobalTransform {
-  matrix : @matrix44.Matrix44[Float]
+  backing : Array[Float]
+  matrix : @matrix44ref.Matrix44Ref[Float]
 }
 pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
+pub fn GlobalTransform::from_matrix44(@matrix44.Matrix44[Float]) -> Self
 pub fn GlobalTransform::identity() -> Self
 pub fn GlobalTransform::to_gpu_bytes(Self) -> FixedArray[Byte]
 pub fn GlobalTransform::write_to_gpu_mut_view(Self, MutArrayView[Byte]) -> Unit

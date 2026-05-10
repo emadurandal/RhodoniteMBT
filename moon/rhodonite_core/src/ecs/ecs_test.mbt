@@ -226,9 +226,10 @@ test "GlobalTransform identity roundtrip and GPU drain" {
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
   let g = @comp.GlobalTransform::identity()
+  let expected = g.matrix.to_matrix44()
   assert_true(world.set_global_transform(entity, g))
   match world.get_global_transform(entity) {
-    Some(read) => assert_eq(read.matrix, g.matrix)
+    Some(read) => assert_eq(read.matrix.to_matrix44(), expected)
     None => abort("expected GlobalTransform")
   }
   let writes = world.drain_gpu_writes(gt_id)
