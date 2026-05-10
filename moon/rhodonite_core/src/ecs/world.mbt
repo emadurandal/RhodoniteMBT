@@ -228,6 +228,7 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
+/// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
 pub fn World::new() -> World {
   let registry = ComponentRegistry::new()
   let tf_layout = @comp.transform3d_gpu_layout()
@@ -245,11 +246,17 @@ pub fn World::new() -> World {
   let global_transform_component_id = registry.register_gpu(
     "GlobalTransform", gt_layout,
   )
+  let co_layout = @comp.child_of_cpu_layout()
+  if !co_layout.is_valid() {
+    abort("builtin ChildOf layout invalid")
+  }
+  let child_of_component_id = registry.register_cpu("ChildOf", co_layout.stride)
   let gpu_stores : Array[GpuComponentStore?] = [
     None,
     Some(
       GpuComponentStore::new(global_transform_component_id, gt_layout.stride),
     ),
+    None,
   ]
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
@@ -271,6 +278,7 @@ pub fn World::new() -> World {
     resize_events,
     transform_component_id,
     global_transform_component_id,
+    child_of_component_id,
   }
 }
 
@@ -497,6 +505,11 @@ pub fn World::global_transform_component(self : World) -> ComponentTypeId {
 }
 
 ///|
+pub fn World::child_of_component(self : World) -> ComponentTypeId {
+  self.child_of_component_id
+}
+
+///|
 /// Assigns builtin [`Transform3D`] for `entity` in archetype SoA (`cpu_stride` = layout stride).
 pub fn World::set_transform(
   self : World,
@@ -554,6 +567,36 @@ pub fn World::get_global_transform(
   }
   match self.gpu_component_bytes(entity, id) {
     Some(bytes) => Some(@comp.GlobalTransform::from_gpu_bytes(bytes))
+    None => None
+  }
+}
+
+///|
+/// Assigns builtin [`ChildOf`] for `entity` (CPU archetype SoA only).
+pub fn World::set_child_of(
+  self : World,
+  entity : EntityId,
+  parent : EntityId,
+) -> Bool {
+  let c = @comp.ChildOf::new(parent.index, parent.generation)
+  self.add_component_bytes(
+    entity,
+    self.child_of_component_id,
+    c.to_component_bytes(),
+  )
+}
+
+///|
+pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
+  let id = self.child_of_component_id
+  if !self.is_alive(entity) || !self.has_component(entity, id) {
+    return None
+  }
+  match self.component_bytes(entity, id) {
+    Some(bytes) => {
+      let c = @comp.ChildOf::from_component_bytes(bytes)
+      Some(EntityId::new(c.parent_index, c.parent_generation))
+    }
     None => None
   }
 }

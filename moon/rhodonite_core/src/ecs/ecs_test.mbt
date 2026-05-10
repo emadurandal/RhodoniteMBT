@@ -126,6 +126,27 @@ test "builtin GlobalTransform uses ComponentTypeId index 1" {
 }
 
 ///|
+test "builtin ChildOf uses ComponentTypeId index 2" {
+  let world = World::new()
+  assert_eq(world.child_of_component().index, 2)
+}
+
+///|
+test "ChildOf roundtrips parent EntityId" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  assert_true(world.set_child_of(child, parent))
+  match world.get_child_of(child) {
+    Some(p) => {
+      assert_eq(p.index, parent.index)
+      assert_eq(p.generation, parent.generation)
+    }
+    None => abort("expected ChildOf")
+  }
+}
+
+///|
 test "Transform3D identity roundtrip bytes and World set/get" {
   let world = World::new()
   let tf = world.transform_component()

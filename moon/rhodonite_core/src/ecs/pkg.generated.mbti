@@ -76,14 +76,17 @@ pub struct World {
   resize_events : Array[GpuResizeEvent]
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
+  child_of_component_id : ComponentTypeId
 }
 pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
+pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @components.GlobalTransform?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
 pub fn World::global_transform_component(Self) -> ComponentTypeId
@@ -96,6 +99,7 @@ pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId
 pub fn World::registry(Self) -> ComponentRegistry
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
+pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @components.GlobalTransform) -> Bool
 pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool

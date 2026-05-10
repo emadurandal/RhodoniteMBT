@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn child_of_cpu_layout() -> GpuLayout
+
 pub fn get_gpu_f32(FixedArray[Byte], Int) -> Double
 
 pub fn global_transform_gpu_layout() -> GpuLayout
@@ -23,6 +25,14 @@ pub fn transform3d_gpu_layout() -> GpuLayout
 // Errors
 
 // Types and methods
+pub(all) struct ChildOf {
+  parent_index : Int
+  parent_generation : Int
+}
+pub fn ChildOf::from_component_bytes(FixedArray[Byte]) -> Self
+pub fn ChildOf::new(Int, Int) -> Self
+pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
+
 pub(all) struct GlobalTransform {
   matrix : @matrix44.Matrix4[Float]
 }

@@ -114,4 +114,5 @@ pub struct World {
   resize_events : Array[GpuResizeEvent]
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
+  child_of_component_id : ComponentTypeId
 }
