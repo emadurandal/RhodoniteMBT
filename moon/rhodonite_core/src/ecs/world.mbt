@@ -65,6 +65,7 @@ fn component_arrays_equal(
 }
 
 ///|
+/// Component-type ids are sorted ascending so archetype keys are canonical and comparable.
 fn sorted_with_added(
   components : Array[ComponentTypeId],
   added : ComponentTypeId,
@@ -101,6 +102,7 @@ fn sorted_with_removed(
 }
 
 ///|
+/// Builds an archetype table for one sorted component signature (empty archetype uses this with zero components).
 fn Archetype::new(
   components : Array[ComponentTypeId],
   registry : ComponentRegistry,
@@ -132,6 +134,7 @@ fn Archetype::column_index(
 }
 
 ///|
+/// Appends a zeroed component row for every column (SoA append).
 fn Archetype::push_empty_row(self : Archetype, entity : EntityId) -> Int {
   let row = self.entities.length()
   self.entities.push(entity)
@@ -142,6 +145,7 @@ fn Archetype::push_empty_row(self : Archetype, entity : EntityId) -> Int {
 }
 
 ///|
+/// Copies overlapping components when moving an entity row between archetypes (new row is the pending tail row).
 fn Archetype::copy_row_to(self : Archetype, row : Int, dst : Archetype) -> Unit {
   for i = 0; i < self.columns.length(); i = i + 1 {
     let col = self.columns[i]
@@ -191,6 +195,7 @@ fn Archetype::component_bytes(
 }
 
 ///|
+/// Dense archetype table helpers (swap-remove keeps rows packed).
 fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
   let last = self.entities.length() - 1
   if row < 0 || row > last {
@@ -220,6 +225,7 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
 }
 
 ///|
+/// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 pub fn World::new() -> World {
   let registry = ComponentRegistry::new()
   let generations : Array[Int] = []
@@ -250,6 +256,7 @@ pub fn World::registry(self : World) -> ComponentRegistry {
 }
 
 ///|
+/// Linear scan for an archetype whose sorted signature matches `components` (small archetype count expected).
 fn World::find_archetype(
   self : World,
   components : Array[ComponentTypeId],
@@ -278,6 +285,7 @@ fn World::ensure_archetype(
 }
 
 ///|
+/// Updates `locations` for the entity swapped into `row` after a removal (keeps archetype tables dense).
 fn World::update_moved_location(
   self : World,
   moved : EntityId?,
@@ -300,6 +308,7 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 }
 
 ///|
+/// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
   let entity = if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
@@ -321,6 +330,7 @@ pub fn World::create_entity(self : World) -> EntityId {
 }
 
 ///|
+/// Removes the entity from its archetype (swap-remove), clears GPU slots at `entity.index`, frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   if !self.is_alive(entity) {
     return false
@@ -368,6 +378,7 @@ pub fn World::has_component(
 }
 
 ///|
+/// Adds or updates a CPU component: may migrate the entity to a new archetype with an expanded sorted signature.
 pub fn World::add_component_bytes(
   self : World,
   entity : EntityId,
@@ -406,6 +417,7 @@ pub fn World::add_component_bytes(
 }
 
 ///|
+/// Removes a CPU component: migrates to a smaller archetype (signature loses one id); GPU flat stores are unaffected by archetype row moves.
 pub fn World::remove_component(
   self : World,
   entity : EntityId,
@@ -434,6 +446,7 @@ pub fn World::remove_component(
 }
 
 ///|
+/// Looks up CPU component bytes from the archetype SoA for this entity row.
 pub fn World::component_bytes(
   self : World,
   entity : EntityId,

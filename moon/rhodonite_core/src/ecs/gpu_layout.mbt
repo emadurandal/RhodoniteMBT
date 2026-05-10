@@ -1,4 +1,5 @@
 ///|
+/// Rounds `value` up to the next multiple of `align` (used for WGSL struct stride alignment).
 fn align_up(value : Int, align : Int) -> Int {
   let r = value % align
   if r == 0 {
@@ -9,6 +10,7 @@ fn align_up(value : Int, align : Int) -> Int {
 }
 
 ///|
+/// Wire size in bytes for std140-style packing (Vec3 occupies 16 bytes including padding).
 pub fn GpuFieldKind::size(self : GpuFieldKind) -> Int {
   match self {
     F32 => 4
@@ -21,6 +23,7 @@ pub fn GpuFieldKind::size(self : GpuFieldKind) -> Int {
 }
 
 ///|
+/// Base alignment for placing this kind at its starting offset.
 pub fn GpuFieldKind::align(self : GpuFieldKind) -> Int {
   match self {
     F32 => 4
@@ -33,6 +36,7 @@ pub fn GpuFieldKind::align(self : GpuFieldKind) -> Int {
 }
 
 ///|
+/// Builds a scalar/vector layout matching OpenGL std140 rules (including vec3 -> 16-byte column slots).
 pub fn GpuLayout::std140(fields : Array[(String, GpuFieldKind)]) -> GpuLayout {
   let out : Array[GpuField] = []
   let mut offset = 0
@@ -52,12 +56,14 @@ pub fn GpuLayout::std140(fields : Array[(String, GpuFieldKind)]) -> GpuLayout {
 }
 
 ///|
+/// Untyped blob layout: no logical fields, only a padded stride (e.g. opaque packed structs written elsewhere).
 pub fn GpuLayout::empty(stride : Int) -> GpuLayout {
   let fields : Array[GpuField] = []
   { fields, stride: align_up(stride, 16), align: 16 }
 }
 
 ///|
+/// Validates stride multiple of 16 and that each field lies inside `[0, stride)` with correct alignment.
 pub fn GpuLayout::is_valid(self : GpuLayout) -> Bool {
   if self.stride <= 0 || self.stride % 16 != 0 {
     return false
@@ -75,11 +81,13 @@ pub fn GpuLayout::is_valid(self : GpuLayout) -> Bool {
 }
 
 ///|
+/// Allocates a zeroed FixedArray sized for one GPU struct row (stride padded to 16 bytes).
 pub fn gpu_component_bytes(stride : Int) -> FixedArray[Byte] {
   FixedArray::make(align_up(stride, 16), (0 : Byte))
 }
 
 ///|
+/// Writes little-endian f32 at `offset` (matches WGSL `f32` storage representation).
 pub fn put_gpu_f32(
   buf : FixedArray[Byte],
   offset : Int,
@@ -89,6 +97,7 @@ pub fn put_gpu_f32(
 }
 
 ///|
+/// Writes little-endian u32 at `offset`.
 pub fn put_gpu_u32(buf : FixedArray[Byte], offset : Int, value : UInt) -> Unit {
   @writes.put_u32_le(buf, offset, value)
 }

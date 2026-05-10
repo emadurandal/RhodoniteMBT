@@ -1,10 +1,12 @@
 ///|
+/// Creates an empty registry; call `register_*` before spawning entities that use those components.
 pub fn ComponentRegistry::new() -> ComponentRegistry {
   let components : Array[RegisteredComponent] = []
   { components, }
 }
 
 ///|
+/// Registers a CPU-only component: data lives only in archetype SoA columns (`cpu_stride` bytes per row).
 pub fn ComponentRegistry::register_cpu(
   self : ComponentRegistry,
   name : String,
@@ -16,6 +18,7 @@ pub fn ComponentRegistry::register_cpu(
 }
 
 ///|
+/// Registers a GPU-visible component: same metadata as CPU plus a layout used for flat storage-buffer packing.
 pub fn ComponentRegistry::register_gpu(
   self : ComponentRegistry,
   name : String,

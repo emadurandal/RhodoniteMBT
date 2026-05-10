@@ -1,4 +1,5 @@
 ///|
+/// Per-GPU-component flat SoA: one `stride`-byte record per possible `EntityId.index`, plus dirty tracking for partial uploads.
 fn GpuComponentStore::new(
   component : ComponentTypeId,
   stride : Int,
@@ -19,6 +20,7 @@ fn GpuComponentStore::capacity(self : GpuComponentStore) -> Int {
 }
 
 ///|
+/// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
 fn GpuComponentStore::ensure_capacity(
   self : GpuComponentStore,
   capacity : Int,
@@ -39,6 +41,7 @@ fn GpuComponentStore::ensure_capacity(
 }
 
 ///|
+/// Queues `entity_index` once for `drain_writes` (idempotent per drain cycle).
 fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit {
   if !self.dirty_flags[index] {
     self.dirty_flags[index] = true
@@ -47,6 +50,7 @@ fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit 
 }
 
 ///|
+/// Writes one entity slot `[entity_index * stride, ..)` and marks it dirty for GPU upload.
 fn GpuComponentStore::set_bytes(
   self : GpuComponentStore,
   entity_index : Int,
@@ -63,6 +67,7 @@ fn GpuComponentStore::set_bytes(
 }
 
 ///|
+/// Zero-fills one logical GPU entity slot and marks it dirty (used by explicit clears and entity teardown).
 fn GpuComponentStore::clear_slot(
   self : GpuComponentStore,
   entity_index : Int,
@@ -75,6 +80,7 @@ fn GpuComponentStore::clear_slot(
 }
 
 ///|
+/// Inserts sorted values one-by-one (simple O(n²); fine for modest dirty counts).
 fn sort_ints(values : Array[Int]) -> Array[Int] {
   let out : Array[Int] = []
   for i = 0; i < values.length(); i = i + 1 {
@@ -94,6 +100,7 @@ fn sort_ints(values : Array[Int]) -> Array[Int] {
 }
 
 ///|
+/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
 fn GpuComponentStore::range_bytes(
   self : GpuComponentStore,
   first : Int,
@@ -110,6 +117,7 @@ fn GpuComponentStore::range_bytes(
 }
 
 ///|
+/// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
 fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
   let writes : Array[GpuWrite] = []
   if self.dirty_indices.length() == 0 {
@@ -139,6 +147,7 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
 }
 
 ///|
+/// Reserves a parallel `gpu_stores` slot (`None`) aligned with registry indices.
 pub fn World::register_cpu_component(
   self : World,
   name : String,
@@ -150,6 +159,7 @@ pub fn World::register_cpu_component(
 }
 
 ///|
+/// Allocates a flat store whose stride matches `gpu_layout.stride` (must pass `GpuLayout::is_valid`).
 pub fn World::register_gpu_component(
   self : World,
   name : String,
@@ -182,6 +192,7 @@ fn World::replace_gpu_store(self : World, store : GpuComponentStore) -> Unit {
 }
 
 ///|
+/// Ensures every GPU store has at least `capacity` entity slots (may emit resize events for buffer recreation).
 fn World::ensure_gpu_capacity(self : World, capacity : Int) -> Unit {
   for i = 0; i < self.gpu_stores.length(); i = i + 1 {
     match self.gpu_stores[i] {
@@ -206,6 +217,7 @@ fn World::ensure_gpu_capacity(self : World, capacity : Int) -> Unit {
 }
 
 ///|
+/// Zeros all GPU-visible slots for one entity index (e.g. on destroy so reused indices do not leak old GPU data).
 fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
   for i = 0; i < self.gpu_stores.length(); i = i + 1 {
     match self.gpu_stores[i] {
@@ -219,6 +231,7 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
 }
 
 ///|
+/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead or `component` is not GPU-visible.
 pub fn World::set_gpu_component_bytes(
   self : World,
   entity : EntityId,
@@ -239,6 +252,7 @@ pub fn World::set_gpu_component_bytes(
 }
 
 ///|
+/// Clears one GPU slot to zeros and marks it dirty (same as destroy-side scrubbing but callable explicitly).
 pub fn World::clear_gpu_component(
   self : World,
   entity : EntityId,
@@ -258,6 +272,7 @@ pub fn World::clear_gpu_component(
 }
 
 ///|
+/// Reads the flat GPU bytes for a living entity (does not consult archetypes).
 pub fn World::gpu_component_bytes(
   self : World,
   entity : EntityId,
@@ -280,6 +295,7 @@ pub fn World::gpu_component_bytes(
 }
 
 ///|
+/// Returns batched byte slices suitable for `write_buffer_from_fixed_array`; consumes pending dirties for this component.
 pub fn World::drain_gpu_writes(
   self : World,
   component : ComponentTypeId,
@@ -295,6 +311,7 @@ pub fn World::drain_gpu_writes(
 }
 
 ///|
+/// Drains resize notifications after GPU backing arrays grow (caller may recreate `GPUBuffer` and full-upload).
 pub fn World::drain_resize_events(self : World) -> Array[GpuResizeEvent] {
   let out : Array[GpuResizeEvent] = []
   for i = 0; i < self.resize_events.length(); i = i + 1 {
