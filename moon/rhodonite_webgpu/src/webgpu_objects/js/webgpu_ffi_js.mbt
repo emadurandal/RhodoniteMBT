@@ -288,6 +288,47 @@ extern "js" fn renderPass_drawIndexed(
   #|   )
 
 ///|
+extern "js" fn renderPipeline_getBindGroupLayout(
+  pipeline : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout =
+  #| (pipeline, group_index) => pipeline.getBindGroupLayout(group_index)
+
+///|
+extern "js" fn device_createBindGroupStorageBuffer(
+  device : GPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup =
+  #| (device, layout, buffer) =>
+  #|   device.createBindGroup({
+  #|     layout,
+  #|     entries: [{ binding: 0, resource: { buffer } }],
+  #|   })
+
+///|
+extern "js" fn device_createBindGroupUniformBuffer(
+  device : GPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup =
+  #| (device, layout, buffer) =>
+  #|   device.createBindGroup({
+  #|     layout,
+  #|     entries: [{ binding: 0, resource: { buffer } }],
+  #|   })
+
+///|
+extern "js" fn renderPass_setBindGroup(
+  pass : GPURenderPassEncoder,
+  index : UInt,
+  group : GPUBindGroup,
+  dynamic_offsets : Array[UInt],
+) -> Unit =
+  #| (pass, index, group, dynamic_offsets) =>
+  #|   pass.setBindGroup(index, group, dynamic_offsets)
+
+///|
 extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
   #| (pass) => pass.end()
 

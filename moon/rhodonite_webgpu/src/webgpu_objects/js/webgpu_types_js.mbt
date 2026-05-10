@@ -40,4 +40,10 @@ pub type GPUCommandBuffer
 pub type GPUBuffer
 
 ///|
+pub type GPUBindGroupLayout
+
+///|
+pub type GPUBindGroup
+
+///|
 pub type HTMLCanvasElement

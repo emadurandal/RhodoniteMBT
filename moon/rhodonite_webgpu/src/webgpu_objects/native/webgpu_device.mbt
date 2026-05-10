@@ -164,6 +164,44 @@ pub fn webgpu_device_create_command_encoder(
 }
 
 ///|
+pub fn webgpu_render_pipeline_get_bind_group_layout(
+  pipeline : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout {
+  GPUBindGroupLayout::{
+    raw: pipeline.raw.get_bind_group_layout_raw(group_index),
+  }
+}
+
+///|
+pub fn webgpu_device_create_bind_group_storage_buffer(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup {
+  GPUBindGroup::{
+    raw: device.device.raw.create_bind_group_storage_buffer(
+      layout.raw,
+      buffer.raw,
+    ),
+  }
+}
+
+///|
+pub fn webgpu_device_create_bind_group_uniform_buffer(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup {
+  GPUBindGroup::{
+    raw: device.device.raw.create_bind_group_uniform_buffer(
+      layout.raw,
+      buffer.raw,
+    ),
+  }
+}
+
+///|
 pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
   device.device.raw.poll(wait~)
 }

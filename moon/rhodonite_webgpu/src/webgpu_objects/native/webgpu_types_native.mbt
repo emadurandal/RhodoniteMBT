@@ -69,3 +69,13 @@ pub struct GPUCommandBuffer {
 pub struct GPUBuffer {
   raw : @wgpu.Buffer
 }
+
+///|
+pub struct GPUBindGroupLayout {
+  raw : @wgpu.BindGroupLayout
+}
+
+///|
+pub struct GPUBindGroup {
+  raw : @wgpu.BindGroup
+}

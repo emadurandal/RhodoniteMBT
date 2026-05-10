@@ -82,6 +82,16 @@ pub fn webgpu_render_pass_encoder_draw_indexed(
 }
 
 ///|
+pub fn webgpu_render_pass_encoder_set_bind_group(
+  renderPass : WebGPURenderPassEncoder,
+  index : UInt,
+  group : GPUBindGroup,
+  dynamic_offsets : Array[UInt],
+) -> Unit {
+  renderPass_setBindGroup(renderPass.encoder, index, group, dynamic_offsets)
+}
+
+///|
 pub fn webgpu_render_pass_encoder_end(
   renderPass : WebGPURenderPassEncoder,
 ) -> Unit {

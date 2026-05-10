@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/ecs-scene-graph/common"
+
+import {
+  "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_webgpu/webgpu",
+  "emadurandal/rhodonite_webgpu/webgpu_objects",
+  "moonbitlang/core/ref",
+}
+
+// Values
+pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
+
+pub fn render_frame(WebGPURenderer) -> Unit
+
+pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct WebGPURenderer {
+  context : @webgpu.GPUCanvasContext
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
+  pipeline : @webgpu.GPURenderPipeline
+  depth_texture : @webgpu.GPUTexture
+  depth_view : @webgpu_objects.GPUTextureView
+  vertex_buffer : @webgpu.GPUBuffer
+  instance_buffer : @webgpu.GPUBuffer
+  index_buffer : @webgpu.GPUBuffer
+  transform_storage : @webgpu.GPUBuffer
+  camera_uniform : @webgpu.GPUBuffer
+  bind_transforms : @webgpu.GPUBindGroup
+  bind_camera : @webgpu.GPUBindGroup
+  layout_transforms : @webgpu.GPUBindGroupLayout
+  layout_camera : @webgpu.GPUBindGroupLayout
+  world : @ecs.World
+  bodies : Array[@ecs.EntityId]
+  gt : @ecs.ComponentTypeId
+  frame : @ref.Ref[Int]
+}
+pub fn WebGPURenderer::release(Self) -> Unit
+
+// Type aliases
+
+// Traits
+

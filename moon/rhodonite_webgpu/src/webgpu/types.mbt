@@ -26,6 +26,16 @@ pub(all) struct GPUBuffer {
 }
 
 ///|
+pub(all) struct GPUBindGroupLayout {
+  raw : @raw.GPUBindGroupLayout
+}
+
+///|
+pub(all) struct GPUBindGroup {
+  raw : @raw.GPUBindGroup
+}
+
+///|
 pub(all) struct GPURenderPassColorAttachment {
   view : GPUTextureView
   clear_value : GPUColor?

@@ -106,3 +106,29 @@ pub fn webgpu_device_create_command_encoder(
 ) -> WebGPUCommandEncoder {
   WebGPUCommandEncoder::new(device_createCommandEncoder(device.device))
 }
+
+///|
+pub fn webgpu_render_pipeline_get_bind_group_layout(
+  pipeline : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout {
+  renderPipeline_getBindGroupLayout(pipeline, group_index)
+}
+
+///|
+pub fn webgpu_device_create_bind_group_storage_buffer(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup {
+  device_createBindGroupStorageBuffer(device.device, layout, buffer)
+}
+
+///|
+pub fn webgpu_device_create_bind_group_uniform_buffer(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  buffer : GPUBuffer,
+) -> GPUBindGroup {
+  device_createBindGroupUniformBuffer(device.device, layout, buffer)
+}

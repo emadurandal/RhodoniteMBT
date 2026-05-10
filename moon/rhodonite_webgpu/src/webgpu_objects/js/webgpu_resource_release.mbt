@@ -9,6 +9,16 @@ pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
 }
 
 ///|
+pub fn bindGroupLayout_release(layout : GPUBindGroupLayout) -> Unit {
+  ignore(layout)
+}
+
+///|
+pub fn bindGroup_release(group : GPUBindGroup) -> Unit {
+  ignore(group)
+}
+
+///|
 extern "js" fn gpu_buffer_destroy(buffer : GPUBuffer) -> Unit =
   #| (b) => b.destroy()
 
