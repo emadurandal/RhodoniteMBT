@@ -699,19 +699,12 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let tf = self.transform_component_id
   let gt = self.global_transform_component_id
   let required : Array[ComponentTypeId] = [tf, gt]
-  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-    let sig = self.archetypes[ai].components
-    if component_array_contains_all(sig, required) {
-      let ents = self.archetypes[ai].entities
-      for j = 0; j < ents.length(); j = j + 1 {
-        let e = ents[j]
-        match self.compute_global_transform(e) {
-          Some(g) => {
-            let _ = self.set_global_transform(e, g)
-          }
-          None => ()
-        }
+  self.for_each_entity_with_components(required, fn(e) {
+    match self.compute_global_transform(e) {
+      Some(g) => {
+        let _ = self.set_global_transform(e, g)
       }
+      None => ()
     }
-  }
+  })
 }
