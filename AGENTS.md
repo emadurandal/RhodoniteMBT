@@ -41,8 +41,8 @@ pnpm install
 
 | Goal | Command |
 |------|---------|
-| Web demo (e.g. basic-triangle) | `pnpm run dev:basic-triangle` (also `dev:triangle-with-buffer`, `dev:depth-test`) |
-| Native (SDL3 / wgpu) | `pnpm run run:wgpu:basic-triangle`, etc. ([`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh)) |
+| JS demo (browser) | `pnpm run dev:js:basic-triangle` (also `dev:js:triangle-with-buffer`, `dev:js:depth-test`) |
+| Native (SDL3 / wgpu) | `pnpm run dev:native:basic-triangle`, etc. ([`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh)) |
 | Core JS bridge (Vitest) | `pnpm run test:core:js` |
 | Core MoonBit tests | `pnpm run test:core:mbt` |
 

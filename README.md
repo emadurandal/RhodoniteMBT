@@ -33,18 +33,18 @@ From [`justfile`](justfile), `just check-ws` runs `moon check --target all`.
 
 ## Build & Run
 
-### Web
+### JS (browser)
 
 ```bash
 pnpm install
-pnpm run dev:basic-triangle
+pnpm run dev:js:basic-triangle
 ```
 
 ### Native
 
 ```bash
 pnpm install
-pnpm run run:wgpu:basic-triangle
+pnpm run dev:native:basic-triangle
 ```
 
 [`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) runs the native binary; under workspace builds it lives at `_build/native/debug/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
