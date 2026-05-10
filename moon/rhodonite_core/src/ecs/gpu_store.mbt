@@ -160,16 +160,16 @@ pub fn World::register_cpu_component(
 
 ///|
 /// Allocates a flat store whose stride matches `gpu_layout.stride` (must pass `GpuLayout::is_valid`).
+/// GPU-visible components never allocate archetype SoA payload bytes (`cpu_stride` is always `0`).
 pub fn World::register_gpu_component(
   self : World,
   name : String,
-  cpu_stride : Int,
   gpu_layout : GpuLayout,
 ) -> ComponentTypeId {
   if !gpu_layout.is_valid() {
     abort("invalid gpu layout")
   }
-  let id = self.registry.register_gpu(name, cpu_stride, gpu_layout)
+  let id = self.registry.register_gpu(name, gpu_layout)
   self.gpu_stores.push(Some(GpuComponentStore::new(id, gpu_layout.stride)))
   id
 }

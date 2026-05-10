@@ -226,8 +226,17 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
 
 ///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
+/// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) with flat GPU storage only.
 pub fn World::new() -> World {
   let registry = ComponentRegistry::new()
+  let tf_layout = transform3d_gpu_layout()
+  if !tf_layout.is_valid() {
+    abort("builtin Transform3D layout invalid")
+  }
+  let transform_component_id = registry.register_gpu("Transform3D", tf_layout)
+  let gpu_stores : Array[GpuComponentStore?] = [
+    Some(GpuComponentStore::new(transform_component_id, tf_layout.stride)),
+  ]
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
   let free_indices : Array[Int] = []
@@ -236,7 +245,6 @@ pub fn World::new() -> World {
   let archetypes : Array[Archetype] = [
     Archetype::new(empty_components, registry),
   ]
-  let gpu_stores : Array[GpuComponentStore?] = []
   let resize_events : Array[GpuResizeEvent] = []
   {
     registry,
@@ -247,6 +255,7 @@ pub fn World::new() -> World {
     archetypes,
     gpu_stores,
     resize_events,
+    transform_component_id,
   }
 }
 
@@ -458,6 +467,41 @@ pub fn World::component_bytes(
   match self.locations[entity.index] {
     Some(loc) =>
       self.archetypes[loc.archetype_index].component_bytes(loc.row, component)
+    None => None
+  }
+}
+
+///|
+pub fn World::transform_component(self : World) -> ComponentTypeId {
+  self.transform_component_id
+}
+
+///|
+/// Assigns builtin [`Transform3D`] for `entity`: archetype signature uses zero-byte SoA row; payload is flat GPU only.
+pub fn World::set_transform(
+  self : World,
+  entity : EntityId,
+  t : Transform3D,
+) -> Bool {
+  let tf = self.transform_component_id
+  let payload = t.to_gpu_bytes()
+  if !self.has_component(entity, tf) {
+    let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+    if !self.add_component_bytes(entity, tf, empty) {
+      return false
+    }
+  }
+  self.set_gpu_component_bytes(entity, tf, payload)
+}
+
+///|
+pub fn World::get_transform(self : World, entity : EntityId) -> Transform3D? {
+  let tf = self.transform_component_id
+  if !self.is_alive(entity) || !self.has_component(entity, tf) {
+    return None
+  }
+  match self.gpu_component_bytes(entity, tf) {
+    Some(bytes) => Some(Transform3D::from_gpu_bytes(bytes))
     None => None
   }
 }

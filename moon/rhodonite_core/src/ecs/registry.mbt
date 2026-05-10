@@ -18,11 +18,11 @@ pub fn ComponentRegistry::register_cpu(
 }
 
 ///|
-/// Registers a GPU-visible component: same metadata as CPU plus a layout used for flat storage-buffer packing.
+/// Registers a GPU-visible component: payload lives only in the flat [`GpuComponentStore`]
+/// (`cpu_stride` is always `0`; archetypes hold this id for signatures only; see `GpuLayout.stride` for packing).
 pub fn ComponentRegistry::register_gpu(
   self : ComponentRegistry,
   name : String,
-  cpu_stride : Int,
   gpu_layout : GpuLayout,
 ) -> ComponentTypeId {
   let id = ComponentTypeId::new(self.components.length())
@@ -30,7 +30,7 @@ pub fn ComponentRegistry::register_gpu(
     id,
     name,
     kind: GpuVisible,
-    cpu_stride,
+    cpu_stride: 0,
     gpu_layout: Some(gpu_layout),
   })
   id

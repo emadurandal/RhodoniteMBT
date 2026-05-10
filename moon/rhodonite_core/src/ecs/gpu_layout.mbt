@@ -101,3 +101,9 @@ pub fn put_gpu_f32(
 pub fn put_gpu_u32(buf : FixedArray[Byte], offset : Int, value : UInt) -> Unit {
   @writes.put_u32_le(buf, offset, value)
 }
+
+///|
+/// Reads little-endian f32 at `offset`; returns `Double`.
+pub fn get_gpu_f32(buf : FixedArray[Byte], offset : Int) -> Double {
+  @writes.get_f32_le(buf, offset)
+}

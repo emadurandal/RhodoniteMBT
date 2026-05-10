@@ -67,7 +67,7 @@ test "std140-compatible layout pads vec3 fields to 16 bytes" {
 ///|
 test "GPU visible components stay flat by EntityId index and drain only dirty ranges" {
   let world = World::new()
-  let gpu = world.register_gpu_component("GpuMaterial", 0, GpuLayout::empty(16))
+  let gpu = world.register_gpu_component("GpuMaterial", GpuLayout::empty(16))
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let _ = world.create_entity()
@@ -91,11 +91,7 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
 ///|
 test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes" {
   let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuTransform",
-    0,
-    GpuLayout::empty(16),
-  )
+  let gpu = world.register_gpu_component("GpuTransform", GpuLayout::empty(16))
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
   assert_true(
@@ -109,4 +105,37 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
   assert_eq(writes[0].byte_offset, entity.index * 16)
   assert_eq(writes[0].bytes.length(), 16)
   assert_eq(writes[0].bytes[0], (2U & 0xFFU).to_byte())
+}
+
+///|
+test "builtin Transform3D uses ComponentTypeId index 0" {
+  let world = World::new()
+  assert_eq(world.transform_component().index, 0)
+}
+
+///|
+test "Transform3D identity roundtrip bytes and World set/get" {
+  let world = World::new()
+  let tf = world.transform_component()
+  let entity = world.create_entity()
+  let _ = world.drain_resize_events()
+  let t = Transform3D::identity()
+  assert_true(world.set_transform(entity, t))
+  match world.get_transform(entity) {
+    Some(got) => {
+      assert_eq(got.position.x(), t.position.x())
+      assert_eq(got.rotation.w(), t.rotation.w())
+      assert_eq(got.scale.x(), t.scale.x())
+    }
+    None => abort("expected Transform3D")
+  }
+  let writes = world.drain_gpu_writes(tf)
+  assert_eq(writes.length(), 1)
+}
+
+///|
+test "get_gpu_f32 reads put_gpu_f32" {
+  let buf = gpu_component_bytes(16)
+  put_gpu_f32(buf, 4, 2.5)
+  assert_eq(get_gpu_f32(buf, 4), 2.5)
 }

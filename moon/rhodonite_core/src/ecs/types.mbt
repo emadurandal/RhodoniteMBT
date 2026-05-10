@@ -30,7 +30,8 @@ pub fn ComponentTypeId::new(index : Int) -> ComponentTypeId {
 }
 
 ///|
-/// CpuOnly: archetype SoA only. GpuVisible: also backed by a flat `GpuComponentStore` for WGSL.
+/// CpuOnly: archetype SoA only (`cpu_stride` bytes per row).
+/// GpuVisible: payload only in flat `GpuComponentStore` (`cpu_stride` is always `0` here; layout stride is `gpu_layout.stride`).
 pub(all) enum ComponentKind {
   CpuOnly
   GpuVisible
@@ -66,7 +67,7 @@ pub(all) struct GpuLayout {
 }
 
 ///|
-/// Metadata for one registered component: CPU packing stride and, if GPU-visible, the layout description.
+/// Metadata for one registered component: `cpu_stride` is `0` for `GpuVisible` (payload lives only in `GpuComponentStore`).
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
@@ -140,4 +141,5 @@ pub struct World {
   archetypes : Array[Archetype]
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
+  transform_component_id : ComponentTypeId
 }
