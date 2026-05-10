@@ -25,6 +25,19 @@ pub impl[T : Neg] Neg for Vector4[T]
 pub impl[T : Show] Show for Vector4[T]
 pub impl[T : Sub] Sub for Vector4[T]
 
+pub(all) struct Vector4Ref[T] {
+  data : MutArrayView[T]
+}
+pub fn Vector4Ref::from_mut_view(MutArrayView[Byte]) -> Self[Byte]
+pub fn Vector4Ref::set_w(Self[Byte], Float) -> Unit
+pub fn Vector4Ref::set_x(Self[Byte], Float) -> Unit
+pub fn Vector4Ref::set_y(Self[Byte], Float) -> Unit
+pub fn Vector4Ref::set_z(Self[Byte], Float) -> Unit
+pub fn Vector4Ref::w(Self[Byte]) -> Float
+pub fn Vector4Ref::x(Self[Byte]) -> Float
+pub fn Vector4Ref::y(Self[Byte]) -> Float
+pub fn Vector4Ref::z(Self[Byte]) -> Float
+
 // Type aliases
 pub type Vector4D = Vector4[Double]
 

@@ -208,12 +208,12 @@ fn Archetype::component_bytes(
 }
 
 ///|
-/// Zero-copy view of one component row (MoonBit [`ArrayView`] over [`ComponentColumn::bytes`]).
-fn Archetype::component_byte_view(
+/// Zero-copy **mutable** view of one component row ([`MutArrayView`] over [`ComponentColumn::bytes`]).
+fn Archetype::component_byte_mut_view(
   self : Archetype,
   row : Int,
   component : ComponentTypeId,
-) -> ArrayView[Byte]? {
+) -> MutArrayView[Byte]? {
   let col_index = self.column_index(component)
   if col_index < 0 {
     None
@@ -221,7 +221,7 @@ fn Archetype::component_byte_view(
     let col = self.columns[col_index]
     let base = row * col.stride
     let end = base + col.stride
-    Some(col.bytes[base:end])
+    Some(col.bytes.mut_view(start=base, end~))
   }
 }
 
@@ -768,14 +768,14 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 /// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
 ///
 /// The callback receives the entity, that row's **full sorted archetype component list**, and one
-/// [`ArrayView`] per entry in `required` (same order): a **non-copying** view into `required[k]`'s SoA
-/// bytes at this row (see MoonBit `array[start:end]`). **GPU-visible** components register `cpu_stride`
+/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into
+/// `required[k]`'s SoA bytes at this row. **GPU-visible** components register `cpu_stride`
 /// `0`, so their archetype column has **no row bytes** — the view length is `0`; update payloads via
 /// [`set_gpu_component_bytes`] / [`set_global_transform`] or write the [`GpuComponentStore`] slot directly.
 pub fn World::for_each_entity_with_components(
   self : World,
   required : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[ArrayView[Byte]]) -> Unit,
+  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
 ) -> Unit {
   if required.length() == 0 {
     return
@@ -786,9 +786,9 @@ pub fn World::for_each_entity_with_components(
       let arch = self.archetypes[ai]
       let ents = arch.entities
       for j = 0; j < ents.length(); j = j + 1 {
-        let payloads : Array[ArrayView[Byte]] = []
+        let payloads : Array[MutArrayView[Byte]] = []
         for k = 0; k < required.length(); k = k + 1 {
-          match arch.component_byte_view(j, required[k]) {
+          match arch.component_byte_mut_view(j, required[k]) {
             Some(v) => payloads.push(v)
             None =>
               abort(
@@ -810,7 +810,7 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let gt = self.global_transform_component_id
   let required : Array[ComponentTypeId] = [tf, gt]
   self.for_each_entity_with_components(required, (e, sig, payloads) => {
-    let local_tf = @comp.Transform3D::from_component_byte_view(payloads[0])
+    let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
     match self.compute_global_transform_for_tf_gt_bulk_row(e, sig, local_tf) {
       Some(g) => {
         let _ = self.set_global_transform(e, g)

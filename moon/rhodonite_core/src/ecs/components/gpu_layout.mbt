@@ -16,6 +16,7 @@ pub fn GpuFieldKind::size(self : GpuFieldKind) -> Int {
     F32 => 4
     U32 => 4
     Vec2F32 => 8
+    Vec3F32Packed => 12
     Vec3F32 => 16
     Vec4F32 => 16
     Mat4x4F32 => 64
@@ -29,6 +30,7 @@ pub fn GpuFieldKind::align(self : GpuFieldKind) -> Int {
     F32 => 4
     U32 => 4
     Vec2F32 => 8
+    Vec3F32Packed => 4
     Vec3F32 => 16
     Vec4F32 => 16
     Mat4x4F32 => 16
@@ -126,4 +128,10 @@ pub fn get_gpu_f32(buf : FixedArray[Byte], offset : Int) -> Float {
 /// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
 pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_byte_view(buf, offset))
+}
+
+///|
+/// Same as [`get_gpu_f32`] but reads through a [`MutArrayView`] (e.g. SoA row slice).
+pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
+  Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(buf, offset))
 }

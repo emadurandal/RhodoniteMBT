@@ -196,14 +196,11 @@ test "get_gpu_f32 reads put_gpu_f32" {
 test "compute_global_transform uses Transform3D only without ChildOf" {
   let world = World::new()
   let e = world.create_entity()
-  let base = @comp.Transform3D::identity()
-  let tf = @comp.Transform3D::{
-    position: {
-      data: ([(2.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: base.rotation,
-    scale: base.scale,
-  }
+  let tf = @comp.Transform3D::from_translation(
+    (2.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
   assert_true(world.set_transform(e, tf))
   match world.compute_global_transform(e) {
     Some(gt) => {
@@ -220,21 +217,16 @@ test "compute_global_transform multiplies parent chain" {
   let world = World::new()
   let parent = world.create_entity()
   let child = world.create_entity()
-  let id = @comp.Transform3D::identity()
-  let tf_p = @comp.Transform3D::{
-    position: {
-      data: ([(10.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: id.rotation,
-    scale: id.scale,
-  }
-  let tf_c = @comp.Transform3D::{
-    position: {
-      data: ([(5.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: id.rotation,
-    scale: id.scale,
-  }
+  let tf_p = @comp.Transform3D::from_translation(
+    (10.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let tf_c = @comp.Transform3D::from_translation(
+    (5.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
   assert_true(world.set_child_of(child, parent))
@@ -298,21 +290,16 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
   let world = World::new()
   let parent = world.create_entity()
   let child = world.create_entity()
-  let id = @comp.Transform3D::identity()
-  let tf_p = @comp.Transform3D::{
-    position: {
-      data: ([(10.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: id.rotation,
-    scale: id.scale,
-  }
-  let tf_c = @comp.Transform3D::{
-    position: {
-      data: ([(5.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: id.rotation,
-    scale: id.scale,
-  }
+  let tf_p = @comp.Transform3D::from_translation(
+    (10.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let tf_c = @comp.Transform3D::from_translation(
+    (5.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
   assert_true(world.set_child_of(child, parent))
@@ -335,14 +322,11 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
 test "update_global_transforms_from_transforms applies root Transform3D only" {
   let world = World::new()
   let e = world.create_entity()
-  let base = @comp.Transform3D::identity()
-  let tf = @comp.Transform3D::{
-    position: {
-      data: ([(7.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
-    },
-    rotation: base.rotation,
-    scale: base.scale,
-  }
+  let tf = @comp.Transform3D::from_translation(
+    (7.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
   assert_true(world.set_transform(e, tf))
   assert_true(world.set_global_transform(e, @comp.GlobalTransform::identity()))
   let _ = world.drain_gpu_writes(world.global_transform_component())

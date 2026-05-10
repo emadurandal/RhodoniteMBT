@@ -1,47 +1,41 @@
 ///|
-/// Library-local transform: TRS packed with std140 vec3/vec4 rules for archetype SoA (`CpuOnly`).
+/// Library-local transform: TRS stored as tightly packed `f32` in archetype SoA (`CpuOnly`).
 
 ///|
 pub(all) struct Transform3D {
-  position : @v3.Vector3F
-  rotation : @v4.Vector4F
-  scale : @v3.Vector3F
+  ///
+  /// When [`Some`], [`position`]/[`rotation`]/[`scale`] views borrow this buffer; when [`None`],
+  /// views borrow an external row (e.g. archetype column) and must not outlive it.
+  storage : FixedArray[Byte]?
+  position : @v3.Vector3Ref[Byte]
+  rotation : @v4.Vector4Ref[Byte]
+  scale : @v3.Vector3Ref[Byte]
 }
 
 ///|
-pub fn Transform3D::identity() -> Transform3D {
+/// Tight packing: `vec3 position` (12B) + `vec4 rotation` (16B) + `vec3 scale` (12B) = 40B;
+/// stride **48** (8B tail pad) so [`GpuLayout::is_valid`] holds (multiple of 16).
+pub fn transform3d_gpu_layout() -> GpuLayout {
   {
-    position: @v3.Vector3F::zero(),
-    rotation: @v4.Vector4F::new(
-      (0.0 : Float),
-      (0.0 : Float),
-      (0.0 : Float),
-      (1.0 : Float),
-    ),
-    scale: @v3.Vector3F::new((1.0 : Float), (1.0 : Float), (1.0 : Float)),
+    fields: [
+      { name: "position", kind: Vec3F32Packed, offset: 0, size: 12, align: 4 },
+      { name: "rotation", kind: Vec4F32, offset: 12, size: 16, align: 4 },
+      { name: "scale", kind: Vec3F32Packed, offset: 28, size: 12, align: 4 },
+    ],
+    stride: 48,
+    align: 16,
   }
 }
 
 ///|
-/// WGSL/std140 layout: `vec3 position`, `vec4 rotation`, `vec3 scale` (each vec3 padded to 16 bytes).
-pub fn transform3d_gpu_layout() -> GpuLayout {
-  let fields : Array[(String, GpuFieldKind)] = [
-    ("position", Vec3F32),
-    ("rotation", Vec4F32),
-    ("scale", Vec3F32),
-  ]
-  GpuLayout::std140(fields)
-}
-
-///|
-fn put_vec3(buf : FixedArray[Byte], base : Int, v : @v3.Vector3F) -> Unit {
+fn put_vec3_fixed(buf : FixedArray[Byte], base : Int, v : @v3.Vector3F) -> Unit {
   put_gpu_f32(buf, base + 0, v.x().to_double())
   put_gpu_f32(buf, base + 4, v.y().to_double())
   put_gpu_f32(buf, base + 8, v.z().to_double())
 }
 
 ///|
-fn put_vec4(buf : FixedArray[Byte], base : Int, v : @v4.Vector4F) -> Unit {
+fn put_vec4_fixed(buf : FixedArray[Byte], base : Int, v : @v4.Vector4F) -> Unit {
   put_gpu_f32(buf, base + 0, v.x().to_double())
   put_gpu_f32(buf, base + 4, v.y().to_double())
   put_gpu_f32(buf, base + 8, v.z().to_double())
@@ -49,40 +43,92 @@ fn put_vec4(buf : FixedArray[Byte], base : Int, v : @v4.Vector4F) -> Unit {
 }
 
 ///|
-fn get_vec3(buf : FixedArray[Byte], base : Int) -> @v3.Vector3F {
-  @v3.Vector3F::new(
-    get_gpu_f32(buf, base + 0),
-    get_gpu_f32(buf, base + 4),
-    get_gpu_f32(buf, base + 8),
-  )
+fn transform3d_from_row_mut(
+  storage : FixedArray[Byte]?,
+  row : MutArrayView[Byte],
+) -> Transform3D {
+  let layout = transform3d_gpu_layout()
+  if row.length() != layout.stride {
+    abort("Transform3D: row length mismatch")
+  }
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d_gpu_layout: expected 3 fields")
+  }
+  let pos = row.mut_view(start=f[0].offset, end=f[0].offset + f[0].size)
+  let rot = row.mut_view(start=f[1].offset, end=f[1].offset + f[1].size)
+  let scl = row.mut_view(start=f[2].offset, end=f[2].offset + f[2].size)
+  {
+    storage,
+    position: @v3.Vector3Ref::from_mut_view(pos),
+    rotation: @v4.Vector4Ref::from_mut_view(rot),
+    scale: @v3.Vector3Ref::from_mut_view(scl),
+  }
 }
 
 ///|
-fn get_vec4(buf : FixedArray[Byte], base : Int) -> @v4.Vector4F {
-  @v4.Vector4F::new(
-    get_gpu_f32(buf, base + 0),
-    get_gpu_f32(buf, base + 4),
-    get_gpu_f32(buf, base + 8),
-    get_gpu_f32(buf, base + 12),
+pub fn Transform3D::identity() -> Transform3D {
+  let layout = transform3d_gpu_layout()
+  let buf = gpu_component_bytes(layout.stride)
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d_gpu_layout: expected 3 fields")
+  }
+  put_vec3_fixed(buf, f[0].offset, @v3.Vector3F::zero())
+  put_vec4_fixed(
+    buf,
+    f[1].offset,
+    @v4.Vector4F::new(
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      (1.0 : Float),
+    ),
   )
+  put_vec3_fixed(
+    buf,
+    f[2].offset,
+    @v3.Vector3F::new((1.0 : Float), (1.0 : Float), (1.0 : Float)),
+  )
+  let stride = buf.length()
+  transform3d_from_row_mut(Some(buf), buf.mut_view(start=0, end=stride))
 }
 
 ///|
-fn get_vec3_byte_view(buf : ArrayView[Byte], base : Int) -> @v3.Vector3F {
-  @v3.Vector3F::new(
-    get_gpu_f32_byte_view(buf, base + 0),
-    get_gpu_f32_byte_view(buf, base + 4),
-    get_gpu_f32_byte_view(buf, base + 8),
-  )
+/// Builds a transform backed by a new row buffer from owned [`Vector3F`]/[`Vector4F`] values.
+pub fn Transform3D::from_trs(
+  position : @v3.Vector3F,
+  rotation : @v4.Vector4F,
+  scale : @v3.Vector3F,
+) -> Transform3D {
+  let buf = gpu_component_bytes(transform3d_gpu_layout().stride)
+  let f = transform3d_gpu_layout().fields
+  if f.length() != 3 {
+    abort("transform3d_gpu_layout: expected 3 fields")
+  }
+  put_vec3_fixed(buf, f[0].offset, position)
+  put_vec4_fixed(buf, f[1].offset, rotation)
+  put_vec3_fixed(buf, f[2].offset, scale)
+  let stride = buf.length()
+  transform3d_from_row_mut(Some(buf), buf.mut_view(start=0, end=stride))
 }
 
 ///|
-fn get_vec4_byte_view(buf : ArrayView[Byte], base : Int) -> @v4.Vector4F {
-  @v4.Vector4F::new(
-    get_gpu_f32_byte_view(buf, base + 0),
-    get_gpu_f32_byte_view(buf, base + 4),
-    get_gpu_f32_byte_view(buf, base + 8),
-    get_gpu_f32_byte_view(buf, base + 12),
+/// Builds a transform with identity rotation, unit scale, and the given translation.
+pub fn Transform3D::from_translation(
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Transform3D {
+  Transform3D::from_trs(
+    @v3.Vector3F::new(x, y, z),
+    @v4.Vector4F::new(
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      (1.0 : Float),
+    ),
+    @v3.Vector3F::new((1.0 : Float), (1.0 : Float), (1.0 : Float)),
   )
 }
 
@@ -91,13 +137,20 @@ fn get_vec4_byte_view(buf : ArrayView[Byte], base : Int) -> @v4.Vector4F {
 pub fn Transform3D::to_component_bytes(self : Transform3D) -> FixedArray[Byte] {
   let layout = transform3d_gpu_layout()
   let buf = gpu_component_bytes(layout.stride)
-  let fields = layout.fields
-  if fields.length() != 3 {
+  let f = layout.fields
+  if f.length() != 3 {
     abort("transform3d_gpu_layout: expected 3 fields")
   }
-  put_vec3(buf, fields[0].offset, self.position)
-  put_vec4(buf, fields[1].offset, self.rotation)
-  put_vec3(buf, fields[2].offset, self.scale)
+  put_gpu_f32(buf, f[0].offset + 0, self.position.x().to_double())
+  put_gpu_f32(buf, f[0].offset + 4, self.position.y().to_double())
+  put_gpu_f32(buf, f[0].offset + 8, self.position.z().to_double())
+  put_gpu_f32(buf, f[1].offset + 0, self.rotation.x().to_double())
+  put_gpu_f32(buf, f[1].offset + 4, self.rotation.y().to_double())
+  put_gpu_f32(buf, f[1].offset + 8, self.rotation.z().to_double())
+  put_gpu_f32(buf, f[1].offset + 12, self.rotation.w().to_double())
+  put_gpu_f32(buf, f[2].offset + 0, self.scale.x().to_double())
+  put_gpu_f32(buf, f[2].offset + 4, self.scale.y().to_double())
+  put_gpu_f32(buf, f[2].offset + 8, self.scale.z().to_double())
   buf
 }
 
@@ -109,39 +162,20 @@ pub fn Transform3D::from_component_bytes(
   if bytes.length() != layout.stride {
     abort("Transform3D::from_component_bytes: length mismatch")
   }
-  let fields = layout.fields
-  if fields.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  {
-    position: get_vec3(bytes, fields[0].offset),
-    rotation: get_vec4(bytes, fields[1].offset),
-    scale: get_vec3(bytes, fields[2].offset),
-  }
+  let stride = bytes.length()
+  transform3d_from_row_mut(Some(bytes), bytes.mut_view(start=0, end=stride))
 }
 
 ///|
-/// Decodes TRS from a zero-copy [`ArrayView`] over one archetype row (see MoonBit array views).
-pub fn Transform3D::from_component_byte_view(
-  bytes : ArrayView[Byte],
+/// Decodes TRS from a zero-copy [`MutArrayView`] over one archetype row.
+pub fn Transform3D::from_component_mut_view(
+  row : MutArrayView[Byte],
 ) -> Transform3D {
-  let layout = transform3d_gpu_layout()
-  if bytes.length() != layout.stride {
-    abort("Transform3D::from_component_byte_view: length mismatch")
-  }
-  let fields = layout.fields
-  if fields.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  {
-    position: get_vec3_byte_view(bytes, fields[0].offset),
-    rotation: get_vec4_byte_view(bytes, fields[1].offset),
-    scale: get_vec3_byte_view(bytes, fields[2].offset),
-  }
+  transform3d_from_row_mut(None, row)
 }
 
 ///|
-fn trs_translation_matrix(t : @v3.Vector3F) -> @m44.Matrix4F {
+fn trs_translation_matrix(t : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
   @m44.Matrix4::new_col_major(
     (1.0 : Float),
     (0.0 : Float),
@@ -163,7 +197,7 @@ fn trs_translation_matrix(t : @v3.Vector3F) -> @m44.Matrix4F {
 }
 
 ///|
-fn trs_scale_matrix(s : @v3.Vector3F) -> @m44.Matrix4F {
+fn trs_scale_matrix(s : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
   @m44.Matrix4::new_col_major(
     s.x(),
     (0.0 : Float),
@@ -186,7 +220,7 @@ fn trs_scale_matrix(s : @v3.Vector3F) -> @m44.Matrix4F {
 
 ///|
 /// Column-major rotation from unit quaternion `(x, y, z, w)` (same axis order as [`rotation`]).
-fn quaternion_to_rotation_matrix(q : @v4.Vector4F) -> @m44.Matrix4F {
+fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix4F {
   let x = q.x()
   let y = q.y()
   let z = q.z()

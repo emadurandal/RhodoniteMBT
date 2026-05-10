@@ -4,6 +4,11 @@ pub(all) enum GpuFieldKind {
   F32
   U32
   Vec2F32
+  ///
+  /// `vec3` as three consecutive `f32` (12 bytes), no std140 tail padding.
+  Vec3F32Packed
+  ///
+  /// std140-style `vec3`: 16-byte column (12 bytes payload + 4 padding).
   Vec3F32
   Vec4F32
   Mat4x4F32
