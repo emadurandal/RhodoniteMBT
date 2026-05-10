@@ -1,5 +1,5 @@
 /** Generated MoonBit js_bridge bindings (`moon build --target js --release`). */
-declare module "@moon/rhodonite_math/js_bridge" {
+declare module "@moon/rhodonite_core/math/js_bridge" {
 	export type MoonVecF = { data: number[] };
 
 	export function v3f_new(x: number, y: number, z: number): MoonVecF;

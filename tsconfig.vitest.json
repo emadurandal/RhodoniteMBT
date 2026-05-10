@@ -3,10 +3,10 @@
 	"compilerOptions": {
 		"baseUrl": ".",
 		"paths": {
-			"@moon/rhodonite_math/js_bridge": [
-				"./_build/js/release/build/emadurandal/rhodonite_math/js_bridge/js_bridge.js"
+			"@moon/rhodonite_core/math/js_bridge": [
+				"./_build/js/release/build/emadurandal/rhodonite_core/math/js_bridge/js_bridge.js"
 			]
 		}
 	},
-	"include": ["moon/rhodonite_math/ts/**/*.ts", "moon/rhodonite_math/ts/math-bridge.d.ts"]
+	"include": ["moon/rhodonite_core/math/ts/**/*.ts", "moon/rhodonite_core/math/ts/math-bridge.d.ts"]
 }

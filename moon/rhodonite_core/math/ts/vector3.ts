@@ -1,4 +1,4 @@
-import type { MoonVecF } from "@moon/rhodonite_math/js_bridge";
+import type { MoonVecF } from "@moon/rhodonite_core/math/js_bridge";
 import {
 	v3f_add,
 	v3f_div_scalar,
@@ -14,7 +14,7 @@ import {
 	v3f_y,
 	v3f_z,
 	v3f_zero,
-} from "@moon/rhodonite_math/js_bridge";
+} from "@moon/rhodonite_core/math/js_bridge";
 
 export class Vector3F {
 	readonly inner: MoonVecF;

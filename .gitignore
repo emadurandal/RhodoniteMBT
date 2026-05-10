@@ -37,7 +37,7 @@ moon/rhodonite_webgpu/target/js/release/build/*
 !moon/rhodonite_webgpu/target/js/release/build/main/
 moon/rhodonite_webgpu/_build
 moon/rhodonite_examples/_build
-moon/rhodonite_math/_build
-moon/rhodonite_math/target
+moon/rhodonite_core/_build
+moon/rhodonite_core/target
 moon/rhodonite_binary/_build
 moon/rhodonite/_build

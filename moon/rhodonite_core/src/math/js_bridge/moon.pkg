@@ -1,6 +1,6 @@
 import {
-  "emadurandal/rhodonite_math/vector3" @v3,
-  "emadurandal/rhodonite_math/vector4" @v4,
+  "emadurandal/rhodonite_core/math/vector3" @v3,
+  "emadurandal/rhodonite_core/math/vector4" @v4,
 }
 
 supported_targets = "js"

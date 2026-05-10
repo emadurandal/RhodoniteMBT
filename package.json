@@ -12,9 +12,9 @@
     "run:wgpu:triangle-with-buffer": "bash scripts/run-wgpu-sdl3.sh triangle-with-buffer",
     "run:wgpu:depth-test": "bash scripts/run-wgpu-sdl3.sh depth-test",
     "build": "pnpm run build:moon && tsc && vite build",
-    "build:math:js": "cd moon/rhodonite_math && moon build --target js --release",
-    "test:math:js": "pnpm run build:math:js && vitest run moon/rhodonite_math/ts",
-    "test:math:mbt": "bash scripts/test-rhodonite-math-mbt.sh"
+    "build:core:js": "cd moon/rhodonite_core && moon build --target js --release",
+    "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/math/ts",
+    "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

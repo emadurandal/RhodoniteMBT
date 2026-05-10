@@ -1,1 +1,0 @@
-# emadurandal/rhodonite_math
