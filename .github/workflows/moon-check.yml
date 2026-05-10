@@ -1,0 +1,31 @@
+name: MoonBit
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: MoonBit version
+        run: moon version --all
+
+      # Resolve semver deps in moon.mod.json (rhodonite_webgpu / rhodonite_examples)
+      # against the mooncakes registry; required on fresh CI runners with no local cache.
+      - name: Moon update (registry index & deps)
+        working-directory: ${{ github.workspace }}
+        run: moon update
+
+      - name: Check workspace (all targets)
+        working-directory: ${{ github.workspace }}
+        run: moon check --target all

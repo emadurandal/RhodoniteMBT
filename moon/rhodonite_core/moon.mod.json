@@ -1,0 +1,11 @@
+{
+  "name": "emadurandal/rhodonite_core",
+  "version": "0.1.3",
+  "deps": {},
+  "readme": "README.md",
+  "repository": "https://github.com/emadurandal/RhodoniteMBT",
+  "license": "Apache-2.0",
+  "keywords": ["rhodonite", "moonbit", "core", "math", "vector", "binary"],
+  "description": "Core utilities: vector math, JS bridge helpers, and little-endian binary writes into buffers for RhodoniteMBT.",
+  "source": "src"
+}

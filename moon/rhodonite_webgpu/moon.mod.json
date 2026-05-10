@@ -1,0 +1,14 @@
+{
+  "name": "emadurandal/rhodonite_webgpu",
+  "version": "0.1.3",
+  "deps": {
+    "moonbitlang/async": "0.18.1",
+    "Milky2018/wgpu_mbt": "0.12.6"
+  },
+  "readme": "README.md",
+  "repository": "https://github.com/emadurandal/RhodoniteMBT",
+  "license": "Apache-2.0",
+  "keywords": ["rhodonite", "moonbit", "webgpu", "wgpu"],
+  "description": "WebGPU abstraction for browser and native targets (RhodoniteMBT).",
+  "source": "src"
+}

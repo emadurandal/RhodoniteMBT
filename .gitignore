@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+_build
 *.local
 
 # Editor directories and files
@@ -26,16 +27,16 @@ dist-ssr
 .mooncakes
 
 # MoonBit build artifacts - ignore everything in target except the JS build output
-moon/webgpu/target/*
-!moon/webgpu/target/js/
-moon/webgpu/target/js/*
-!moon/webgpu/target/js/release/
-moon/webgpu/target/js/release/*
-!moon/webgpu/target/js/release/build/
-moon/webgpu/target/js/release/build/*
-!moon/webgpu/target/js/release/build/main/
-moon/webgpu/_build
-moon/webgpu-examples/_build
-moon/math/_build
-moon/math/target
-moon/binary/_build
+moon/rhodonite_webgpu/target/*
+!moon/rhodonite_webgpu/target/js/
+moon/rhodonite_webgpu/target/js/*
+!moon/rhodonite_webgpu/target/js/release/
+moon/rhodonite_webgpu/target/js/release/*
+!moon/rhodonite_webgpu/target/js/release/build/
+moon/rhodonite_webgpu/target/js/release/build/*
+!moon/rhodonite_webgpu/target/js/release/build/main/
+moon/rhodonite_webgpu/_build
+moon/rhodonite_examples/_build
+moon/rhodonite_core/_build
+moon/rhodonite_core/target
+moon/rhodonite/_build

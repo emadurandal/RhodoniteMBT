@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/math/vector3"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Vector3[T] {
+  data : FixedArray[T]
+}
+pub fn[T] Vector3::data(Self[T]) -> FixedArray[T]
+pub fn[T : Div] Vector3::div_scalar(Self[T], T) -> Self[T]
+pub fn[T] Vector3::new(T, T, T) -> Self[T]
+pub fn[T : Mul] Vector3::scale(Self[T], T) -> Self[T]
+pub fn[T] Vector3::x(Self[T]) -> T
+pub fn[T] Vector3::y(Self[T]) -> T
+pub fn[T] Vector3::z(Self[T]) -> T
+pub fn[T : Default] Vector3::zero() -> Self[T]
+pub impl[T : Add] Add for Vector3[T]
+pub impl[T : Eq] Eq for Vector3[T]
+pub impl[T : Mul] Mul for Vector3[T]
+pub impl[T : Neg] Neg for Vector3[T]
+pub impl[T : Show] Show for Vector3[T]
+pub impl[T : Sub] Sub for Vector3[T]
+
+// Type aliases
+pub type Vector3D = Vector3[Double]
+
+pub type Vector3F = Vector3[Float]
+
+pub type Vector3I = Vector3[Int]
+
+pub type Vector3U = Vector3[UInt]
+
+// Traits
+

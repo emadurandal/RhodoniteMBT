@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Native wgpu + SDL3 三角デモ。SDL3 の開発用ヘッダが必要（例: brew install sdl3）。
-# 第1引数でサンプル名（省略時 basic-triangle）。例: scripts/run-wgpu-sdl3.sh triangle-with-buffer
-# Kaida-Amethyst/sdl3 の env.sh と同様に、pkg-config または Homebrew の include を通す。
+# Native wgpu + SDL3 triangle demo. Requires SDL3 development headers (e.g. brew install sdl3).
+# First argument: sample name (default basic-triangle). Example: scripts/run-wgpu-sdl3.sh triangle-with-buffer
+# Like Kaida-Amethyst/sdl3 env.sh: expose pkg-config or Homebrew include paths.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/moon/webgpu-examples"
+cd "$ROOT/moon/rhodonite_examples"
 
-# Moon の mooncake C スタブ（例: sdl3 の wrap.c）は CC_FLAGS を必ずしも参照しないため、
-# ヘッダ探索用に CPATH / C_INCLUDE_PATH も設定する。
+# Moon mooncake C stubs (e.g. sdl3 wrap.c) may not read CC_FLAGS; also set CPATH / C_INCLUDE_PATH for headers.
 if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists sdl3; then
   export CC_FLAGS="$(pkg-config --cflags sdl3) ${CC_FLAGS:-}"
   for i in $(pkg-config --cflags-only-I sdl3); do
@@ -36,4 +35,5 @@ else
   SAMPLE="basic-triangle"
 fi
 
-exec "$ROOT/moon/webgpu-examples/_build/native/debug/build/${SAMPLE}/wgpu/main/main.exe" "$@"
+# Workspace builds emit native binaries under the repo-root `_build`, not `moon/rhodonite_examples/_build`.
+exec "$ROOT/_build/native/debug/build/emadurandal/rhodonite_examples/${SAMPLE}/wgpu/main/main.exe" "$@"
