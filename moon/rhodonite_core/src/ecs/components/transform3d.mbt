@@ -100,3 +100,101 @@ pub fn Transform3D::from_component_bytes(
     scale: get_vec3(bytes, fields[2].offset),
   }
 }
+
+///|
+fn trs_translation_matrix(t : @v3.Vector3F) -> @m44.Matrix4F {
+  @m44.Matrix4::new_col_major(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+    t.x(),
+    t.y(),
+    t.z(),
+    (1.0 : Float),
+  )
+}
+
+///|
+fn trs_scale_matrix(s : @v3.Vector3F) -> @m44.Matrix4F {
+  @m44.Matrix4::new_col_major(
+    s.x(),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    s.y(),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    s.z(),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+  )
+}
+
+///|
+/// Column-major rotation from unit quaternion `(x, y, z, w)` (same axis order as [`rotation`]).
+fn quaternion_to_rotation_matrix(q : @v4.Vector4F) -> @m44.Matrix4F {
+  let x = q.x()
+  let y = q.y()
+  let z = q.z()
+  let w = q.w()
+  let xx = x * x
+  let yy = y * y
+  let zz = z * z
+  let xy = x * y
+  let xz = x * z
+  let yz = y * z
+  let wx = w * x
+  let wy = w * y
+  let wz = w * z
+  let r00 = (1.0 : Float) - (2.0 : Float) * (yy + zz)
+  let r01 = (2.0 : Float) * (xy - wz)
+  let r02 = (2.0 : Float) * (xz + wy)
+  let r10 = (2.0 : Float) * (xy + wz)
+  let r11 = (1.0 : Float) - (2.0 : Float) * (xx + zz)
+  let r12 = (2.0 : Float) * (yz - wx)
+  let r20 = (2.0 : Float) * (xz - wy)
+  let r21 = (2.0 : Float) * (yz + wx)
+  let r22 = (1.0 : Float) - (2.0 : Float) * (xx + yy)
+  @m44.Matrix4::new_col_major(
+    r00,
+    r10,
+    r20,
+    (0.0 : Float),
+    r01,
+    r11,
+    r21,
+    (0.0 : Float),
+    r02,
+    r12,
+    r22,
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+  )
+}
+
+///|
+/// Local model matrix: column vectors, `translation * rotation * scale`.
+pub fn Transform3D::to_local_matrix(self : Transform3D) -> @m44.Matrix4F {
+  let s = trs_scale_matrix(self.scale)
+  let r = quaternion_to_rotation_matrix(self.rotation)
+  let t = trs_translation_matrix(self.position)
+  t.mat_mul(r.mat_mul(s))
+}

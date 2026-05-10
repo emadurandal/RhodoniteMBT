@@ -82,6 +82,7 @@ pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
+pub fn World::compute_global_transform(Self, EntityId) -> @components.GlobalTransform?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]

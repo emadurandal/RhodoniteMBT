@@ -76,6 +76,7 @@ pub(all) struct Transform3D {
 pub fn Transform3D::from_component_bytes(FixedArray[Byte]) -> Self
 pub fn Transform3D::identity() -> Self
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
+pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix4[Float]
 
 // Type aliases
 

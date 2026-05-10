@@ -600,3 +600,59 @@ pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
     None => None
   }
 }
+
+///|
+/// Computes world-space matrix from [`Transform3D`] along [`ChildOf`] ancestors (root → entity).
+/// Returns [`None`] when `entity` is dead, lacks [`Transform3D`], an ancestor lacks [`Transform3D`],
+/// a [`ChildOf`] parent is not alive, or a parent cycle is detected.
+pub fn World::compute_global_transform(
+  self : World,
+  entity : EntityId,
+) -> @comp.GlobalTransform? {
+  if !self.is_alive(entity) {
+    return None
+  }
+  match self.get_transform(entity) {
+    None => None
+    Some(_) => {
+      let chain : Array[EntityId] = []
+      let slot_count = self.generations.length()
+      let visited = FixedArray::make(slot_count, false)
+      let mut cur = entity
+      let mut walking = true
+      while walking {
+        if cur.index < 0 || cur.index >= slot_count {
+          return None
+        }
+        if visited[cur.index] {
+          return None
+        }
+        visited[cur.index] = true
+        chain.push(cur)
+        match self.get_child_of(cur) {
+          None => walking = false
+          Some(parent) =>
+            if !self.is_alive(parent) {
+              return None
+            } else {
+              cur = parent
+            }
+        }
+      }
+      let mut world_m = @m44.Matrix4F::identity()
+      let mut i = chain.length() - 1
+      while i >= 0 {
+        let e = chain[i]
+        match self.get_transform(e) {
+          None => return None
+          Some(tf) => {
+            let model_m = tf.to_local_matrix()
+            world_m = world_m.mat_mul(model_m)
+          }
+        }
+        i = i - 1
+      }
+      Some({ matrix: world_m })
+    }
+  }
+}

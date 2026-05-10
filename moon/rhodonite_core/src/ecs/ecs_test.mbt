@@ -191,3 +191,79 @@ test "get_gpu_f32 reads put_gpu_f32" {
   @comp.put_gpu_f32(buf, 4, 2.5)
   assert_eq(@comp.get_gpu_f32(buf, 4), 2.5)
 }
+
+///|
+test "compute_global_transform uses Transform3D only without ChildOf" {
+  let world = World::new()
+  let e = world.create_entity()
+  let base = @comp.Transform3D::identity()
+  let tf = @comp.Transform3D::{
+    position: {
+      data: ([(2.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: base.rotation,
+    scale: base.scale,
+  }
+  assert_true(world.set_transform(e, tf))
+  match world.compute_global_transform(e) {
+    Some(gt) => {
+      assert_eq(gt.matrix.at(0, 3), (2.0 : Float))
+      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
+      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    }
+    None => abort("expected GlobalTransform")
+  }
+}
+
+///|
+test "compute_global_transform multiplies parent chain" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  let id = @comp.Transform3D::identity()
+  let tf_p = @comp.Transform3D::{
+    position: {
+      data: ([(10.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: id.rotation,
+    scale: id.scale,
+  }
+  let tf_c = @comp.Transform3D::{
+    position: {
+      data: ([(5.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: id.rotation,
+    scale: id.scale,
+  }
+  assert_true(world.set_transform(parent, tf_p))
+  assert_true(world.set_transform(child, tf_c))
+  assert_true(world.set_child_of(child, parent))
+  match world.compute_global_transform(child) {
+    Some(gt) => {
+      assert_eq(gt.matrix.at(0, 3), (15.0 : Float))
+      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
+      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    }
+    None => abort("expected GlobalTransform")
+  }
+}
+
+///|
+test "compute_global_transform returns None without Transform3D" {
+  let world = World::new()
+  let e = world.create_entity()
+  assert_true(world.compute_global_transform(e) is None)
+}
+
+///|
+test "compute_global_transform returns None on ChildOf cycle" {
+  let world = World::new()
+  let a = world.create_entity()
+  let b = world.create_entity()
+  let tf = @comp.Transform3D::identity()
+  assert_true(world.set_transform(a, tf))
+  assert_true(world.set_transform(b, tf))
+  assert_true(world.set_child_of(a, b))
+  assert_true(world.set_child_of(b, a))
+  assert_true(world.compute_global_transform(a) is None)
+}
