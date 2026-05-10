@@ -504,9 +504,9 @@ fn push_local_transforms(
     0.0,
     0.0,
     1.0,
-    (0.2 : Float),
-    (0.2 : Float),
-    (0.2 : Float),
+    (0.5 : Float),
+    (0.5 : Float),
+    (0.5 : Float),
   )
   let n_sun = sun_tf.length()
   let n_earth = earth_tf.length()
