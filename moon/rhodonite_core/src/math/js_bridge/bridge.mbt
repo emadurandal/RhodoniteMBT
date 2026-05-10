@@ -147,6 +147,222 @@ pub fn v4f_to_string(v : @v4.Vector4F) -> String {
   v.to_string()
 }
 
+///| `Matrix3F` / `Matrix4F` for JS (column-major `data`, length 9 / 16).
+
+///|
+pub fn m3f_new_col_major(
+  m00 : Float,
+  m10 : Float,
+  m20 : Float,
+  m01 : Float,
+  m11 : Float,
+  m21 : Float,
+  m02 : Float,
+  m12 : Float,
+  m22 : Float,
+) -> @m33.Matrix3F {
+  @m33.Matrix3::new_col_major(m00, m10, m20, m01, m11, m21, m02, m12, m22)
+}
+
+///|
+pub fn m3f_zero() -> @m33.Matrix3F {
+  @m33.Matrix3::zero()
+}
+
+///|
+pub fn m3f_identity() -> @m33.Matrix3F {
+  @m33.Matrix3F::identity()
+}
+
+///|
+pub fn m3f_data(m : @m33.Matrix3F) -> FixedArray[Float] {
+  m.data()
+}
+
+///|
+pub fn m3f_at(m : @m33.Matrix3F, row : Int, col : Int) -> Float {
+  m.at(row, col)
+}
+
+///|
+pub fn m3f_transpose(m : @m33.Matrix3F) -> @m33.Matrix3F {
+  m.transpose()
+}
+
+///|
+pub fn m3f_mat_mul(a : @m33.Matrix3F, b : @m33.Matrix3F) -> @m33.Matrix3F {
+  a.mat_mul(b)
+}
+
+///|
+pub fn m3f_mul_vec(m : @m33.Matrix3F, v : @v3.Vector3F) -> @v3.Vector3F {
+  m.mul_vec(v)
+}
+
+///|
+pub fn m3f_scale(m : @m33.Matrix3F, s : Float) -> @m33.Matrix3F {
+  m.scale(s)
+}
+
+///|
+pub fn m3f_div_scalar(m : @m33.Matrix3F, s : Float) -> @m33.Matrix3F {
+  m.div_scalar(s)
+}
+
+///|
+pub fn m3f_det(m : @m33.Matrix3F) -> Float {
+  m.determinant()
+}
+
+///|
+pub fn m3f_inverse(m : @m33.Matrix3F) -> @m33.Matrix3F? {
+  m.inverse()
+}
+
+///|
+pub fn m3f_add(a : @m33.Matrix3F, b : @m33.Matrix3F) -> @m33.Matrix3F {
+  a + b
+}
+
+///|
+pub fn m3f_sub(a : @m33.Matrix3F, b : @m33.Matrix3F) -> @m33.Matrix3F {
+  a - b
+}
+
+///|
+pub fn m3f_neg(m : @m33.Matrix3F) -> @m33.Matrix3F {
+  -m
+}
+
+///|
+pub fn m3f_mul(a : @m33.Matrix3F, b : @m33.Matrix3F) -> @m33.Matrix3F {
+  a * b
+}
+
+///|
+pub fn m3f_eq(a : @m33.Matrix3F, b : @m33.Matrix3F) -> Bool {
+  a == b
+}
+
+///|
+pub fn m3f_to_string(m : @m33.Matrix3F) -> String {
+  m.to_string()
+}
+
+///|
+pub fn m4f_new_col_major(
+  m00 : Float,
+  m10 : Float,
+  m20 : Float,
+  m30 : Float,
+  m01 : Float,
+  m11 : Float,
+  m21 : Float,
+  m31 : Float,
+  m02 : Float,
+  m12 : Float,
+  m22 : Float,
+  m32 : Float,
+  m03 : Float,
+  m13 : Float,
+  m23 : Float,
+  m33 : Float,
+) -> @m44.Matrix4F {
+  @m44.Matrix4::new_col_major(
+    m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23, m33,
+  )
+}
+
+///|
+pub fn m4f_zero() -> @m44.Matrix4F {
+  @m44.Matrix4::zero()
+}
+
+///|
+pub fn m4f_identity() -> @m44.Matrix4F {
+  @m44.Matrix4F::identity()
+}
+
+///|
+pub fn m4f_data(m : @m44.Matrix4F) -> FixedArray[Float] {
+  m.data()
+}
+
+///|
+pub fn m4f_at(m : @m44.Matrix4F, row : Int, col : Int) -> Float {
+  m.at(row, col)
+}
+
+///|
+pub fn m4f_transpose(m : @m44.Matrix4F) -> @m44.Matrix4F {
+  m.transpose()
+}
+
+///|
+pub fn m4f_mat_mul(a : @m44.Matrix4F, b : @m44.Matrix4F) -> @m44.Matrix4F {
+  a.mat_mul(b)
+}
+
+///|
+pub fn m4f_mul_vec4(m : @m44.Matrix4F, v : @v4.Vector4F) -> @v4.Vector4F {
+  m.mul_vec4(v)
+}
+
+///|
+pub fn m4f_transform_point(m : @m44.Matrix4F, p : @v3.Vector3F) -> @v3.Vector3F {
+  m.transform_point(p)
+}
+
+///|
+pub fn m4f_scale(m : @m44.Matrix4F, s : Float) -> @m44.Matrix4F {
+  m.scale(s)
+}
+
+///|
+pub fn m4f_div_scalar(m : @m44.Matrix4F, s : Float) -> @m44.Matrix4F {
+  m.div_scalar(s)
+}
+
+///|
+pub fn m4f_det(m : @m44.Matrix4F) -> Float {
+  m.determinant()
+}
+
+///|
+pub fn m4f_inverse(m : @m44.Matrix4F) -> @m44.Matrix4F? {
+  m.inverse()
+}
+
+///|
+pub fn m4f_add(a : @m44.Matrix4F, b : @m44.Matrix4F) -> @m44.Matrix4F {
+  a + b
+}
+
+///|
+pub fn m4f_sub(a : @m44.Matrix4F, b : @m44.Matrix4F) -> @m44.Matrix4F {
+  a - b
+}
+
+///|
+pub fn m4f_neg(m : @m44.Matrix4F) -> @m44.Matrix4F {
+  -m
+}
+
+///|
+pub fn m4f_mul(a : @m44.Matrix4F, b : @m44.Matrix4F) -> @m44.Matrix4F {
+  a * b
+}
+
+///|
+pub fn m4f_eq(a : @m44.Matrix4F, b : @m44.Matrix4F) -> Bool {
+  a == b
+}
+
+///|
+pub fn m4f_to_string(m : @m44.Matrix4F) -> String {
+  m.to_string()
+}
+
 ///|
 fn main {
   ()

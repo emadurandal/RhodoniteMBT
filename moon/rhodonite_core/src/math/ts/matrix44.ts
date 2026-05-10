@@ -1,0 +1,148 @@
+import type { MoonMat4F } from "@moon/rhodonite_core/math/js_bridge";
+import {
+	m4f_add,
+	m4f_at,
+	m4f_data,
+	m4f_det,
+	m4f_div_scalar,
+	m4f_eq,
+	m4f_identity,
+	m4f_inverse,
+	m4f_mat_mul,
+	m4f_mul,
+	m4f_mul_vec4,
+	m4f_neg,
+	m4f_new_col_major,
+	m4f_scale,
+	m4f_sub,
+	m4f_to_string,
+	m4f_transform_point,
+	m4f_transpose,
+	m4f_zero,
+} from "@moon/rhodonite_core/math/js_bridge";
+import { Vector3F } from "./vector3.ts";
+import { Vector4F } from "./vector4.ts";
+
+export class Matrix4F {
+	readonly inner: MoonMat4F;
+
+	constructor(inner: MoonMat4F) {
+		this.inner = inner;
+	}
+
+	static newColMajor(
+		m00: number,
+		m10: number,
+		m20: number,
+		m30: number,
+		m01: number,
+		m11: number,
+		m21: number,
+		m31: number,
+		m02: number,
+		m12: number,
+		m22: number,
+		m32: number,
+		m03: number,
+		m13: number,
+		m23: number,
+		m33: number,
+	): Matrix4F {
+		return new Matrix4F(
+			m4f_new_col_major(
+				m00,
+				m10,
+				m20,
+				m30,
+				m01,
+				m11,
+				m21,
+				m31,
+				m02,
+				m12,
+				m22,
+				m32,
+				m03,
+				m13,
+				m23,
+				m33,
+			),
+		);
+	}
+
+	static zero(): Matrix4F {
+		return new Matrix4F(m4f_zero());
+	}
+
+	static identity(): Matrix4F {
+		return new Matrix4F(m4f_identity());
+	}
+
+	at(row: number, col: number): number {
+		return m4f_at(this.inner, row, col);
+	}
+
+	data(): number[] {
+		return m4f_data(this.inner);
+	}
+
+	transpose(): Matrix4F {
+		return new Matrix4F(m4f_transpose(this.inner));
+	}
+
+	matMul(other: Matrix4F): Matrix4F {
+		return new Matrix4F(m4f_mat_mul(this.inner, other.inner));
+	}
+
+	mulVec4(v: Vector4F): Vector4F {
+		return new Vector4F(m4f_mul_vec4(this.inner, v.inner));
+	}
+
+	transformPoint(p: Vector3F): Vector3F {
+		return new Vector3F(m4f_transform_point(this.inner, p.inner));
+	}
+
+	scale(s: number): Matrix4F {
+		return new Matrix4F(m4f_scale(this.inner, s));
+	}
+
+	divScalar(s: number): Matrix4F {
+		return new Matrix4F(m4f_div_scalar(this.inner, s));
+	}
+
+	det(): number {
+		return m4f_det(this.inner);
+	}
+
+	inverse(): Matrix4F | null {
+		const r = m4f_inverse(this.inner);
+		if (r === undefined || r === null) {
+			return null;
+		}
+		return new Matrix4F(r);
+	}
+
+	add(other: Matrix4F): Matrix4F {
+		return new Matrix4F(m4f_add(this.inner, other.inner));
+	}
+
+	sub(other: Matrix4F): Matrix4F {
+		return new Matrix4F(m4f_sub(this.inner, other.inner));
+	}
+
+	neg(): Matrix4F {
+		return new Matrix4F(m4f_neg(this.inner));
+	}
+
+	mul(other: Matrix4F): Matrix4F {
+		return new Matrix4F(m4f_mul(this.inner, other.inner));
+	}
+
+	eq(other: Matrix4F): boolean {
+		return m4f_eq(this.inner, other.inner) === 1;
+	}
+
+	toString(): string {
+		return m4f_to_string(this.inner);
+	}
+}

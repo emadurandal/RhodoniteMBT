@@ -1,0 +1,3 @@
+import {
+  "emadurandal/rhodonite_core/math/vector3" @v3,
+}

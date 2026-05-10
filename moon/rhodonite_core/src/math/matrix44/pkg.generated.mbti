@@ -1,0 +1,49 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/math/matrix44"
+
+import {
+  "emadurandal/rhodonite_core/math/vector3",
+  "emadurandal/rhodonite_core/math/vector4",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Matrix4[T] {
+  data : FixedArray[T]
+}
+pub fn[T] Matrix4::at(Self[T], Int, Int) -> T
+pub fn[T] Matrix4::data(Self[T]) -> FixedArray[T]
+pub fn[T : Mul + Add + Sub] Matrix4::determinant(Self[T]) -> T
+pub fn[T : Div] Matrix4::div_scalar(Self[T], T) -> Self[T]
+pub fn[T] Matrix4::from_cols(@vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T]) -> Self[T]
+pub fn Matrix4::identity() -> Self[Float]
+pub fn[T] Matrix4::identity_with(T, T) -> Self[T]
+pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix4::inverse(Self[T]) -> Self[T]?
+pub fn[T : Mul + Add] Matrix4::mat_mul(Self[T], Self[T]) -> Self[T]
+pub fn[T : Mul + Add] Matrix4::mul_vec4(Self[T], @vector4.Vector4[T]) -> @vector4.Vector4[T]
+pub fn[T] Matrix4::new_col_major(T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T) -> Self[T]
+pub fn[T : Mul] Matrix4::scale(Self[T], T) -> Self[T]
+pub fn Matrix4::transform_point(Self[Float], @vector3.Vector3[Float]) -> @vector3.Vector3[Float]
+pub fn[T] Matrix4::transpose(Self[T]) -> Self[T]
+pub fn[T : Default] Matrix4::zero() -> Self[T]
+pub impl[T : Add] Add for Matrix4[T]
+pub impl[T : Eq] Eq for Matrix4[T]
+pub impl[T : Mul] Mul for Matrix4[T]
+pub impl[T : Neg] Neg for Matrix4[T]
+pub impl[T : Show] Show for Matrix4[T]
+pub impl[T : Sub] Sub for Matrix4[T]
+
+// Type aliases
+pub type Matrix4D = Matrix4[Double]
+
+pub type Matrix4F = Matrix4[Float]
+
+pub type Matrix4I = Matrix4[Int]
+
+pub type Matrix4U = Matrix4[UInt]
+
+// Traits
+
