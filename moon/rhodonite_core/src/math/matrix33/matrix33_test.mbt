@@ -1,13 +1,13 @@
 ///|
-test "Matrix3 identity mul_vec" {
-  let id = Matrix3F::identity()
+test "Matrix33 identity mul_vec" {
+  let id = Matrix33F::identity()
   let v = @v3.Vector3::new((2.0 : Float), (3.0 : Float), (4.0 : Float))
   assert_eq(id.mul_vec(v), v)
 }
 
 ///|
-test "Matrix3 mat_mul scale" {
-  let s = Matrix3::new_col_major(
+test "Matrix33 mat_mul scale" {
+  let s = Matrix33::new_col_major(
     (2.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -18,7 +18,7 @@ test "Matrix3 mat_mul scale" {
     (0.0 : Float),
     (2.0 : Float),
   )
-  let t = Matrix3::new_col_major(
+  let t = Matrix33::new_col_major(
     (3.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -36,8 +36,8 @@ test "Matrix3 mat_mul scale" {
 }
 
 ///|
-test "Matrix3 transpose twice" {
-  let m = Matrix3::new_col_major(
+test "Matrix33 transpose twice" {
+  let m = Matrix33::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
     (3.0 : Float),
@@ -52,8 +52,8 @@ test "Matrix3 transpose twice" {
 }
 
 ///|
-test "Matrix3 Hadamard mul" {
-  let a = Matrix3::new_col_major(
+test "Matrix33 Hadamard mul" {
+  let a = Matrix33::new_col_major(
     (2.0 : Float),
     (3.0 : Float),
     (4.0 : Float),
@@ -64,7 +64,7 @@ test "Matrix3 Hadamard mul" {
     (0.0 : Float),
     (0.0 : Float),
   )
-  let b = Matrix3::new_col_major(
+  let b = Matrix33::new_col_major(
     (5.0 : Float),
     (6.0 : Float),
     (7.0 : Float),
@@ -82,8 +82,8 @@ test "Matrix3 Hadamard mul" {
 }
 
 ///|
-test "Matrix3 determinant and inverse" {
-  let m = Matrix3::new_col_major(
+test "Matrix33 determinant and inverse" {
+  let m = Matrix33::new_col_major(
     (1.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -99,12 +99,12 @@ test "Matrix3 determinant and inverse" {
     Some(x) => x
     None => abort("expected invertible")
   }
-  assert_eq(inv.mat_mul(m), Matrix3F::identity())
+  assert_eq(inv.mat_mul(m), Matrix33F::identity())
 }
 
 ///|
-test "Matrix3 singular inverse" {
-  let m = Matrix3::new_col_major(
+test "Matrix33 singular inverse" {
+  let m = Matrix33::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
     (3.0 : Float),
@@ -120,8 +120,8 @@ test "Matrix3 singular inverse" {
 }
 
 ///|
-test "Matrix3 Show" {
-  let m = Matrix3::new_col_major(
+test "Matrix33 Show" {
+  let m = Matrix33::new_col_major(
     (1.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -132,5 +132,5 @@ test "Matrix3 Show" {
     (0.0 : Float),
     (1.0 : Float),
   )
-  assert_eq(m.to_string(), "Matrix3::new_col_major(1, 0, 0, 0, 1, 0, 0, 0, 1)")
+  assert_eq(m.to_string(), "Matrix33::new_col_major(1, 0, 0, 0, 1, 0, 0, 0, 1)")
 }

@@ -1,6 +1,6 @@
 ///|
-pub impl[T : Add] Add for Matrix3[T] with add(self, other) {
-  Matrix3::{
+pub impl[T : Add] Add for Matrix33[T] with add(self, other) {
+  Matrix33::{
     data: (
       [
         self.data[0] + other.data[0],
@@ -17,8 +17,8 @@ pub impl[T : Add] Add for Matrix3[T] with add(self, other) {
 }
 
 ///|
-pub impl[T : Sub] Sub for Matrix3[T] with sub(self, other) {
-  Matrix3::{
+pub impl[T : Sub] Sub for Matrix33[T] with sub(self, other) {
+  Matrix33::{
     data: (
       [
         self.data[0] - other.data[0],
@@ -35,8 +35,8 @@ pub impl[T : Sub] Sub for Matrix3[T] with sub(self, other) {
 }
 
 ///|
-pub impl[T : Neg] Neg for Matrix3[T] with neg(self) {
-  Matrix3::{
+pub impl[T : Neg] Neg for Matrix33[T] with neg(self) {
+  Matrix33::{
     data: (
       [
         -self.data[0],
@@ -53,9 +53,9 @@ pub impl[T : Neg] Neg for Matrix3[T] with neg(self) {
 }
 
 ///|
-/// Hadamard (component-wise) product; use [`Matrix3::mat_mul`] for matrix multiplication.
-pub impl[T : Mul] Mul for Matrix3[T] with mul(self, other) {
-  Matrix3::{
+/// Hadamard (component-wise) product; use [`Matrix33::mat_mul`] for matrix multiplication.
+pub impl[T : Mul] Mul for Matrix33[T] with mul(self, other) {
+  Matrix33::{
     data: (
       [
         self.data[0] * other.data[0],
@@ -72,7 +72,7 @@ pub impl[T : Mul] Mul for Matrix3[T] with mul(self, other) {
 }
 
 ///|
-pub impl[T : Eq] Eq for Matrix3[T] with equal(self, other) {
+pub impl[T : Eq] Eq for Matrix33[T] with equal(self, other) {
   self.data[0] == other.data[0] &&
   self.data[1] == other.data[1] &&
   self.data[2] == other.data[2] &&

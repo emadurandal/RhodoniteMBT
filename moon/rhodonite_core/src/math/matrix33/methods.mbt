@@ -1,5 +1,5 @@
 ///|
-pub fn[T] Matrix3::new_col_major(
+pub fn[T] Matrix33::new_col_major(
   m00 : T,
   m10 : T,
   m20 : T,
@@ -9,19 +9,19 @@ pub fn[T] Matrix3::new_col_major(
   m02 : T,
   m12 : T,
   m22 : T,
-) -> Matrix3[T] {
-  Matrix3::{
+) -> Matrix33[T] {
+  Matrix33::{
     data: ([m00, m10, m20, m01, m11, m21, m02, m12, m22] : FixedArray[T]),
   }
 }
 
 ///|
-pub fn[T] Matrix3::from_cols(
+pub fn[T] Matrix33::from_cols(
   c0 : @v3.Vector3[T],
   c1 : @v3.Vector3[T],
   c2 : @v3.Vector3[T],
-) -> Matrix3[T] {
-  Matrix3::new_col_major(
+) -> Matrix33[T] {
+  Matrix33::new_col_major(
     c0.x(),
     c0.y(),
     c0.z(),
@@ -35,35 +35,35 @@ pub fn[T] Matrix3::from_cols(
 }
 
 ///|
-pub fn[T : Default] Matrix3::zero() -> Matrix3[T] {
+pub fn[T : Default] Matrix33::zero() -> Matrix33[T] {
   let z = T::default()
-  Matrix3::new_col_major(z, z, z, z, z, z, z, z, z)
+  Matrix33::new_col_major(z, z, z, z, z, z, z, z, z)
 }
 
 ///|
-pub fn[T] Matrix3::identity_with(one : T, zero : T) -> Matrix3[T] {
-  Matrix3::new_col_major(one, zero, zero, zero, one, zero, zero, zero, one)
+pub fn[T] Matrix33::identity_with(one : T, zero : T) -> Matrix33[T] {
+  Matrix33::new_col_major(one, zero, zero, zero, one, zero, zero, zero, one)
 }
 
 ///|
-pub fn Matrix3F::identity() -> Matrix3F {
-  Matrix3::identity_with((1.0 : Float), (0.0 : Float))
+pub fn Matrix33F::identity() -> Matrix33F {
+  Matrix33::identity_with((1.0 : Float), (0.0 : Float))
 }
 
 ///|
-pub fn[T] Matrix3::at(self : Matrix3[T], row : Int, col : Int) -> T {
+pub fn[T] Matrix33::at(self : Matrix33[T], row : Int, col : Int) -> T {
   self.data[col * 3 + row]
 }
 
 ///|
 /// Returns the inner `FixedArray` unchanged (length 9, column-major).
-pub fn[T] Matrix3::data(self : Matrix3[T]) -> FixedArray[T] {
+pub fn[T] Matrix33::data(self : Matrix33[T]) -> FixedArray[T] {
   self.data
 }
 
 ///|
-pub fn[T : Mul] Matrix3::scale(self : Matrix3[T], s : T) -> Matrix3[T] {
-  Matrix3::{
+pub fn[T : Mul] Matrix33::scale(self : Matrix33[T], s : T) -> Matrix33[T] {
+  Matrix33::{
     data: (
       [
         self.data[0] * s,
@@ -80,8 +80,8 @@ pub fn[T : Mul] Matrix3::scale(self : Matrix3[T], s : T) -> Matrix3[T] {
 }
 
 ///|
-pub fn[T : Div] Matrix3::div_scalar(self : Matrix3[T], s : T) -> Matrix3[T] {
-  Matrix3::{
+pub fn[T : Div] Matrix33::div_scalar(self : Matrix33[T], s : T) -> Matrix33[T] {
+  Matrix33::{
     data: (
       [
         self.data[0] / s,
@@ -98,8 +98,8 @@ pub fn[T : Div] Matrix3::div_scalar(self : Matrix3[T], s : T) -> Matrix3[T] {
 }
 
 ///|
-pub fn[T] Matrix3::transpose(self : Matrix3[T]) -> Matrix3[T] {
-  Matrix3::from_cols(
+pub fn[T] Matrix33::transpose(self : Matrix33[T]) -> Matrix33[T] {
+  Matrix33::from_cols(
     @v3.Vector3::new(self.at(0, 0), self.at(1, 0), self.at(2, 0)),
     @v3.Vector3::new(self.at(0, 1), self.at(1, 1), self.at(2, 1)),
     @v3.Vector3::new(self.at(0, 2), self.at(1, 2), self.at(2, 2)),
@@ -108,11 +108,11 @@ pub fn[T] Matrix3::transpose(self : Matrix3[T]) -> Matrix3[T] {
 
 ///|
 /// Matrix product `self * other` (standard linear algebra).
-pub fn[T : Mul + Add] Matrix3::mat_mul(
-  self : Matrix3[T],
-  other : Matrix3[T],
-) -> Matrix3[T] {
-  Matrix3::from_cols(
+pub fn[T : Mul + Add] Matrix33::mat_mul(
+  self : Matrix33[T],
+  other : Matrix33[T],
+) -> Matrix33[T] {
+  Matrix33::from_cols(
     self.mul_vec(
       @v3.Vector3::new(other.at(0, 0), other.at(1, 0), other.at(2, 0)),
     ),
@@ -127,8 +127,8 @@ pub fn[T : Mul + Add] Matrix3::mat_mul(
 
 ///|
 /// Column vector multiply: `self * v` (treats `v` as a column 3-vector).
-pub fn[T : Mul + Add] Matrix3::mul_vec(
-  self : Matrix3[T],
+pub fn[T : Mul + Add] Matrix33::mul_vec(
+  self : Matrix33[T],
   v : @v3.Vector3[T],
 ) -> @v3.Vector3[T] {
   let x = v.x()
@@ -142,7 +142,7 @@ pub fn[T : Mul + Add] Matrix3::mul_vec(
 }
 
 ///|
-pub fn[T : Mul + Add + Sub] Matrix3::determinant(self : Matrix3[T]) -> T {
+pub fn[T : Mul + Add + Sub] Matrix33::determinant(self : Matrix33[T]) -> T {
   let a = self.at(0, 0)
   let b = self.at(0, 1)
   let c = self.at(0, 2)
@@ -157,9 +157,9 @@ pub fn[T : Mul + Add + Sub] Matrix3::determinant(self : Matrix3[T]) -> T {
 
 ///|
 /// Returns `None` when the determinant is exactly `T::default()` (typically 0).
-pub fn[T : Mul + Add + Sub + Div + Eq + Default] Matrix3::inverse(
-  self : Matrix3[T],
-) -> Matrix3[T]? {
+pub fn[T : Mul + Add + Sub + Div + Eq + Default] Matrix33::inverse(
+  self : Matrix33[T],
+) -> Matrix33[T]? {
   let det = self.determinant()
   if det == T::default() {
     None
@@ -183,7 +183,7 @@ pub fn[T : Mul + Add + Sub + Div + Eq + Default] Matrix3::inverse(
     let inv21 = (b * g - a * h) / det
     let inv22 = (a * e - b * d) / det
     Some(
-      Matrix3::new_col_major(
+      Matrix33::new_col_major(
         inv00, inv10, inv20, inv01, inv11, inv21, inv02, inv12, inv22,
       ),
     )

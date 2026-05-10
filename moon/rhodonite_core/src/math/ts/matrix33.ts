@@ -21,14 +21,14 @@ import {
 } from "@moon/rhodonite_core/math/js_bridge";
 import { Vector3F } from "./vector3.ts";
 
-export class Matrix3F {
+export class Matrix33F {
 	readonly inner: MoonMat3F;
 
 	constructor(inner: MoonMat3F) {
 		this.inner = inner;
 	}
 
-	/** Column-major component order (see MoonBit `Matrix3::new_col_major`). */
+	/** Column-major component order (see MoonBit `Matrix33::new_col_major`). */
 	static newColMajor(
 		m00: number,
 		m10: number,
@@ -39,18 +39,18 @@ export class Matrix3F {
 		m02: number,
 		m12: number,
 		m22: number,
-	): Matrix3F {
-		return new Matrix3F(
+	): Matrix33F {
+		return new Matrix33F(
 			m3f_new_col_major(m00, m10, m20, m01, m11, m21, m02, m12, m22),
 		);
 	}
 
-	static zero(): Matrix3F {
-		return new Matrix3F(m3f_zero());
+	static zero(): Matrix33F {
+		return new Matrix33F(m3f_zero());
 	}
 
-	static identity(): Matrix3F {
-		return new Matrix3F(m3f_identity());
+	static identity(): Matrix33F {
+		return new Matrix33F(m3f_identity());
 	}
 
 	at(row: number, col: number): number {
@@ -62,24 +62,24 @@ export class Matrix3F {
 		return m3f_data(this.inner);
 	}
 
-	transpose(): Matrix3F {
-		return new Matrix3F(m3f_transpose(this.inner));
+	transpose(): Matrix33F {
+		return new Matrix33F(m3f_transpose(this.inner));
 	}
 
-	matMul(other: Matrix3F): Matrix3F {
-		return new Matrix3F(m3f_mat_mul(this.inner, other.inner));
+	matMul(other: Matrix33F): Matrix33F {
+		return new Matrix33F(m3f_mat_mul(this.inner, other.inner));
 	}
 
 	mulVec(v: Vector3F): Vector3F {
 		return new Vector3F(m3f_mul_vec(this.inner, v.inner));
 	}
 
-	scale(s: number): Matrix3F {
-		return new Matrix3F(m3f_scale(this.inner, s));
+	scale(s: number): Matrix33F {
+		return new Matrix33F(m3f_scale(this.inner, s));
 	}
 
-	divScalar(s: number): Matrix3F {
-		return new Matrix3F(m3f_div_scalar(this.inner, s));
+	divScalar(s: number): Matrix33F {
+		return new Matrix33F(m3f_div_scalar(this.inner, s));
 	}
 
 	det(): number {
@@ -87,32 +87,32 @@ export class Matrix3F {
 	}
 
 	/** `null` when singular (MoonBit `None` → `undefined` in JS). */
-	inverse(): Matrix3F | null {
+	inverse(): Matrix33F | null {
 		const r = m3f_inverse(this.inner);
 		if (r === undefined || r === null) {
 			return null;
 		}
-		return new Matrix3F(r);
+		return new Matrix33F(r);
 	}
 
-	add(other: Matrix3F): Matrix3F {
-		return new Matrix3F(m3f_add(this.inner, other.inner));
+	add(other: Matrix33F): Matrix33F {
+		return new Matrix33F(m3f_add(this.inner, other.inner));
 	}
 
-	sub(other: Matrix3F): Matrix3F {
-		return new Matrix3F(m3f_sub(this.inner, other.inner));
+	sub(other: Matrix33F): Matrix33F {
+		return new Matrix33F(m3f_sub(this.inner, other.inner));
 	}
 
-	neg(): Matrix3F {
-		return new Matrix3F(m3f_neg(this.inner));
+	neg(): Matrix33F {
+		return new Matrix33F(m3f_neg(this.inner));
 	}
 
 	/** Hadamard (component-wise) product. */
-	mul(other: Matrix3F): Matrix3F {
-		return new Matrix3F(m3f_mul(this.inner, other.inner));
+	mul(other: Matrix33F): Matrix33F {
+		return new Matrix33F(m3f_mul(this.inner, other.inner));
 	}
 
-	eq(other: Matrix3F): boolean {
+	eq(other: Matrix33F): boolean {
 		return m3f_eq(this.inner, other.inner) === 1;
 	}
 
