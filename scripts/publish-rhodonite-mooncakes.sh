@@ -4,6 +4,13 @@
 #
 # Prerequisites: run `moon login` once; network access for the registry.
 # Run from repository root (directory containing moon.work).
+#
+# Environment:
+#   PUBLISH_MOON_FACADE_ONLY=1  Skip publishing rhodonite_core and rhodonite_webgpu;
+#                                only refresh registry, patch facade deps, publish facade.
+#                                Use when deps are already on the registry but facade failed (e.g. index lag).
+#   MOON_PUBLISH_INDEX_WAIT_SECONDS  Seconds to sleep after moon update so the registry index
+#                                    can catch up (default: 8). Set to 0 to disable.
 
 set -euo pipefail
 
@@ -39,11 +46,24 @@ moon info
 echo "==> moon check --target all"
 moon check --target all
 
-echo "==> Publish emadurandal/rhodonite_core"
-moon -C moon/rhodonite_core publish
+if [[ "${PUBLISH_MOON_FACADE_ONLY:-}" == "1" ]]; then
+  echo "==> PUBLISH_MOON_FACADE_ONLY=1: skip rhodonite_core / rhodonite_webgpu publish (already on registry)"
+else
+  echo "==> Publish emadurandal/rhodonite_core"
+  moon -C moon/rhodonite_core publish
 
-echo "==> Publish emadurandal/rhodonite_webgpu"
-moon -C moon/rhodonite_webgpu publish
+  echo "==> Publish emadurandal/rhodonite_webgpu"
+  moon -C moon/rhodonite_webgpu publish
+fi
+
+echo "==> moon update (refresh local registry index for newly published deps)"
+moon update
+
+WAIT="${MOON_PUBLISH_INDEX_WAIT_SECONDS:-8}"
+if [[ "${WAIT}" != "0" ]]; then
+  echo "==> Waiting ${WAIT}s for registry index (override with MOON_PUBLISH_INDEX_WAIT_SECONDS=0)"
+  sleep "${WAIT}"
+fi
 
 echo "==> Stage facade deps (path -> registry versions from sibling moon.mod.json)"
 BACKUP="$(mktemp)"
@@ -75,6 +95,9 @@ facade["deps"] = deps
 facade_path.write_text(json.dumps(facade, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(f"Patched facade deps to rhodonite_core={core_ver}, rhodonite_webgpu={webgpu_ver}")
 PY
+
+echo "==> moon update (resolve facade semver deps before publish)"
+moon update
 
 echo "==> Publish emadurandal/rhodonite (facade)"
 moon -C moon/rhodonite publish

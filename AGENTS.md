@@ -17,7 +17,7 @@ See [`docs/module_boundaries.md`](docs/module_boundaries.md) for dependency boun
 
 ## Publish (mooncakes)
 
-After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded.
+After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) so the facade’s publish-time `moon check` can resolve freshly published deps. If core/webgpu are already on the registry and only the facade step must be retried, use `PUBLISH_MOON_FACADE_ONLY=1 pnpm run publish:moon`.
 
 ## Workspace development
 
