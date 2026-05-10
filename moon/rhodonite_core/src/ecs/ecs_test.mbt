@@ -280,11 +280,16 @@ test "for_each_entity_with_components matches supersets and skips empty required
   assert_true(world.add_component_bytes(e_only_a, qa, bytes4(9, 10, 11, 12)))
   ignore(e_only_a)
   let hits : Array[EntityId] = []
-  world.for_each_entity_with_components([qa, qb], fn(ent) { hits.push(ent) })
+  world.for_each_entity_with_components([qa, qb], (ent, _sig, payloads) => {
+    hits.push(ent)
+    ignore(payloads)
+  })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e_both)
   let empty_hits : Array[EntityId] = []
-  world.for_each_entity_with_components([], fn(ent) { empty_hits.push(ent) })
+  world.for_each_entity_with_components([], (ent, _sig, _pay) => {
+    empty_hits.push(ent)
+  })
   assert_eq(empty_hits.length(), 0)
 }
 

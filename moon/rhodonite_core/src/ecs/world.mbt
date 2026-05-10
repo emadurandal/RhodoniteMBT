@@ -208,6 +208,24 @@ fn Archetype::component_bytes(
 }
 
 ///|
+/// Zero-copy view of one component row (MoonBit [`ArrayView`] over [`ComponentColumn::bytes`]).
+fn Archetype::component_byte_view(
+  self : Archetype,
+  row : Int,
+  component : ComponentTypeId,
+) -> ArrayView[Byte]? {
+  let col_index = self.column_index(component)
+  if col_index < 0 {
+    None
+  } else {
+    let col = self.columns[col_index]
+    let base = row * col.stride
+    let end = base + col.stride
+    Some(col.bytes[base:end])
+  }
+}
+
+///|
 /// Dense archetype table helpers (swap-remove keeps rows packed).
 fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
   let last = self.entities.length() - 1
@@ -625,58 +643,108 @@ pub fn World::compute_global_transform(
   if !self.is_alive(entity) {
     return None
   }
-  match self.get_transform(entity) {
+  match self.locations[entity.index] {
     None => None
-    Some(_) => {
-      let chain : Array[EntityId] = []
-      let slot_count = self.generations.length()
-      let visited = FixedArray::make(slot_count, false)
-      let mut cur = entity
-      let mut walking = true
-      while walking {
-        if cur.index < 0 || cur.index >= slot_count {
-          return None
+    Some(loc) => {
+      let sig = self.archetypes[loc.archetype_index].components
+      self.compute_global_transform_kernel(entity, sig, false, None)
+    }
+  }
+}
+
+///|
+/// `archetype_components`: sorted signature of the archetype row for `entity` (see [`for_each_entity_with_components`]).
+/// When `trust_tf_gt_iterator_entity` is [`true`], skips [`Transform3D`] membership checks on `entity`
+/// (only for entities from a query that already guarantees builtin TF+GT).
+///
+/// When `prefetched_entity_transform` is [`Some`], uses it instead of [`get_transform`] for `entity`
+/// (leaf row); ancestors still load via [`get_transform`] unless also passed here (not supported).
+fn World::compute_global_transform_kernel(
+  self : World,
+  entity : EntityId,
+  archetype_components : Array[ComponentTypeId],
+  trust_tf_gt_iterator_entity : Bool,
+  prefetched_entity_transform : @comp.Transform3D?,
+) -> @comp.GlobalTransform? {
+  let tf_id = self.transform_component_id
+  if !trust_tf_gt_iterator_entity {
+    if !component_array_contains(archetype_components, tf_id) {
+      return None
+    }
+  }
+  let co_id = self.child_of_component_id
+  if !component_array_contains(archetype_components, co_id) {
+    match prefetched_entity_transform {
+      Some(tf) => Some({ matrix: tf.to_local_matrix() })
+      None =>
+        match self.get_transform(entity) {
+          None => None
+          Some(tf) => Some({ matrix: tf.to_local_matrix() })
         }
-        if visited[cur.index] {
-          return None
-        }
-        visited[cur.index] = true
-        chain.push(cur)
-        match self.get_child_of(cur) {
-          None => walking = false
-          Some(parent) =>
-            if !self.is_alive(parent) {
-              return None
-            } else {
-              cur = parent
+    }
+  } else {
+    let chain : Array[EntityId] = []
+    let slot_count = self.generations.length()
+    let visited = FixedArray::make(slot_count, false)
+    let mut cur = entity
+    let mut walking = true
+    while walking {
+      if cur.index < 0 || cur.index >= slot_count {
+        return None
+      }
+      if visited[cur.index] {
+        return None
+      }
+      visited[cur.index] = true
+      chain.push(cur)
+      match self.get_child_of(cur) {
+        None => walking = false
+        Some(parent) =>
+          if !self.is_alive(parent) {
+            return None
+          } else {
+            cur = parent
+          }
+      }
+    }
+    let mut world_m = @m44.Matrix4F::identity()
+    let mut i = chain.length() - 1
+    while i >= 0 {
+      let e = chain[i]
+      let tf : @comp.Transform3D = if e == entity {
+        match prefetched_entity_transform {
+          Some(ptf) => ptf
+          None =>
+            match self.get_transform(e) {
+              Some(t) => t
+              None => return None
             }
         }
-      }
-      let mut world_m = @m44.Matrix4F::identity()
-      let mut i = chain.length() - 1
-      while i >= 0 {
-        let e = chain[i]
+      } else {
         match self.get_transform(e) {
+          Some(t) => t
           None => return None
-          Some(tf) => {
-            let model_m = tf.to_local_matrix()
-            world_m = world_m.mat_mul(model_m)
-          }
         }
-        i = i - 1
       }
-      Some({ matrix: world_m })
+      let model_m = tf.to_local_matrix()
+      world_m = world_m.mat_mul(model_m)
+      i = i - 1
     }
+    Some({ matrix: world_m })
   }
 }
 
 ///|
 /// Iterates every living entity whose archetype signature **includes all** `required`
 /// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
+///
+/// The callback receives the entity, that row's **full sorted archetype component list**, and one
+/// [`ArrayView`] per entry in `required` (same order): a **non-copying** view into `required[k]`'s SoA
+/// bytes at this row (see MoonBit `array[start:end]`). GPU-visible components use zero-length views.
 pub fn World::for_each_entity_with_components(
   self : World,
   required : Array[ComponentTypeId],
-  f : (EntityId) -> Unit,
+  f : (EntityId, Array[ComponentTypeId], Array[ArrayView[Byte]]) -> Unit,
 ) -> Unit {
   if required.length() == 0 {
     return
@@ -684,9 +752,20 @@ pub fn World::for_each_entity_with_components(
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let sig = self.archetypes[ai].components
     if component_array_contains_all(sig, required) {
-      let ents = self.archetypes[ai].entities
+      let arch = self.archetypes[ai]
+      let ents = arch.entities
       for j = 0; j < ents.length(); j = j + 1 {
-        f(ents[j])
+        let payloads : Array[ArrayView[Byte]] = []
+        for k = 0; k < required.length(); k = k + 1 {
+          match arch.component_byte_view(j, required[k]) {
+            Some(v) => payloads.push(v)
+            None =>
+              abort(
+                "for_each_entity_with_components: required component missing from archetype",
+              )
+          }
+        }
+        f(ents[j], sig, payloads)
       }
     }
   }
@@ -699,8 +778,9 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let tf = self.transform_component_id
   let gt = self.global_transform_component_id
   let required : Array[ComponentTypeId] = [tf, gt]
-  self.for_each_entity_with_components(required, fn(e) {
-    match self.compute_global_transform(e) {
+  self.for_each_entity_with_components(required, (e, sig, payloads) => {
+    let local_tf = @comp.Transform3D::from_component_byte_view(payloads[0])
+    match self.compute_global_transform_kernel(e, sig, true, Some(local_tf)) {
       Some(g) => {
         let _ = self.set_global_transform(e, g)
       }

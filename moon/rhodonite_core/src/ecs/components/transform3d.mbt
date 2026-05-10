@@ -68,6 +68,25 @@ fn get_vec4(buf : FixedArray[Byte], base : Int) -> @v4.Vector4F {
 }
 
 ///|
+fn get_vec3_byte_view(buf : ArrayView[Byte], base : Int) -> @v3.Vector3F {
+  @v3.Vector3F::new(
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 0)),
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 4)),
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 8)),
+  )
+}
+
+///|
+fn get_vec4_byte_view(buf : ArrayView[Byte], base : Int) -> @v4.Vector4F {
+  @v4.Vector4F::new(
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 0)),
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 4)),
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 8)),
+    Float::from_double(get_gpu_f32_byte_view(buf, base + 12)),
+  )
+}
+
+///|
 /// Encodes one archetype row using [`transform3d_gpu_layout`] stride and field offsets.
 pub fn Transform3D::to_component_bytes(self : Transform3D) -> FixedArray[Byte] {
   let layout = transform3d_gpu_layout()
@@ -98,6 +117,26 @@ pub fn Transform3D::from_component_bytes(
     position: get_vec3(bytes, fields[0].offset),
     rotation: get_vec4(bytes, fields[1].offset),
     scale: get_vec3(bytes, fields[2].offset),
+  }
+}
+
+///|
+/// Decodes TRS from a zero-copy [`ArrayView`] over one archetype row (see MoonBit array views).
+pub fn Transform3D::from_component_byte_view(
+  bytes : ArrayView[Byte],
+) -> Transform3D {
+  let layout = transform3d_gpu_layout()
+  if bytes.length() != layout.stride {
+    abort("Transform3D::from_component_byte_view: length mismatch")
+  }
+  let fields = layout.fields
+  if fields.length() != 3 {
+    abort("transform3d_gpu_layout: expected 3 fields")
+  }
+  {
+    position: get_vec3_byte_view(bytes, fields[0].offset),
+    rotation: get_vec4_byte_view(bytes, fields[1].offset),
+    scale: get_vec3_byte_view(bytes, fields[2].offset),
   }
 }
 

@@ -12,6 +12,8 @@ pub fn child_of_cpu_layout() -> GpuLayout
 
 pub fn get_gpu_f32(FixedArray[Byte], Int) -> Double
 
+pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Double
+
 pub fn global_transform_gpu_layout() -> GpuLayout
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
@@ -73,6 +75,7 @@ pub(all) struct Transform3D {
   rotation : @vector4.Vector4[Float]
   scale : @vector3.Vector3[Float]
 }
+pub fn Transform3D::from_component_byte_view(ArrayView[Byte]) -> Self
 pub fn Transform3D::from_component_bytes(FixedArray[Byte]) -> Self
 pub fn Transform3D::identity() -> Self
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]

@@ -87,7 +87,7 @@ pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
-pub fn World::for_each_entity_with_components(Self, Array[ComponentTypeId], (EntityId) -> Unit) -> Unit
+pub fn World::for_each_entity_with_components(Self, Array[ComponentTypeId], (EntityId, Array[ComponentTypeId], Array[ArrayView[Byte]]) -> Unit) -> Unit
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @components.GlobalTransform?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
