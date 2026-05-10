@@ -1,12 +1,12 @@
 ///|
-/// WebGPU 頂点ステップモード（`vertex.buffers[].stepMode`）。
+/// WebGPU vertex step mode (`vertex.buffers[].stepMode`).
 pub(all) enum GPUVertexStepMode {
   Vertex
   Instance
 } derive(Eq)
 
 ///|
-/// JS FFI 用タグ（0: vertex, 1: instance）。
+/// JS FFI tag (0: vertex, 1: instance).
 pub fn GPUVertexStepMode::to_js_tag(self : GPUVertexStepMode) -> Int {
   match self {
     Vertex => 0
@@ -15,7 +15,7 @@ pub fn GPUVertexStepMode::to_js_tag(self : GPUVertexStepMode) -> Int {
 }
 
 ///|
-/// WebGPU `GPUVertexFormat` のサブセット。
+/// Subset of WebGPU `GPUVertexFormat`.
 pub(all) enum GPUVertexFormat {
   Float32x2
   Float32x3
@@ -23,7 +23,7 @@ pub(all) enum GPUVertexFormat {
 } derive(Eq)
 
 ///|
-/// JS `VERTEX_FORMAT_NAMES` の添字。
+/// Index into JS `VERTEX_FORMAT_NAMES`.
 pub fn GPUVertexFormat::to_js_tag(self : GPUVertexFormat) -> Int {
   match self {
     Float32x2 => 0

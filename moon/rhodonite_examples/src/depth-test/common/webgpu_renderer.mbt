@@ -1,12 +1,12 @@
 ///|
-/// キャンバス解像度（デモ HTML と一致）。
+/// Canvas resolution (matches demo HTML).
 let canvas_width : UInt = 800U
 
 ///|
 let canvas_height : UInt = 600U
 
 ///|
-/// 立方体中心間の半分距離（ワールド座標）。
+/// Half the distance between cube centers (world units).
 let half_separation : Double = 1.25
 
 ///|
@@ -25,11 +25,11 @@ let index_u16_count : Int = 36
 let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 
 ///|
-/// 真横投影を避け、立方体の奥行きが分かるようわずかに上から見上げる（ラジアン・約 22°）。
+/// Slight elevation so depth reads clearly (not a pure side view); radians (~22°).
 let camera_elevation_rad : Double = 0.38
 
 ///|
-/// \([-π, π]\) 向けのテイラー近似。
+/// Taylor approximation for \([-π, π]\).
 fn sin_approx(a : Double) -> Double {
   let two_pi = 6.283185307179586
   let mut x = a
@@ -84,7 +84,7 @@ fn mat4_translate(tx : Double, ty : Double, tz : Double) -> Array[Double] {
 }
 
 ///|
-/// 右手座標系・+X 軸周り（`c = cos θ`, `s = sin θ`）。
+/// Right-handed, +X axis rotation (`c = cos θ`, `s = sin θ`).
 fn mat4_rotate_x(c : Double, s : Double) -> Array[Double] {
   let m = Array::make(16, 0.0)
   m[0] = 1.0
@@ -129,7 +129,7 @@ fn mat4_rotate_y(c : Double, s : Double) -> Array[Double] {
 }
 
 ///|
-/// 右手・OpenGL 系クリップ Z ∈ [-1,1] の直交投影（XY はそのまま WebGPU と整合）。
+/// Right-handed orthographic projection with OpenGL-style clip Z ∈ [-1,1] (XY matches WebGPU usage).
 fn mat4_ortho(
   l : Double,
   r : Double,
@@ -150,7 +150,7 @@ fn mat4_ortho(
 }
 
 ///|
-/// GL 系クリップ座標の Z を WebGPU NDC の Z ∈ [0,1] に合わせる（`z' = 0.5*z + 0.5*w`）。
+/// Map GL-style clip Z to WebGPU NDC Z ∈ [0,1] (`z' = 0.5*z + 0.5*w`).
 fn mat4_clip_gl_depth_to_webgpu() -> Array[Double] {
   let m = Array::make(16, 0.0)
   m[0] = 1.0

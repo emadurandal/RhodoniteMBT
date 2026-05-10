@@ -1,6 +1,6 @@
 ///|
-/// 3 次元ベクトル。成分は `FixedArray[T]` に保持する。
-/// `T` は浮動小数点（`Float` / `Double` など）を想定する。
+/// 3D vector; components live in `FixedArray[T]`.
+/// `T` is expected to be floating-point (`Float`, `Double`, ...).
 pub(all) struct Vector3[T] {
   data : FixedArray[T]
 }
@@ -18,7 +18,7 @@ pub type Vector3I = Vector3[Int]
 pub type Vector3U = Vector3[UInt]
 
 ///|
-/// `T : Show` のとき、MoonBit 上で再構築可能な `Vector3::new(...)` 形式で出力する。
+/// When `T : Show`, prints a MoonBit-friendly `Vector3::new(...)` form.
 pub impl[T : Show] Show for Vector3[T] with output(self, logger) {
   logger.write_string("Vector3::new(")
   logger.write_object(self.data[0])

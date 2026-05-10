@@ -22,7 +22,7 @@ pub impl[T : Neg] Neg for Vector3[T] with neg(self) {
 }
 
 ///|
-/// ベクトル同士の成分ごとの積（Hadamard）。内積ではない。
+/// Component-wise product (Hadamard) between vectors; not the dot product.
 pub impl[T : Mul] Mul for Vector3[T] with mul(self, other) {
   Vector3::new(
     self.data[0] * other.data[0],

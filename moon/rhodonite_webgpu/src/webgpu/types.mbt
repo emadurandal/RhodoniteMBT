@@ -84,7 +84,7 @@ pub(all) struct GPURenderPipelineDescriptor {
   topology : GPUPrimitiveTopology
   formats : Array[String]
   vertex_buffers : Array[GPUVertexBufferLayout]
-  /// `Some("depth24plus")` のときデプステスト有効。`None` で従来どおり。
+  /// When `Some("depth24plus")`, depth testing is enabled; `None` keeps legacy behavior.
   depth_stencil_format : String?
 }
 

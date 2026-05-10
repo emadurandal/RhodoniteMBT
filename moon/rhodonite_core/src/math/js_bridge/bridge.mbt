@@ -1,4 +1,4 @@
-///| TypeScript / Vitest 向けに `Vector3F` をそのまま JS に出せるようラップする。
+///| Wrapper so `Vector3F` can be exported to JS as-is for TypeScript / Vitest.
 
 ///|
 pub fn v3f_new(x : Float, y : Float, z : Float) -> @v3.Vector3F {
@@ -70,7 +70,7 @@ pub fn v3f_to_string(v : @v3.Vector3F) -> String {
   v.to_string()
 }
 
-///| TypeScript / Vitest 向けに `Vector4F` をそのまま JS に出せるようラップする。
+///| Wrapper so `Vector4F` can be exported to JS as-is for TypeScript / Vitest.
 
 ///|
 pub fn v4f_new(x : Float, y : Float, z : Float, w : Float) -> @v4.Vector4F {

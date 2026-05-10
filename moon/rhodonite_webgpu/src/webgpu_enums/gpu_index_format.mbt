@@ -1,12 +1,12 @@
 ///|
-/// WebGPU `GPUIndexFormat`（`setIndexBuffer` の形式）。
+/// WebGPU `GPUIndexFormat` (`setIndexBuffer` format).
 pub(all) enum GPUIndexFormat {
   Uint16
   Uint32
 } derive(Eq)
 
 ///|
-/// ブラウザの `GPUQueue.setIndexBuffer` に渡す文字列。
+/// String passed to the browser `GPUQueue.setIndexBuffer`.
 pub fn GPUIndexFormat::to_js_tag(self : GPUIndexFormat) -> String {
   match self {
     Uint16 => "uint16"

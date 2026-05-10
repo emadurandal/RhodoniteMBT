@@ -135,22 +135,22 @@ pub fn GPUQueue::write_buffer(
 }
 
 ///|
-/// `FixedArray[Byte]` をヒープコピーせず `Bytes` として解釈してから `write_buffer` へ渡す。
+/// Pass `FixedArray[Byte]` to `write_buffer` as `Bytes` without a heap copy.
 ///
-/// `FixedArray::unsafe_reinterpret_as_bytes` は同一ストレージを `Bytes` として
-/// 見せるだけなので、`Bytes::from_array` のような全面コピーは発生しない。
+/// `FixedArray::unsafe_reinterpret_as_bytes` only reinterprets the same storage as `Bytes`,
+/// so there is no full-buffer copy like `Bytes::from_array`.
 ///
-/// # 注意（利用者向け）
+/// # Notes for callers
 ///
-/// - **unsafe の意味**: 標準ライブラリが `#internal` としている reinterpret と同じ意味で、
-///   `Bytes` は元のバイト列とエイリアスになる（`Bytes` を経由した変更は `FixedArray` と同一メモリに反映される）。
-///   本関数は引数の `FixedArray` を所有権移動で受け取り、内部で `Bytes` に変換して転送するため、
-///   呼び出し側では **渡した後に同じバッファを別参照しない**こと。
-/// - **ライフサイム**: `webgpu_queue_write_buffer` は FFI でデータを借用する。呼び出しが返るまで
-///   バッファは有効であること（通常は関数スコープ内で満たされる）。
-/// - **ネイティブ（wgpu）**: 依存する `wgpu_mbt` の `Queue::write_buffer` は、データ長が 4 バイト境界でない場合、
-///   パディング用に別バッファへコピーする経路がある。不要なコピーを避けるには長さを 4 の倍数にしておくこと。
-/// - **JS**: `Bytes` は JS FFI で `Uint8Array` に対応するため、そのまま `GPUQueue.writeBuffer` に渡る。
+/// - **What unsafe means**: same as the standard library’s `#internal` reinterpret; `Bytes`
+///   aliases the original bytes (changes through `Bytes` affect the same memory as `FixedArray`).
+///   This function takes the `FixedArray` by move, converts to `Bytes` internally, and forwards it—
+///   **do not keep other references to the buffer after passing it in**.
+/// - **Lifetime**: `webgpu_queue_write_buffer` borrows data across FFI; the buffer must stay valid
+///   until the call returns (usually satisfied within the function scope).
+/// - **Native (wgpu)**: `wgpu_mbt` `Queue::write_buffer` may copy into a padding buffer when the
+///   length is not a multiple of 4; pad lengths to multiples of 4 to avoid extra copies.
+/// - **JS**: `Bytes` maps to `Uint8Array` in JS FFI and goes straight to `GPUQueue.writeBuffer`.
 ///
 pub fn GPUQueue::write_buffer_from_fixed_array(
   self : GPUQueue,

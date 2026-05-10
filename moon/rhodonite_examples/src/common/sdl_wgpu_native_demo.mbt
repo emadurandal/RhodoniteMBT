@@ -1,4 +1,4 @@
-///| SDL3 + Metal（`CAMetalLayer`）＋ wgpu ネイティブの共有ブートストラップとレンダループ。
+///| Shared SDL3 + Metal (`CAMetalLayer`) + native wgpu bootstrap and render loop.
 
 ///|
 pub(all) struct SdlMetalWebGpuNativeSession {
@@ -31,7 +31,7 @@ pub async fn init_sdl_metal_webgpu_native(
   )
   if sdl_win.is_null() {
     ctx.quit()
-    println("SDL_CreateWindow failed (SDL3 が入っているか確認)")
+    println("SDL_CreateWindow failed (check SDL3 installation)")
     return None
   }
   let _ = @lib.sdl_ShowWindow(sdl_win)

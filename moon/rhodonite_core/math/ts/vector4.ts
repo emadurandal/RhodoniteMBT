@@ -48,7 +48,7 @@ export class Vector4F {
 		return v4f_w(this.inner);
 	}
 
-	/** 内部ストレージと同一の配列（コピーなし）。 */
+	/** Same array as internal storage (no copy). */
 	data(): number[] {
 		return v4f_data(this.inner);
 	}

@@ -1,30 +1,30 @@
 # Module boundaries
 
-RhodoniteMBT は [Moon workspace](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)（ルートの [`moon.work`](../moon.work)）で複数モジュールをまとめている。
+RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html) via the root [`moon.work`](../moon.work).
 
 ## Workspace modules
 
-| Moon module (`moon.mod.json` の `name`) | ディレクトリ | 役割 |
-|----------------------------------------|--------------|------|
-| `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | 公開用の薄い facade。下位モジュールへの依存を束ねる。 |
-| `emadurandal/rhodonite_binary` | [`moon/rhodonite_binary/`](../moon/rhodonite_binary/) | GPU 向けバッファへの little-endian 書き込みなど。 |
-| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | ベクトル演算と JS bridge（`src/math/`）などコア。 |
-| `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU（ブラウザ・ネイティブ）抽象化。 |
-| `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | 実行可能サンプル（デモ用モジュール）。 |
+| Moon module (`moon.mod.json` `name`) | Directory | Role |
+|--------------------------------------|-----------|------|
+| `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | Thin public facade; aggregates lower modules. |
+| `emadurandal/rhodonite_binary` | [`moon/rhodonite_binary/`](../moon/rhodonite_binary/) | Little-endian writes into GPU-facing buffers, etc. |
+| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), and other core code. |
+| `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU abstraction (browser and native). |
+| `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | Runnable samples (demo module). |
 
-## Release units（mooncakes に載せる単位）
+## Release units (what goes on mooncakes)
 
-次の **モジュールごとに** `moon publish`（各ディレクトリで実行）。依存がないものから順に上げるとよい。
+Run `moon publish` **once per module** below (from each module directory). Publishing in dependency order (fewer deps first) is recommended.
 
 1. `emadurandal/rhodonite_binary`
 2. `emadurandal/rhodonite_core`
-3. `emadurandal/rhodonite_webgpu`（外部: `moonbitlang/async`, `Milky2018/wgpu_mbt`, `Kaida-Amethyst/sdl3`）
-4. `emadurandal/rhodonite`（上記 3 つへの **バージョン依存**に差し替えたうえで）
-5. `emadurandal/rhodonite_examples`（任意。ライブラリ利用者には必須ではない）
+3. `emadurandal/rhodonite_webgpu` (external: `moonbitlang/async`, `Milky2018/wgpu_mbt`, `Kaida-Amethyst/sdl3`)
+4. `emadurandal/rhodonite` (after replacing the three path deps above with **versioned** registry deps)
+5. `emadurandal/rhodonite_examples` (optional; not required for library consumers)
 
-`samples` モジュールは publish 対象から外し、GitHub のこのリポジトリだけで配布する、という運用もありうる。
+You may also keep a `samples`-style module unpublished and distribute it only from this GitHub repo.
 
-## Dependency direction（許可される依存）
+## Dependency direction (allowed edges)
 
 ```mermaid
 flowchart LR
@@ -40,17 +40,17 @@ flowchart LR
   examples --> binary
 ```
 
-- **禁止の例**: `rhodonite_examples` が `emadurandal/rhodonite`（facade）に依存する（サンプルは下位ライブラリのみを直接参照する）。
-- **禁止の例**: `rhodonite_webgpu` が `rhodonite_examples` に依存する。
+- **Disallowed**: `rhodonite_examples` depending on `emadurandal/rhodonite` (facade); samples should reference lower libraries directly.
+- **Disallowed**: `rhodonite_webgpu` depending on `rhodonite_examples`.
 
-開発時はメンバー間を [`path` 依存](https://docs.moonbitlang.com/en/stable/toolchain/moon/module.html#dependency-management)で結ぶ。registry に出す直前に、依存側の `moon.mod.json` で path を **semver 文字列**へ置き換える（必要なら `moon work sync`）。
+During development, link workspace members with [`path` dependencies](https://docs.moonbitlang.com/en/stable/toolchain/moon/module.html#dependency-management). Before publishing, replace `path` entries in dependents’ `moon.mod.json` with **semver** strings (use `moon work sync` if needed).
 
-## Publish checklist（簡易）
+## Publish checklist (short)
 
-1. `moon login` 済み（mooncakes.io）。
-2. ルートで `moon fmt` と `moon info` を実行し、意図した `.mbti` の差分だけになっていることを確認する。
-3. ルートで `moon check --target all` が通ることを確認する。
-4. publish するモジュールの `moon.mod.json` で、`deps` の workspace メンバーを registry のバージョンへ更新する。
-5. 各モジュールディレクトリで `moon publish`（例: `moon -C moon/rhodonite_webgpu publish`）。
+1. Logged in with `moon login` (mooncakes.io).
+2. From the root, run `moon fmt` and `moon info`; confirm only intended `.mbti` changes.
+3. From the root, `moon check --target all` passes.
+4. In the module you publish, update `deps` workspace members to registry versions in `moon.mod.json`.
+5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
-完全自動の staging（path を一括でバージョンへ変換するスクリプト）は [kagura](https://github.com/mizchi/kagura) の `just release-stage` 型を将来追加できる。
+Fully automated staging (rewrite all path deps to versions in one shot) could be added later in the style of [kagura](https://github.com/mizchi/kagura) `just release-stage`.

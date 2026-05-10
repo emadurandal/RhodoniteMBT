@@ -1,4 +1,4 @@
-///| ブラウザの `<canvas>` から `GPUContext` までを構築する。
+///| Build a `GPUContext` from the browser `<canvas>`.
 
 ///|
 pub async fn gpu_context_from_html_canvas(

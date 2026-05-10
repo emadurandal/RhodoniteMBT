@@ -1,73 +1,73 @@
-# RhodoniteMBT — エージェント向けガイド
+# RhodoniteMBT — Agent guide
 
-[RhodoniteMBT](README.md) は [MoonBit](https://docs.moonbitlang.com) と WebGPU（ブラウザ・ネイティブ SDL3）を扱う **モノレポ** です。ルートの [`moon.work`](moon.work) で複数モジュールがワークスペース化されています（[Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)）。
+[RhodoniteMBT](README.md) is a **monorepo** for graphics-related code using [MoonBit](https://docs.moonbitlang.com) and WebGPU (browser and native SDL3). Multiple modules are wired as a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
 
-MoonBit 共通のスキルは <https://github.com/moonbitlang/skills> を参照できます。
+Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 
-## モジュール構成
+## Modules
 
-| モジュール名（`moon.mod.json`） | ディレクトリ | 役割 |
-|--------------------------------|--------------|------|
-| `emadurandal/rhodonite` | `moon/rhodonite/` | 公開用 facade |
-| `emadurandal/rhodonite_binary` | `moon/rhodonite_binary/` | バイナリ書き込みヘルパー |
-| `emadurandal/rhodonite_core` | `moon/rhodonite_core/` | コア（ベクトル・JS bridge など） |
-| `emadurandal/rhodonite_webgpu` | `moon/rhodonite_webgpu/` | WebGPU 抽象化 |
-| `emadurandal/rhodonite_examples` | `moon/rhodonite_examples/` | サンプル・デモ |
+| Module (`moon.mod.json` name) | Directory | Role |
+|-------------------------------|-----------|------|
+| `emadurandal/rhodonite` | `moon/rhodonite/` | Public facade |
+| `emadurandal/rhodonite_binary` | `moon/rhodonite_binary/` | Binary write helpers |
+| `emadurandal/rhodonite_core` | `moon/rhodonite_core/` | Core (vectors, JS bridge, etc.) |
+| `emadurandal/rhodonite_webgpu` | `moon/rhodonite_webgpu/` | WebGPU abstraction |
+| `emadurandal/rhodonite_examples` | `moon/rhodonite_examples/` | Samples and demos |
 
-モジュール間の依存境界・publish 順序は [`docs/module_boundaries.md`](docs/module_boundaries.md) を正とする。
+See [`docs/module_boundaries.md`](docs/module_boundaries.md) for dependency boundaries and publish order.
 
-## ワークスペースでの開発
+## Workspace development
 
-リポジトリルートで:
+From the repository root:
 
 ```bash
-moon update          # 必要に応じて（ネットワーク利用）
+moon update          # when needed (may require network)
 moon check --target all
 moon fmt
 moon info
 ```
 
-[`justfile`](justfile) の `just check-ws` は `moon check --target all` を呼ぶ。
+[`justfile`](justfile) `just check-ws` runs `moon check --target all`.
 
-## Node / pnpm の注意
+## Node / pnpm notes
 
-- ルート [`package.json`](package.json) に **`"type": "module"` は付けない**。付けると依存 mooncake（例: `Milky2018/wgpu_mbt`）の prebuild が CommonJS の `require` と衝突して失敗することがある。
-- ワークスペースビルドの JS 成果物は、モジュール直下ではなく **リポジトリルートの `_build`** にまとまることがある（Vitest のエイリアスや `src/main-*.ts` の import はその前提）。
+- Do **not** add `"type": "module"` to the root [`package.json`](package.json). Doing so can break mooncake prebuilds (e.g. `Milky2018/wgpu_mbt`) that rely on CommonJS `require`.
+- Workspace JS build artifacts may land under the **repository root `_build`**, not necessarily next to each module (Vitest aliases and `src/main-*.ts` imports assume this).
 
-## ビルド・実行・テスト（pnpm）
+## Build, run, and test (pnpm)
 
 ```bash
 pnpm install
 ```
 
-| 目的 | コマンド |
-|------|----------|
-| Web デモ（例: basic-triangle） | `pnpm run dev:basic-triangle`（他に `dev:triangle-with-buffer`, `dev:depth-test`） |
-| ネイティブ（SDL3 / wgpu） | `pnpm run run:wgpu:basic-triangle` など（[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh)） |
-| Core の JS bridge（Vitest） | `pnpm run test:core:js` |
-| Core の MoonBit テスト | `pnpm run test:core:mbt` |
+| Goal | Command |
+|------|---------|
+| Web demo (e.g. basic-triangle) | `pnpm run dev:basic-triangle` (also `dev:triangle-with-buffer`, `dev:depth-test`) |
+| Native (SDL3 / wgpu) | `pnpm run run:wgpu:basic-triangle`, etc. ([`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh)) |
+| Core JS bridge (Vitest) | `pnpm run test:core:js` |
+| Core MoonBit tests | `pnpm run test:core:mbt` |
 
-ネイティブ実行ファイルは、`moon/rhodonite_examples/_build` ではなく **ルート** `_build/native/debug/build/emadurandal/rhodonite_examples/<サンプル>/wgpu/main/main.exe` に出力される（[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) が参照）。
+Native executables are emitted under the **root** `_build/native/debug/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, not under `moon/rhodonite_examples/_build` ([`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) expects this).
 
-ルートに `moon.work` があると `moon/rhodonite_core` だけで `moon test` すると `rhodonite_webgpu` などが計画に含まれ、`webgpu_objects` の解決で失敗することがある。そのため Core の MoonBit テストは [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) 経由で、`rhodonite_core/src` 以下に `*_test.mbt` があるパッケージだけを指定する。
+With a root `moon.work`, running `moon test` only inside `moon/rhodonite_core` can pull `rhodonite_webgpu` into the plan and fail resolving `webgpu_objects`. Use [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) from the repo root to pass only packages under `moon/rhodonite_core/src` that contain `*_test.mbt`.
 
-## MoonBit プロジェクト構造（各モジュール内）
+## MoonBit layout (inside each module)
 
-- パッケージはディレクトリ単位。各ディレクトリに `moon.pkg`（依存関係）。
-- ファイル名: 通常の実装、ブラックボックステスト `*_test.mbt`、ホワイトボックステスト `*_wbtest.mbt`。
-- モジュール直下に `moon.mod.json`（モジュールメタデータ）。
+- Packages are directories; each has `moon.pkg` (dependencies).
+- Files: implementation, black-box tests `*_test.mbt`, white-box tests `*_wbtest.mbt`.
+- Module metadata lives in `moon.mod.json` at the module root.
 
-## コーディング規約（MoonBit）
+## Coding conventions (MoonBit)
 
-- コードはブロックスタイル。ブロックは `///|` で区切り、順序は任意。リファクタ時はブロック単位で扱える。
-- 非推奨コードは各ディレクトリの `deprecated.mbt` に寄せるとよい。
+- Block-oriented style; blocks are separated by `///|` and order does not matter; refactor block-by-block when useful.
+- Prefer moving deprecated code into `deprecated.mbt` per directory.
 
-## ツールチェーン
+## Tooling
 
-- `moon fmt` — 整形。
-- `moon ide` — peek-def / outline / find-references など（詳細は `$moonbit-agent-guide`）。
-- `moon info` — パッケージの `.mbti`（公開インターフェース）を更新。差分がなければ外部から見た変更は通常ない（安全なリファクタの目安）。
-- 変更の最後は `moon info && moon fmt` を推奨。`.mbti` の差分が意図どおりか確認する。
-- `moon test` — テスト。スナップショットは `moon test --update` で更新。
-- アサーションは結果が安定しているなら `assert_eq` や `assert_true(pattern is Pattern(...))`。振る舞いの記録にはスナップショット。数値計算など明確な結果にはアサーション優先。
-- `moon coverage analyze > uncovered.log` でカバレッジの穴を確認できる。
+- `moon fmt` — formatting.
+- `moon ide` — peek-def, outline, find-references (see `$moonbit-agent-guide`).
+- `moon info` — refresh `.mbti` public interfaces; no diff usually means no externally visible change (safe refactor signal).
+- Finish changes with `moon info && moon fmt` when appropriate; review `.mbti` diffs.
+- `moon test` — run tests; refresh snapshots with `moon test --update`.
+- Prefer `assert_eq` or `assert_true(pattern is Pattern(...))` for stable results; use snapshots to capture behavior; prefer assertions for well-defined numeric output.
+- `moon coverage analyze > uncovered.log` — inspect coverage gaps.

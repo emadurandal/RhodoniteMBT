@@ -16,7 +16,7 @@ describe("Vector3F (MoonBit js_bridge wrapper)", () => {
 		expect(z.z()).toBeCloseTo(0);
 	});
 
-	it("Vector3 data() は inner.data と同一参照", () => {
+	it("Vector3 data() shares reference with inner.data", () => {
 		const v = Vector3F.new(1, 2, 3);
 		const a = v.data();
 		expect(a).toBe(v.inner.data);

@@ -58,9 +58,9 @@ fn vertex_format_to_u32(f : @webgpu_enums.GPUVertexFormat) -> UInt {
 }
 
 ///|
-/// Native は `Milky2018/wgpu_mbt` の `RenderPipelineDescBuilder` 経由のみ組み立て可能で、
-/// 頂点・フラグメントで **別ハンドルの ShaderModule** を正しく割り当てる API が無い。
-/// 別 WGSL モジュールが必要な場合は wgpu_mbt 側の拡張か C からの記述子構築が必要。
+/// Native builds pipelines only via `Milky2018/wgpu_mbt` `RenderPipelineDescBuilder`;
+/// there is no API to assign **distinct ShaderModule handles** for vertex vs fragment.
+/// Separate WGSL modules need an extension in wgpu_mbt or descriptor setup from C.
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
   vertex : GPUShaderModule,
@@ -72,7 +72,7 @@ pub fn webgpu_device_create_render_pipeline(
 ) -> GPURenderPipeline {
   if !physical_equal(vertex.raw, fragment.raw) {
     abort(
-      "native WebGPU: 頂点用とフラグメント用に異なる ShaderModule を渡すことは、現在の wgpu_mbt ラッパだけではサポートしていません。同一 WGSL なら `create_shader_module` を1回だけ呼び、descriptor の vertex/fragment に同じモジュールを渡してください。",
+      "native WebGPU: different ShaderModule handles for vertex and fragment are not supported with the current wgpu_mbt wrapper. For a single WGSL source, call `create_shader_module` once and pass the same module to vertex and fragment in the descriptor.",
     )
   }
   let format = if formats.length() > 0 {

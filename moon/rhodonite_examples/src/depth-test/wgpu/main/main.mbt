@@ -1,4 +1,4 @@
-///| SDL3 + Metal + wgpu ネイティブ。毎フレーム `depth-test` レンダラを回す。
+///| SDL3 + Metal + native wgpu; runs the `depth-test` renderer each frame.
 
 ///|
 async fn run_depth_test_native() -> Unit raise Error {
@@ -30,7 +30,7 @@ async fn main {
   run_depth_test_native() catch {
     _ =>
       println(
-        "wgpu+SDL3 起動失敗: macOS+Metal か、SDL3/wgpu のリンク・ヘッダを確認してください。",
+        "wgpu+SDL3 failed to start: check macOS+Metal, SDL3/wgpu link, and headers.",
       )
   }
 }

@@ -1,4 +1,4 @@
-///| [SDL3 SDL_metal.h](https://github.com/libsdl-org/SDL/blob/main/include/SDL3/SDL_metal.h) 最小 FFI。
+///| [SDL3 SDL_metal.h](https://github.com/libsdl-org/SDL/blob/main/include/SDL3/SDL_metal.h) minimal FFI.
 
 ///|
 extern "C" fn sdl_metal_create_view(w : @lib.SDL_Window) -> @c.OpaquePtr = "SDL_Metal_CreateView"

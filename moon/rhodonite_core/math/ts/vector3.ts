@@ -43,7 +43,7 @@ export class Vector3F {
 		return v3f_z(this.inner);
 	}
 
-	/** 内部ストレージと同一の配列（コピーなし）。 */
+	/** Same array as internal storage (no copy). */
 	data(): number[] {
 		return v3f_data(this.inner);
 	}

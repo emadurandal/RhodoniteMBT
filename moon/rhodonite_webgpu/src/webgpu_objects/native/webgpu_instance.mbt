@@ -23,14 +23,14 @@ pub fn webgpu_instance_get_preferred_canvas_format(
   instance : WebGPUInstance,
 ) -> String {
   ignore(instance)
-  // ブラウザの getPreferredCanvasFormat が線形を返す環境と揃えるための既定ヒント。
-  // 実際のスワップ形式は webgpu_instance_get_preferred_canvas_format_for_surface で解決する。
+  // Default hint aligned with browsers where getPreferredCanvasFormat returns linear.
+  // Actual swap format is resolved in webgpu_instance_get_preferred_canvas_format_for_surface.
   "bgra8unorm"
 }
 
 ///|
-/// webgpu_instance_get_preferred_canvas_format のヒントに対し、スワップチェーンで
-/// sRGB 形式をより優先するか（Surface::configure_best_effort の辞書順と一致）。
+/// Given the hint from webgpu_instance_get_preferred_canvas_format, whether to prefer sRGB
+/// formats for the swap chain (matches Surface::configure_best_effort ordering).
 fn webgpu_instance_surface_hint_prefers_srgb(hint : String) -> Bool {
   match hint {
     "bgra8unorm-srgb"
@@ -42,7 +42,7 @@ fn webgpu_instance_surface_hint_prefers_srgb(hint : String) -> Bool {
 }
 
 ///|
-/// サーフェスがサポートする形式一覧から、`prefer_srgb` に応じて1つ選ぶ。
+/// Pick one supported surface format based on `prefer_srgb`.
 fn webgpu_instance_surface_pick_texture_format(
   formats : Array[@wgpu.TextureFormat],
   prefer_srgb : Bool,

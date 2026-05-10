@@ -1,18 +1,18 @@
 ///|
-/// 頂点1つあたり 32 バイト × 3 頂点。
+/// 32 bytes per vertex × 3 vertices.
 let vertex_buffer_byte_length : UInt64 = 96UL
 
 ///|
-/// インデックス uint16 × 3（0, 1, 2）＝ 6 バイト。`GPUQueue.writeBuffer` は
-/// ブラウザ実装でコピー長が 4 の倍数であることが求められるため、GPU 上は 8 バイト確保し末尾をパディングする。
+/// Index uint16 × 3 (0, 1, 2) = 6 bytes. Some browser `GPUQueue.writeBuffer`
+/// implementations require copy sizes aligned to 4 bytes; allocate 8 bytes on-GPU and pad the tail.
 let index_buffer_allocation_byte_length : UInt64 = 8UL
 
 ///|
-/// `setIndexBuffer` に渡すインデックス領域のバイト数（実データのみ）。
+/// Byte length of index data passed to `setIndexBuffer` (payload only).
 let index_buffer_index_range_byte_length : UInt64 = 6UL
 
 ///|
-/// インターリーブ頂点: `vec2 pos` @ offset 0, `vec3 color` @ offset 8, stride 32。
+/// Interleaved vertices: `vec2 pos` @ offset 0, `vec3 color` @ offset 8, stride 32.
 fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
   let stride = 32
   let n = 3
@@ -39,7 +39,7 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
 }
 
 ///|
-/// 6 バイトのインデックス + 2 バイトパディング（`writeBuffer` の 4 バイト境界用）。
+/// 6 bytes of indices + 2 bytes padding (for `writeBuffer` 4-byte alignment).
 fn index_triangle_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(8, (0 : Byte))
   @writes.put_u16_le(buf, 0, 0U)

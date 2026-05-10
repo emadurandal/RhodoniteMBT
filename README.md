@@ -1,36 +1,36 @@
 # RhodoniteMBT
 
-MoonBit と WebGPU（ブラウザ・ネイティブ）を使ったグラフィクス関連コードのモノレポです。複数の MoonBit **モジュール**はルートの [`moon.work`](moon.work) でワークスペース化されています（[Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)）。
+A monorepo of graphics-related code using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
 
-## モジュール構成
+## Modules
 
-| モジュール | 説明 |
-|------------|------|
-| `emadurandal/rhodonite` | 公開用の薄い facade（[`moon/rhodonite`](moon/rhodonite)） |
-| `emadurandal/rhodonite_binary` | バイナリ書き込みヘルパー |
-| `emadurandal/rhodonite_core` | コア（ベクトル・JS bridge など） |
-| `emadurandal/rhodonite_webgpu` | WebGPU 抽象化 |
-| `emadurandal/rhodonite_examples` | サンプル |
+| Module | Description |
+|--------|-------------|
+| `emadurandal/rhodonite` | Thin public facade ([`moon/rhodonite`](moon/rhodonite)) |
+| `emadurandal/rhodonite_binary` | Binary write helpers |
+| `emadurandal/rhodonite_core` | Core (vectors, JS bridge, etc.) |
+| `emadurandal/rhodonite_webgpu` | WebGPU abstraction |
+| `emadurandal/rhodonite_examples` | Samples |
 
-境界と publish の注意は [docs/module_boundaries.md](docs/module_boundaries.md) を参照。
+See [docs/module_boundaries.md](docs/module_boundaries.md) for boundaries and publishing notes.
 
-## 開発（ワークスペース）
+## Development (workspace)
 
-リポジトリルートで依存を更新し、全体をチェックする例:
+Example from the repository root (update deps and check everything):
 
 ```bash
-moon update   # ネットワークが必要な場合があります
+moon update   # network may be required
 moon check --target all
 moon fmt
 moon info
 ```
 
-[`justfile`](justfile) から `just check-ws` で `moon check --target all` を実行できます。
+From [`justfile`](justfile), `just check-ws` runs `moon check --target all`.
 
-### Node・pnpm とワークスペースの出力
+### Node, pnpm, and workspace output
 
-- ルート [`package.json`](package.json) に **`"type": "module"` を付けていません**。付けると、依存 mooncake（例: `Milky2018/wgpu_mbt`）の prebuild が CommonJS の `require` を使うため、Node が ES モジュール扱いにして失敗することがあります。
-- [`moon.work`](moon.work) 配下でビルドした JS の成果物は、モジュール直下ではなく **リポジトリルートの `_build`** にまとまることがあります（Vitest のエイリアスや `src/main-*.ts` の import はその前提で書いています）。
+- The root [`package.json`](package.json) does **not** set `"type": "module"`. Setting it can break mooncake prebuilds (e.g. `Milky2018/wgpu_mbt`) that use CommonJS `require`, because Node then treats the package as ESM.
+- JS artifacts built under [`moon.work`](moon.work) may be grouped under the **repository root `_build`**, not always next to each module (Vitest aliases and `src/main-*.ts` imports are written with that in mind).
 
 ## Build & Run
 
@@ -48,22 +48,22 @@ pnpm install
 pnpm run run:wgpu:basic-triangle
 ```
 
-`scripts/run-wgpu-sdl3.sh` が参照する実行ファイルは、ワークスペースビルドでは **`moon/rhodonite_examples/_build` ではなく**、ルートの `_build/native/debug/build/emadurandal/rhodonite_examples/<サンプル>/wgpu/main/main.exe` に出力されます。
+[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) runs the native binary; under workspace builds it lives at `_build/native/debug/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
 
-### Core（JS bridge の Vitest）
+### Core (JS bridge / Vitest)
 
 ```bash
 pnpm run test:core:js
 ```
 
-### Core（MoonBit のテスト）
+### Core (MoonBit tests)
 
 ```bash
 pnpm run test:core:mbt
 ```
 
-ルートに [`moon.work`](moon.work) があると、`moon/rhodonite_core` に移動して単に `moon test` するとワークスペース全体のビルド計画に `rhodonite_webgpu` が含まれ、`webgpu_objects` が仮想パッケージのまま解決できずエラーになることがあります。そのため [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) がリポジトリルートから実行し、`moon/rhodonite_core/src` 以下の `*_test.mbt` があるパッケージだけを `moon test` に渡します（新しいパッケージを追加しても `package.json` を編集する必要はありません）。
+With a root [`moon.work`](moon.work), running plain `moon test` from `moon/rhodonite_core` can include `rhodonite_webgpu` in the workspace plan and fail while `webgpu_objects` stays unresolved. [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) therefore runs from the repo root and passes only packages under `moon/rhodonite_core/src` that contain `*_test.mbt` (no need to edit `package.json` when adding packages).
 
-## Publish の順序（目安）
+## Publish order (outline)
 
-registry に出すときは、依存の浅い順に **モジュール単位**で `moon publish` します（各サブディレクトリで実行）。詳細は [docs/module_boundaries.md](docs/module_boundaries.md) の Release units を参照。
+When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/module_boundaries.md](docs/module_boundaries.md) — Release units.
