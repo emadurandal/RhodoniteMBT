@@ -226,16 +226,30 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
 
 ///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
-/// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) with flat GPU storage only.
+/// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
+/// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
 pub fn World::new() -> World {
   let registry = ComponentRegistry::new()
   let tf_layout = transform3d_gpu_layout()
   if !tf_layout.is_valid() {
     abort("builtin Transform3D layout invalid")
   }
-  let transform_component_id = registry.register_gpu("Transform3D", tf_layout)
+  let transform_component_id = registry.register_cpu(
+    "Transform3D",
+    tf_layout.stride,
+  )
+  let gt_layout = global_transform_gpu_layout()
+  if !gt_layout.is_valid() {
+    abort("builtin GlobalTransform layout invalid")
+  }
+  let global_transform_component_id = registry.register_gpu(
+    "GlobalTransform", gt_layout,
+  )
   let gpu_stores : Array[GpuComponentStore?] = [
-    Some(GpuComponentStore::new(transform_component_id, tf_layout.stride)),
+    None,
+    Some(
+      GpuComponentStore::new(global_transform_component_id, gt_layout.stride),
+    ),
   ]
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
@@ -256,6 +270,7 @@ pub fn World::new() -> World {
     gpu_stores,
     resize_events,
     transform_component_id,
+    global_transform_component_id,
   }
 }
 
@@ -477,21 +492,22 @@ pub fn World::transform_component(self : World) -> ComponentTypeId {
 }
 
 ///|
-/// Assigns builtin [`Transform3D`] for `entity`: archetype signature uses zero-byte SoA row; payload is flat GPU only.
+pub fn World::global_transform_component(self : World) -> ComponentTypeId {
+  self.global_transform_component_id
+}
+
+///|
+/// Assigns builtin [`Transform3D`] for `entity` in archetype SoA (`cpu_stride` = layout stride).
 pub fn World::set_transform(
   self : World,
   entity : EntityId,
   t : Transform3D,
 ) -> Bool {
-  let tf = self.transform_component_id
-  let payload = t.to_gpu_bytes()
-  if !self.has_component(entity, tf) {
-    let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-    if !self.add_component_bytes(entity, tf, empty) {
-      return false
-    }
-  }
-  self.set_gpu_component_bytes(entity, tf, payload)
+  self.add_component_bytes(
+    entity,
+    self.transform_component_id,
+    t.to_component_bytes(),
+  )
 }
 
 ///|
@@ -500,8 +516,41 @@ pub fn World::get_transform(self : World, entity : EntityId) -> Transform3D? {
   if !self.is_alive(entity) || !self.has_component(entity, tf) {
     return None
   }
-  match self.gpu_component_bytes(entity, tf) {
-    Some(bytes) => Some(Transform3D::from_gpu_bytes(bytes))
+  match self.component_bytes(entity, tf) {
+    Some(bytes) => Some(Transform3D::from_component_bytes(bytes))
+    None => None
+  }
+}
+
+///|
+/// Assigns builtin [`GlobalTransform`] for `entity`: archetype signature uses zero-byte SoA row; payload is flat GPU only.
+pub fn World::set_global_transform(
+  self : World,
+  entity : EntityId,
+  gt : GlobalTransform,
+) -> Bool {
+  let id = self.global_transform_component_id
+  let payload = gt.to_gpu_bytes()
+  if !self.has_component(entity, id) {
+    let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+    if !self.add_component_bytes(entity, id, empty) {
+      return false
+    }
+  }
+  self.set_gpu_component_bytes(entity, id, payload)
+}
+
+///|
+pub fn World::get_global_transform(
+  self : World,
+  entity : EntityId,
+) -> GlobalTransform? {
+  let id = self.global_transform_component_id
+  if !self.is_alive(entity) || !self.has_component(entity, id) {
+    return None
+  }
+  match self.gpu_component_bytes(entity, id) {
+    Some(bytes) => Some(GlobalTransform::from_gpu_bytes(bytes))
     None => None
   }
 }

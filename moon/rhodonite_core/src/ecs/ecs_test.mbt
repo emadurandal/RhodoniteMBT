@@ -114,6 +114,12 @@ test "builtin Transform3D uses ComponentTypeId index 0" {
 }
 
 ///|
+test "builtin GlobalTransform uses ComponentTypeId index 1" {
+  let world = World::new()
+  assert_eq(world.global_transform_component().index, 1)
+}
+
+///|
 test "Transform3D identity roundtrip bytes and World set/get" {
   let world = World::new()
   let tf = world.transform_component()
@@ -129,7 +135,26 @@ test "Transform3D identity roundtrip bytes and World set/get" {
     }
     None => abort("expected Transform3D")
   }
-  let writes = world.drain_gpu_writes(tf)
+  assert_eq(world.drain_gpu_writes(tf).length(), 0)
+  assert_eq(
+    world.drain_gpu_writes(world.global_transform_component()).length(),
+    0,
+  )
+}
+
+///|
+test "GlobalTransform identity roundtrip and GPU drain" {
+  let world = World::new()
+  let gt_id = world.global_transform_component()
+  let entity = world.create_entity()
+  let _ = world.drain_resize_events()
+  let g = GlobalTransform::identity()
+  assert_true(world.set_global_transform(entity, g))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read.matrix, g.matrix)
+    None => abort("expected GlobalTransform")
+  }
+  let writes = world.drain_gpu_writes(gt_id)
   assert_eq(writes.length(), 1)
 }
 

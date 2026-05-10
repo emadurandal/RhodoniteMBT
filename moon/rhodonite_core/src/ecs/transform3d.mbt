@@ -1,5 +1,5 @@
 ///|
-/// Library-local transform: TRS in std140-friendly packing for flat GPU storage.
+/// Library-local transform: TRS packed with std140 vec3/vec4 rules for archetype SoA (`CpuOnly`).
 
 ///|
 pub(all) struct Transform3D {
@@ -68,8 +68,8 @@ fn get_vec4(buf : FixedArray[Byte], base : Int) -> @v4.Vector4F {
 }
 
 ///|
-/// Encodes one row using [`transform3d_gpu_layout`] stride and field offsets.
-pub fn Transform3D::to_gpu_bytes(self : Transform3D) -> FixedArray[Byte] {
+/// Encodes one archetype row using [`transform3d_gpu_layout`] stride and field offsets.
+pub fn Transform3D::to_component_bytes(self : Transform3D) -> FixedArray[Byte] {
   let layout = transform3d_gpu_layout()
   let buf = gpu_component_bytes(layout.stride)
   let fields = layout.fields
@@ -83,10 +83,12 @@ pub fn Transform3D::to_gpu_bytes(self : Transform3D) -> FixedArray[Byte] {
 }
 
 ///|
-pub fn Transform3D::from_gpu_bytes(bytes : FixedArray[Byte]) -> Transform3D {
+pub fn Transform3D::from_component_bytes(
+  bytes : FixedArray[Byte],
+) -> Transform3D {
   let layout = transform3d_gpu_layout()
   if bytes.length() != layout.stride {
-    abort("Transform3D::from_gpu_bytes: length mismatch")
+    abort("Transform3D::from_component_bytes: length mismatch")
   }
   let fields = layout.fields
   if fields.length() != 3 {

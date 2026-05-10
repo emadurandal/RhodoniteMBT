@@ -142,4 +142,5 @@ pub struct World {
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
   transform_component_id : ComponentTypeId
+  global_transform_component_id : ComponentTypeId
 }

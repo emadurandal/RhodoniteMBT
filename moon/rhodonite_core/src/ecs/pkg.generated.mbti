@@ -2,12 +2,15 @@
 package "emadurandal/rhodonite_core/ecs"
 
 import {
+  "emadurandal/rhodonite_core/math/matrix44",
   "emadurandal/rhodonite_core/math/vector3",
   "emadurandal/rhodonite_core/math/vector4",
 }
 
 // Values
 pub fn get_gpu_f32(FixedArray[Byte], Int) -> Double
+
+pub fn global_transform_gpu_layout() -> GpuLayout
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
@@ -53,6 +56,13 @@ pub(all) struct EntityLocation {
   archetype_index : Int
   row : Int
 }
+
+pub(all) struct GlobalTransform {
+  matrix : @matrix44.Matrix4[Float]
+}
+pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
+pub fn GlobalTransform::identity() -> Self
+pub fn GlobalTransform::to_gpu_bytes(Self) -> FixedArray[Byte]
 
 type GpuComponentStore
 
@@ -108,9 +118,9 @@ pub(all) struct Transform3D {
   rotation : @vector4.Vector4[Float]
   scale : @vector3.Vector3[Float]
 }
-pub fn Transform3D::from_gpu_bytes(FixedArray[Byte]) -> Self
+pub fn Transform3D::from_component_bytes(FixedArray[Byte]) -> Self
 pub fn Transform3D::identity() -> Self
-pub fn Transform3D::to_gpu_bytes(Self) -> FixedArray[Byte]
+pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
 
 pub struct World {
   registry : ComponentRegistry
@@ -122,6 +132,7 @@ pub struct World {
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
   transform_component_id : ComponentTypeId
+  global_transform_component_id : ComponentTypeId
 }
 pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
@@ -130,7 +141,9 @@ pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
+pub fn World::get_global_transform(Self, EntityId) -> GlobalTransform?
 pub fn World::get_transform(Self, EntityId) -> Transform3D?
+pub fn World::global_transform_component(Self) -> ComponentTypeId
 pub fn World::gpu_component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
@@ -140,6 +153,7 @@ pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, GpuLayout) -> ComponentTypeId
 pub fn World::registry(Self) -> ComponentRegistry
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
+pub fn World::set_global_transform(Self, EntityId, GlobalTransform) -> Bool
 pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, Transform3D) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
