@@ -5,8 +5,8 @@ fn bytes4(a : Byte, b : Byte, c : Byte, d : Byte) -> FixedArray[Byte] {
 
 ///|
 fn gpu_bytes_with_u32(value : UInt) -> FixedArray[Byte] {
-  let bytes = gpu_component_bytes(16)
-  put_gpu_u32(bytes, 0, value)
+  let bytes = @comp.gpu_component_bytes(16)
+  @comp.put_gpu_u32(bytes, 0, value)
   bytes
 }
 
@@ -50,12 +50,12 @@ test "CPU components move entities between archetypes and preserve bytes" {
 
 ///|
 test "std140-compatible layout pads vec3 fields to 16 bytes" {
-  let fields : Array[(String, GpuFieldKind)] = [
-    ("roughness", F32),
-    ("position", Vec3F32),
-    ("material_id", U32),
+  let fields : Array[(String, @comp.GpuFieldKind)] = [
+    ("roughness", @comp.F32),
+    ("position", @comp.Vec3F32),
+    ("material_id", @comp.U32),
   ]
-  let layout = GpuLayout::std140(fields)
+  let layout = @comp.GpuLayout::std140(fields)
   assert_true(layout.is_valid())
   assert_eq(layout.fields[0].offset, 0)
   assert_eq(layout.fields[1].offset, 16)
@@ -67,7 +67,10 @@ test "std140-compatible layout pads vec3 fields to 16 bytes" {
 ///|
 test "GPU visible components stay flat by EntityId index and drain only dirty ranges" {
   let world = World::new()
-  let gpu = world.register_gpu_component("GpuMaterial", GpuLayout::empty(16))
+  let gpu = world.register_gpu_component(
+    "GpuMaterial",
+    @comp.GpuLayout::empty(16),
+  )
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let _ = world.create_entity()
@@ -91,7 +94,10 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
 ///|
 test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes" {
   let world = World::new()
-  let gpu = world.register_gpu_component("GpuTransform", GpuLayout::empty(16))
+  let gpu = world.register_gpu_component(
+    "GpuTransform",
+    @comp.GpuLayout::empty(16),
+  )
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
   assert_true(
@@ -125,7 +131,7 @@ test "Transform3D identity roundtrip bytes and World set/get" {
   let tf = world.transform_component()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
-  let t = Transform3D::identity()
+  let t = @comp.Transform3D::identity()
   assert_true(world.set_transform(entity, t))
   match world.get_transform(entity) {
     Some(got) => {
@@ -148,7 +154,7 @@ test "GlobalTransform identity roundtrip and GPU drain" {
   let gt_id = world.global_transform_component()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
-  let g = GlobalTransform::identity()
+  let g = @comp.GlobalTransform::identity()
   assert_true(world.set_global_transform(entity, g))
   match world.get_global_transform(entity) {
     Some(read) => assert_eq(read.matrix, g.matrix)
@@ -160,7 +166,7 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 
 ///|
 test "get_gpu_f32 reads put_gpu_f32" {
-  let buf = gpu_component_bytes(16)
-  put_gpu_f32(buf, 4, 2.5)
-  assert_eq(get_gpu_f32(buf, 4), 2.5)
+  let buf = @comp.gpu_component_bytes(16)
+  @comp.put_gpu_f32(buf, 4, 2.5)
+  assert_eq(@comp.get_gpu_f32(buf, 4), 2.5)
 }

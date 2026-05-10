@@ -1,0 +1,73 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/ecs/components"
+
+import {
+  "emadurandal/rhodonite_core/math/matrix44",
+  "emadurandal/rhodonite_core/math/vector3",
+  "emadurandal/rhodonite_core/math/vector4",
+}
+
+// Values
+pub fn get_gpu_f32(FixedArray[Byte], Int) -> Double
+
+pub fn global_transform_gpu_layout() -> GpuLayout
+
+pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
+
+pub fn put_gpu_f32(FixedArray[Byte], Int, Double) -> Unit
+
+pub fn put_gpu_u32(FixedArray[Byte], Int, UInt) -> Unit
+
+pub fn transform3d_gpu_layout() -> GpuLayout
+
+// Errors
+
+// Types and methods
+pub(all) struct GlobalTransform {
+  matrix : @matrix44.Matrix4[Float]
+}
+pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
+pub fn GlobalTransform::identity() -> Self
+pub fn GlobalTransform::to_gpu_bytes(Self) -> FixedArray[Byte]
+
+pub(all) struct GpuField {
+  name : String
+  kind : GpuFieldKind
+  offset : Int
+  size : Int
+  align : Int
+}
+
+pub(all) enum GpuFieldKind {
+  F32
+  U32
+  Vec2F32
+  Vec3F32
+  Vec4F32
+  Mat4x4F32
+} derive(Eq)
+pub fn GpuFieldKind::align(Self) -> Int
+pub fn GpuFieldKind::size(Self) -> Int
+
+pub(all) struct GpuLayout {
+  fields : Array[GpuField]
+  stride : Int
+  align : Int
+}
+pub fn GpuLayout::empty(Int) -> Self
+pub fn GpuLayout::is_valid(Self) -> Bool
+pub fn GpuLayout::std140(Array[(String, GpuFieldKind)]) -> Self
+
+pub(all) struct Transform3D {
+  position : @vector3.Vector3[Float]
+  rotation : @vector4.Vector4[Float]
+  scale : @vector3.Vector3[Float]
+}
+pub fn Transform3D::from_component_bytes(FixedArray[Byte]) -> Self
+pub fn Transform3D::identity() -> Self
+pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
+
+// Type aliases
+
+// Traits
+

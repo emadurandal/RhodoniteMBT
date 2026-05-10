@@ -164,7 +164,7 @@ pub fn World::register_cpu_component(
 pub fn World::register_gpu_component(
   self : World,
   name : String,
-  gpu_layout : GpuLayout,
+  gpu_layout : @comp.GpuLayout,
 ) -> ComponentTypeId {
   if !gpu_layout.is_valid() {
     abort("invalid gpu layout")

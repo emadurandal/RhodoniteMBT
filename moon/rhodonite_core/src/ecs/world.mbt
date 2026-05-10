@@ -230,7 +230,7 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
 pub fn World::new() -> World {
   let registry = ComponentRegistry::new()
-  let tf_layout = transform3d_gpu_layout()
+  let tf_layout = @comp.transform3d_gpu_layout()
   if !tf_layout.is_valid() {
     abort("builtin Transform3D layout invalid")
   }
@@ -238,7 +238,7 @@ pub fn World::new() -> World {
     "Transform3D",
     tf_layout.stride,
   )
-  let gt_layout = global_transform_gpu_layout()
+  let gt_layout = @comp.global_transform_gpu_layout()
   if !gt_layout.is_valid() {
     abort("builtin GlobalTransform layout invalid")
   }
@@ -501,7 +501,7 @@ pub fn World::global_transform_component(self : World) -> ComponentTypeId {
 pub fn World::set_transform(
   self : World,
   entity : EntityId,
-  t : Transform3D,
+  t : @comp.Transform3D,
 ) -> Bool {
   self.add_component_bytes(
     entity,
@@ -511,13 +511,16 @@ pub fn World::set_transform(
 }
 
 ///|
-pub fn World::get_transform(self : World, entity : EntityId) -> Transform3D? {
+pub fn World::get_transform(
+  self : World,
+  entity : EntityId,
+) -> @comp.Transform3D? {
   let tf = self.transform_component_id
   if !self.is_alive(entity) || !self.has_component(entity, tf) {
     return None
   }
   match self.component_bytes(entity, tf) {
-    Some(bytes) => Some(Transform3D::from_component_bytes(bytes))
+    Some(bytes) => Some(@comp.Transform3D::from_component_bytes(bytes))
     None => None
   }
 }
@@ -527,7 +530,7 @@ pub fn World::get_transform(self : World, entity : EntityId) -> Transform3D? {
 pub fn World::set_global_transform(
   self : World,
   entity : EntityId,
-  gt : GlobalTransform,
+  gt : @comp.GlobalTransform,
 ) -> Bool {
   let id = self.global_transform_component_id
   let payload = gt.to_gpu_bytes()
@@ -544,13 +547,13 @@ pub fn World::set_global_transform(
 pub fn World::get_global_transform(
   self : World,
   entity : EntityId,
-) -> GlobalTransform? {
+) -> @comp.GlobalTransform? {
   let id = self.global_transform_component_id
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
   match self.gpu_component_bytes(entity, id) {
-    Some(bytes) => Some(GlobalTransform::from_gpu_bytes(bytes))
+    Some(bytes) => Some(@comp.GlobalTransform::from_gpu_bytes(bytes))
     None => None
   }
 }

@@ -23,7 +23,7 @@ pub fn ComponentRegistry::register_cpu(
 pub fn ComponentRegistry::register_gpu(
   self : ComponentRegistry,
   name : String,
-  gpu_layout : GpuLayout,
+  gpu_layout : @comp.GpuLayout,
 ) -> ComponentTypeId {
   let id = ComponentTypeId::new(self.components.length())
   self.components.push({
@@ -63,7 +63,7 @@ pub fn ComponentRegistry::stride(
 pub fn ComponentRegistry::gpu_layout(
   self : ComponentRegistry,
   id : ComponentTypeId,
-) -> GpuLayout? {
+) -> @comp.GpuLayout? {
   match self.get(id) {
     Some(component) => component.gpu_layout
     None => None

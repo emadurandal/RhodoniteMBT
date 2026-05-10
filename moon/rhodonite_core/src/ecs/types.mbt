@@ -38,42 +38,13 @@ pub(all) enum ComponentKind {
 } derive(Eq)
 
 ///|
-/// Scalar and vector kinds sized for std140-like layouts (`Vec3` uses 16-byte slots including padding).
-pub(all) enum GpuFieldKind {
-  F32
-  U32
-  Vec2F32
-  Vec3F32
-  Vec4F32
-  Mat4x4F32
-} derive(Eq)
-
-///|
-/// One member inside the struct described by `GpuLayout` (offset/size are resolved by `GpuLayout::std140`).
-pub(all) struct GpuField {
-  name : String
-  kind : GpuFieldKind
-  offset : Int
-  size : Int
-  align : Int
-}
-
-///|
-/// CPU-side mirror of a WGSL-friendly layout (std140-style packing). Stride is padded to 16 bytes for storage-buffer alignment.
-pub(all) struct GpuLayout {
-  fields : Array[GpuField]
-  stride : Int
-  align : Int
-}
-
-///|
 /// Metadata for one registered component: `cpu_stride` is `0` for `GpuVisible` (payload lives only in `GpuComponentStore`).
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
   kind : ComponentKind
   cpu_stride : Int
-  gpu_layout : GpuLayout?
+  gpu_layout : @comp.GpuLayout?
 }
 
 ///|
