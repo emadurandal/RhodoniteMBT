@@ -267,3 +267,83 @@ test "compute_global_transform returns None on ChildOf cycle" {
   assert_true(world.set_child_of(b, a))
   assert_true(world.compute_global_transform(a) is None)
 }
+
+///|
+test "for_each_entity_with_components matches supersets and skips empty required" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryA", 4)
+  let qb = world.register_cpu_component("QueryB", 4)
+  let e_both = world.create_entity()
+  assert_true(world.add_component_bytes(e_both, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e_both, qb, bytes4(5, 6, 7, 8)))
+  let e_only_a = world.create_entity()
+  assert_true(world.add_component_bytes(e_only_a, qa, bytes4(9, 10, 11, 12)))
+  ignore(e_only_a)
+  let hits : Array[EntityId] = []
+  world.for_each_entity_with_components([qa, qb], fn(ent) { hits.push(ent) })
+  assert_eq(hits.length(), 1)
+  assert_true(hits[0] == e_both)
+  let empty_hits : Array[EntityId] = []
+  world.for_each_entity_with_components([], fn(ent) { empty_hits.push(ent) })
+  assert_eq(empty_hits.length(), 0)
+}
+
+///|
+test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  let id = @comp.Transform3D::identity()
+  let tf_p = @comp.Transform3D::{
+    position: {
+      data: ([(10.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: id.rotation,
+    scale: id.scale,
+  }
+  let tf_c = @comp.Transform3D::{
+    position: {
+      data: ([(5.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: id.rotation,
+    scale: id.scale,
+  }
+  assert_true(world.set_transform(parent, tf_p))
+  assert_true(world.set_transform(child, tf_c))
+  assert_true(world.set_child_of(child, parent))
+  let g0 = @comp.GlobalTransform::identity()
+  assert_true(world.set_global_transform(parent, g0))
+  assert_true(world.set_global_transform(child, g0))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(child) {
+    Some(gt) => {
+      assert_eq(gt.matrix.at(0, 3), (15.0 : Float))
+      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
+      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    }
+    None => abort("expected GlobalTransform")
+  }
+}
+
+///|
+test "update_global_transforms_from_transforms applies root Transform3D only" {
+  let world = World::new()
+  let e = world.create_entity()
+  let base = @comp.Transform3D::identity()
+  let tf = @comp.Transform3D::{
+    position: {
+      data: ([(7.0 : Float), (0.0 : Float), (0.0 : Float)] : FixedArray[Float]),
+    },
+    rotation: base.rotation,
+    scale: base.scale,
+  }
+  assert_true(world.set_transform(e, tf))
+  assert_true(world.set_global_transform(e, @comp.GlobalTransform::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(e) {
+    Some(gt) => assert_eq(gt.matrix.at(0, 3), (7.0 : Float))
+    None => abort("expected GlobalTransform")
+  }
+}

@@ -49,6 +49,19 @@ fn component_array_contains(
 }
 
 ///|
+fn component_array_contains_all(
+  haystack : Array[ComponentTypeId],
+  needles : Array[ComponentTypeId],
+) -> Bool {
+  for i = 0; i < needles.length(); i = i + 1 {
+    if !component_array_contains(haystack, needles[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 fn component_arrays_equal(
   a : Array[ComponentTypeId],
   b : Array[ComponentTypeId],
@@ -653,6 +666,52 @@ pub fn World::compute_global_transform(
         i = i - 1
       }
       Some({ matrix: world_m })
+    }
+  }
+}
+
+///|
+/// Iterates every living entity whose archetype signature **includes all** `required`
+/// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
+pub fn World::for_each_entity_with_components(
+  self : World,
+  required : Array[ComponentTypeId],
+  f : (EntityId) -> Unit,
+) -> Unit {
+  if required.length() == 0 {
+    return
+  }
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let sig = self.archetypes[ai].components
+    if component_array_contains_all(sig, required) {
+      let ents = self.archetypes[ai].entities
+      for j = 0; j < ents.length(); j = j + 1 {
+        f(ents[j])
+      }
+    }
+  }
+}
+
+///|
+/// Recomputes [`GlobalTransform`] GPU payloads from [`Transform3D`] (and optional [`ChildOf`] hierarchy)
+/// for every entity that currently has **both** builtin transforms.
+pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
+  let tf = self.transform_component_id
+  let gt = self.global_transform_component_id
+  let required : Array[ComponentTypeId] = [tf, gt]
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let sig = self.archetypes[ai].components
+    if component_array_contains_all(sig, required) {
+      let ents = self.archetypes[ai].entities
+      for j = 0; j < ents.length(); j = j + 1 {
+        let e = ents[j]
+        match self.compute_global_transform(e) {
+          Some(g) => {
+            let _ = self.set_global_transform(e, g)
+          }
+          None => ()
+        }
+      }
     }
   }
 }
