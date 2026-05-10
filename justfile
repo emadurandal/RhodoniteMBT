@@ -15,7 +15,11 @@ fmt:
 info:
 	moon info
 
-# Placeholder for a future kagura-style release staging (path deps -> versions).
+# Publish rhodonite_core → rhodonite_webgpu → rhodonite to mooncakes (not rhodonite_examples).
+# Prerequisites: `moon login`; network for registry.
+publish-mooncakes:
+	bash scripts/publish-rhodonite-mooncakes.sh
+
+# Alias for scripts that referenced the old placeholder name.
 release-stage:
-	@echo "TODO: add scripting to rewrite moon.mod.json path deps to semver for publish."
-	@exit 1
+	just publish-mooncakes

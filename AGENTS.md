@@ -15,6 +15,10 @@ Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 
 See [`docs/module_boundaries.md`](docs/module_boundaries.md) for dependency boundaries and publish order.
 
+## Publish (mooncakes)
+
+After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded.
+
 ## Workspace development
 
 From the repository root:

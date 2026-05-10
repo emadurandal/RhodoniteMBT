@@ -14,7 +14,8 @@
     "build": "pnpm run build:moon && tsc && vite build",
     "build:core:js": "cd moon/rhodonite_core && moon build --target js --release",
     "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/math/ts",
-    "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh"
+    "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh",
+    "publish:moon": "bash scripts/publish-rhodonite-mooncakes.sh"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

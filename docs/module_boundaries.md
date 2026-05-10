@@ -49,4 +49,4 @@ During development, link workspace members with [`path` dependencies](https://do
 4. In the module you publish, update `deps` workspace members to registry versions in `moon.mod.json`.
 5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
-Fully automated staging (rewrite all path deps to versions in one shot) could be added later in the style of [kagura](https://github.com/mizchi/kagura) `just release-stage`.
+From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core and webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver (matching sibling module versions), publishes the facade, then restores the workspace file. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`.
