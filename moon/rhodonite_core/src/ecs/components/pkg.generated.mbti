@@ -20,6 +20,8 @@ pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
 pub fn put_gpu_f32(FixedArray[Byte], Int, Double) -> Unit
 
+pub fn put_gpu_f32_mut_view(MutArrayView[Byte], Int, Double) -> Unit
+
 pub fn put_gpu_u32(FixedArray[Byte], Int, UInt) -> Unit
 
 pub fn transform3d_gpu_layout() -> GpuLayout
@@ -41,6 +43,7 @@ pub(all) struct GlobalTransform {
 pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
 pub fn GlobalTransform::identity() -> Self
 pub fn GlobalTransform::to_gpu_bytes(Self) -> FixedArray[Byte]
+pub fn GlobalTransform::write_to_gpu_mut_view(Self, MutArrayView[Byte]) -> Unit
 
 pub(all) struct GpuField {
   name : String

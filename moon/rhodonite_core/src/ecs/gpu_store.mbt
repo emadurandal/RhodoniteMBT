@@ -50,6 +50,20 @@ fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit 
 }
 
 ///|
+/// Zero-copy mutable view of one logical GPU row; caller must not retain the view past store mutations.
+fn GpuComponentStore::mut_entity_row(
+  self : GpuComponentStore,
+  entity_index : Int,
+  write : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  let _ = self.ensure_capacity(entity_index + 1)
+  let base = entity_index * self.stride
+  let view = self.bytes.mut_view(start=base, end=base + self.stride)
+  write(view)
+  self.mark_dirty(entity_index)
+}
+
+///|
 /// Writes one entity slot `[entity_index * stride, ..)` and marks it dirty for GPU upload.
 fn GpuComponentStore::set_bytes(
   self : GpuComponentStore,

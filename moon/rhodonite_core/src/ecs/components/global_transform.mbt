@@ -37,6 +37,26 @@ pub fn GlobalTransform::to_gpu_bytes(
 }
 
 ///|
+/// Writes [`to_gpu_bytes`] layout directly into one flat GPU backing row (no intermediate [`FixedArray`]).
+pub fn GlobalTransform::write_to_gpu_mut_view(
+  self : GlobalTransform,
+  buf : MutArrayView[Byte],
+) -> Unit {
+  let layout = global_transform_gpu_layout()
+  if layout.fields.length() != 1 {
+    abort("global_transform_gpu_layout: expected 1 field")
+  }
+  if buf.length() != layout.stride {
+    abort("GlobalTransform::write_to_gpu_mut_view: length mismatch")
+  }
+  let base = layout.fields[0].offset
+  let m = self.matrix.data()
+  for i = 0; i < 16; i = i + 1 {
+    put_gpu_f32_mut_view(buf, base + i * 4, m[i].to_double())
+  }
+}
+
+///|
 pub fn GlobalTransform::from_gpu_bytes(
   bytes : FixedArray[Byte],
 ) -> GlobalTransform {

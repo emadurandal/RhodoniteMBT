@@ -577,14 +577,22 @@ pub fn World::set_global_transform(
   gt : @comp.GlobalTransform,
 ) -> Bool {
   let id = self.global_transform_component_id
-  let payload = gt.to_gpu_bytes()
   if !self.has_component(entity, id) {
     let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
     if !self.add_component_bytes(entity, id, empty) {
       return false
     }
   }
-  self.set_gpu_component_bytes(entity, id, payload)
+  match self.gpu_store(id) {
+    Some(store) => {
+      store.mut_entity_row(entity.index, fn(view) {
+        gt.write_to_gpu_mut_view(view)
+      })
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
 }
 
 ///|
@@ -761,7 +769,9 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 ///
 /// The callback receives the entity, that row's **full sorted archetype component list**, and one
 /// [`ArrayView`] per entry in `required` (same order): a **non-copying** view into `required[k]`'s SoA
-/// bytes at this row (see MoonBit `array[start:end]`). GPU-visible components use zero-length views.
+/// bytes at this row (see MoonBit `array[start:end]`). **GPU-visible** components register `cpu_stride`
+/// `0`, so their archetype column has **no row bytes** — the view length is `0`; update payloads via
+/// [`set_gpu_component_bytes`] / [`set_global_transform`] or write the [`GpuComponentStore`] slot directly.
 pub fn World::for_each_entity_with_components(
   self : World,
   required : Array[ComponentTypeId],

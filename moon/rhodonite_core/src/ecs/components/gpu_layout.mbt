@@ -97,6 +97,20 @@ pub fn put_gpu_f32(
 }
 
 ///|
+/// Same as [`put_gpu_f32`] but writes into a [`MutArrayView`] (flat GPU store rows).
+pub fn put_gpu_f32_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : Double,
+) -> Unit {
+  let u = Float::from_double(value).reinterpret_as_uint()
+  buf[offset] = (u & 0xFFU).to_byte()
+  buf[offset + 1] = ((u >> 8) & 0xFFU).to_byte()
+  buf[offset + 2] = ((u >> 16) & 0xFFU).to_byte()
+  buf[offset + 3] = ((u >> 24) & 0xFFU).to_byte()
+}
+
+///|
 /// Writes little-endian u32 at `offset`.
 pub fn put_gpu_u32(buf : FixedArray[Byte], offset : Int, value : UInt) -> Unit {
   @writes.put_u32_le(buf, offset, value)
