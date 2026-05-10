@@ -1,0 +1,5 @@
+import {
+  "emadurandal/rhodonite_core/math/vector3" @v3,
+  "emadurandal/rhodonite_core/math/vector4" @v4,
+  "emadurandal/rhodonite_core/math/matrix44" @m44,
+}
