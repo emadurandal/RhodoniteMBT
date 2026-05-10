@@ -33,7 +33,7 @@ fn[T : Mul + Add + Sub] det3_values(
 
 ///|
 fn[T : Mul + Add + Sub] mat4_minor(
-  m : Matrix4[T],
+  m : Matrix44[T],
   skip_r : Int,
   skip_c : Int,
 ) -> T {
@@ -54,7 +54,7 @@ fn[T : Mul + Add + Sub] mat4_minor(
 
 ///|
 fn[T : Mul + Add + Sub + Neg] matrix4_cofactor(
-  m : Matrix4[T],
+  m : Matrix44[T],
   r : Int,
   c : Int,
 ) -> T {
@@ -67,7 +67,7 @@ fn[T : Mul + Add + Sub + Neg] matrix4_cofactor(
 }
 
 ///|
-pub fn[T] Matrix4::new_col_major(
+pub fn[T] Matrix44::new_col_major(
   m00 : T,
   m10 : T,
   m20 : T,
@@ -84,8 +84,8 @@ pub fn[T] Matrix4::new_col_major(
   m13 : T,
   m23 : T,
   m33 : T,
-) -> Matrix4[T] {
-  Matrix4::{
+) -> Matrix44[T] {
+  Matrix44::{
     data: (
       [
         m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23,
@@ -95,13 +95,13 @@ pub fn[T] Matrix4::new_col_major(
 }
 
 ///|
-pub fn[T] Matrix4::from_cols(
+pub fn[T] Matrix44::from_cols(
   c0 : @v4.Vector4[T],
   c1 : @v4.Vector4[T],
   c2 : @v4.Vector4[T],
   c3 : @v4.Vector4[T],
-) -> Matrix4[T] {
-  Matrix4::new_col_major(
+) -> Matrix44[T] {
+  Matrix44::new_col_major(
     c0.x(),
     c0.y(),
     c0.z(),
@@ -122,38 +122,38 @@ pub fn[T] Matrix4::from_cols(
 }
 
 ///|
-pub fn[T : Default] Matrix4::zero() -> Matrix4[T] {
+pub fn[T : Default] Matrix44::zero() -> Matrix44[T] {
   let z = T::default()
-  Matrix4::new_col_major(z, z, z, z, z, z, z, z, z, z, z, z, z, z, z, z)
+  Matrix44::new_col_major(z, z, z, z, z, z, z, z, z, z, z, z, z, z, z, z)
 }
 
 ///|
-pub fn[T] Matrix4::identity_with(one : T, zero : T) -> Matrix4[T] {
-  Matrix4::new_col_major(
+pub fn[T] Matrix44::identity_with(one : T, zero : T) -> Matrix44[T] {
+  Matrix44::new_col_major(
     one, zero, zero, zero, zero, one, zero, zero, zero, zero, one, zero, zero, zero,
     zero, one,
   )
 }
 
 ///|
-pub fn Matrix4F::identity() -> Matrix4F {
-  Matrix4::identity_with((1.0 : Float), (0.0 : Float))
+pub fn Matrix44F::identity() -> Matrix44F {
+  Matrix44::identity_with((1.0 : Float), (0.0 : Float))
 }
 
 ///|
-pub fn[T] Matrix4::at(self : Matrix4[T], row : Int, col : Int) -> T {
+pub fn[T] Matrix44::at(self : Matrix44[T], row : Int, col : Int) -> T {
   self.data[col * 4 + row]
 }
 
 ///|
 /// Returns the inner `FixedArray` unchanged (length 16, column-major).
-pub fn[T] Matrix4::data(self : Matrix4[T]) -> FixedArray[T] {
+pub fn[T] Matrix44::data(self : Matrix44[T]) -> FixedArray[T] {
   self.data
 }
 
 ///|
-pub fn[T : Mul] Matrix4::scale(self : Matrix4[T], s : T) -> Matrix4[T] {
-  Matrix4::{
+pub fn[T : Mul] Matrix44::scale(self : Matrix44[T], s : T) -> Matrix44[T] {
+  Matrix44::{
     data: (
       [
         self.data[0] * s,
@@ -177,8 +177,8 @@ pub fn[T : Mul] Matrix4::scale(self : Matrix4[T], s : T) -> Matrix4[T] {
 }
 
 ///|
-pub fn[T : Div] Matrix4::div_scalar(self : Matrix4[T], s : T) -> Matrix4[T] {
-  Matrix4::{
+pub fn[T : Div] Matrix44::div_scalar(self : Matrix44[T], s : T) -> Matrix44[T] {
+  Matrix44::{
     data: (
       [
         self.data[0] / s,
@@ -202,8 +202,8 @@ pub fn[T : Div] Matrix4::div_scalar(self : Matrix4[T], s : T) -> Matrix4[T] {
 }
 
 ///|
-pub fn[T] Matrix4::transpose(self : Matrix4[T]) -> Matrix4[T] {
-  Matrix4::from_cols(
+pub fn[T] Matrix44::transpose(self : Matrix44[T]) -> Matrix44[T] {
+  Matrix44::from_cols(
     @v4.Vector4::new(self.at(0, 0), self.at(1, 0), self.at(2, 0), self.at(3, 0)),
     @v4.Vector4::new(self.at(0, 1), self.at(1, 1), self.at(2, 1), self.at(3, 1)),
     @v4.Vector4::new(self.at(0, 2), self.at(1, 2), self.at(2, 2), self.at(3, 2)),
@@ -213,11 +213,11 @@ pub fn[T] Matrix4::transpose(self : Matrix4[T]) -> Matrix4[T] {
 
 ///|
 /// Matrix product `self * other` (standard linear algebra).
-pub fn[T : Mul + Add] Matrix4::mat_mul(
-  self : Matrix4[T],
-  other : Matrix4[T],
-) -> Matrix4[T] {
-  Matrix4::from_cols(
+pub fn[T : Mul + Add] Matrix44::mat_mul(
+  self : Matrix44[T],
+  other : Matrix44[T],
+) -> Matrix44[T] {
+  Matrix44::from_cols(
     self.mul_vec4(
       @v4.Vector4::new(
         other.at(0, 0),
@@ -255,8 +255,8 @@ pub fn[T : Mul + Add] Matrix4::mat_mul(
 
 ///|
 /// Column vector multiply: `self * v` (treats `v` as a column 4-vector).
-pub fn[T : Mul + Add] Matrix4::mul_vec4(
-  self : Matrix4[T],
+pub fn[T : Mul + Add] Matrix44::mul_vec4(
+  self : Matrix44[T],
   v : @v4.Vector4[T],
 ) -> @v4.Vector4[T] {
   let x = v.x()
@@ -285,8 +285,8 @@ pub fn[T : Mul + Add] Matrix4::mul_vec4(
 
 ///|
 /// Homogeneous point: applies `M * (x, y, z, 1)` and divides by the resulting `w` (when non-zero).
-pub fn Matrix4F::transform_point(
-  self : Matrix4F,
+pub fn Matrix44F::transform_point(
+  self : Matrix44F,
   p : @v3.Vector3F,
 ) -> @v3.Vector3F {
   let r = self.mul_vec4(@v4.Vector4::new(p.x(), p.y(), p.z(), (1.0 : Float)))
@@ -299,7 +299,7 @@ pub fn Matrix4F::transform_point(
 }
 
 ///|
-pub fn[T : Mul + Add + Sub] Matrix4::determinant(self : Matrix4[T]) -> T {
+pub fn[T : Mul + Add + Sub] Matrix44::determinant(self : Matrix44[T]) -> T {
   let a00 = self.at(0, 0)
   let a01 = self.at(0, 1)
   let a02 = self.at(0, 2)
@@ -312,15 +312,15 @@ pub fn[T : Mul + Add + Sub] Matrix4::determinant(self : Matrix4[T]) -> T {
 
 ///|
 /// Returns `None` when the determinant is exactly `T::default()` (typically 0).
-pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix4::inverse(
-  self : Matrix4[T],
-) -> Matrix4[T]? {
+pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix44::inverse(
+  self : Matrix44[T],
+) -> Matrix44[T]? {
   let det = self.determinant()
   if det == T::default() {
     None
   } else {
     Some(
-      Matrix4::from_cols(
+      Matrix44::from_cols(
         @v4.Vector4::new(
           matrix4_cofactor(self, 0, 0) / det,
           matrix4_cofactor(self, 0, 1) / det,

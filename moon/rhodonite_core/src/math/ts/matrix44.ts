@@ -23,7 +23,7 @@ import {
 import { Vector3F } from "./vector3.ts";
 import { Vector4F } from "./vector4.ts";
 
-export class Matrix4F {
+export class Matrix44F {
 	readonly inner: MoonMat4F;
 
 	constructor(inner: MoonMat4F) {
@@ -47,8 +47,8 @@ export class Matrix4F {
 		m13: number,
 		m23: number,
 		m33: number,
-	): Matrix4F {
-		return new Matrix4F(
+	): Matrix44F {
+		return new Matrix44F(
 			m4f_new_col_major(
 				m00,
 				m10,
@@ -70,12 +70,12 @@ export class Matrix4F {
 		);
 	}
 
-	static zero(): Matrix4F {
-		return new Matrix4F(m4f_zero());
+	static zero(): Matrix44F {
+		return new Matrix44F(m4f_zero());
 	}
 
-	static identity(): Matrix4F {
-		return new Matrix4F(m4f_identity());
+	static identity(): Matrix44F {
+		return new Matrix44F(m4f_identity());
 	}
 
 	at(row: number, col: number): number {
@@ -86,12 +86,12 @@ export class Matrix4F {
 		return m4f_data(this.inner);
 	}
 
-	transpose(): Matrix4F {
-		return new Matrix4F(m4f_transpose(this.inner));
+	transpose(): Matrix44F {
+		return new Matrix44F(m4f_transpose(this.inner));
 	}
 
-	matMul(other: Matrix4F): Matrix4F {
-		return new Matrix4F(m4f_mat_mul(this.inner, other.inner));
+	matMul(other: Matrix44F): Matrix44F {
+		return new Matrix44F(m4f_mat_mul(this.inner, other.inner));
 	}
 
 	mulVec4(v: Vector4F): Vector4F {
@@ -102,43 +102,43 @@ export class Matrix4F {
 		return new Vector3F(m4f_transform_point(this.inner, p.inner));
 	}
 
-	scale(s: number): Matrix4F {
-		return new Matrix4F(m4f_scale(this.inner, s));
+	scale(s: number): Matrix44F {
+		return new Matrix44F(m4f_scale(this.inner, s));
 	}
 
-	divScalar(s: number): Matrix4F {
-		return new Matrix4F(m4f_div_scalar(this.inner, s));
+	divScalar(s: number): Matrix44F {
+		return new Matrix44F(m4f_div_scalar(this.inner, s));
 	}
 
 	det(): number {
 		return m4f_det(this.inner);
 	}
 
-	inverse(): Matrix4F | null {
+	inverse(): Matrix44F | null {
 		const r = m4f_inverse(this.inner);
 		if (r === undefined || r === null) {
 			return null;
 		}
-		return new Matrix4F(r);
+		return new Matrix44F(r);
 	}
 
-	add(other: Matrix4F): Matrix4F {
-		return new Matrix4F(m4f_add(this.inner, other.inner));
+	add(other: Matrix44F): Matrix44F {
+		return new Matrix44F(m4f_add(this.inner, other.inner));
 	}
 
-	sub(other: Matrix4F): Matrix4F {
-		return new Matrix4F(m4f_sub(this.inner, other.inner));
+	sub(other: Matrix44F): Matrix44F {
+		return new Matrix44F(m4f_sub(this.inner, other.inner));
 	}
 
-	neg(): Matrix4F {
-		return new Matrix4F(m4f_neg(this.inner));
+	neg(): Matrix44F {
+		return new Matrix44F(m4f_neg(this.inner));
 	}
 
-	mul(other: Matrix4F): Matrix4F {
-		return new Matrix4F(m4f_mul(this.inner, other.inner));
+	mul(other: Matrix44F): Matrix44F {
+		return new Matrix44F(m4f_mul(this.inner, other.inner));
 	}
 
-	eq(other: Matrix4F): boolean {
+	eq(other: Matrix44F): boolean {
 		return m4f_eq(this.inner, other.inner) === 1;
 	}
 

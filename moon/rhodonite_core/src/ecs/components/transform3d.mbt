@@ -74,8 +74,8 @@ pub fn Transform3D::from_component_mut_view(
 }
 
 ///|
-fn trs_translation_matrix(t : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
-  @m44.Matrix4::new_col_major(
+fn trs_translation_matrix(t : @v3.Vector3Ref[Byte]) -> @m44.Matrix44F {
+  @m44.Matrix44::new_col_major(
     (1.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -96,8 +96,8 @@ fn trs_translation_matrix(t : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
 }
 
 ///|
-fn trs_scale_matrix(s : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
-  @m44.Matrix4::new_col_major(
+fn trs_scale_matrix(s : @v3.Vector3Ref[Byte]) -> @m44.Matrix44F {
+  @m44.Matrix44::new_col_major(
     s.x(),
     (0.0 : Float),
     (0.0 : Float),
@@ -119,7 +119,7 @@ fn trs_scale_matrix(s : @v3.Vector3Ref[Byte]) -> @m44.Matrix4F {
 
 ///|
 /// Column-major rotation from unit quaternion `(x, y, z, w)` (same axis order as [`rotation`]).
-fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix4F {
+fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix44F {
   let x = q.x()
   let y = q.y()
   let z = q.z()
@@ -142,7 +142,7 @@ fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix4F {
   let r20 = (2.0 : Float) * (xz - wy)
   let r21 = (2.0 : Float) * (yz + wx)
   let r22 = (1.0 : Float) - (2.0 : Float) * (xx + yy)
-  @m44.Matrix4::new_col_major(
+  @m44.Matrix44::new_col_major(
     r00,
     r10,
     r20,
@@ -164,7 +164,7 @@ fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix4F {
 
 ///|
 /// Local model matrix: column vectors, `translation * rotation * scale`.
-pub fn Transform3D::to_local_matrix(self : Transform3D) -> @m44.Matrix4F {
+pub fn Transform3D::to_local_matrix(self : Transform3D) -> @m44.Matrix44F {
   let s = trs_scale_matrix(self.scale)
   let r = quaternion_to_rotation_matrix(self.rotation)
   let t = trs_translation_matrix(self.position)

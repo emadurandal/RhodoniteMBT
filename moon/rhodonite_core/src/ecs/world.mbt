@@ -689,7 +689,7 @@ fn World::multiply_world_from_chain(
   chain : Array[EntityId],
   leaf_tf : @comp.Transform3D?,
 ) -> @comp.GlobalTransform? {
-  let mut world_m = @m44.Matrix4F::identity()
+  let mut world_m = @m44.Matrix44F::identity()
   let mut i = chain.length() - 1
   while i >= 0 {
     let e = chain[i]

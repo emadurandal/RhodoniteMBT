@@ -1,6 +1,6 @@
 ///|
-pub impl[T : Add] Add for Matrix4[T] with add(self, other) {
-  Matrix4::{
+pub impl[T : Add] Add for Matrix44[T] with add(self, other) {
+  Matrix44::{
     data: (
       [
         self.data[0] + other.data[0],
@@ -24,8 +24,8 @@ pub impl[T : Add] Add for Matrix4[T] with add(self, other) {
 }
 
 ///|
-pub impl[T : Sub] Sub for Matrix4[T] with sub(self, other) {
-  Matrix4::{
+pub impl[T : Sub] Sub for Matrix44[T] with sub(self, other) {
+  Matrix44::{
     data: (
       [
         self.data[0] - other.data[0],
@@ -49,8 +49,8 @@ pub impl[T : Sub] Sub for Matrix4[T] with sub(self, other) {
 }
 
 ///|
-pub impl[T : Neg] Neg for Matrix4[T] with neg(self) {
-  Matrix4::{
+pub impl[T : Neg] Neg for Matrix44[T] with neg(self) {
+  Matrix44::{
     data: (
       [
         -self.data[0],
@@ -74,9 +74,9 @@ pub impl[T : Neg] Neg for Matrix4[T] with neg(self) {
 }
 
 ///|
-/// Hadamard (component-wise) product; use [`Matrix4::mat_mul`] for matrix multiplication.
-pub impl[T : Mul] Mul for Matrix4[T] with mul(self, other) {
-  Matrix4::{
+/// Hadamard (component-wise) product; use [`Matrix44::mat_mul`] for matrix multiplication.
+pub impl[T : Mul] Mul for Matrix44[T] with mul(self, other) {
+  Matrix44::{
     data: (
       [
         self.data[0] * other.data[0],
@@ -100,7 +100,7 @@ pub impl[T : Mul] Mul for Matrix4[T] with mul(self, other) {
 }
 
 ///|
-pub impl[T : Eq] Eq for Matrix4[T] with equal(self, other) {
+pub impl[T : Eq] Eq for Matrix44[T] with equal(self, other) {
   self.data[0] == other.data[0] &&
   self.data[1] == other.data[1] &&
   self.data[2] == other.data[2] &&

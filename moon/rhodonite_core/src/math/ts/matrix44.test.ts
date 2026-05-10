@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Matrix4F } from "./matrix44.ts";
+import { Matrix44F } from "./matrix44.ts";
 import { Vector3F } from "./vector3.ts";
 import { Vector4F } from "./vector4.ts";
 
-describe("Matrix4F (MoonBit js_bridge wrapper)", () => {
+describe("Matrix44F (MoonBit js_bridge wrapper)", () => {
 	it("identity mulVec4", () => {
-		const id = Matrix4F.identity();
+		const id = Matrix44F.identity();
 		const v = Vector4F.new(2, 3, 4, 5);
 		const o = id.mulVec4(v);
 		expect(o.x()).toBeCloseTo(2);
@@ -15,10 +15,10 @@ describe("Matrix4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("matMul diagonal", () => {
-		const s = Matrix4F.newColMajor(
+		const s = Matrix44F.newColMajor(
 			2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2,
 		);
-		const t = Matrix4F.newColMajor(
+		const t = Matrix44F.newColMajor(
 			3, 0, 0, 0, 0, 3, 0, 0, 0, 0, 3, 0, 0, 0, 0, 3,
 		);
 		const p = s.matMul(t);
@@ -29,14 +29,14 @@ describe("Matrix4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("transpose twice", () => {
-		const m = Matrix4F.newColMajor(
+		const m = Matrix44F.newColMajor(
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 		);
 		expect(m.transpose().transpose().eq(m)).toBe(true);
 	});
 
 	it("transformPoint translation", () => {
-		const m = Matrix4F.newColMajor(
+		const m = Matrix44F.newColMajor(
 			1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1,
 		);
 		const p = Vector3F.new(1, 2, 3);
@@ -47,17 +47,17 @@ describe("Matrix4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("det and inverse", () => {
-		const m = Matrix4F.newColMajor(
+		const m = Matrix44F.newColMajor(
 			2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2,
 		);
 		expect(m.det()).toBeCloseTo(16);
 		const inv = m.inverse();
 		expect(inv).not.toBeNull();
-		expect(inv!.matMul(m).eq(Matrix4F.identity())).toBe(true);
+		expect(inv!.matMul(m).eq(Matrix44F.identity())).toBe(true);
 	});
 
 	it("singular inverse returns null", () => {
-		const m = Matrix4F.newColMajor(
+		const m = Matrix44F.newColMajor(
 			1, 2, 3, 4, 2, 4, 6, 8, 3, 6, 9, 12, 4, 8, 12, 16,
 		);
 		expect(m.det()).toBeCloseTo(0);
@@ -65,8 +65,8 @@ describe("Matrix4F (MoonBit js_bridge wrapper)", () => {
 	});
 
 	it("toString", () => {
-		expect(Matrix4F.identity().toString()).toBe(
-			"Matrix4::new_col_major(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
+		expect(Matrix44F.identity().toString()).toBe(
+			"Matrix44::new_col_major(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
 		);
 	});
 });

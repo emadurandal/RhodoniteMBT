@@ -3,12 +3,12 @@
 
 ///|
 pub(all) struct GlobalTransform {
-  matrix : @m44.Matrix4F
+  matrix : @m44.Matrix44F
 }
 
 ///|
 pub fn GlobalTransform::identity() -> GlobalTransform {
-  { matrix: @m44.Matrix4::identity() }
+  { matrix: @m44.Matrix44::identity() }
 }
 
 ///|
@@ -19,7 +19,7 @@ pub fn global_transform_gpu_layout() -> GpuLayout {
 }
 
 ///|
-/// Writes [`@m44.Matrix4::data`] column-major into one GPU row (same order as WGSL `mat4x4`).
+/// Writes [`@m44.Matrix44::data`] column-major into one GPU row (same order as WGSL `mat4x4`).
 pub fn GlobalTransform::to_gpu_bytes(
   self : GlobalTransform,
 ) -> FixedArray[Byte] {
@@ -72,5 +72,5 @@ pub fn GlobalTransform::from_gpu_bytes(
   for i = 0; i < 16; i = i + 1 {
     cols[i] = get_gpu_f32(bytes, base + i * 4)
   }
-  { matrix: @m44.Matrix4::{ data: cols } }
+  { matrix: @m44.Matrix44::{ data: cols } }
 }

@@ -40,7 +40,7 @@ pub fn ChildOf::new(Int, Int) -> Self
 pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
 
 pub(all) struct GlobalTransform {
-  matrix : @matrix44.Matrix4[Float]
+  matrix : @matrix44.Matrix44[Float]
 }
 pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
 pub fn GlobalTransform::identity() -> Self
@@ -83,7 +83,7 @@ pub(all) struct Transform3D {
 }
 pub fn Transform3D::from_component_mut_view(MutArrayView[Byte]) -> Self
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
-pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix4[Float]
+pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix44[Float]
 
 // Type aliases
 

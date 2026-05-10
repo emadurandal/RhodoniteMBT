@@ -1,6 +1,6 @@
 ///|
-test "Matrix4 identity mul_vec4" {
-  let id = Matrix4F::identity()
+test "Matrix44 identity mul_vec4" {
+  let id = Matrix44F::identity()
   let v = @v4.Vector4::new(
     (2.0 : Float),
     (3.0 : Float),
@@ -11,8 +11,8 @@ test "Matrix4 identity mul_vec4" {
 }
 
 ///|
-test "Matrix4 mat_mul diagonal" {
-  let s = Matrix4::new_col_major(
+test "Matrix44 mat_mul diagonal" {
+  let s = Matrix44::new_col_major(
     (2.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -30,7 +30,7 @@ test "Matrix4 mat_mul diagonal" {
     (0.0 : Float),
     (2.0 : Float),
   )
-  let t = Matrix4::new_col_major(
+  let t = Matrix44::new_col_major(
     (3.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -56,8 +56,8 @@ test "Matrix4 mat_mul diagonal" {
 }
 
 ///|
-test "Matrix4 transpose twice" {
-  let m = Matrix4::new_col_major(
+test "Matrix44 transpose twice" {
+  let m = Matrix44::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
     (3.0 : Float),
@@ -79,8 +79,8 @@ test "Matrix4 transpose twice" {
 }
 
 ///|
-test "Matrix4 transform_point translation" {
-  let m = Matrix4::new_col_major(
+test "Matrix44 transform_point translation" {
+  let m = Matrix44::new_col_major(
     (1.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -106,8 +106,8 @@ test "Matrix4 transform_point translation" {
 }
 
 ///|
-test "Matrix4 determinant and inverse" {
-  let m = Matrix4::new_col_major(
+test "Matrix44 determinant and inverse" {
+  let m = Matrix44::new_col_major(
     (2.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -130,12 +130,12 @@ test "Matrix4 determinant and inverse" {
     Some(x) => x
     None => abort("expected invertible")
   }
-  assert_eq(inv.mat_mul(m), Matrix4F::identity())
+  assert_eq(inv.mat_mul(m), Matrix44F::identity())
 }
 
 ///|
-test "Matrix4 singular inverse" {
-  let m = Matrix4::new_col_major(
+test "Matrix44 singular inverse" {
+  let m = Matrix44::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
     (3.0 : Float),
@@ -163,10 +163,10 @@ test "Matrix4 singular inverse" {
 }
 
 ///|
-test "Matrix4 Show" {
-  let m = Matrix4F::identity()
+test "Matrix44 Show" {
+  let m = Matrix44F::identity()
   assert_eq(
     m.to_string(),
-    "Matrix4::new_col_major(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
+    "Matrix44::new_col_major(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
   )
 }
