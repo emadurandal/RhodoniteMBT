@@ -20,6 +20,12 @@ jobs:
       - name: MoonBit version
         run: moon version --all
 
+      # Resolve semver deps in moon.mod.json (rhodonite_webgpu / rhodonite_examples)
+      # against the mooncakes registry; required on fresh CI runners with no local cache.
+      - name: Moon update (registry index & deps)
+        working-directory: ${{ github.workspace }}
+        run: moon update
+
       - name: Check workspace (all targets)
         working-directory: ${{ github.workspace }}
         run: moon check --target all
