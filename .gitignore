@@ -39,5 +39,4 @@ moon/rhodonite_webgpu/_build
 moon/rhodonite_examples/_build
 moon/rhodonite_core/_build
 moon/rhodonite_core/target
-moon/rhodonite_binary/_build
 moon/rhodonite/_build

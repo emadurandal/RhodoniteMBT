@@ -2,9 +2,6 @@
   "name": "emadurandal/rhodonite",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite_binary": {
-      "path": "../rhodonite_binary"
-    },
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"
     },
@@ -16,6 +13,6 @@
   "repository": "https://github.com/emadurandal/RhodoniteMBT",
   "license": "Apache-2.0",
   "keywords": ["rhodonite", "moonbit", "webgpu", "graphics"],
-  "description": "Thin public facade over RhodoniteMBT modules (WebGPU, core, binary helpers). Prefer importing subpackages under emadurandal/rhodonite_* for full APIs.",
+  "description": "Thin public facade over RhodoniteMBT modules (WebGPU, core). Prefer importing subpackages under emadurandal/rhodonite_* for full APIs.",
   "source": "src"
 }

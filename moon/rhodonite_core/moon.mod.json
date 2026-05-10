@@ -5,7 +5,7 @@
   "readme": "README.mbt.md",
   "repository": "https://github.com/emadurandal/RhodoniteMBT",
   "license": "Apache-2.0",
-  "keywords": ["rhodonite", "moonbit", "core", "math", "vector"],
-  "description": "Core utilities: vector math and JS bridge helpers for RhodoniteMBT.",
+  "keywords": ["rhodonite", "moonbit", "core", "math", "vector", "binary"],
+  "description": "Core utilities: vector math, JS bridge helpers, and little-endian binary writes into buffers for RhodoniteMBT.",
   "source": "src"
 }

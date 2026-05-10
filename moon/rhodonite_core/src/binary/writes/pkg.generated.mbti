@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "emadurandal/rhodonite_binary/writes"
+package "emadurandal/rhodonite_core/binary/writes"
 
 // Values
 pub fn put_f32_le(FixedArray[Byte], Int, Double) -> Unit

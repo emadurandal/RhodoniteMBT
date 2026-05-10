@@ -2,8 +2,8 @@
   "name": "emadurandal/rhodonite_examples",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite_binary": {
-      "path": "../rhodonite_binary"
+    "emadurandal/rhodonite_core": {
+      "path": "../rhodonite_core"
     },
     "emadurandal/rhodonite_webgpu": {
       "path": "../rhodonite_webgpu"

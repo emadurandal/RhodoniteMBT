@@ -1,6 +1,5 @@
 members = [
   "./moon/rhodonite",
-  "./moon/rhodonite_binary",
   "./moon/rhodonite_core",
   "./moon/rhodonite_webgpu",
   "./moon/rhodonite_examples",

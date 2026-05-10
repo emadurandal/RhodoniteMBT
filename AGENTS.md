@@ -9,8 +9,7 @@ Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 | Module (`moon.mod.json` name) | Directory | Role |
 |-------------------------------|-----------|------|
 | `emadurandal/rhodonite` | `moon/rhodonite/` | Public facade |
-| `emadurandal/rhodonite_binary` | `moon/rhodonite_binary/` | Binary write helpers |
-| `emadurandal/rhodonite_core` | `moon/rhodonite_core/` | Core (vectors, JS bridge, etc.) |
+| `emadurandal/rhodonite_core` | `moon/rhodonite_core/` | Core (vectors, JS bridge, binary buffer writes, etc.) |
 | `emadurandal/rhodonite_webgpu` | `moon/rhodonite_webgpu/` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | `moon/rhodonite_examples/` | Samples and demos |
 

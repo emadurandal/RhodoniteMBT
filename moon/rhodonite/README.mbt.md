@@ -5,7 +5,6 @@ Public **facade** module for [RhodoniteMBT](https://github.com/emadurandal/Rhodo
 For full surface area, import packages from the underlying modules directly:
 
 - `emadurandal/rhodonite_webgpu` — WebGPU (browser + native)
-- `emadurandal/rhodonite_core` — vectors and related math
-- `emadurandal/rhodonite_binary` — little-endian writes into byte buffers
+- `emadurandal/rhodonite_core` — vectors, related math, and little-endian buffer writes (`binary/writes`)
 
 The `lib` package here exposes a small curated subset (see `src/lib`).
