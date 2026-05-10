@@ -15,6 +15,6 @@ export default defineConfig({
 	},
 	test: {
 		environment: "node",
-		include: ["moon/rhodonite_core/math/ts/**/*.test.ts"],
+		include: ["moon/rhodonite_core/src/math/ts/**/*.test.ts"],
 	},
 });
