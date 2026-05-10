@@ -21,6 +21,10 @@ pub fn global_transform_gpu_layout() -> GpuLayout
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
+pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
+
+pub fn matrix44f_write_std140_mat4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
+
 pub fn put_gpu_f32(FixedArray[Byte], Int, Double) -> Unit
 
 pub fn put_gpu_f32_mut_view(MutArrayView[Byte], Int, Double) -> Unit
@@ -41,16 +45,9 @@ pub fn ChildOf::new(Int, Int) -> Self
 pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
 
 pub(all) struct GlobalTransform {
-  backing : Array[Float]
   matrix : @matrix44ref.Matrix44Ref[Float]
-  gpu_row : MutArrayView[Byte]?
 }
-pub fn GlobalTransform::commit_gpu_row(Self) -> Unit
-pub fn GlobalTransform::from_gpu_bytes(FixedArray[Byte]) -> Self
-pub fn GlobalTransform::from_gpu_row_mut_view(MutArrayView[Byte]) -> Self
-pub fn GlobalTransform::from_local_matrix(@matrix44.Matrix44[Float]) -> Self
-pub fn GlobalTransform::to_gpu_bytes(Self) -> FixedArray[Byte]
-pub fn GlobalTransform::write_to_gpu_mut_view(Self, MutArrayView[Byte]) -> Unit
+pub fn GlobalTransform::view_std140_gpu_row(MutArrayView[Byte]) -> Self
 
 pub(all) struct GpuField {
   name : String

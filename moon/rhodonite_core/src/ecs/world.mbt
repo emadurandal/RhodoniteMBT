@@ -581,7 +581,7 @@ pub fn World::get_transform(
 pub fn World::set_global_transform(
   self : World,
   entity : EntityId,
-  gt : @comp.GlobalTransform,
+  m : @m44.Matrix44F,
 ) -> Bool {
   let id = self.global_transform_component_id
   if !self.has_component(entity, id) {
@@ -593,7 +593,7 @@ pub fn World::set_global_transform(
   match self.gpu_store(id) {
     Some(store) => {
       store.mut_entity_row(entity.index, fn(view) {
-        gt.write_to_gpu_mut_view(view)
+        @comp.matrix44f_write_std140_mat4_to_gpu_row(m, view)
       })
       self.replace_gpu_store(store)
       true
@@ -606,13 +606,13 @@ pub fn World::set_global_transform(
 pub fn World::get_global_transform(
   self : World,
   entity : EntityId,
-) -> @comp.GlobalTransform? {
+) -> @m44.Matrix44F? {
   let id = self.global_transform_component_id
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
   match self.gpu_component_bytes(entity, id) {
-    Some(bytes) => Some(@comp.GlobalTransform::from_gpu_bytes(bytes))
+    Some(bytes) => Some(@comp.matrix44f_from_std140_gpu_bytes(bytes))
     None => None
   }
 }
@@ -682,7 +682,7 @@ fn World::build_child_of_ancestor_chain(
 }
 
 ///|
-/// Copies column-major [`@m44.Matrix44F`] components into a [`@m44ref.Matrix44RefF`] (same layout).
+/// Copies column-major [`@m44.Matrix44F`] into a [`@m44ref.Matrix44RefF`] (same layout).
 fn matrix44f_copy_to_ref(
   dst : @m44ref.Matrix44RefF,
   m : @m44.Matrix44F,
@@ -734,11 +734,8 @@ fn World::multiply_world_from_chain(
   leaf : EntityId,
   chain : Array[EntityId],
   leaf_tf : @comp.Transform3D?,
-) -> @comp.GlobalTransform? {
-  match self.multiply_world_chain_matrix(leaf, chain, leaf_tf) {
-    None => None
-    Some(world_m) => Some(@comp.GlobalTransform::from_local_matrix(world_m))
-  }
+) -> @m44.Matrix44F? {
+  self.multiply_world_chain_matrix(leaf, chain, leaf_tf)
 }
 
 ///|
@@ -748,7 +745,7 @@ fn World::multiply_world_from_chain(
 pub fn World::compute_global_transform(
   self : World,
   entity : EntityId,
-) -> @comp.GlobalTransform? {
+) -> @m44.Matrix44F? {
   if !self.is_alive(entity) {
     return None
   }
@@ -764,8 +761,7 @@ pub fn World::compute_global_transform(
       if !component_array_contains(sig, co_id) {
         match self.get_transform(entity) {
           None => None
-          Some(tf) =>
-            Some(@comp.GlobalTransform::from_local_matrix(tf.to_local_matrix()))
+          Some(tf) => Some(tf.to_local_matrix())
         }
       } else {
         match self.build_child_of_ancestor_chain(entity) {
@@ -786,12 +782,12 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
   entity : EntityId,
   archetype_components : Array[ComponentTypeId],
   leaf_tf : @comp.Transform3D,
-  global_tf : @comp.GlobalTransform,
+  gt_gpu_row : MutArrayView[Byte],
 ) -> Bool {
+  let gt = @comp.GlobalTransform::view_std140_gpu_row(gt_gpu_row)
   let co_id = self.child_of_component_id
   if !component_array_contains(archetype_components, co_id) {
-    matrix44f_copy_to_ref(global_tf.matrix, leaf_tf.to_local_matrix())
-    global_tf.commit_gpu_row()
+    matrix44f_copy_to_ref(gt.matrix, leaf_tf.to_local_matrix())
     true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
@@ -800,8 +796,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
         match self.multiply_world_chain_matrix(entity, chain, Some(leaf_tf)) {
           None => false
           Some(world_m) => {
-            matrix44f_copy_to_ref(global_tf.matrix, world_m)
-            global_tf.commit_gpu_row()
+            matrix44f_copy_to_ref(gt.matrix, world_m)
             true
           }
         }
@@ -903,9 +898,11 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let required : Array[ComponentTypeId] = [tf, gt]
   self.for_each_entity_with_components(required, (e, sig, payloads) => {
     let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
-    let global_tf = @comp.GlobalTransform::from_gpu_row_mut_view(payloads[1])
     if self.compute_global_transform_for_tf_gt_bulk_row(
-        e, sig, local_tf, global_tf,
+        e,
+        sig,
+        local_tf,
+        payloads[1],
       ) {
       let _ = self.mark_gpu_component_dirty(e, gt)
     }

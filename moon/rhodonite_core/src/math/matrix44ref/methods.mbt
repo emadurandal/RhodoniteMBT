@@ -32,7 +32,7 @@ fn[T : Mul + Add + Sub] det3_values(
 }
 
 ///|
-fn[T : Mul + Add + Sub] mat4_minor_ref(
+fn[T : Mul + Add + Sub + Matrix44RefElem] mat4_minor_ref(
   m : Matrix44Ref[T],
   skip_r : Int,
   skip_c : Int,
@@ -53,7 +53,7 @@ fn[T : Mul + Add + Sub] mat4_minor_ref(
 }
 
 ///|
-fn[T : Mul + Add + Sub + Neg] matrix4_cofactor_ref(
+fn[T : Mul + Add + Sub + Neg + Matrix44RefElem] matrix4_cofactor_ref(
   m : Matrix44Ref[T],
   r : Int,
   c : Int,
@@ -67,28 +67,56 @@ fn[T : Mul + Add + Sub + Neg] matrix4_cofactor_ref(
 }
 
 ///|
-pub fn[T] Matrix44Ref::at(self : Matrix44Ref[T], row : Int, col : Int) -> T {
-  self.data[col * 4 + row]
+pub fn[T : Matrix44RefElem] Matrix44Ref::at(
+  self : Matrix44Ref[T],
+  row : Int,
+  col : Int,
+) -> T {
+  match self.std140_row {
+    Some(bytes) => T::read_std140_mat4_cell(bytes, row, col)
+    None =>
+      match self.values {
+        Some(v) => v[col * 4 + row]
+        None => abort("Matrix44Ref::at: empty reference")
+      }
+  }
 }
 
 ///|
-pub fn[T] Matrix44Ref::set_at(
+pub fn[T : Matrix44RefElem] Matrix44Ref::set_at(
   self : Matrix44Ref[T],
   row : Int,
   col : Int,
   v : T,
 ) -> Unit {
-  self.data[col * 4 + row] = v
+  match self.std140_row {
+    Some(bytes) => T::write_std140_mat4_cell(bytes, row, col, v)
+    None =>
+      match self.values {
+        Some(data) => data[col * 4 + row] = v
+        None => abort("Matrix44Ref::set_at: empty reference")
+      }
+  }
 }
 
 ///|
 /// Returns the backing [`MutArrayView`] (length 16, column-major `T` slots).
 pub fn[T] Matrix44Ref::data(self : Matrix44Ref[T]) -> MutArrayView[T] {
-  self.data
+  match self.std140_row {
+    Some(_) =>
+      abort(
+        "Matrix44Ref::data: not available for std140 GPU row views (use at/set_at)",
+      )
+    None =>
+      match self.values {
+        Some(v) => v
+        None => abort("Matrix44Ref::data: empty reference")
+      }
+  }
 }
 
 ///|
-pub fn[T] Matrix44Ref::write_col_major(
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_col_major(
   self : Matrix44Ref[T],
   m00 : T,
   m10 : T,
@@ -126,7 +154,7 @@ pub fn[T] Matrix44Ref::write_col_major(
 }
 
 ///|
-pub fn[T] Matrix44Ref::write_from_cols(
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_from_cols(
   self : Matrix44Ref[T],
   c0 : @v4.Vector4[T],
   c1 : @v4.Vector4[T],
@@ -154,13 +182,15 @@ pub fn[T] Matrix44Ref::write_from_cols(
 }
 
 ///|
-pub fn[T : Default] Matrix44Ref::write_zero(self : Matrix44Ref[T]) -> Unit {
+pub fn[T : Default + Matrix44RefElem] Matrix44Ref::write_zero(
+  self : Matrix44Ref[T],
+) -> Unit {
   let z = T::default()
   self.write_col_major(z, z, z, z, z, z, z, z, z, z, z, z, z, z, z, z)
 }
 
 ///|
-pub fn[T] Matrix44Ref::write_identity_with(
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_identity_with(
   self : Matrix44Ref[T],
   one : T,
   zero : T,
@@ -177,7 +207,7 @@ pub fn Matrix44RefF::write_identity(self : Matrix44RefF) -> Unit {
 }
 
 ///|
-pub fn[T : Mul] Matrix44Ref::scale(
+pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::scale(
   self : Matrix44Ref[T],
   s : T,
 ) -> @m44.Matrix44[T] {
@@ -202,7 +232,7 @@ pub fn[T : Mul] Matrix44Ref::scale(
 }
 
 ///|
-pub fn[T : Div] Matrix44Ref::div_scalar(
+pub fn[T : Div + Matrix44RefElem] Matrix44Ref::div_scalar(
   self : Matrix44Ref[T],
   s : T,
 ) -> @m44.Matrix44[T] {
@@ -227,7 +257,9 @@ pub fn[T : Div] Matrix44Ref::div_scalar(
 }
 
 ///|
-pub fn[T] Matrix44Ref::transpose(self : Matrix44Ref[T]) -> @m44.Matrix44[T] {
+pub fn[T : Matrix44RefElem] Matrix44Ref::transpose(
+  self : Matrix44Ref[T],
+) -> @m44.Matrix44[T] {
   @m44.Matrix44::from_cols(
     @v4.Vector4::new(self.at(0, 0), self.at(1, 0), self.at(2, 0), self.at(3, 0)),
     @v4.Vector4::new(self.at(0, 1), self.at(1, 1), self.at(2, 1), self.at(3, 1)),
@@ -238,7 +270,7 @@ pub fn[T] Matrix44Ref::transpose(self : Matrix44Ref[T]) -> @m44.Matrix44[T] {
 
 ///|
 /// Matrix product `self * other` (both refs).
-pub fn[T : Mul + Add] Matrix44Ref::mat_mul(
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mat_mul(
   self : Matrix44Ref[T],
   other : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
@@ -280,7 +312,7 @@ pub fn[T : Mul + Add] Matrix44Ref::mat_mul(
 
 ///|
 /// Matrix product `self * other` with an owned right-hand side.
-pub fn[T : Mul + Add] Matrix44Ref::mat_mul_matrix(
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mat_mul_matrix(
   self : Matrix44Ref[T],
   other : @m44.Matrix44[T],
 ) -> @m44.Matrix44[T] {
@@ -322,7 +354,7 @@ pub fn[T : Mul + Add] Matrix44Ref::mat_mul_matrix(
 
 ///|
 /// Column vector multiply: `self * v` (treats `v` as a column 4-vector).
-pub fn[T : Mul + Add] Matrix44Ref::mul_vec4(
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mul_vec4(
   self : Matrix44Ref[T],
   v : @v4.Vector4[T],
 ) -> @v4.Vector4[T] {
@@ -366,7 +398,7 @@ pub fn Matrix44RefF::transform_point(
 }
 
 ///|
-pub fn[T : Mul + Add + Sub] Matrix44Ref::determinant(
+pub fn[T : Mul + Add + Sub + Matrix44RefElem] Matrix44Ref::determinant(
   self : Matrix44Ref[T],
 ) -> T {
   let a00 = self.at(0, 0)
@@ -381,7 +413,7 @@ pub fn[T : Mul + Add + Sub] Matrix44Ref::determinant(
 
 ///|
 /// Returns `None` when the determinant is exactly `T::default()` (typically 0).
-pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix44Ref::inverse(
+pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default + Matrix44RefElem] Matrix44Ref::inverse(
   self : Matrix44Ref[T],
 ) -> @m44.Matrix44[T]? {
   let det = self.determinant()
@@ -422,7 +454,7 @@ pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix44Ref::inverse(
 ///|
 /// Component-wise sum; same semantics as [`@m44.Matrix44`] `+`, but result is owned
 /// (standard `Add` on [`Matrix44Ref`] would require returning another ref).
-pub fn[T : Add] Matrix44Ref::add_matrix(
+pub fn[T : Add + Matrix44RefElem] Matrix44Ref::add_matrix(
   self : Matrix44Ref[T],
   other : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
@@ -430,7 +462,7 @@ pub fn[T : Add] Matrix44Ref::add_matrix(
 }
 
 ///|
-pub fn[T : Sub] Matrix44Ref::sub_matrix(
+pub fn[T : Sub + Matrix44RefElem] Matrix44Ref::sub_matrix(
   self : Matrix44Ref[T],
   other : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
@@ -438,7 +470,7 @@ pub fn[T : Sub] Matrix44Ref::sub_matrix(
 }
 
 ///|
-pub fn[T : Neg] Matrix44Ref::neg_matrix(
+pub fn[T : Neg + Matrix44RefElem] Matrix44Ref::neg_matrix(
   self : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
   -self.to_matrix44()
@@ -446,7 +478,7 @@ pub fn[T : Neg] Matrix44Ref::neg_matrix(
 
 ///|
 /// Hadamard (component-wise) product; use [`Matrix44Ref::mat_mul`] for matrix multiplication.
-pub fn[T : Mul] Matrix44Ref::mul_hadamard_matrix(
+pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::mul_hadamard_matrix(
   self : Matrix44Ref[T],
   other : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {

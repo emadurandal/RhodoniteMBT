@@ -1,5 +1,5 @@
 ///|
-pub impl[T : Eq] Eq for Matrix44Ref[T] with equal(self, other) {
+pub impl[T : Eq + Matrix44RefElem] Eq for Matrix44Ref[T] with equal(self, other) {
   self.at(0, 0) == other.at(0, 0) &&
   self.at(1, 0) == other.at(1, 0) &&
   self.at(2, 0) == other.at(2, 0) &&

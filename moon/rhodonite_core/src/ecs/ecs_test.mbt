@@ -225,12 +225,11 @@ test "GlobalTransform identity roundtrip and GPU drain" {
   let gt_id = world.global_transform_component()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
-  let g = @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity())
-  let expected = g.matrix.to_matrix44()
-  assert_true(world.set_global_transform(entity, g))
+  let expected = @m44.Matrix44F::identity()
+  assert_true(world.set_global_transform(entity, expected))
   match world.get_global_transform(entity) {
-    Some(read) => assert_eq(read.matrix.to_matrix44(), expected)
-    None => abort("expected GlobalTransform")
+    Some(read) => assert_eq(read, expected)
+    None => abort("expected Matrix44F")
   }
   let writes = world.drain_gpu_writes(gt_id)
   assert_eq(writes.length(), 1)
@@ -258,12 +257,12 @@ test "compute_global_transform uses Transform3D only without ChildOf" {
   )
   assert_true(world.set_transform(e, tf))
   match world.compute_global_transform(e) {
-    Some(gt) => {
-      assert_eq(gt.matrix.at(0, 3), (2.0 : Float))
-      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
-      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    Some(m) => {
+      assert_eq(m.at(0, 3), (2.0 : Float))
+      assert_eq(m.at(1, 3), (0.0 : Float))
+      assert_eq(m.at(2, 3), (0.0 : Float))
     }
-    None => abort("expected GlobalTransform")
+    None => abort("expected Matrix44F")
   }
 }
 
@@ -294,12 +293,12 @@ test "compute_global_transform multiplies parent chain" {
   assert_true(world.set_transform(child, tf_c))
   assert_true(world.set_child_of(child, parent))
   match world.compute_global_transform(child) {
-    Some(gt) => {
-      assert_eq(gt.matrix.at(0, 3), (15.0 : Float))
-      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
-      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    Some(m) => {
+      assert_eq(m.at(0, 3), (15.0 : Float))
+      assert_eq(m.at(1, 3), (0.0 : Float))
+      assert_eq(m.at(2, 3), (0.0 : Float))
     }
-    None => abort("expected GlobalTransform")
+    None => abort("expected Matrix44F")
   }
 }
 
@@ -398,18 +397,18 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
   assert_true(world.set_child_of(child, parent))
-  let g0 = @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity())
+  let g0 = @m44.Matrix44F::identity()
   assert_true(world.set_global_transform(parent, g0))
   assert_true(world.set_global_transform(child, g0))
   let _ = world.drain_gpu_writes(world.global_transform_component())
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(child) {
-    Some(gt) => {
-      assert_eq(gt.matrix.at(0, 3), (15.0 : Float))
-      assert_eq(gt.matrix.at(1, 3), (0.0 : Float))
-      assert_eq(gt.matrix.at(2, 3), (0.0 : Float))
+    Some(m) => {
+      assert_eq(m.at(0, 3), (15.0 : Float))
+      assert_eq(m.at(1, 3), (0.0 : Float))
+      assert_eq(m.at(2, 3), (0.0 : Float))
     }
-    None => abort("expected GlobalTransform")
+    None => abort("expected Matrix44F")
   }
 }
 
@@ -427,16 +426,11 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
     buf.mut_view(start=0, end=n),
   )
   assert_true(world.set_transform(e, tf))
-  assert_true(
-    world.set_global_transform(
-      e,
-      @comp.GlobalTransform::from_local_matrix(@m44.Matrix44::identity()),
-    ),
-  )
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
   let _ = world.drain_gpu_writes(world.global_transform_component())
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(e) {
-    Some(gt) => assert_eq(gt.matrix.at(0, 3), (7.0 : Float))
-    None => abort("expected GlobalTransform")
+    Some(m) => assert_eq(m.at(0, 3), (7.0 : Float))
+    None => abort("expected Matrix44F")
   }
 }
