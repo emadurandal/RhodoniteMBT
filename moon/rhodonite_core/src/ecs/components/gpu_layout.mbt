@@ -125,9 +125,5 @@ pub fn get_gpu_f32(buf : FixedArray[Byte], offset : Int) -> Float {
 ///|
 /// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
 pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
-  let u = buf[offset].to_uint() |
-    (buf[offset + 1].to_uint() << 8) |
-    (buf[offset + 2].to_uint() << 16) |
-    (buf[offset + 3].to_uint() << 24)
-  Float::reinterpret_from_uint(u)
+  Float::reinterpret_from_uint(@writes.get_u32_le_byte_view(buf, offset))
 }

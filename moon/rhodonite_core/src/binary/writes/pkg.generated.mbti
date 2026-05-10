@@ -6,6 +6,8 @@ pub fn get_f32_le(FixedArray[Byte], Int) -> Double
 
 pub fn get_u32_le(FixedArray[Byte], Int) -> UInt
 
+pub fn get_u32_le_byte_view(ArrayView[Byte], Int) -> UInt
+
 pub fn put_f32_le(FixedArray[Byte], Int, Double) -> Unit
 
 pub fn put_u16_le(FixedArray[Byte], Int, UInt) -> Unit
