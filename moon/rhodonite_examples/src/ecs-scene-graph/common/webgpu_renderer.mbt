@@ -387,9 +387,10 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
       cg = 0.55
       cb = 1.0
     } else {
-      cr = 0.75
-      cg = 0.75
-      cb = 0.78
+      // Moon: magenta
+      cr = 1.0
+      cg = 0.0
+      cb = 1.0
     }
     @writes.put_f32_le(instance_bytes, base + 0, idx_f)
     @writes.put_f32_le(instance_bytes, base + 4, cr)
@@ -492,8 +493,9 @@ fn push_local_transforms(
     (0.22 : Float),
     (0.22 : Float),
   )
-  let mx = cos_approx(moon_orbit) * 0.62
-  let mz = sin_approx(moon_orbit) * 0.62
+  let moon_orbit_radius = 1.05
+  let mx = cos_approx(moon_orbit) * moon_orbit_radius
+  let mz = sin_approx(moon_orbit) * moon_orbit_radius
   let moon_tf = transform3d_trs_bytes(
     Float::from_double(mx),
     (0.0 : Float),
@@ -502,9 +504,9 @@ fn push_local_transforms(
     0.0,
     0.0,
     1.0,
-    (0.14 : Float),
-    (0.14 : Float),
-    (0.14 : Float),
+    (0.2 : Float),
+    (0.2 : Float),
+    (0.2 : Float),
   )
   let n_sun = sun_tf.length()
   let n_earth = earth_tf.length()
@@ -555,9 +557,9 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let v_sin = sin_approx(camera_elevation_rad)
   let view = mat4_mul(
     mat4_rotate_x(v_cos, v_sin),
-    mat4_translate(0.0, 0.0, -8.0),
+    mat4_translate(0.0, 0.0, -5.6),
   )
-  let proj = mat4_ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
+  let proj = mat4_ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)
   let pv = mat4_mul(proj, view)
   let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
   let vp = mat4_mul(z_ndc_webgpu, pv)
