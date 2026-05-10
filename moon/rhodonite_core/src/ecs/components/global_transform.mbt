@@ -70,7 +70,7 @@ pub fn GlobalTransform::from_gpu_bytes(
   let base = layout.fields[0].offset
   let cols : FixedArray[Float] = FixedArray::make(16, (0.0 : Float))
   for i = 0; i < 16; i = i + 1 {
-    cols[i] = Float::from_double(get_gpu_f32(bytes, base + i * 4))
+    cols[i] = get_gpu_f32(bytes, base + i * 4)
   }
   { matrix: @m44.Matrix4::{ data: cols } }
 }

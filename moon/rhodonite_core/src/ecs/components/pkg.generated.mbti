@@ -10,9 +10,9 @@ import {
 // Values
 pub fn child_of_cpu_layout() -> GpuLayout
 
-pub fn get_gpu_f32(FixedArray[Byte], Int) -> Double
+pub fn get_gpu_f32(FixedArray[Byte], Int) -> Float
 
-pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Double
+pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Float
 
 pub fn global_transform_gpu_layout() -> GpuLayout
 

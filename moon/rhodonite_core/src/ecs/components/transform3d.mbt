@@ -51,38 +51,38 @@ fn put_vec4(buf : FixedArray[Byte], base : Int, v : @v4.Vector4F) -> Unit {
 ///|
 fn get_vec3(buf : FixedArray[Byte], base : Int) -> @v3.Vector3F {
   @v3.Vector3F::new(
-    Float::from_double(get_gpu_f32(buf, base + 0)),
-    Float::from_double(get_gpu_f32(buf, base + 4)),
-    Float::from_double(get_gpu_f32(buf, base + 8)),
+    get_gpu_f32(buf, base + 0),
+    get_gpu_f32(buf, base + 4),
+    get_gpu_f32(buf, base + 8),
   )
 }
 
 ///|
 fn get_vec4(buf : FixedArray[Byte], base : Int) -> @v4.Vector4F {
   @v4.Vector4F::new(
-    Float::from_double(get_gpu_f32(buf, base + 0)),
-    Float::from_double(get_gpu_f32(buf, base + 4)),
-    Float::from_double(get_gpu_f32(buf, base + 8)),
-    Float::from_double(get_gpu_f32(buf, base + 12)),
+    get_gpu_f32(buf, base + 0),
+    get_gpu_f32(buf, base + 4),
+    get_gpu_f32(buf, base + 8),
+    get_gpu_f32(buf, base + 12),
   )
 }
 
 ///|
 fn get_vec3_byte_view(buf : ArrayView[Byte], base : Int) -> @v3.Vector3F {
   @v3.Vector3F::new(
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 0)),
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 4)),
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 8)),
+    get_gpu_f32_byte_view(buf, base + 0),
+    get_gpu_f32_byte_view(buf, base + 4),
+    get_gpu_f32_byte_view(buf, base + 8),
   )
 }
 
 ///|
 fn get_vec4_byte_view(buf : ArrayView[Byte], base : Int) -> @v4.Vector4F {
   @v4.Vector4F::new(
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 0)),
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 4)),
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 8)),
-    Float::from_double(get_gpu_f32_byte_view(buf, base + 12)),
+    get_gpu_f32_byte_view(buf, base + 0),
+    get_gpu_f32_byte_view(buf, base + 4),
+    get_gpu_f32_byte_view(buf, base + 8),
+    get_gpu_f32_byte_view(buf, base + 12),
   )
 }
 
