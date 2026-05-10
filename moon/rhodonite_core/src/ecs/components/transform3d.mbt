@@ -1,12 +1,8 @@
 ///|
-/// Library-local transform: TRS stored as tightly packed `f32` in archetype SoA (`CpuOnly`).
+/// Library-local transform: TRS as views over one tightly packed `f32` row in archetype SoA (`CpuOnly`).
 
 ///|
 pub(all) struct Transform3D {
-  ///
-  /// When [`Some`], [`position`]/[`rotation`]/[`scale`] views borrow this buffer; when [`None`],
-  /// views borrow an external row (e.g. archetype column) and must not outlive it.
-  storage : FixedArray[Byte]?
   position : @v3.Vector3Ref[Byte]
   rotation : @v4.Vector4Ref[Byte]
   scale : @v3.Vector3Ref[Byte]
@@ -28,25 +24,7 @@ pub fn transform3d_gpu_layout() -> GpuLayout {
 }
 
 ///|
-fn put_vec3_fixed(buf : FixedArray[Byte], base : Int, v : @v3.Vector3F) -> Unit {
-  put_gpu_f32(buf, base + 0, v.x().to_double())
-  put_gpu_f32(buf, base + 4, v.y().to_double())
-  put_gpu_f32(buf, base + 8, v.z().to_double())
-}
-
-///|
-fn put_vec4_fixed(buf : FixedArray[Byte], base : Int, v : @v4.Vector4F) -> Unit {
-  put_gpu_f32(buf, base + 0, v.x().to_double())
-  put_gpu_f32(buf, base + 4, v.y().to_double())
-  put_gpu_f32(buf, base + 8, v.z().to_double())
-  put_gpu_f32(buf, base + 12, v.w().to_double())
-}
-
-///|
-fn transform3d_from_row_mut(
-  storage : FixedArray[Byte]?,
-  row : MutArrayView[Byte],
-) -> Transform3D {
+fn transform3d_from_row_mut(row : MutArrayView[Byte]) -> Transform3D {
   let layout = transform3d_gpu_layout()
   if row.length() != layout.stride {
     abort("Transform3D: row length mismatch")
@@ -59,77 +37,10 @@ fn transform3d_from_row_mut(
   let rot = row.mut_view(start=f[1].offset, end=f[1].offset + f[1].size)
   let scl = row.mut_view(start=f[2].offset, end=f[2].offset + f[2].size)
   {
-    storage,
     position: @v3.Vector3Ref::from_mut_view(pos),
     rotation: @v4.Vector4Ref::from_mut_view(rot),
     scale: @v3.Vector3Ref::from_mut_view(scl),
   }
-}
-
-///|
-pub fn Transform3D::identity() -> Transform3D {
-  let layout = transform3d_gpu_layout()
-  let buf = gpu_component_bytes(layout.stride)
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  put_vec3_fixed(buf, f[0].offset, @v3.Vector3F::zero())
-  put_vec4_fixed(
-    buf,
-    f[1].offset,
-    @v4.Vector4F::new(
-      (0.0 : Float),
-      (0.0 : Float),
-      (0.0 : Float),
-      (1.0 : Float),
-    ),
-  )
-  put_vec3_fixed(
-    buf,
-    f[2].offset,
-    @v3.Vector3F::new((1.0 : Float), (1.0 : Float), (1.0 : Float)),
-  )
-  let stride = buf.length()
-  transform3d_from_row_mut(Some(buf), buf.mut_view(start=0, end=stride))
-}
-
-///|
-/// Builds a transform backed by a new row buffer from owned [`Vector3F`]/[`Vector4F`] values.
-pub fn Transform3D::from_trs(
-  position : @v3.Vector3F,
-  rotation : @v4.Vector4F,
-  scale : @v3.Vector3F,
-) -> Transform3D {
-  let buf = gpu_component_bytes(transform3d_gpu_layout().stride)
-  let f = transform3d_gpu_layout().fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  put_vec3_fixed(buf, f[0].offset, position)
-  put_vec4_fixed(buf, f[1].offset, rotation)
-  put_vec3_fixed(buf, f[2].offset, scale)
-  let stride = buf.length()
-  transform3d_from_row_mut(Some(buf), buf.mut_view(start=0, end=stride))
-}
-
-///|
-/// Builds a transform with identity rotation, unit scale, and the given translation.
-pub fn Transform3D::from_translation(
-  x : Float,
-  y : Float,
-  z : Float,
-) -> Transform3D {
-  Transform3D::from_trs(
-    @v3.Vector3F::new(x, y, z),
-    @v4.Vector4F::new(
-      (0.0 : Float),
-      (0.0 : Float),
-      (0.0 : Float),
-      (1.0 : Float),
-    ),
-    @v3.Vector3F::new((1.0 : Float), (1.0 : Float), (1.0 : Float)),
-  )
 }
 
 ///|
@@ -155,23 +66,11 @@ pub fn Transform3D::to_component_bytes(self : Transform3D) -> FixedArray[Byte] {
 }
 
 ///|
-pub fn Transform3D::from_component_bytes(
-  bytes : FixedArray[Byte],
-) -> Transform3D {
-  let layout = transform3d_gpu_layout()
-  if bytes.length() != layout.stride {
-    abort("Transform3D::from_component_bytes: length mismatch")
-  }
-  let stride = bytes.length()
-  transform3d_from_row_mut(Some(bytes), bytes.mut_view(start=0, end=stride))
-}
-
-///|
 /// Decodes TRS from a zero-copy [`MutArrayView`] over one archetype row.
 pub fn Transform3D::from_component_mut_view(
   row : MutArrayView[Byte],
 ) -> Transform3D {
-  transform3d_from_row_mut(None, row)
+  transform3d_from_row_mut(row)
 }
 
 ///|

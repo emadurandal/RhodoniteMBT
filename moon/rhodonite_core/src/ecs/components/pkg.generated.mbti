@@ -77,16 +77,11 @@ pub fn GpuLayout::is_valid(Self) -> Bool
 pub fn GpuLayout::std140(Array[(String, GpuFieldKind)]) -> Self
 
 pub(all) struct Transform3D {
-  storage : FixedArray[Byte]?
   position : @vector3.Vector3Ref[Byte]
   rotation : @vector4.Vector4Ref[Byte]
   scale : @vector3.Vector3Ref[Byte]
 }
-pub fn Transform3D::from_component_bytes(FixedArray[Byte]) -> Self
 pub fn Transform3D::from_component_mut_view(MutArrayView[Byte]) -> Self
-pub fn Transform3D::from_translation(Float, Float, Float) -> Self
-pub fn Transform3D::from_trs(@vector3.Vector3[Float], @vector4.Vector4[Float], @vector3.Vector3[Float]) -> Self
-pub fn Transform3D::identity() -> Self
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
 pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix4[Float]
 

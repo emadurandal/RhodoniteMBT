@@ -11,6 +11,52 @@ fn gpu_bytes_with_u32(value : UInt) -> FixedArray[Byte] {
 }
 
 ///|
+fn transform3d_bytes_identity() -> FixedArray[Byte] {
+  let layout = @comp.transform3d_gpu_layout()
+  let buf = @comp.gpu_component_bytes(layout.stride)
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d layout")
+  }
+  @comp.put_gpu_f32(buf, f[0].offset + 0, 0.0)
+  @comp.put_gpu_f32(buf, f[0].offset + 4, 0.0)
+  @comp.put_gpu_f32(buf, f[0].offset + 8, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 0, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 4, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 8, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 12, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 0, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 4, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 8, 1.0)
+  buf
+}
+
+///|
+fn transform3d_bytes_translation(
+  x : Float,
+  y : Float,
+  z : Float,
+) -> FixedArray[Byte] {
+  let layout = @comp.transform3d_gpu_layout()
+  let buf = @comp.gpu_component_bytes(layout.stride)
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d layout")
+  }
+  @comp.put_gpu_f32(buf, f[0].offset + 0, x.to_double())
+  @comp.put_gpu_f32(buf, f[0].offset + 4, y.to_double())
+  @comp.put_gpu_f32(buf, f[0].offset + 8, z.to_double())
+  @comp.put_gpu_f32(buf, f[1].offset + 0, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 4, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 8, 0.0)
+  @comp.put_gpu_f32(buf, f[1].offset + 12, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 0, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 4, 1.0)
+  @comp.put_gpu_f32(buf, f[2].offset + 8, 1.0)
+  buf
+}
+
+///|
 test "EntityId generation invalidates stale handles and reuses gpu index" {
   let world = World::new()
   let e0 = world.create_entity()
@@ -152,7 +198,11 @@ test "Transform3D identity roundtrip bytes and World set/get" {
   let tf = world.transform_component()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
-  let t = @comp.Transform3D::identity()
+  let buf = transform3d_bytes_identity()
+  let n = buf.length()
+  let t = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
   assert_true(world.set_transform(entity, t))
   match world.get_transform(entity) {
     Some(got) => {
@@ -196,10 +246,14 @@ test "get_gpu_f32 reads put_gpu_f32" {
 test "compute_global_transform uses Transform3D only without ChildOf" {
   let world = World::new()
   let e = world.create_entity()
-  let tf = @comp.Transform3D::from_translation(
+  let buf = transform3d_bytes_translation(
     (2.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
   )
   assert_true(world.set_transform(e, tf))
   match world.compute_global_transform(e) {
@@ -217,15 +271,23 @@ test "compute_global_transform multiplies parent chain" {
   let world = World::new()
   let parent = world.create_entity()
   let child = world.create_entity()
-  let tf_p = @comp.Transform3D::from_translation(
+  let buf_p = transform3d_bytes_translation(
     (10.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
   )
-  let tf_c = @comp.Transform3D::from_translation(
+  let np = buf_p.length()
+  let tf_p = @comp.Transform3D::from_component_mut_view(
+    buf_p.mut_view(start=0, end=np),
+  )
+  let buf_c = transform3d_bytes_translation(
     (5.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
+  )
+  let nc = buf_c.length()
+  let tf_c = @comp.Transform3D::from_component_mut_view(
+    buf_c.mut_view(start=0, end=nc),
   )
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
@@ -252,7 +314,11 @@ test "compute_global_transform returns None on ChildOf cycle" {
   let world = World::new()
   let a = world.create_entity()
   let b = world.create_entity()
-  let tf = @comp.Transform3D::identity()
+  let buf = transform3d_bytes_identity()
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
   assert_true(world.set_transform(a, tf))
   assert_true(world.set_transform(b, tf))
   assert_true(world.set_child_of(a, b))
@@ -290,15 +356,23 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
   let world = World::new()
   let parent = world.create_entity()
   let child = world.create_entity()
-  let tf_p = @comp.Transform3D::from_translation(
+  let buf_p = transform3d_bytes_translation(
     (10.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
   )
-  let tf_c = @comp.Transform3D::from_translation(
+  let np = buf_p.length()
+  let tf_p = @comp.Transform3D::from_component_mut_view(
+    buf_p.mut_view(start=0, end=np),
+  )
+  let buf_c = transform3d_bytes_translation(
     (5.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
+  )
+  let nc = buf_c.length()
+  let tf_c = @comp.Transform3D::from_component_mut_view(
+    buf_c.mut_view(start=0, end=nc),
   )
   assert_true(world.set_transform(parent, tf_p))
   assert_true(world.set_transform(child, tf_c))
@@ -322,10 +396,14 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
 test "update_global_transforms_from_transforms applies root Transform3D only" {
   let world = World::new()
   let e = world.create_entity()
-  let tf = @comp.Transform3D::from_translation(
+  let buf = transform3d_bytes_translation(
     (7.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
   )
   assert_true(world.set_transform(e, tf))
   assert_true(world.set_global_transform(e, @comp.GlobalTransform::identity()))

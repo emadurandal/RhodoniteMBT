@@ -564,7 +564,14 @@ pub fn World::get_transform(
     return None
   }
   match self.component_bytes(entity, tf) {
-    Some(bytes) => Some(@comp.Transform3D::from_component_bytes(bytes))
+    Some(bytes) => {
+      let n = bytes.length()
+      Some(
+        @comp.Transform3D::from_component_mut_view(
+          bytes.mut_view(start=0, end=n),
+        ),
+      )
+    }
     None => None
   }
 }
