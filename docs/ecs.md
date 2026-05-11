@@ -69,7 +69,9 @@ flowchart LR
   a -->|"add Mat"| ab
 ```
 
-For a visual of “columns = components, rows = entities”, see the [SoA sketch](assets/ecs-soa-sketch.svg).
+For a visual of “columns = components, rows = entities”, see below.
+
+![SoA sketch](assets/ecs-soa-sketch.svg)
 
 ---
 

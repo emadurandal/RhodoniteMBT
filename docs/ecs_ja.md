@@ -69,7 +69,9 @@ flowchart LR
   a -->|"add Mat"| ab
 ```
 
-SoA の「列がコンポーネント、行がエンティティ」のイメージは [SoA 列の補助図](assets/ecs-soa-sketch.svg) も参照してください。
+SoA の「列がコンポーネント、行がエンティティ」のイメージは下図を参照してください。
+
+![SoA 列の補助図](assets/ecs-soa-sketch.svg)
 
 ---
 
