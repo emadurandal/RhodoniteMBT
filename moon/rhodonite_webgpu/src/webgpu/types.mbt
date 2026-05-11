@@ -26,6 +26,11 @@ pub(all) struct GPUBuffer {
 }
 
 ///|
+pub(all) struct GPUTexture {
+  raw : @raw.WebGPUTexture
+}
+
+///|
 pub(all) struct GPUBindGroupLayout {
   raw : @raw.GPUBindGroupLayout
 }
@@ -40,16 +45,46 @@ pub(all) struct GPUBindGroup {
 pub const GPU_BUFFER_BINDING_WHOLE_SIZE : UInt64 = 0xFFFFFFFFFFFFFFFFUL
 
 ///|
-pub(all) struct GPUBindGroupBufferBinding {
-  binding : UInt
+/// WebGPU `GPUBufferBinding`.
+pub(all) struct GPUBufferBinding {
   buffer : GPUBuffer
   offset : UInt64
   size : UInt64
 }
 
 ///|
-pub(all) enum GPUBindGroupEntry {
-  Buffer(GPUBindGroupBufferBinding)
+/// WebGPU `GPUBindingResource`.
+pub(all) enum GPUBindingResource {
+  Sampler(GPUSampler)
+  Texture(GPUTexture)
+  TextureView(GPUTextureView)
+  Buffer(GPUBuffer)
+  BufferBinding(GPUBufferBinding)
+  ExternalTexture(GPUExternalTexture)
+}
+
+///|
+/// WebGPU `GPUBindGroupEntry`.
+pub(all) struct GPUBindGroupEntry {
+  binding : UInt
+  resource : GPUBindingResource
+}
+
+///|
+/// WebGPU `GPUBindGroupDescriptor`.
+pub(all) struct GPUBindGroupDescriptor {
+  layout : GPUBindGroupLayout
+  entries : Array[GPUBindGroupEntry]
+}
+
+///|
+pub(all) struct GPUSampler {
+  raw : @raw.GPUSampler
+}
+
+///|
+pub(all) struct GPUExternalTexture {
+  raw : @raw.GPUExternalTexture
 }
 
 ///|
@@ -97,11 +132,6 @@ pub(all) struct GPUQueue {
 ///|
 pub(all) struct GPUCanvasContext {
   raw : @raw.WebGPUCanvasContext
-}
-
-///|
-pub(all) struct GPUTexture {
-  raw : @raw.WebGPUTexture
 }
 
 ///|

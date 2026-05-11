@@ -40,10 +40,20 @@ pub type GPUCommandBuffer
 pub type GPUBuffer
 
 ///|
+pub type GPUSampler
+
+///|
+pub type GPUExternalTexture
+
+///|
 pub type GPUBindGroupLayout
 
 ///|
 pub type GPUBindGroup
+
+///|
+/// Pre-resolved `GPUBindGroupEntry.resource` for JS FFI (opaque browser object).
+pub type BindGroupResourceJs
 
 ///|
 pub type HTMLCanvasElement

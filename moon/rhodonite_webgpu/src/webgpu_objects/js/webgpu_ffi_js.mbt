@@ -295,35 +295,70 @@ extern "js" fn renderPipeline_getBindGroupLayout(
   #| (pipeline, group_index) => pipeline.getBindGroupLayout(group_index)
 
 ///|
-pub(all) struct BindGroupBufferEntryJs {
+/// [`BindGroupResourceJs`] is built by the helpers below so [`GPUBuffer`] and
+/// friends are passed as plain JS handles; optional fields in a tagged struct
+/// did not round-trip correctly through the MoonBit JS FFI.
+extern "js" fn bind_group_resource_sampler(
+  sampler : GPUSampler,
+) -> BindGroupResourceJs =
+  #| (sampler) => sampler
+
+///|
+extern "js" fn bind_group_resource_texture(
+  texture : GPUTexture,
+) -> BindGroupResourceJs =
+  #| (texture) => texture
+
+///|
+extern "js" fn bind_group_resource_texture_view(
+  view : GPUTextureView,
+) -> BindGroupResourceJs =
+  #| (view) => view
+
+///|
+extern "js" fn bind_group_resource_buffer(
+  buffer : GPUBuffer,
+) -> BindGroupResourceJs =
+  #| (buffer) => buffer
+
+///|
+extern "js" fn bind_group_resource_buffer_binding(
+  buffer : GPUBuffer,
+  offset : Double,
+  size : Double,
+  whole_buffer : Bool,
+) -> BindGroupResourceJs =
+  #| (buffer, offset, size, whole_buffer) => {
+  #|   if (whole_buffer && offset === 0) return { buffer };
+  #|   if (whole_buffer) return { buffer, offset };
+  #|   return { buffer, offset, size };
+  #| }
+
+///|
+extern "js" fn bind_group_resource_external(
+  external_texture : GPUExternalTexture,
+) -> BindGroupResourceJs =
+  #| (external_texture) => external_texture
+
+///|
+pub(all) struct BindGroupEntryResolvedJs {
   binding : UInt
-  buffer : GPUBuffer
-  /// When true, omit `size` in `GPUBufferBinding` (and `offset` when zero).
-  whole_buffer : Bool
-  offset : Double
-  size : Double
+  resource : BindGroupResourceJs
 }
 
 ///|
 extern "js" fn device_createBindGroup(
   device : GPUDevice,
   layout : GPUBindGroupLayout,
-  entries : Array[BindGroupBufferEntryJs],
+  entries : Array[BindGroupEntryResolvedJs],
 ) -> GPUBindGroup =
   #| (device, layout, entries) =>
   #|   device.createBindGroup({
   #|     layout,
-  #|     entries: entries.map((e) => {
-  #|       let resource;
-  #|       if (e.whole_buffer && e.offset === 0) {
-  #|         resource = { buffer: e.buffer };
-  #|       } else if (e.whole_buffer) {
-  #|         resource = { buffer: e.buffer, offset: e.offset };
-  #|       } else {
-  #|         resource = { buffer: e.buffer, offset: e.offset, size: e.size };
-  #|       }
-  #|       return { binding: e.binding, resource };
-  #|     }),
+  #|     entries: entries.map((e) => ({
+  #|       binding: e.binding,
+  #|       resource: e.resource,
+  #|     })),
   #|   })
 
 ///|

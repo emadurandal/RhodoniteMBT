@@ -333,25 +333,33 @@ pub fn GPURenderPipeline::get_bind_group_layout(
 ///|
 pub fn GPUDevice::create_bind_group(
   self : GPUDevice,
-  layout : GPUBindGroupLayout,
-  entries : Array[GPUBindGroupEntry],
+  descriptor : GPUBindGroupDescriptor,
 ) -> GPUBindGroup {
-  let raw_bindings : Array[@raw.GPUBindGroupBufferBinding] = entries.map(fn(e) {
-    match e {
-      Buffer(bg) =>
-        @raw.gp_bind_group_buffer_binding(
-          bg.binding,
-          bg.buffer.raw,
-          bg.offset,
-          bg.size,
+  let raw_entries : Array[@raw.GPUBindGroupEntry] = descriptor.entries.map(fn(
+    entry,
+  ) {
+    match entry.resource {
+      Buffer(buf) => @raw.gp_bind_group_entry_buffer(entry.binding, buf.raw)
+      BufferBinding(bb) =>
+        @raw.gp_bind_group_entry_buffer_binding(
+          entry.binding,
+          bb.buffer.raw,
+          bb.offset,
+          bb.size,
         )
+      TextureView(view) =>
+        @raw.gp_bind_group_entry_texture_view(entry.binding, view)
+      Texture(tex) => @raw.gp_bind_group_entry_texture(entry.binding, tex.raw)
+      Sampler(sam) => @raw.gp_bind_group_entry_sampler(entry.binding, sam.raw)
+      ExternalTexture(ext) =>
+        @raw.gp_bind_group_entry_external_texture(entry.binding, ext.raw)
     }
   })
   {
     raw: @raw.webgpu_device_create_bind_group(
       self.raw,
-      layout.raw,
-      raw_bindings,
+      descriptor.layout.raw,
+      raw_entries,
     ),
   }
 }

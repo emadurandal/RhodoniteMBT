@@ -116,23 +116,57 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
 }
 
 ///|
-let gpu_buffer_binding_whole_size : UInt64 = 0xFFFFFFFFFFFFFFFFUL
+fn bind_group_entry_resolved_js(
+  entry : GPUBindGroupEntry,
+) -> BindGroupEntryResolvedJs {
+  let whole_u64 : UInt64 = 0xFFFFFFFFFFFFFFFFUL
+  match entry.inner {
+    Buffer(b, buf) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_buffer(buf),
+      }
+    BufferBinding(b, buf, off, sz) => {
+      let whole = sz == whole_u64
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_buffer_binding(
+          buf,
+          js_u64_to_double(off),
+          js_u64_to_double(sz),
+          whole,
+        ),
+      }
+    }
+    TextureView(b, view) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_texture_view(view),
+      }
+    Texture(b, wt) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_texture(wt.texture),
+      }
+    Sampler(b, sam) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_sampler(sam),
+      }
+    ExternalTexture(b, ext) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_external(ext),
+      }
+  }
+}
 
 ///|
 pub fn webgpu_device_create_bind_group(
   device : WebGPUDevice,
   layout : GPUBindGroupLayout,
-  entries : Array[GPUBindGroupBufferBinding],
+  entries : Array[GPUBindGroupEntry],
 ) -> GPUBindGroup {
-  let js_entries = entries.map(fn(e) {
-    let whole = e.size == gpu_buffer_binding_whole_size
-    BindGroupBufferEntryJs::{
-      binding: e.binding,
-      buffer: e.buffer,
-      whole_buffer: whole,
-      offset: js_u64_to_double(e.offset),
-      size: js_u64_to_double(e.size),
-    }
-  })
+  let js_entries = entries.map(fn(e) { bind_group_entry_resolved_js(e) })
   device_createBindGroup(device.device, layout, js_entries)
 }

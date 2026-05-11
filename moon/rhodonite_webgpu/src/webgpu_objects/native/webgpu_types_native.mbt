@@ -79,3 +79,13 @@ pub struct GPUBindGroupLayout {
 pub struct GPUBindGroup {
   raw : @wgpu.BindGroup
 }
+
+///|
+pub struct GPUSampler {
+  raw : @wgpu.Sampler
+}
+
+///|
+pub struct GPUExternalTexture {
+  raw : UInt
+}
