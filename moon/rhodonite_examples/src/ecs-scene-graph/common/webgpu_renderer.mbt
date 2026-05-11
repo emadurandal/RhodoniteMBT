@@ -416,9 +416,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       w.bytes,
     )
   }
-  let v_cos = @math.cos(camera_elevation_rad)
-  let v_sin = @math.sin(camera_elevation_rad)
-  let view = @m44.Matrix44::rotation_x_cos_sin(v_cos, v_sin, 1.0, 0.0).mat_mul(
+  let view = @m44.Matrix44::rotation_x_rad(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -5.6, 1.0, 0.0),
   )
   let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)

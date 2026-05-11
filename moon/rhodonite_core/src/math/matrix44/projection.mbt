@@ -14,25 +14,24 @@ pub fn[T] Matrix44::translation(
 }
 
 ///|
-/// Rotation about **+X** (right-handed). Pass `cos(angle)`, `sin(angle)`, `one`, `zero`.
-pub fn[T : Neg] Matrix44::rotation_x_cos_sin(
-  cos_angle : T,
-  sin_angle : T,
-  one : T,
-  zero : T,
-) -> Matrix44[T] {
+/// Rotation about **+X** (radians, right-handed). Returns [`Matrix44D`] (column-major).
+pub fn Matrix44::rotation_x_rad(angle_rad : Double) -> Matrix44D {
+  let c = @math.cos(angle_rad)
+  let s = @math.sin(angle_rad)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
   Matrix44::new_col_major(
     one,
     zero,
     zero,
     zero,
     zero,
-    cos_angle,
-    sin_angle,
+    c,
+    s,
     zero,
     zero,
-    -sin_angle,
-    cos_angle,
+    -s,
+    c,
     zero,
     zero,
     zero,
