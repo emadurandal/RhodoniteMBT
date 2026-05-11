@@ -56,11 +56,12 @@
 
   <rect x="244" y="82" width="388" height="328" class="panel"/>
   <text x="262" y="110" class="section">Archetype 7: dense SoA table</text>
-  <text x="262" y="132" class="small">Signature is sorted ComponentTypeId list; rows can move on add/remove/destroy.</text>
+  <text x="262" y="132" class="small">Signature is a sorted ComponentTypeId list;</text>
+  <text x="262" y="146" class="small">rows can move on add/remove/destroy.</text>
 
-  <rect x="262" y="151" width="352" height="39" class="sig"/>
+  <rect x="262" y="154" width="352" height="51" class="sig"/>
   <text x="276" y="174" class="mono">signature = [Transform3D, GlobalTransform, ChildOf]</text>
-  <text x="276" y="187" class="small">GlobalTransform participates in queries, but has 0 CPU bytes here.</text>
+  <text x="276" y="200" class="small">GlobalTransform is query-visible; CPU bytes are 0.</text>
 
   <rect x="262" y="218" width="76" height="32" class="entity-h"/>
   <text x="281" y="239" class="label">entities[]</text>
@@ -115,7 +116,8 @@
 
   <rect x="674" y="82" width="178" height="328" class="panel"/>
   <text x="692" y="110" class="section">GpuComponentStore</text>
-  <text x="692" y="132" class="small">One flat array per GpuVisible component</text>
+  <text x="692" y="132" class="small">One flat array per</text>
+  <text x="692" y="146" class="small">GpuVisible component</text>
 
   <rect x="694" y="151" width="136" height="39" class="gpu-h"/>
   <text x="709" y="174" class="mono">GlobalTransform</text>
@@ -164,5 +166,6 @@
   <rect x="28" y="435" width="824" height="58" class="callout"/>
   <text x="46" y="459" class="label">Key rule</text>
   <text x="108" y="459" class="small">Archetype row is an implementation detail for cache-friendly CPU iteration.</text>
-  <text x="108" y="477" class="small">GpuVisible bytes are addressed as EntityId.index * stride, so their storage slot does not change when a row is swap-removed or migrated.</text>
+  <text x="108" y="477" class="small">GpuVisible bytes use EntityId.index * stride; their storage slot stays stable</text>
+  <text x="108" y="489" class="small">when a row is swap-removed or migrated.</text>
 </svg>
