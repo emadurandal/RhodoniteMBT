@@ -100,9 +100,9 @@ pub fn[T : Div] Matrix33::div_scalar(self : Matrix33[T], s : T) -> Matrix33[T] {
 ///|
 pub fn[T] Matrix33::transpose(self : Matrix33[T]) -> Matrix33[T] {
   Matrix33::from_cols(
-    @v3.Vector3::new(self.at(0, 0), self.at(1, 0), self.at(2, 0)),
-    @v3.Vector3::new(self.at(0, 1), self.at(1, 1), self.at(2, 1)),
-    @v3.Vector3::new(self.at(0, 2), self.at(1, 2), self.at(2, 2)),
+    @v3.Vector3::new(self.at(0, 0), self.at(0, 1), self.at(0, 2)),
+    @v3.Vector3::new(self.at(1, 0), self.at(1, 1), self.at(1, 2)),
+    @v3.Vector3::new(self.at(2, 0), self.at(2, 1), self.at(2, 2)),
   )
 }
 
