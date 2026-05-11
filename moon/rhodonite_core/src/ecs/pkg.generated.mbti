@@ -107,6 +107,7 @@ pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
+pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 

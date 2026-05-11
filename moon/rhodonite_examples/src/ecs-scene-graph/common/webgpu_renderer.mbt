@@ -24,32 +24,6 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-fn sin_approx(a : Double) -> Double {
-  let two_pi = 6.283185307179586
-  let mut x = a
-  while x > two_pi {
-    x = x - two_pi
-  }
-  while x < 0.0 {
-    x = x + two_pi
-  }
-  let pi = 3.141592653589793
-  if x > pi {
-    x = x - two_pi
-  }
-  let x2 = x * x
-  let x3 = x2 * x
-  let x5 = x3 * x2
-  let x7 = x5 * x2
-  x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0
-}
-
-///|
-fn cos_approx(a : Double) -> Double {
-  sin_approx(a + 1.5707963267948966)
-}
-
-///|
 fn mat4_mul(a : Array[Double], b : Array[Double]) -> Array[Double] {
   let o = Array::make(16, 0.0)
   for j = 0; j < 4; j = j + 1 {
@@ -430,8 +404,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 ///|
 fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
   let half = angle * 0.5
-  let s = sin_approx(half)
-  let c = cos_approx(half)
+  let s = @math.sin(half)
+  let c = @math.cos(half)
   (0.0, s, 0.0, c)
 }
 
@@ -461,8 +435,8 @@ fn push_local_transforms(
       (0.55 : Float),
     ),
   )
-  let ex = cos_approx(earth_orbit) * 2.35
-  let ez = sin_approx(earth_orbit) * 2.35
+  let ex = @math.cos(earth_orbit) * 2.35
+  let ez = @math.sin(earth_orbit) * 2.35
   let (eqx, eqy, eqz, eqw) = quat_y(earth_spin)
   ignore(
     world.set_transform_trs(
@@ -480,8 +454,8 @@ fn push_local_transforms(
     ),
   )
   let moon_orbit_radius = 1.05
-  let mx = cos_approx(moon_orbit) * moon_orbit_radius
-  let mz = sin_approx(moon_orbit) * moon_orbit_radius
+  let mx = @math.cos(moon_orbit) * moon_orbit_radius
+  let mz = @math.sin(moon_orbit) * moon_orbit_radius
   ignore(
     world.set_transform_trs(
       bodies[2],
@@ -515,8 +489,8 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       w.bytes,
     )
   }
-  let v_cos = cos_approx(camera_elevation_rad)
-  let v_sin = sin_approx(camera_elevation_rad)
+  let v_cos = @math.cos(camera_elevation_rad)
+  let v_sin = @math.sin(camera_elevation_rad)
   let view = mat4_mul(
     mat4_rotate_x(v_cos, v_sin),
     mat4_translate(0.0, 0.0, -5.6),
