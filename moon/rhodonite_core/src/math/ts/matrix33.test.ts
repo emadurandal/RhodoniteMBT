@@ -21,9 +21,10 @@ describe("Matrix33F (MoonBit js_bridge wrapper)", () => {
 		expect(p.at(2, 2)).toBeCloseTo(6);
 	});
 
-	it("transpose twice", () => {
+	it("transpose col_major_1_to_9", () => {
 		const m = Matrix33F.newColMajor(1, 2, 3, 4, 5, 6, 7, 8, 9);
-		expect(m.transpose().transpose().eq(m)).toBe(true);
+		const t = Matrix33F.newColMajor(1, 4, 7, 2, 5, 8, 3, 6, 9);
+		expect(m.transpose().eq(t)).toBe(true);
 	});
 
 	it("Hadamard mul", () => {

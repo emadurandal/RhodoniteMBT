@@ -28,11 +28,14 @@ describe("Matrix44F (MoonBit js_bridge wrapper)", () => {
 		expect(p.at(3, 3)).toBeCloseTo(6);
 	});
 
-	it("transpose twice", () => {
+	it("transpose col_major_1_to_16", () => {
 		const m = Matrix44F.newColMajor(
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 		);
-		expect(m.transpose().transpose().eq(m)).toBe(true);
+		const t = Matrix44F.newColMajor(
+			1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15, 4, 8, 12, 16,
+		);
+		expect(m.transpose().eq(t)).toBe(true);
 	});
 
 	it("transformPoint translation", () => {

@@ -36,7 +36,7 @@ test "Matrix33 mat_mul scale" {
 }
 
 ///|
-test "Matrix33 transpose twice" {
+test "Matrix33 transpose col_major_1_to_9" {
   let m = Matrix33::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
@@ -48,7 +48,18 @@ test "Matrix33 transpose twice" {
     (8.0 : Float),
     (9.0 : Float),
   )
-  assert_eq(m.transpose().transpose(), m)
+  let t = Matrix33::new_col_major(
+    (1.0 : Float),
+    (4.0 : Float),
+    (7.0 : Float),
+    (2.0 : Float),
+    (5.0 : Float),
+    (8.0 : Float),
+    (3.0 : Float),
+    (6.0 : Float),
+    (9.0 : Float),
+  )
+  assert_eq(m.transpose(), t)
 }
 
 ///|

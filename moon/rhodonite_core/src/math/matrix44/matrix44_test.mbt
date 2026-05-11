@@ -56,7 +56,7 @@ test "Matrix44 mat_mul diagonal" {
 }
 
 ///|
-test "Matrix44 transpose twice" {
+test "Matrix44 transpose col_major_1_to_16" {
   let m = Matrix44::new_col_major(
     (1.0 : Float),
     (2.0 : Float),
@@ -75,7 +75,25 @@ test "Matrix44 transpose twice" {
     (15.0 : Float),
     (16.0 : Float),
   )
-  assert_eq(m.transpose().transpose(), m)
+  let t = Matrix44::new_col_major(
+    (1.0 : Float),
+    (5.0 : Float),
+    (9.0 : Float),
+    (13.0 : Float),
+    (2.0 : Float),
+    (6.0 : Float),
+    (10.0 : Float),
+    (14.0 : Float),
+    (3.0 : Float),
+    (7.0 : Float),
+    (11.0 : Float),
+    (15.0 : Float),
+    (4.0 : Float),
+    (8.0 : Float),
+    (12.0 : Float),
+    (16.0 : Float),
+  )
+  assert_eq(m.transpose(), t)
 }
 
 ///|
