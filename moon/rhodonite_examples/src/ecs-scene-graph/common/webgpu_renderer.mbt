@@ -160,38 +160,6 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
-fn transform3d_trs_bytes(
-  px : Float,
-  py : Float,
-  pz : Float,
-  qx : Double,
-  qy : Double,
-  qz : Double,
-  qw : Double,
-  sx : Float,
-  sy : Float,
-  sz : Float,
-) -> FixedArray[Byte] {
-  let layout = @comp.transform3d_gpu_layout()
-  let buf = @comp.gpu_component_bytes(layout.stride)
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d layout")
-  }
-  @comp.put_gpu_f32(buf, f[0].offset + 0, px.to_double())
-  @comp.put_gpu_f32(buf, f[0].offset + 4, py.to_double())
-  @comp.put_gpu_f32(buf, f[0].offset + 8, pz.to_double())
-  @comp.put_gpu_f32(buf, f[1].offset + 0, qx)
-  @comp.put_gpu_f32(buf, f[1].offset + 4, qy)
-  @comp.put_gpu_f32(buf, f[1].offset + 8, qz)
-  @comp.put_gpu_f32(buf, f[1].offset + 12, qw)
-  @comp.put_gpu_f32(buf, f[2].offset + 0, sx.to_double())
-  @comp.put_gpu_f32(buf, f[2].offset + 4, sy.to_double())
-  @comp.put_gpu_f32(buf, f[2].offset + 8, sz.to_double())
-  buf
-}
-
-///|
 fn put_mat4_col_major_f64_to_bytes(
   out : FixedArray[Byte],
   m : Array[Double],
@@ -478,7 +446,7 @@ fn push_local_transforms(
   let earth_spin = t * 2.2
   let moon_orbit = t * 2.8
   let (sqx, sqy, sqz, sqw) = quat_y(sun_angle)
-  let sun_tf = transform3d_trs_bytes(
+  let sun_tf = @comp.transform3d_trs_bytes(
     (0.0 : Float),
     (0.0 : Float),
     (0.0 : Float),
@@ -493,7 +461,7 @@ fn push_local_transforms(
   let ex = cos_approx(earth_orbit) * 2.35
   let ez = sin_approx(earth_orbit) * 2.35
   let (eqx, eqy, eqz, eqw) = quat_y(earth_spin)
-  let earth_tf = transform3d_trs_bytes(
+  let earth_tf = @comp.transform3d_trs_bytes(
     Float::from_double(ex),
     (0.0 : Float),
     Float::from_double(ez),
@@ -508,7 +476,7 @@ fn push_local_transforms(
   let moon_orbit_radius = 1.05
   let mx = cos_approx(moon_orbit) * moon_orbit_radius
   let mz = sin_approx(moon_orbit) * moon_orbit_radius
-  let moon_tf = transform3d_trs_bytes(
+  let moon_tf = @comp.transform3d_trs_bytes(
     Float::from_double(mx),
     (0.0 : Float),
     Float::from_double(mz),

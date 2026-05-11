@@ -33,6 +33,8 @@ pub fn put_gpu_u32(FixedArray[Byte], Int, UInt) -> Unit
 
 pub fn transform3d_gpu_layout() -> GpuLayout
 
+pub fn transform3d_trs_bytes(Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> FixedArray[Byte]
+
 // Errors
 
 // Types and methods

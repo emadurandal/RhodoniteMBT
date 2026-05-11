@@ -66,6 +66,39 @@ pub fn Transform3D::to_component_bytes(self : Transform3D) -> FixedArray[Byte] {
 }
 
 ///|
+/// Encodes TRS scalars into GPU component bytes using [`transform3d_gpu_layout`].
+pub fn transform3d_trs_bytes(
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> FixedArray[Byte] {
+  let layout = transform3d_gpu_layout()
+  let buf = gpu_component_bytes(layout.stride)
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d layout")
+  }
+  put_gpu_f32(buf, f[0].offset + 0, px.to_double())
+  put_gpu_f32(buf, f[0].offset + 4, py.to_double())
+  put_gpu_f32(buf, f[0].offset + 8, pz.to_double())
+  put_gpu_f32(buf, f[1].offset + 0, qx)
+  put_gpu_f32(buf, f[1].offset + 4, qy)
+  put_gpu_f32(buf, f[1].offset + 8, qz)
+  put_gpu_f32(buf, f[1].offset + 12, qw)
+  put_gpu_f32(buf, f[2].offset + 0, sx.to_double())
+  put_gpu_f32(buf, f[2].offset + 4, sy.to_double())
+  put_gpu_f32(buf, f[2].offset + 8, sz.to_double())
+  buf
+}
+
+///|
 /// Decodes TRS from a zero-copy [`MutArrayView`] over one archetype row.
 pub fn Transform3D::from_component_mut_view(
   row : MutArrayView[Byte],
