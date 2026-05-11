@@ -29,124 +29,26 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-fn mat4_mul(a : Array[Double], b : Array[Double]) -> Array[Double] {
-  let o = Array::make(16, 0.0)
-  for j = 0; j < 4; j = j + 1 {
-    for i = 0; i < 4; i = i + 1 {
-      let mut s = 0.0
-      for k = 0; k < 4; k = k + 1 {
-        s = s + a[k * 4 + i] * b[j * 4 + k]
-      }
-      o[j * 4 + i] = s
-    }
-  }
-  o
-}
-
-///|
-fn mat4_translate(tx : Double, ty : Double, tz : Double) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[5] = 1.0
-  m[10] = 1.0
-  m[12] = tx
-  m[13] = ty
-  m[14] = tz
-  m[15] = 1.0
-  m
-}
-
-///|
-/// Right-handed, +X axis rotation (`c = cos θ`, `s = sin θ`).
-fn mat4_rotate_x(c : Double, s : Double) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[1] = 0.0
-  m[2] = 0.0
-  m[3] = 0.0
-  m[4] = 0.0
-  m[5] = c
-  m[6] = s
-  m[7] = 0.0
-  m[8] = 0.0
-  m[9] = -s
-  m[10] = c
-  m[11] = 0.0
-  m[12] = 0.0
-  m[13] = 0.0
-  m[14] = 0.0
-  m[15] = 1.0
-  m
-}
-
-///|
-fn mat4_rotate_y(c : Double, s : Double) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = c
-  m[1] = 0.0
-  m[2] = -s
-  m[3] = 0.0
-  m[4] = 0.0
-  m[5] = 1.0
-  m[6] = 0.0
-  m[7] = 0.0
-  m[8] = s
-  m[9] = 0.0
-  m[10] = c
-  m[11] = 0.0
-  m[12] = 0.0
-  m[13] = 0.0
-  m[14] = 0.0
-  m[15] = 1.0
-  m
-}
-
-///|
-/// Right-handed orthographic projection with OpenGL-style clip Z ∈ [-1,1] (XY matches WebGPU usage).
-fn mat4_ortho(
-  l : Double,
-  r : Double,
-  b : Double,
-  t : Double,
-  n : Double,
-  f : Double,
-) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 2.0 / (r - l)
-  m[5] = 2.0 / (t - b)
-  m[10] = -2.0 / (f - n)
-  m[12] = -(r + l) / (r - l)
-  m[13] = -(t + b) / (t - b)
-  m[14] = -(f + n) / (f - n)
-  m[15] = 1.0
-  m
-}
-
-///|
-/// Map GL-style clip Z to WebGPU NDC Z ∈ [0,1] (`z' = 0.5*z + 0.5*w`).
-fn mat4_clip_gl_depth_to_webgpu() -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[5] = 1.0
-  m[10] = 0.5
-  m[14] = 0.5
-  m[15] = 1.0
-  m
-}
-
-///|
-fn transform_hom(
-  m : Array[Double],
-  x : Double,
-  y : Double,
-  z : Double,
-) -> (Double, Double, Double, Double) {
-  let w = 1.0
-  let ox = m[0] * x + m[4] * y + m[8] * z + m[12] * w
-  let oy = m[1] * x + m[5] * y + m[9] * z + m[13] * w
-  let oz = m[2] * x + m[6] * y + m[10] * z + m[14] * w
-  let ow = m[3] * x + m[7] * y + m[11] * z + m[15] * w
-  (ox, oy, oz, ow)
+/// Right-handed rotation about **+Y** (`c = cos θ`, `s = sin θ`).
+fn rotation_y_cos_sin(c : Double, s : Double) -> @m44.Matrix44D {
+  @m44.Matrix44::new_col_major(
+    c,
+    0.0,
+    s,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    -s,
+    0.0,
+    c,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+  )
 }
 
 ///|
@@ -179,7 +81,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
 ///|
 fn write_cube_interleaved(
   buf : FixedArray[Byte],
-  mvp : Array[Double],
+  mvp : @m44.Matrix44D,
   color_r : Double,
   color_g : Double,
   color_b : Double,
@@ -187,12 +89,12 @@ fn write_cube_interleaved(
   let corners = cube_local_corners()
   for vi = 0; vi < verts_per_cube; vi = vi + 1 {
     let (lx, ly, lz) = corners[vi]
-    let (cx, cy, cz, cw) = transform_hom(mvp, lx, ly, lz)
+    let clip = mvp.mul_vec4(@v4.Vector4::new(lx, ly, lz, 1.0))
     let base = vi * vertex_stride_bytes
-    @writes.put_f32_le(buf, base + 0, cx)
-    @writes.put_f32_le(buf, base + 4, cy)
-    @writes.put_f32_le(buf, base + 8, cz)
-    @writes.put_f32_le(buf, base + 12, cw)
+    @writes.put_f32_le(buf, base + 0, clip.x())
+    @writes.put_f32_le(buf, base + 4, clip.y())
+    @writes.put_f32_le(buf, base + 8, clip.z())
+    @writes.put_f32_le(buf, base + 12, clip.w())
     @writes.put_f32_le(buf, base + 16, color_r)
     @writes.put_f32_le(buf, base + 20, color_g)
     @writes.put_f32_le(buf, base + 24, color_b)
@@ -277,22 +179,20 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let t = renderer.frame.val.to_double() * 0.03
   let c = @math.cos(t)
   let s = @math.sin(t)
-  let r = mat4_rotate_y(c, s)
-  let ta = mat4_translate(-half_separation, 0.0, 0.0)
-  let tb = mat4_translate(half_separation, 0.0, 0.0)
-  let ma = mat4_mul(r, ta)
-  let mb = mat4_mul(r, tb)
+  let r = rotation_y_cos_sin(c, s)
+  let ta = @m44.Matrix44::translation(-half_separation, 0.0, 0.0, 1.0, 0.0)
+  let tb = @m44.Matrix44::translation(half_separation, 0.0, 0.0, 1.0, 0.0)
+  let ma = r.mat_mul(ta)
+  let mb = r.mat_mul(tb)
   let v_cos = @math.cos(camera_elevation_rad)
   let v_sin = @math.sin(camera_elevation_rad)
-  let view = mat4_mul(
-    mat4_rotate_x(v_cos, v_sin),
-    mat4_translate(0.0, 0.0, -8.0),
+  let view = @m44.Matrix44::rotation_x_cos_sin(v_cos, v_sin, 1.0, 0.0).mat_mul(
+    @m44.Matrix44::translation(0.0, 0.0, -8.0, 1.0, 0.0),
   )
-  let proj = mat4_ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
-  let pv = mat4_mul(proj, view)
-  let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
-  let mvp_a = mat4_mul(z_ndc_webgpu, mat4_mul(pv, ma))
-  let mvp_b = mat4_mul(z_ndc_webgpu, mat4_mul(pv, mb))
+  let proj = @m44.Matrix44::ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
+  let pv = proj.mat_mul(view)
+  let mvp_a = pv.mat_mul(ma)
+  let mvp_b = pv.mat_mul(mb)
   let bytes_a = FixedArray::make(
     verts_per_cube * vertex_stride_bytes,
     (0 : Byte),
