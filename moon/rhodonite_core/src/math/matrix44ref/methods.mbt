@@ -391,26 +391,26 @@ pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default + Matrix44RefElem] Matrix4
       @m44.Matrix44::from_cols(
         @v4.Vector4::new(
           matrix4_cofactor_ref(self, 0, 0) / det,
-          matrix4_cofactor_ref(self, 0, 1) / det,
-          matrix4_cofactor_ref(self, 0, 2) / det,
-          matrix4_cofactor_ref(self, 0, 3) / det,
-        ),
-        @v4.Vector4::new(
           matrix4_cofactor_ref(self, 1, 0) / det,
-          matrix4_cofactor_ref(self, 1, 1) / det,
-          matrix4_cofactor_ref(self, 1, 2) / det,
-          matrix4_cofactor_ref(self, 1, 3) / det,
-        ),
-        @v4.Vector4::new(
           matrix4_cofactor_ref(self, 2, 0) / det,
-          matrix4_cofactor_ref(self, 2, 1) / det,
-          matrix4_cofactor_ref(self, 2, 2) / det,
-          matrix4_cofactor_ref(self, 2, 3) / det,
+          matrix4_cofactor_ref(self, 3, 0) / det,
         ),
         @v4.Vector4::new(
-          matrix4_cofactor_ref(self, 3, 0) / det,
+          matrix4_cofactor_ref(self, 0, 1) / det,
+          matrix4_cofactor_ref(self, 1, 1) / det,
+          matrix4_cofactor_ref(self, 2, 1) / det,
           matrix4_cofactor_ref(self, 3, 1) / det,
+        ),
+        @v4.Vector4::new(
+          matrix4_cofactor_ref(self, 0, 2) / det,
+          matrix4_cofactor_ref(self, 1, 2) / det,
+          matrix4_cofactor_ref(self, 2, 2) / det,
           matrix4_cofactor_ref(self, 3, 2) / det,
+        ),
+        @v4.Vector4::new(
+          matrix4_cofactor_ref(self, 0, 3) / det,
+          matrix4_cofactor_ref(self, 1, 3) / det,
+          matrix4_cofactor_ref(self, 2, 3) / det,
           matrix4_cofactor_ref(self, 3, 3) / det,
         ),
       ),
