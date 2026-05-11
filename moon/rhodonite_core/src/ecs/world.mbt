@@ -526,132 +526,6 @@ pub fn World::component_bytes(
 }
 
 ///|
-pub fn World::transform_component(self : World) -> ComponentTypeId {
-  self.transform_component_id
-}
-
-///|
-pub fn World::global_transform_component(self : World) -> ComponentTypeId {
-  self.global_transform_component_id
-}
-
-///|
-pub fn World::child_of_component(self : World) -> ComponentTypeId {
-  self.child_of_component_id
-}
-
-///|
-/// Copies column-major [`@m44.Matrix44F`] into a [`@m44ref.Matrix44RefF`] (same layout).
-fn matrix44f_copy_to_ref(
-  dst : @m44ref.Matrix44RefF,
-  m : @m44.Matrix44F,
-) -> Unit {
-  for c = 0; c < 4; c = c + 1 {
-    for r = 0; r < 4; r = r + 1 {
-      dst.set_at(r, c, m.data[c * 4 + r])
-    }
-  }
-}
-
-///|
-/// `leaf_tf`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
-fn World::multiply_world_chain_matrix(
-  self : World,
-  leaf : EntityId,
-  chain : Array[EntityId],
-  leaf_tf : @comp.Transform3D?,
-) -> @m44.Matrix44F? {
-  let mut world_m = @m44.Matrix44F::identity()
-  let mut i = chain.length() - 1
-  while i >= 0 {
-    let e = chain[i]
-    let tf : @comp.Transform3D = if e == leaf {
-      match leaf_tf {
-        Some(ptf) => ptf
-        None =>
-          match self.get_transform(e) {
-            Some(t) => t
-            None => return None
-          }
-      }
-    } else {
-      match self.get_transform(e) {
-        Some(t) => t
-        None => return None
-      }
-    }
-    world_m = world_m.mat_mul(tf.to_local_matrix())
-    i = i - 1
-  }
-  Some(world_m)
-}
-
-///|
-/// Computes world-space matrix from [`Transform3D`] along [`ChildOf`] ancestors (root → entity).
-/// Returns [`None`] when `entity` is dead, lacks [`Transform3D`], an ancestor lacks [`Transform3D`],
-/// a [`ChildOf`] parent is not alive, or a parent cycle is detected.
-pub fn World::compute_global_transform(
-  self : World,
-  entity : EntityId,
-) -> @m44.Matrix44F? {
-  if !self.is_alive(entity) {
-    return None
-  }
-  match self.locations[entity.index] {
-    None => None
-    Some(loc) => {
-      let sig = self.archetypes[loc.archetype_index].components
-      let tf_id = self.transform_component_id
-      if !component_array_contains(sig, tf_id) {
-        return None
-      }
-      let co_id = self.child_of_component_id
-      if !component_array_contains(sig, co_id) {
-        match self.get_transform(entity) {
-          None => None
-          Some(tf) => Some(tf.to_local_matrix())
-        }
-      } else {
-        match self.build_child_of_ancestor_chain(entity) {
-          None => None
-          Some(chain) => self.multiply_world_chain_matrix(entity, chain, None)
-        }
-      }
-    }
-  }
-}
-
-///|
-/// Used only by [`update_global_transforms_from_transforms`]: entity comes from a TF+GT query row and
-/// `leaf_tf` was decoded from that row's Transform SoA view (no [`get_transform`] on the leaf).
-/// Writes the world matrix into `gt_gpu_row` and returns whether a matrix was written.
-fn World::compute_global_transform_for_tf_gt_bulk_row(
-  self : World,
-  entity : EntityId,
-  archetype_components : Array[ComponentTypeId],
-  leaf_tf : @comp.Transform3D,
-  gt : @comp.GlobalTransform,
-) -> Bool {
-  let co_id = self.child_of_component_id
-  if !component_array_contains(archetype_components, co_id) {
-    matrix44f_copy_to_ref(gt.matrix, leaf_tf.to_local_matrix())
-    true
-  } else {
-    match self.build_child_of_ancestor_chain(entity) {
-      None => false
-      Some(chain) =>
-        match self.multiply_world_chain_matrix(entity, chain, Some(leaf_tf)) {
-          None => false
-          Some(world_m) => {
-            matrix44f_copy_to_ref(gt.matrix, world_m)
-            true
-          }
-        }
-    }
-  }
-}
-
-///|
 /// Iterates every living entity whose archetype signature **includes all** `required`
 /// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
 ///
@@ -737,19 +611,16 @@ pub fn World::for_each_entity_with_components(
 }
 
 ///|
-/// Recomputes [`GlobalTransform`] GPU payloads from [`Transform3D`] (and optional [`ChildOf`] hierarchy)
-/// for every entity that currently has **both** builtin transforms.
-pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
-  let tf = self.transform_component_id
-  let gt = self.global_transform_component_id
-  let required : Array[ComponentTypeId] = [tf, gt]
-  self.for_each_entity_with_components(required, (e, sig, payloads) => {
-    let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
-    let global_tf = @comp.GlobalTransform::view_std140_gpu_row(payloads[1])
-    if self.compute_global_transform_for_tf_gt_bulk_row(
-        e, sig, local_tf, global_tf,
-      ) {
-      let _ = self.mark_gpu_component_dirty(e, gt)
-    }
-  })
+pub fn World::transform_component(self : World) -> ComponentTypeId {
+  self.transform_component_id
+}
+
+///|
+pub fn World::global_transform_component(self : World) -> ComponentTypeId {
+  self.global_transform_component_id
+}
+
+///|
+pub fn World::child_of_component(self : World) -> ComponentTypeId {
+  self.child_of_component_id
 }
