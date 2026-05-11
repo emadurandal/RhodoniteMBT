@@ -106,3 +106,67 @@ pub fn webgpu_device_create_command_encoder(
 ) -> WebGPUCommandEncoder {
   WebGPUCommandEncoder::new(device_createCommandEncoder(device.device))
 }
+
+///|
+pub fn webgpu_render_pipeline_get_bind_group_layout(
+  pipeline : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout {
+  renderPipeline_getBindGroupLayout(pipeline, group_index)
+}
+
+///|
+fn bind_group_entry_resolved_js(
+  entry : GPUBindGroupEntry,
+) -> BindGroupEntryResolvedJs {
+  let whole_u64 : UInt64 = 0xFFFFFFFFFFFFFFFFUL
+  match entry.inner {
+    Buffer(b, buf) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_buffer(buf),
+      }
+    BufferBinding(b, buf, off, sz) => {
+      let whole = sz == whole_u64
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_buffer_binding(
+          buf,
+          js_u64_to_double(off),
+          js_u64_to_double(sz),
+          whole,
+        ),
+      }
+    }
+    TextureView(b, view) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_texture_view(view),
+      }
+    Texture(b, wt) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_texture(wt.texture),
+      }
+    Sampler(b, sam) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_sampler(sam),
+      }
+    ExternalTexture(b, ext) =>
+      BindGroupEntryResolvedJs::{
+        binding: b,
+        resource: bind_group_resource_external(ext),
+      }
+  }
+}
+
+///|
+pub fn webgpu_device_create_bind_group(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  entries : Array[GPUBindGroupEntry],
+) -> GPUBindGroup {
+  let js_entries = entries.map(fn(e) { bind_group_entry_resolved_js(e) })
+  device_createBindGroup(device.device, layout, js_entries)
+}

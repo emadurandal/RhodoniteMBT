@@ -7,13 +7,23 @@ import {
 }
 
 // Values
+pub const GPU_BUFFER_BINDING_WHOLE_SIZE : UInt64 = 0xFFFFFFFFFFFFFFFF
+
 pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8
 
 pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16
 
+pub const GPU_BUFFER_USAGE_STORAGE : UInt64 = 128
+
+pub const GPU_BUFFER_USAGE_UNIFORM : UInt64 = 64
+
 pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32
 
 pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16
+
+pub fn bindGroupLayout_release(GPUBindGroupLayout) -> Unit
+
+pub fn bindGroup_release(GPUBindGroup) -> Unit
 
 pub fn buffer_release(GPUBuffer) -> Unit
 
@@ -64,10 +74,43 @@ pub(all) struct GPUAdapter {
 pub fn GPUAdapter::release(Self) -> Unit
 pub async fn GPUAdapter::request_device(Self) -> GPUDevice
 
+pub(all) struct GPUBindGroup {
+  raw : @webgpu_objects.GPUBindGroup
+}
+
+pub(all) struct GPUBindGroupDescriptor {
+  layout : GPUBindGroupLayout
+  entries : Array[GPUBindGroupEntry]
+}
+
+pub(all) struct GPUBindGroupEntry {
+  binding : UInt
+  resource : GPUBindingResource
+}
+
+pub(all) struct GPUBindGroupLayout {
+  raw : @webgpu_objects.GPUBindGroupLayout
+}
+
+pub(all) enum GPUBindingResource {
+  Sampler(GPUSampler)
+  Texture(GPUTexture)
+  TextureView(@webgpu_objects.GPUTextureView)
+  Buffer(GPUBuffer)
+  BufferBinding(GPUBufferBinding)
+  ExternalTexture(GPUExternalTexture)
+}
+
 pub(all) struct GPUBuffer {
   raw : @webgpu_objects.GPUBuffer
 }
 pub fn GPUBuffer::release(Self) -> Unit
+
+pub(all) struct GPUBufferBinding {
+  buffer : GPUBuffer
+  offset : UInt64
+  size : UInt64
+}
 
 pub(all) struct GPUCanvasContext {
   raw : @webgpu_objects.WebGPUCanvasContext
@@ -93,6 +136,7 @@ pub fn GPUContext::get(Self) -> (GPUDevice, GPUCanvasContext, String, GPUQueue)
 pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
+pub fn GPUDevice::create_bind_group(Self, GPUBindGroupDescriptor) -> GPUBindGroup
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
@@ -102,6 +146,10 @@ pub fn GPUDevice::get(Self) -> @webgpu_objects.GPUDevice
 pub fn GPUDevice::get_queue(Self) -> GPUQueue
 pub fn GPUDevice::poll(Self, wait? : Bool) -> Bool
 pub fn GPUDevice::release(Self) -> Unit
+
+pub(all) struct GPUExternalTexture {
+  raw : @webgpu_objects.GPUExternalTexture
+}
 
 pub(all) struct GPUInstance {
   raw : @webgpu_objects.WebGPUInstance
@@ -146,6 +194,7 @@ pub fn GPURenderPassEncoder::draw(Self, Int) -> Unit
 pub fn GPURenderPassEncoder::draw_indexed(Self, Int, instance_count? : Int, first_index? : Int, base_vertex? : Int, first_instance? : Int) -> Unit
 pub fn GPURenderPassEncoder::end(Self) -> Unit
 pub fn GPURenderPassEncoder::release(Self) -> Unit
+pub fn GPURenderPassEncoder::set_bind_group(Self, UInt, GPUBindGroup, Array[UInt]) -> Unit
 pub fn GPURenderPassEncoder::set_index_buffer(Self, GPUBuffer, @webgpu_enums.GPUIndexFormat, UInt64, UInt64) -> Unit
 pub fn GPURenderPassEncoder::set_pipeline(Self, GPURenderPipeline) -> Unit
 pub fn GPURenderPassEncoder::set_vertex_buffer(Self, Int, GPUBuffer, UInt64, UInt64) -> Unit
@@ -153,6 +202,7 @@ pub fn GPURenderPassEncoder::set_vertex_buffer(Self, Int, GPUBuffer, UInt64, UIn
 pub(all) struct GPURenderPipeline {
   raw : @webgpu_objects.GPURenderPipeline
 }
+pub fn GPURenderPipeline::get_bind_group_layout(Self, UInt) -> GPUBindGroupLayout
 pub fn GPURenderPipeline::release(Self) -> Unit
 
 pub(all) struct GPURenderPipelineDescriptor {
@@ -162,6 +212,10 @@ pub(all) struct GPURenderPipelineDescriptor {
   formats : Array[String]
   vertex_buffers : Array[@webgpu_enums.GPUVertexBufferLayout]
   depth_stencil_format : String?
+}
+
+pub(all) struct GPUSampler {
+  raw : @webgpu_objects.GPUSampler
 }
 
 pub(all) struct GPUTexture {

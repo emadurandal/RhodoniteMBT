@@ -97,6 +97,14 @@ pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8UL
 pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16UL
 
 ///|
+/// WebGPU `GPUBufferUsage.STORAGE`（0x80）。
+pub const GPU_BUFFER_USAGE_STORAGE : UInt64 = 128UL
+
+///|
+/// WebGPU `GPUBufferUsage.UNIFORM`（0x40）。
+pub const GPU_BUFFER_USAGE_UNIFORM : UInt64 = 64UL
+
+///|
 pub fn GPUDevice::create_buffer(
   self : GPUDevice,
   size : UInt64,
@@ -310,6 +318,53 @@ pub fn GPURenderPassEncoder::set_pipeline(
 }
 
 ///|
+pub fn GPURenderPipeline::get_bind_group_layout(
+  self : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout {
+  {
+    raw: @raw.webgpu_render_pipeline_get_bind_group_layout(
+      self.raw,
+      group_index,
+    ),
+  }
+}
+
+///|
+pub fn GPUDevice::create_bind_group(
+  self : GPUDevice,
+  descriptor : GPUBindGroupDescriptor,
+) -> GPUBindGroup {
+  let raw_entries : Array[@raw.GPUBindGroupEntry] = descriptor.entries.map(fn(
+    entry,
+  ) {
+    match entry.resource {
+      Buffer(buf) => @raw.gp_bind_group_entry_buffer(entry.binding, buf.raw)
+      BufferBinding(bb) =>
+        @raw.gp_bind_group_entry_buffer_binding(
+          entry.binding,
+          bb.buffer.raw,
+          bb.offset,
+          bb.size,
+        )
+      TextureView(view) =>
+        @raw.gp_bind_group_entry_texture_view(entry.binding, view)
+      Texture(tex) => @raw.gp_bind_group_entry_texture(entry.binding, tex.raw)
+      Sampler(sam) => @raw.gp_bind_group_entry_sampler(entry.binding, sam.raw)
+      ExternalTexture(ext) =>
+        @raw.gp_bind_group_entry_external_texture(entry.binding, ext.raw)
+    }
+  })
+  {
+    raw: @raw.webgpu_device_create_bind_group(
+      self.raw,
+      descriptor.layout.raw,
+      raw_entries,
+    ),
+  }
+}
+
+///|
 pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
   renderPipeline_release(self)
 }
@@ -338,6 +393,21 @@ pub fn GPURenderPassEncoder::draw_indexed(
     first_index,
     base_vertex,
     first_instance,
+  )
+}
+
+///|
+pub fn GPURenderPassEncoder::set_bind_group(
+  self : GPURenderPassEncoder,
+  index : UInt,
+  group : GPUBindGroup,
+  dynamic_offsets : Array[UInt],
+) -> Unit {
+  @raw.webgpu_render_pass_encoder_set_bind_group(
+    self.raw,
+    index,
+    group.raw,
+    dynamic_offsets,
   )
 }
 

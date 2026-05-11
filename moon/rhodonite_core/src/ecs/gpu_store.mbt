@@ -1,0 +1,360 @@
+///|
+/// Per-GPU-component flat SoA: one `stride`-byte record per possible `EntityId.index`, plus dirty tracking for partial uploads.
+fn GpuComponentStore::new(
+  component : ComponentTypeId,
+  stride : Int,
+) -> GpuComponentStore {
+  let bytes : Array[Byte] = []
+  let dirty_flags : Array[Bool] = []
+  let dirty_indices : Array[Int] = []
+  { component, stride, bytes, dirty_flags, dirty_indices }
+}
+
+///|
+fn GpuComponentStore::capacity(self : GpuComponentStore) -> Int {
+  if self.stride == 0 {
+    0
+  } else {
+    self.bytes.length() / self.stride
+  }
+}
+
+///|
+/// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
+fn GpuComponentStore::ensure_capacity(
+  self : GpuComponentStore,
+  capacity : Int,
+) -> Bool {
+  let old = self.capacity()
+  if capacity <= old {
+    return false
+  }
+  for entity_i = old; entity_i < capacity; entity_i = entity_i + 1 {
+    ignore(entity_i)
+    for byte_i = 0; byte_i < self.stride; byte_i = byte_i + 1 {
+      ignore(byte_i)
+      self.bytes.push((0 : Byte))
+    }
+    self.dirty_flags.push(false)
+  }
+  true
+}
+
+///|
+/// Queues `entity_index` once for `drain_writes` (idempotent per drain cycle).
+fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit {
+  if !self.dirty_flags[index] {
+    self.dirty_flags[index] = true
+    self.dirty_indices.push(index)
+  }
+}
+
+///|
+/// Zero-copy mutable view of one logical GPU row; caller must not retain the view past store mutations.
+fn GpuComponentStore::mut_entity_row(
+  self : GpuComponentStore,
+  entity_index : Int,
+  write : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  let _ = self.ensure_capacity(entity_index + 1)
+  let base = entity_index * self.stride
+  let view = self.bytes.mut_view(start=base, end=base + self.stride)
+  write(view)
+  self.mark_dirty(entity_index)
+}
+
+///|
+/// Writes one entity slot `[entity_index * stride, ..)` and marks it dirty for GPU upload.
+fn GpuComponentStore::set_bytes(
+  self : GpuComponentStore,
+  entity_index : Int,
+  bytes : FixedArray[Byte],
+) -> Unit {
+  if bytes.length() != self.stride {
+    abort("gpu component byte length does not match gpu stride")
+  }
+  let _ = self.ensure_capacity(entity_index + 1)
+  for i = 0; i < bytes.length(); i = i + 1 {
+    self.bytes[entity_index * self.stride + i] = bytes[i]
+  }
+  self.mark_dirty(entity_index)
+}
+
+///|
+/// Zero-fills one logical GPU entity slot and marks it dirty (used by explicit clears and entity teardown).
+fn GpuComponentStore::clear_slot(
+  self : GpuComponentStore,
+  entity_index : Int,
+) -> Unit {
+  let _ = self.ensure_capacity(entity_index + 1)
+  for i = 0; i < self.stride; i = i + 1 {
+    self.bytes[entity_index * self.stride + i] = (0 : Byte)
+  }
+  self.mark_dirty(entity_index)
+}
+
+///|
+/// Inserts sorted values one-by-one (simple O(n²); fine for modest dirty counts).
+fn sort_ints(values : Array[Int]) -> Array[Int] {
+  let out : Array[Int] = []
+  for i = 0; i < values.length(); i = i + 1 {
+    let v = values[i]
+    let mut inserted = false
+    for j = 0; j < out.length(); j = j + 1 {
+      if !inserted && v < out[j] {
+        out.insert(j, v)
+        inserted = true
+      }
+    }
+    if !inserted {
+      out.push(v)
+    }
+  }
+  out
+}
+
+///|
+/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
+fn GpuComponentStore::range_bytes(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> GpuWrite {
+  let count = last - first + 1
+  let len = count * self.stride
+  let out = FixedArray::make(len, (0 : Byte))
+  let src_base = first * self.stride
+  for i = 0; i < len; i = i + 1 {
+    out[i] = self.bytes[src_base + i]
+  }
+  { byte_offset: src_base, bytes: out }
+}
+
+///|
+/// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
+fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
+  let writes : Array[GpuWrite] = []
+  if self.dirty_indices.length() == 0 {
+    return writes
+  }
+  let sorted = sort_ints(self.dirty_indices)
+  let mut first = sorted[0]
+  let mut prev = sorted[0]
+  for i = 1; i < sorted.length(); i = i + 1 {
+    let idx = sorted[i]
+    if idx == prev + 1 {
+      prev = idx
+    } else {
+      writes.push(self.range_bytes(first, prev))
+      first = idx
+      prev = idx
+    }
+  }
+  writes.push(self.range_bytes(first, prev))
+  for i = 0; i < self.dirty_indices.length(); i = i + 1 {
+    self.dirty_flags[self.dirty_indices[i]] = false
+  }
+  while self.dirty_indices.length() > 0 {
+    let _ = self.dirty_indices.pop()
+  }
+  writes
+}
+
+///|
+/// Reserves a parallel `gpu_stores` slot (`None`) aligned with registry indices.
+pub fn World::register_cpu_component(
+  self : World,
+  name : String,
+  cpu_stride : Int,
+) -> ComponentTypeId {
+  let id = self.registry.register_cpu(name, cpu_stride)
+  self.gpu_stores.push(None)
+  id
+}
+
+///|
+/// Allocates a flat store whose stride matches `gpu_layout.stride` (must pass `GpuLayout::is_valid`).
+/// GPU-visible components never allocate archetype SoA payload bytes (`cpu_stride` is always `0`).
+pub fn World::register_gpu_component(
+  self : World,
+  name : String,
+  gpu_layout : @comp.GpuLayout,
+) -> ComponentTypeId {
+  if !gpu_layout.is_valid() {
+    abort("invalid gpu layout")
+  }
+  let id = self.registry.register_gpu(name, gpu_layout)
+  self.gpu_stores.push(Some(GpuComponentStore::new(id, gpu_layout.stride)))
+  id
+}
+
+///|
+fn World::gpu_store(
+  self : World,
+  component : ComponentTypeId,
+) -> GpuComponentStore? {
+  if component.index < 0 || component.index >= self.gpu_stores.length() {
+    None
+  } else {
+    self.gpu_stores[component.index]
+  }
+}
+
+///|
+fn World::replace_gpu_store(self : World, store : GpuComponentStore) -> Unit {
+  self.gpu_stores[store.component.index] = Some(store)
+}
+
+///|
+/// Ensures every GPU store has at least `capacity` entity slots (may emit resize events for buffer recreation).
+fn World::ensure_gpu_capacity(self : World, capacity : Int) -> Unit {
+  for i = 0; i < self.gpu_stores.length(); i = i + 1 {
+    match self.gpu_stores[i] {
+      Some(store) =>
+        if store.ensure_capacity(capacity) {
+          self.resize_events.push({
+            component: store.component,
+            required_capacity: capacity,
+            needs_full_upload: true,
+          })
+          self.replace_gpu_store({
+            component: store.component,
+            stride: store.stride,
+            bytes: store.bytes,
+            dirty_flags: store.dirty_flags,
+            dirty_indices: store.dirty_indices,
+          })
+        }
+      None => ()
+    }
+  }
+}
+
+///|
+/// Zeros all GPU-visible slots for one entity index (e.g. on destroy so reused indices do not leak old GPU data).
+fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
+  for i = 0; i < self.gpu_stores.length(); i = i + 1 {
+    match self.gpu_stores[i] {
+      Some(store) => {
+        store.clear_slot(entity_index)
+        self.replace_gpu_store(store)
+      }
+      None => ()
+    }
+  }
+}
+
+///|
+/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead or `component` is not GPU-visible.
+pub fn World::set_gpu_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  if !self.is_alive(entity) {
+    return false
+  }
+  match self.gpu_store(component) {
+    Some(store) => {
+      store.set_bytes(entity.index, bytes)
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
+}
+
+///|
+/// After mutating a [`GpuVisible`] row through a [`MutArrayView`] from [`World::for_each_entity_with_components`]
+/// (or any path that writes GPU bytes without going through [`World::set_gpu_component_bytes`]), call this
+/// so [`World::drain_gpu_writes`] includes that entity slot.
+pub fn World::mark_gpu_component_dirty(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  if !self.is_alive(entity) {
+    return false
+  }
+  match self.gpu_store(component) {
+    Some(store) => {
+      store.mark_dirty(entity.index)
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
+}
+
+///|
+/// Clears one GPU slot to zeros and marks it dirty (same as destroy-side scrubbing but callable explicitly).
+pub fn World::clear_gpu_component(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  if !self.is_alive(entity) {
+    return false
+  }
+  match self.gpu_store(component) {
+    Some(store) => {
+      store.clear_slot(entity.index)
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
+}
+
+///|
+/// Reads the flat GPU bytes for a living entity (does not consult archetypes).
+pub fn World::gpu_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> FixedArray[Byte]? {
+  if !self.is_alive(entity) {
+    return None
+  }
+  match self.gpu_store(component) {
+    Some(store) =>
+      Some(
+        copy_array_range_to_fixed(
+          store.bytes,
+          entity.index * store.stride,
+          store.stride,
+        ),
+      )
+    None => None
+  }
+}
+
+///|
+/// Returns batched byte slices suitable for `write_buffer_from_fixed_array`; consumes pending dirties for this component.
+pub fn World::drain_gpu_writes(
+  self : World,
+  component : ComponentTypeId,
+) -> Array[GpuWrite] {
+  match self.gpu_store(component) {
+    Some(store) => {
+      let writes = store.drain_writes()
+      self.replace_gpu_store(store)
+      writes
+    }
+    None => []
+  }
+}
+
+///|
+/// Drains resize notifications after GPU backing arrays grow (caller may recreate `GPUBuffer` and full-upload).
+pub fn World::drain_resize_events(self : World) -> Array[GpuResizeEvent] {
+  let out : Array[GpuResizeEvent] = []
+  for i = 0; i < self.resize_events.length(); i = i + 1 {
+    out.push(self.resize_events[i])
+  }
+  while self.resize_events.length() > 0 {
+    let _ = self.resize_events.pop()
+  }
+  out
+}

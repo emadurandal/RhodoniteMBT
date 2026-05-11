@@ -29,33 +29,6 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-/// Taylor approximation for \([-π, π]\).
-fn sin_approx(a : Double) -> Double {
-  let two_pi = 6.283185307179586
-  let mut x = a
-  while x > two_pi {
-    x = x - two_pi
-  }
-  while x < 0.0 {
-    x = x + two_pi
-  }
-  let pi = 3.141592653589793
-  if x > pi {
-    x = x - two_pi
-  }
-  let x2 = x * x
-  let x3 = x2 * x
-  let x5 = x3 * x2
-  let x7 = x5 * x2
-  x - x3 / 6.0 + x5 / 120.0 - x7 / 5040.0
-}
-
-///|
-fn cos_approx(a : Double) -> Double {
-  sin_approx(a + 1.5707963267948966)
-}
-
-///|
 fn mat4_mul(a : Array[Double], b : Array[Double]) -> Array[Double] {
   let o = Array::make(16, 0.0)
   for j = 0; j < 4; j = j + 1 {
@@ -302,15 +275,15 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.03
-  let c = cos_approx(t)
-  let s = sin_approx(t)
+  let c = @math.cos(t)
+  let s = @math.sin(t)
   let r = mat4_rotate_y(c, s)
   let ta = mat4_translate(-half_separation, 0.0, 0.0)
   let tb = mat4_translate(half_separation, 0.0, 0.0)
   let ma = mat4_mul(r, ta)
   let mb = mat4_mul(r, tb)
-  let v_cos = cos_approx(camera_elevation_rad)
-  let v_sin = sin_approx(camera_elevation_rad)
+  let v_cos = @math.cos(camera_elevation_rad)
+  let v_sin = @math.sin(camera_elevation_rad)
   let view = mat4_mul(
     mat4_rotate_x(v_cos, v_sin),
     mat4_translate(0.0, 0.0, -8.0),

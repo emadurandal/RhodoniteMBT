@@ -164,6 +164,49 @@ pub fn webgpu_device_create_command_encoder(
 }
 
 ///|
+pub fn webgpu_render_pipeline_get_bind_group_layout(
+  pipeline : GPURenderPipeline,
+  group_index : UInt,
+) -> GPUBindGroupLayout {
+  GPUBindGroupLayout::{
+    raw: pipeline.raw.get_bind_group_layout_raw(group_index),
+  }
+}
+
+///|
+pub fn webgpu_device_create_bind_group(
+  device : WebGPUDevice,
+  layout : GPUBindGroupLayout,
+  entries : Array[GPUBindGroupEntry],
+) -> GPUBindGroup {
+  let n = entries.length()
+  let builder = @wgpu.BindGroupBuilder::new(max_entries=n.to_uint64())
+  for i = 0; i < n; i = i + 1 {
+    let ok = match entries[i].inner {
+      Buffer(b, buf) =>
+        builder.add_buffer(b, buf.raw, offset=0UL, size=@wgpu.WHOLE_SIZE)
+      BufferBinding(b, buf, off, sz) =>
+        builder.add_buffer(b, buf.raw, offset=off, size=sz)
+      TextureView(b, view) => builder.add_texture_view(b, view.raw)
+      Texture(b, wt) => {
+        let gv = webgpu_texture_create_view(wt)
+        builder.add_texture_view(b, gv.raw)
+      }
+      Sampler(b, sam) => builder.add_sampler(b, sam.raw)
+      ExternalTexture(_) =>
+        abort(
+          "native WebGPU: GPUExternalTexture bind group entries are not implemented",
+        )
+    }
+    if !ok {
+      abort("native WebGPU: bind group builder failed")
+    }
+  }
+  let bg = builder.finish(device.device.raw, layout.raw)
+  GPUBindGroup::{ raw: bg }
+}
+
+///|
 pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
   device.device.raw.poll(wait~)
 }

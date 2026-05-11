@@ -1,0 +1,64 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/math/matrix44ref"
+
+import {
+  "emadurandal/rhodonite_core/math/matrix44",
+  "emadurandal/rhodonite_core/math/vector3",
+  "emadurandal/rhodonite_core/math/vector4",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Matrix44Ref[T] {
+  values : MutArrayView[T]?
+  std140_row : MutArrayView[Byte]?
+}
+pub fn[T : Add + Matrix44RefElem] Matrix44Ref::add_matrix(Self[T], Self[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Matrix44RefElem] Matrix44Ref::at(Self[T], Int, Int) -> T
+pub fn[T] Matrix44Ref::data(Self[T]) -> MutArrayView[T]
+pub fn[T : Mul + Add + Sub + Matrix44RefElem] Matrix44Ref::determinant(Self[T]) -> T
+pub fn[T : Div + Matrix44RefElem] Matrix44Ref::div_scalar(Self[T], T) -> @matrix44.Matrix44[T]
+pub fn[T] Matrix44Ref::from_mut_view(MutArrayView[T]) -> Self[T]
+pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default + Matrix44RefElem] Matrix44Ref::inverse(Self[T]) -> @matrix44.Matrix44[T]?
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mat_mul(Self[T], Self[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mat_mul_matrix(Self[T], @matrix44.Matrix44[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::mul_hadamard_matrix(Self[T], Self[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Mul + Add + Matrix44RefElem] Matrix44Ref::mul_vec4(Self[T], @vector4.Vector4[T]) -> @vector4.Vector4[T]
+pub fn[T : Neg + Matrix44RefElem] Matrix44Ref::neg_matrix(Self[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::scale(Self[T], T) -> @matrix44.Matrix44[T]
+pub fn[T : Matrix44RefElem] Matrix44Ref::set_at(Self[T], Int, Int, T) -> Unit
+pub fn[T : Sub + Matrix44RefElem] Matrix44Ref::sub_matrix(Self[T], Self[T]) -> @matrix44.Matrix44[T]
+pub fn[T : Matrix44RefElem] Matrix44Ref::to_matrix44(Self[T]) -> @matrix44.Matrix44[T]
+pub fn Matrix44Ref::transform_point(Self[Float], @vector3.Vector3[Float]) -> @vector3.Vector3[Float]
+pub fn[T : Matrix44RefElem] Matrix44Ref::transpose(Self[T]) -> @matrix44.Matrix44[T]
+pub fn Matrix44Ref::view_std140_mat4x4_le_gpu_row(MutArrayView[Byte]) -> Self[Float]
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_col_major(Self[T], T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T) -> Unit
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_from_cols(Self[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T]) -> Unit
+pub fn Matrix44Ref::write_identity(Self[Float]) -> Unit
+pub fn[T : Matrix44RefElem] Matrix44Ref::write_identity_with(Self[T], T, T) -> Unit
+pub fn[T : Default + Matrix44RefElem] Matrix44Ref::write_zero(Self[T]) -> Unit
+pub impl[T : Eq + Matrix44RefElem] Eq for Matrix44Ref[T]
+pub impl[T : Show + Matrix44RefElem] Show for Matrix44Ref[T]
+
+// Type aliases
+pub type Matrix44RefD = Matrix44Ref[Double]
+
+pub type Matrix44RefF = Matrix44Ref[Float]
+
+pub type Matrix44RefI = Matrix44Ref[Int]
+
+pub type Matrix44RefU = Matrix44Ref[UInt]
+
+// Traits
+pub(open) trait Matrix44RefElem {
+  read_std140_mat4_cell(MutArrayView[Byte], Int, Int) -> Self
+  write_std140_mat4_cell(MutArrayView[Byte], Int, Int, Self) -> Unit
+}
+pub impl Matrix44RefElem for Int
+pub impl Matrix44RefElem for UInt
+pub impl Matrix44RefElem for Float
+pub impl Matrix44RefElem for Double
+

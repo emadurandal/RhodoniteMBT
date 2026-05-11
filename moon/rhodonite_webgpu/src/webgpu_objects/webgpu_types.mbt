@@ -36,3 +36,6 @@ pub type GPUCommandBuffer
 
 ///|
 pub type GPUBuffer
+
+///|
+pub type GPUBindGroupLayout

@@ -32,6 +32,14 @@ pub fn webgpu_instance_release(WebGPUInstance) -> Unit
 pub fn webgpu_context_get(WebGPUContext) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)
 pub fn webgpu_device_create_shader_module(WebGPUDevice, String) -> GPUShaderModule
 pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String], vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout], depth_stencil_format~ : String) -> GPURenderPipeline
+pub fn webgpu_render_pipeline_get_bind_group_layout(GPURenderPipeline, UInt) -> GPUBindGroupLayout
+pub fn gp_bind_group_entry_buffer(UInt, GPUBuffer) -> GPUBindGroupEntry
+pub fn gp_bind_group_entry_buffer_binding(UInt, GPUBuffer, UInt64, UInt64) -> GPUBindGroupEntry
+pub fn gp_bind_group_entry_texture_view(UInt, GPUTextureView) -> GPUBindGroupEntry
+pub fn gp_bind_group_entry_texture(UInt, WebGPUTexture) -> GPUBindGroupEntry
+pub fn gp_bind_group_entry_sampler(UInt, GPUSampler) -> GPUBindGroupEntry
+pub fn gp_bind_group_entry_external_texture(UInt, GPUExternalTexture) -> GPUBindGroupEntry
+pub fn webgpu_device_create_bind_group(WebGPUDevice, GPUBindGroupLayout, Array[GPUBindGroupEntry]) -> GPUBindGroup
 pub fn webgpu_device_create_buffer(WebGPUDevice, UInt64, UInt64) -> GPUBuffer
 pub fn webgpu_device_create_texture(WebGPUDevice, UInt, UInt, String, UInt64) -> WebGPUTexture
 pub fn webgpu_texture_release(WebGPUTexture) -> Unit
@@ -48,9 +56,12 @@ pub fn webgpu_render_pass_encoder_draw(WebGPURenderPassEncoder, Int) -> Unit
 pub fn webgpu_render_pass_encoder_set_vertex_buffer(WebGPURenderPassEncoder, Int, GPUBuffer, UInt64, UInt64) -> Unit
 pub fn webgpu_render_pass_encoder_set_index_buffer(WebGPURenderPassEncoder, GPUBuffer, @webgpu_enums.GPUIndexFormat, UInt64, UInt64) -> Unit
 pub fn webgpu_render_pass_encoder_draw_indexed(WebGPURenderPassEncoder, Int, Int, Int, Int, Int) -> Unit
+pub fn webgpu_render_pass_encoder_set_bind_group(WebGPURenderPassEncoder, UInt, GPUBindGroup, Array[UInt]) -> Unit
 pub fn webgpu_render_pass_encoder_end(WebGPURenderPassEncoder) -> Unit
 pub fn shaderModule_release(GPUShaderModule) -> Unit
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
+pub fn bindGroupLayout_release(GPUBindGroupLayout) -> Unit
+pub fn bindGroup_release(GPUBindGroup) -> Unit
 pub fn buffer_release(GPUBuffer) -> Unit
 pub fn textureView_release(GPUTextureView) -> Unit
 pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
@@ -68,12 +79,17 @@ type GPUQueue
 type GPUCanvasContext
 type GPUTexture
 type GPUTextureView
+type GPUSampler
+type GPUExternalTexture
 type GPUShaderModule
 type GPURenderPipeline
 type GPUCommandEncoder
 type GPURenderPassEncoder
 type GPUCommandBuffer
 type GPUBuffer
+type GPUBindGroupEntry
+type GPUBindGroupLayout
+type GPUBindGroup
 type HTMLCanvasElement
 type WebGPUInstance
 type WebGPUAdapter

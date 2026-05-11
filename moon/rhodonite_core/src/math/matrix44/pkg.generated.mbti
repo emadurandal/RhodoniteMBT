@@ -1,0 +1,58 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/math/matrix44"
+
+import {
+  "emadurandal/rhodonite_core/math/vector3",
+  "emadurandal/rhodonite_core/math/vector4",
+}
+
+// Values
+pub fn cols_exc(Int) -> (Int, Int, Int)
+
+pub fn[T : Mul + Add + Sub] det3_values(T, T, T, T, T, T, T, T, T) -> T
+
+pub fn rows_exc(Int) -> (Int, Int, Int)
+
+// Errors
+
+// Types and methods
+pub(all) struct Matrix44[T] {
+  data : FixedArray[T]
+}
+pub fn[T] Matrix44::at(Self[T], Int, Int) -> T
+pub fn[T] Matrix44::data(Self[T]) -> FixedArray[T]
+pub fn[T : Mul + Add + Sub] Matrix44::determinant(Self[T]) -> T
+pub fn[T : Div] Matrix44::div_scalar(Self[T], T) -> Self[T]
+pub fn[T] Matrix44::from_cols(@vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T]) -> Self[T]
+pub fn Matrix44::identity() -> Self[Float]
+pub fn[T] Matrix44::identity_with(T, T) -> Self[T]
+pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix44::inverse(Self[T]) -> Self[T]?
+pub fn[T : Mul + Add] Matrix44::mat_mul(Self[T], Self[T]) -> Self[T]
+pub fn[T : Mul + Add] Matrix44::mul_vec4(Self[T], @vector4.Vector4[T]) -> @vector4.Vector4[T]
+pub fn[T : Add + Div] Matrix44::ndc_depth_gl_to_webgpu(T, T) -> Self[T]
+pub fn[T] Matrix44::new_col_major(T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T) -> Self[T]
+pub fn[T : Add + Sub + Div + Neg] Matrix44::ortho_gl(T, T, T, T, T, T, T, T) -> Self[T]
+pub fn[T : Neg] Matrix44::rotation_x_cos_sin(T, T, T, T) -> Self[T]
+pub fn[T : Mul] Matrix44::scale(Self[T], T) -> Self[T]
+pub fn Matrix44::transform_point(Self[Float], @vector3.Vector3[Float]) -> @vector3.Vector3[Float]
+pub fn[T] Matrix44::translation(T, T, T, T, T) -> Self[T]
+pub fn[T] Matrix44::transpose(Self[T]) -> Self[T]
+pub fn[T : Default] Matrix44::zero() -> Self[T]
+pub impl[T : Add] Add for Matrix44[T]
+pub impl[T : Eq] Eq for Matrix44[T]
+pub impl[T : Mul] Mul for Matrix44[T]
+pub impl[T : Neg] Neg for Matrix44[T]
+pub impl[T : Show] Show for Matrix44[T]
+pub impl[T : Sub] Sub for Matrix44[T]
+
+// Type aliases
+pub type Matrix44D = Matrix44[Double]
+
+pub type Matrix44F = Matrix44[Float]
+
+pub type Matrix44I = Matrix44[Int]
+
+pub type Matrix44U = Matrix44[UInt]
+
+// Traits
+

@@ -1,0 +1,47 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/math/matrix33"
+
+import {
+  "emadurandal/rhodonite_core/math/vector3",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Matrix33[T] {
+  data : FixedArray[T]
+}
+pub fn[T] Matrix33::at(Self[T], Int, Int) -> T
+pub fn[T] Matrix33::data(Self[T]) -> FixedArray[T]
+pub fn[T : Mul + Add + Sub] Matrix33::determinant(Self[T]) -> T
+pub fn[T : Div] Matrix33::div_scalar(Self[T], T) -> Self[T]
+pub fn[T] Matrix33::from_cols(@vector3.Vector3[T], @vector3.Vector3[T], @vector3.Vector3[T]) -> Self[T]
+pub fn Matrix33::identity() -> Self[Float]
+pub fn[T] Matrix33::identity_with(T, T) -> Self[T]
+pub fn[T : Mul + Add + Sub + Div + Eq + Default] Matrix33::inverse(Self[T]) -> Self[T]?
+pub fn[T : Mul + Add] Matrix33::mat_mul(Self[T], Self[T]) -> Self[T]
+pub fn[T : Mul + Add] Matrix33::mul_vec(Self[T], @vector3.Vector3[T]) -> @vector3.Vector3[T]
+pub fn[T] Matrix33::new_col_major(T, T, T, T, T, T, T, T, T) -> Self[T]
+pub fn[T : Mul] Matrix33::scale(Self[T], T) -> Self[T]
+pub fn[T] Matrix33::transpose(Self[T]) -> Self[T]
+pub fn[T : Default] Matrix33::zero() -> Self[T]
+pub impl[T : Add] Add for Matrix33[T]
+pub impl[T : Eq] Eq for Matrix33[T]
+pub impl[T : Mul] Mul for Matrix33[T]
+pub impl[T : Neg] Neg for Matrix33[T]
+pub impl[T : Show] Show for Matrix33[T]
+pub impl[T : Sub] Sub for Matrix33[T]
+
+// Type aliases
+pub type Matrix33D = Matrix33[Double]
+
+pub type Matrix33F = Matrix33[Float]
+
+pub type Matrix33I = Matrix33[Int]
+
+pub type Matrix33U = Matrix33[UInt]
+
+// Traits
+

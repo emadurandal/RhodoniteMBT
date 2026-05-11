@@ -153,6 +153,16 @@ pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
 }
 
 ///|
+pub fn bindGroupLayout_release(layout : GPUBindGroupLayout) -> Unit {
+  @raw.bindGroupLayout_release(layout.raw)
+}
+
+///|
+pub fn bindGroup_release(group : GPUBindGroup) -> Unit {
+  @raw.bindGroup_release(group.raw)
+}
+
+///|
 pub fn buffer_release(buffer : GPUBuffer) -> Unit {
   @raw.buffer_release(buffer.raw)
 }
