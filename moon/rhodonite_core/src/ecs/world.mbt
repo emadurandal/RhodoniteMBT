@@ -541,40 +541,6 @@ pub fn World::child_of_component(self : World) -> ComponentTypeId {
 }
 
 ///|
-/// Walks [`ChildOf`] links upward from `start` (includes `start`). Returns [`None`] on cycle,
-/// out-of-range indices, or missing/dead parent link.
-fn World::build_child_of_ancestor_chain(
-  self : World,
-  start : EntityId,
-) -> Array[EntityId]? {
-  let chain : Array[EntityId] = []
-  let slot_count = self.generations.length()
-  let visited = FixedArray::make(slot_count, false)
-  let mut cur = start
-  let mut walking = true
-  while walking {
-    if cur.index < 0 || cur.index >= slot_count {
-      return None
-    }
-    if visited[cur.index] {
-      return None
-    }
-    visited[cur.index] = true
-    chain.push(cur)
-    match self.get_child_of(cur) {
-      None => walking = false
-      Some(parent) =>
-        if !self.is_alive(parent) {
-          return None
-        } else {
-          cur = parent
-        }
-    }
-  }
-  Some(chain)
-}
-
-///|
 /// Copies column-major [`@m44.Matrix44F`] into a [`@m44ref.Matrix44RefF`] (same layout).
 fn matrix44f_copy_to_ref(
   dst : @m44ref.Matrix44RefF,
