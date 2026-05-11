@@ -446,73 +446,55 @@ fn push_local_transforms(
   let earth_spin = t * 2.2
   let moon_orbit = t * 2.8
   let (sqx, sqy, sqz, sqw) = quat_y(sun_angle)
-  let sun_tf = @comp.transform3d_trs_bytes(
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    sqx,
-    sqy,
-    sqz,
-    sqw,
-    (0.55 : Float),
-    (0.55 : Float),
-    (0.55 : Float),
+  ignore(
+    world.set_transform_trs(
+      bodies[0],
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      sqx,
+      sqy,
+      sqz,
+      sqw,
+      (0.55 : Float),
+      (0.55 : Float),
+      (0.55 : Float),
+    ),
   )
   let ex = cos_approx(earth_orbit) * 2.35
   let ez = sin_approx(earth_orbit) * 2.35
   let (eqx, eqy, eqz, eqw) = quat_y(earth_spin)
-  let earth_tf = @comp.transform3d_trs_bytes(
-    Float::from_double(ex),
-    (0.0 : Float),
-    Float::from_double(ez),
-    eqx,
-    eqy,
-    eqz,
-    eqw,
-    (0.22 : Float),
-    (0.22 : Float),
-    (0.22 : Float),
+  ignore(
+    world.set_transform_trs(
+      bodies[1],
+      Float::from_double(ex),
+      (0.0 : Float),
+      Float::from_double(ez),
+      eqx,
+      eqy,
+      eqz,
+      eqw,
+      (0.22 : Float),
+      (0.22 : Float),
+      (0.22 : Float),
+    ),
   )
   let moon_orbit_radius = 1.05
   let mx = cos_approx(moon_orbit) * moon_orbit_radius
   let mz = sin_approx(moon_orbit) * moon_orbit_radius
-  let moon_tf = @comp.transform3d_trs_bytes(
-    Float::from_double(mx),
-    (0.0 : Float),
-    Float::from_double(mz),
-    0.0,
-    0.0,
-    0.0,
-    1.0,
-    (0.5 : Float),
-    (0.5 : Float),
-    (0.5 : Float),
-  )
-  let n_sun = sun_tf.length()
-  let n_earth = earth_tf.length()
-  let n_moon = moon_tf.length()
   ignore(
-    world.set_transform(
-      bodies[0],
-      @comp.Transform3D::from_component_mut_view(
-        sun_tf.mut_view(start=0, end=n_sun),
-      ),
-    ),
-  )
-  ignore(
-    world.set_transform(
-      bodies[1],
-      @comp.Transform3D::from_component_mut_view(
-        earth_tf.mut_view(start=0, end=n_earth),
-      ),
-    ),
-  )
-  ignore(
-    world.set_transform(
+    world.set_transform_trs(
       bodies[2],
-      @comp.Transform3D::from_component_mut_view(
-        moon_tf.mut_view(start=0, end=n_moon),
-      ),
+      Float::from_double(mx),
+      (0.0 : Float),
+      Float::from_double(mz),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (0.5 : Float),
+      (0.5 : Float),
+      (0.5 : Float),
     ),
   )
 }
