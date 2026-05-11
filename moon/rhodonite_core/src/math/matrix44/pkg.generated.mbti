@@ -32,6 +32,7 @@ pub fn[T : Mul + Add] Matrix44::mul_vec4(Self[T], @vector4.Vector4[T]) -> @vecto
 pub fn[T] Matrix44::new_col_major(T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T) -> Self[T]
 pub fn[T : Add + Sub + Div] Matrix44::ortho(T, T, T, T, T, T) -> Self[T]
 pub fn Matrix44::rotation_x_rad(Double) -> Self[Double]
+pub fn Matrix44::rotation_y_rad(Double) -> Self[Double]
 pub fn[T : Mul] Matrix44::scale(Self[T], T) -> Self[T]
 pub fn Matrix44::transform_point(Self[Float], @vector3.Vector3[Float]) -> @vector3.Vector3[Float]
 pub fn[T] Matrix44::translation(T, T, T, T, T) -> Self[T]

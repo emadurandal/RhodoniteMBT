@@ -41,6 +41,33 @@ pub fn Matrix44::rotation_x_rad(angle_rad : Double) -> Matrix44D {
 }
 
 ///|
+/// Rotation about **+Y** (radians, right-handed). Returns [`Matrix44D`] (column-major).
+pub fn Matrix44::rotation_y_rad(angle_rad : Double) -> Matrix44D {
+  let c = @math.cos(angle_rad)
+  let s = @math.sin(angle_rad)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  Matrix44::new_col_major(
+    c,
+    zero,
+    -s,
+    zero,
+    zero,
+    one,
+    zero,
+    zero,
+    s,
+    zero,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+  )
+}
+
+///|
 /// Orthographic projection (column-major) mapping the frustum to NDC:
 /// **x** and **y** in `[-1, 1]`, **z** in `[0, 1]` (WebGPU depth).
 /// `near` and `far` are depths along **negative Z** (larger magnitude = farther).

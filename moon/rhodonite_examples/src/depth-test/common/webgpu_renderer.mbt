@@ -29,29 +29,6 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-/// Right-handed rotation about **+Y** (`c = cos θ`, `s = sin θ`).
-fn rotation_y_cos_sin(c : Double, s : Double) -> @m44.Matrix44D {
-  @m44.Matrix44::new_col_major(
-    c,
-    0.0,
-    -s,
-    0.0,
-    0.0,
-    1.0,
-    0.0,
-    0.0,
-    s,
-    0.0,
-    c,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    1.0,
-  )
-}
-
-///|
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -177,16 +154,12 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.03
-  let c = @math.cos(t)
-  let s = @math.sin(t)
-  let r = rotation_y_cos_sin(c, s)
+  let r = @m44.Matrix44::rotation_y_rad(t)
   let ta = @m44.Matrix44::translation(-half_separation, 0.0, 0.0, 1.0, 0.0)
   let tb = @m44.Matrix44::translation(half_separation, 0.0, 0.0, 1.0, 0.0)
   let ma = r.mat_mul(ta)
   let mb = r.mat_mul(tb)
-  let v_cos = @math.cos(camera_elevation_rad)
-  let v_sin = @math.sin(camera_elevation_rad)
-  let view = @m44.Matrix44::rotation_x_cos_sin(v_cos, v_sin, 1.0, 0.0).mat_mul(
+  let view = @m44.Matrix44::rotation_x_rad(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -8.0, 1.0, 0.0),
   )
   let proj = @m44.Matrix44::ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
