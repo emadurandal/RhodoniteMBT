@@ -206,14 +206,108 @@ test "Matrix44F translation" {
 }
 
 ///|
-test "Matrix44F rotation_x_cos_sin identity" {
-  let m = Matrix44::rotation_x_cos_sin(
-    (1.0 : Float),
-    (0.0 : Float),
-    (1.0 : Float),
-    (0.0 : Float),
+test "Matrix44D rotation_x zero is identity" {
+  let m = Matrix44::rotation_x((0.0 : Double))
+  assert_eq(m, Matrix44::identity_with((1.0 : Double), (0.0 : Double)))
+}
+
+///|
+test "Matrix44D rotation_x matches explicit col major" {
+  let rad = (0.7 : Double)
+  let c = @math.cos(rad)
+  let s = @math.sin(rad)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  let m0 = Matrix44::new_col_major(
+    one,
+    zero,
+    zero,
+    zero,
+    zero,
+    c,
+    s,
+    zero,
+    zero,
+    -s,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
   )
-  assert_eq(m, Matrix44F::identity())
+  let m1 = Matrix44::rotation_x(rad)
+  assert_eq(m0, m1)
+}
+
+///|
+test "Matrix44D rotation_y zero is identity" {
+  let m = Matrix44::rotation_y((0.0 : Double))
+  assert_eq(m, Matrix44::identity_with((1.0 : Double), (0.0 : Double)))
+}
+
+///|
+test "Matrix44D rotation_y matches explicit col major" {
+  let rad = (0.7 : Double)
+  let c = @math.cos(rad)
+  let s = @math.sin(rad)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  let m0 = Matrix44::new_col_major(
+    c,
+    zero,
+    -s,
+    zero,
+    zero,
+    one,
+    zero,
+    zero,
+    s,
+    zero,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+  )
+  let m1 = Matrix44::rotation_y(rad)
+  assert_eq(m0, m1)
+}
+
+///|
+test "Matrix44D rotation_z zero is identity" {
+  let m = Matrix44::rotation_z((0.0 : Double))
+  assert_eq(m, Matrix44::identity_with((1.0 : Double), (0.0 : Double)))
+}
+
+///|
+test "Matrix44D rotation_z matches explicit col major" {
+  let rad = (0.7 : Double)
+  let c = @math.cos(rad)
+  let s = @math.sin(rad)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  let m0 = Matrix44::new_col_major(
+    c,
+    s,
+    zero,
+    zero,
+    -s,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+  )
+  let m1 = Matrix44::rotation_z(rad)
+  assert_eq(m0, m1)
 }
 
 ///|

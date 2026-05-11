@@ -13,9 +13,14 @@ import {
 	m4f_mul_vec4,
 	m4f_neg,
 	m4f_new_col_major,
+	m4f_ortho,
+	m4f_rotation_x,
+	m4f_rotation_y,
+	m4f_rotation_z,
 	m4f_scale,
 	m4f_sub,
 	m4f_to_string,
+	m4f_translation,
 	m4f_transform_point,
 	m4f_transpose,
 	m4f_zero,
@@ -76,6 +81,40 @@ export class Matrix44F {
 
 	static identity(): Matrix44F {
 		return new Matrix44F(m4f_identity());
+	}
+
+	/** Radians, right-handed, +X axis (column-major [`Matrix44F`]). */
+	static rotationX(angle: number): Matrix44F {
+		return new Matrix44F(m4f_rotation_x(angle));
+	}
+
+	/** Radians, right-handed, +Y axis (column-major [`Matrix44F`]). */
+	static rotationY(angle: number): Matrix44F {
+		return new Matrix44F(m4f_rotation_y(angle));
+	}
+
+	/** Radians, right-handed, +Z axis (column-major [`Matrix44F`]). */
+	static rotationZ(angle: number): Matrix44F {
+		return new Matrix44F(m4f_rotation_z(angle));
+	}
+
+	static translation(tx: number, ty: number, tz: number): Matrix44F {
+		return new Matrix44F(m4f_translation(tx, ty, tz));
+	}
+
+	/**
+	 * Orthographic projection (WebGPU-style depth in z ∈ [0, 1]);
+	 * `near` / `far` are depths along negative Z (same contract as MoonBit [`Matrix44::ortho`]).
+	 */
+	static ortho(
+		left: number,
+		right: number,
+		bottom: number,
+		top: number,
+		near: number,
+		far: number,
+	): Matrix44F {
+		return new Matrix44F(m4f_ortho(left, right, bottom, top, near, far));
 	}
 
 	at(row: number, col: number): number {

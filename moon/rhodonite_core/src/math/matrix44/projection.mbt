@@ -14,25 +14,78 @@ pub fn[T] Matrix44::translation(
 }
 
 ///|
-/// Rotation about **+X** (right-handed). Pass `cos(angle)`, `sin(angle)`, `one`, `zero`.
-pub fn[T : Neg] Matrix44::rotation_x_cos_sin(
-  cos_angle : T,
-  sin_angle : T,
-  one : T,
-  zero : T,
-) -> Matrix44[T] {
+/// Rotation about **+X** (radians, right-handed). Returns [`Matrix44D`] (column-major).
+pub fn Matrix44::rotation_x(angle : Double) -> Matrix44D {
+  let c = @math.cos(angle)
+  let s = @math.sin(angle)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
   Matrix44::new_col_major(
     one,
     zero,
     zero,
     zero,
     zero,
-    cos_angle,
-    sin_angle,
+    c,
+    s,
     zero,
     zero,
-    -sin_angle,
-    cos_angle,
+    -s,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+  )
+}
+
+///|
+/// Rotation about **+Y** (radians, right-handed). Returns [`Matrix44D`] (column-major).
+pub fn Matrix44::rotation_y(angle : Double) -> Matrix44D {
+  let c = @math.cos(angle)
+  let s = @math.sin(angle)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  Matrix44::new_col_major(
+    c,
+    zero,
+    -s,
+    zero,
+    zero,
+    one,
+    zero,
+    zero,
+    s,
+    zero,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
+  )
+}
+
+///|
+/// Rotation about **+Z** (radians, right-handed). Returns [`Matrix44D`] (column-major).
+pub fn Matrix44::rotation_z(angle : Double) -> Matrix44D {
+  let c = @math.cos(angle)
+  let s = @math.sin(angle)
+  let one = (1.0 : Double)
+  let zero = (0.0 : Double)
+  Matrix44::new_col_major(
+    c,
+    s,
+    zero,
+    zero,
+    -s,
+    c,
+    zero,
+    zero,
+    zero,
+    zero,
+    one,
     zero,
     zero,
     zero,

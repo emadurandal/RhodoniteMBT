@@ -96,6 +96,18 @@ declare module "@moon/rhodonite_core/math/js_bridge" {
 	): MoonMat4F;
 	export function m4f_zero(): MoonMat4F;
 	export function m4f_identity(): MoonMat4F;
+	export function m4f_rotation_x(angle: number): MoonMat4F;
+	export function m4f_rotation_y(angle: number): MoonMat4F;
+	export function m4f_rotation_z(angle: number): MoonMat4F;
+	export function m4f_translation(tx: number, ty: number, tz: number): MoonMat4F;
+	export function m4f_ortho(
+		left: number,
+		right: number,
+		bottom: number,
+		top: number,
+		near: number,
+		far: number,
+	): MoonMat4F;
 	export function m4f_data(m: MoonMat4F): number[];
 	export function m4f_at(m: MoonMat4F, row: number, col: number): number;
 	export function m4f_transpose(m: MoonMat4F): MoonMat4F;
