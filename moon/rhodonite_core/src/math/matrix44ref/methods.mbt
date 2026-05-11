@@ -1,45 +1,12 @@
 ///|
-fn rows_exc(skip : Int) -> (Int, Int, Int) {
-  match skip {
-    0 => (1, 2, 3)
-    1 => (0, 2, 3)
-    2 => (0, 1, 3)
-    3 => (0, 1, 2)
-    _ => abort("rows_exc: invalid skip")
-  }
-}
-
-///|
-fn cols_exc(skip : Int) -> (Int, Int, Int) {
-  rows_exc(skip)
-}
-
-///|
-fn[T : Mul + Add + Sub] det3_values(
-  a00 : T,
-  a10 : T,
-  a20 : T,
-  a01 : T,
-  a11 : T,
-  a21 : T,
-  a02 : T,
-  a12 : T,
-  a22 : T,
-) -> T {
-  a00 * (a11 * a22 - a12 * a21) -
-  a01 * (a10 * a22 - a12 * a20) +
-  a02 * (a10 * a21 - a11 * a20)
-}
-
-///|
 fn[T : Mul + Add + Sub + Matrix44RefElem] mat4_minor_ref(
   m : Matrix44Ref[T],
   skip_r : Int,
   skip_c : Int,
 ) -> T {
-  let (r0, r1, r2) = rows_exc(skip_r)
-  let (c0, c1, c2) = cols_exc(skip_c)
-  det3_values(
+  let (r0, r1, r2) = @m44.rows_exc(skip_r)
+  let (c0, c1, c2) = @m44.cols_exc(skip_c)
+  @m44.det3_values(
     m.at(r0, c0),
     m.at(r1, c0),
     m.at(r2, c0),
