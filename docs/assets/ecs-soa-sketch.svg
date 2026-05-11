@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="300" viewBox="0 0 520 300" role="img" aria-label="SoA archetype: entities as rows, components as columns">
+  <defs>
+    <style>
+      .title { font: 14px system-ui, sans-serif; fill: #1a1a1a; }
+      .label { font: 12px system-ui, sans-serif; fill: #333; }
+      .small { font: 11px system-ui, sans-serif; fill: #555; }
+      .cell { fill: #e8f4fc; stroke: #2b6cb0; stroke-width: 1.2; }
+      .hdr { fill: #bee3f8; stroke: #2b6cb0; stroke-width: 1.2; }
+      .ent { fill: #fefcbf; stroke: #b7791f; stroke-width: 1.2; }
+    </style>
+  </defs>
+  <text x="12" y="22" class="title">Archetype table (SoA)</text>
+  <text x="12" y="40" class="small">Rows = entities (dense). Columns = CpuOnly component byte columns (stride-wide cells).</text>
+  <rect x="40" y="56" width="72" height="28" class="hdr"/>
+  <text x="52" y="74" class="label">entities[]</text>
+  <rect x="120" y="56" width="100" height="28" class="hdr"/>
+  <text x="132" y="74" class="label">Transform3D</text>
+  <rect x="228" y="56" width="100" height="28" class="hdr"/>
+  <text x="248" y="74" class="label">ChildOf</text>
+  <rect x="40" y="88" width="72" height="36" class="ent"/>
+  <text x="52" y="110" class="label">E0</text>
+  <rect x="120" y="88" width="100" height="36" class="cell"/>
+  <rect x="228" y="88" width="100" height="36" class="cell"/>
+  <rect x="40" y="128" width="72" height="36" class="ent"/>
+  <text x="52" y="150" class="label">E1</text>
+  <rect x="120" y="128" width="100" height="36" class="cell"/>
+  <rect x="228" y="128" width="100" height="36" class="cell"/>
+  <rect x="40" y="168" width="72" height="36" class="ent"/>
+  <text x="52" y="190" class="label">E2</text>
+  <rect x="120" y="168" width="100" height="36" class="cell"/>
+  <rect x="228" y="168" width="100" height="36" class="cell"/>
+  <text x="12" y="230" class="label">GpuVisible (e.g. GlobalTransform)</text>
+  <text x="12" y="248" class="small">Separate flat array: slot at entity.index × stride (stable when archetype rows move).</text>
+  <rect x="360" y="88" width="140" height="116" fill="#f0fff4" stroke="#276749" stroke-width="1.2"/>
+  <text x="372" y="108" class="label">GpuComponentStore</text>
+  <text x="372" y="128" class="small">[0×stride ..)</text>
+  <text x="372" y="148" class="small">[1×stride ..)</text>
+  <text x="372" y="168" class="small">[2×stride ..)</text>
+  <text x="372" y="196" class="small">...</text>
+</svg>
