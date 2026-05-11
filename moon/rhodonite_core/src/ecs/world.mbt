@@ -30,6 +30,19 @@ fn component_array_contains_all(
 }
 
 ///|
+/// Rejects duplicate `required` entries so one callback cannot receive the same component view twice.
+fn component_array_has_duplicates(components : Array[ComponentTypeId]) -> Bool {
+  for i = 0; i < components.length(); i = i + 1 {
+    for j = i + 1; j < components.length(); j = j + 1 {
+      if components[i] == components[j] {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
 fn component_arrays_equal(
   a : Array[ComponentTypeId],
   b : Array[ComponentTypeId],
@@ -83,6 +96,14 @@ fn sorted_with_removed(
 }
 
 ///|
+/// Blocks structural mutation while a query is active so row views and entity locations stay valid.
+fn World::assert_not_querying(self : World, operation : String) -> Unit {
+  if self.query_depth > 0 {
+    abort(operation + " cannot be called while querying ECS component views")
+  }
+}
+
+///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
@@ -125,6 +146,7 @@ pub fn World::new() -> World {
     Archetype::new(empty_components, registry),
   ]
   let resize_events : Array[GpuResizeEvent] = []
+  let query_depth = 0
   {
     registry,
     generations,
@@ -134,6 +156,7 @@ pub fn World::new() -> World {
     archetypes,
     gpu_stores,
     resize_events,
+    query_depth,
     transform_component_id,
     global_transform_component_id,
     child_of_component_id,
@@ -200,6 +223,7 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 ///|
 /// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
+  self.assert_not_querying("World::create_entity")
   let entity = if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
     let index = self.free_indices[last]
@@ -222,6 +246,7 @@ pub fn World::create_entity(self : World) -> EntityId {
 ///|
 /// Removes the entity from its archetype (swap-remove), clears GPU slots at `entity.index`, frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
+  self.assert_not_querying("World::destroy_entity")
   if !self.is_alive(entity) {
     return false
   }
@@ -275,6 +300,7 @@ pub fn World::add_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_querying("World::add_component_bytes")
   if !self.is_alive(entity) {
     return false
   }
@@ -313,6 +339,7 @@ pub fn World::remove_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_not_querying("World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
   }
@@ -367,6 +394,11 @@ pub fn World::component_bytes(
 ///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
 ///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
 ///   [`ensure_gpu_capacity`]).
+///
+/// The callback must not call structural mutation APIs such as `create_entity`,
+/// `destroy_entity`, `add_component_bytes`, `remove_component`, or component registration.
+/// `for_each_entity_with_components` detects those calls and aborts because they can invalidate
+/// the archetype rows and mutable views currently being iterated.
 pub fn World::for_each_entity_with_components(
   self : World,
   required : Array[ComponentTypeId],
@@ -375,6 +407,11 @@ pub fn World::for_each_entity_with_components(
   if required.length() == 0 {
     return
   }
+  if component_array_has_duplicates(required) {
+    abort("for_each_entity_with_components: duplicate required component")
+  }
+  // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
+  self.query_depth = self.query_depth + 1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let sig = self.archetypes[ai].components
     if component_array_contains_all(sig, required) {
@@ -435,6 +472,8 @@ pub fn World::for_each_entity_with_components(
       }
     }
   }
+  // Restore the outer mutation state after the query finishes.
+  self.query_depth = self.query_depth - 1
 }
 
 ///|

@@ -349,6 +349,11 @@ test "for_each_entity_with_components matches supersets and skips empty required
     empty_hits.push(ent)
   })
   assert_eq(empty_hits.length(), 0)
+  // Query scope has ended, so normal structural mutation should work again.
+  let e_after_query = world.create_entity()
+  assert_true(
+    world.add_component_bytes(e_after_query, qa, bytes4(13, 14, 15, 16)),
+  )
 }
 
 ///|

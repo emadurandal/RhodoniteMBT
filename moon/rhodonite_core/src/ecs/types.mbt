@@ -112,6 +112,8 @@ pub struct World {
   archetypes : Array[Archetype]
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
+  /// Query nesting depth; nonzero means callback code is currently iterating component views.
+  mut query_depth : Int
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId
