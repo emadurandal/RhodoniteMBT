@@ -323,26 +323,26 @@ pub fn[T : Mul + Add + Sub + Div + Neg + Eq + Default] Matrix44::inverse(
       Matrix44::from_cols(
         @v4.Vector4::new(
           matrix4_cofactor(self, 0, 0) / det,
-          matrix4_cofactor(self, 1, 0) / det,
-          matrix4_cofactor(self, 2, 0) / det,
-          matrix4_cofactor(self, 3, 0) / det,
-        ),
-        @v4.Vector4::new(
           matrix4_cofactor(self, 0, 1) / det,
-          matrix4_cofactor(self, 1, 1) / det,
-          matrix4_cofactor(self, 2, 1) / det,
-          matrix4_cofactor(self, 3, 1) / det,
-        ),
-        @v4.Vector4::new(
           matrix4_cofactor(self, 0, 2) / det,
-          matrix4_cofactor(self, 1, 2) / det,
-          matrix4_cofactor(self, 2, 2) / det,
-          matrix4_cofactor(self, 3, 2) / det,
+          matrix4_cofactor(self, 0, 3) / det,
         ),
         @v4.Vector4::new(
-          matrix4_cofactor(self, 0, 3) / det,
+          matrix4_cofactor(self, 1, 0) / det,
+          matrix4_cofactor(self, 1, 1) / det,
+          matrix4_cofactor(self, 1, 2) / det,
           matrix4_cofactor(self, 1, 3) / det,
+        ),
+        @v4.Vector4::new(
+          matrix4_cofactor(self, 2, 0) / det,
+          matrix4_cofactor(self, 2, 1) / det,
+          matrix4_cofactor(self, 2, 2) / det,
           matrix4_cofactor(self, 2, 3) / det,
+        ),
+        @v4.Vector4::new(
+          matrix4_cofactor(self, 3, 0) / det,
+          matrix4_cofactor(self, 3, 1) / det,
+          matrix4_cofactor(self, 3, 2) / det,
           matrix4_cofactor(self, 3, 3) / det,
         ),
       ),
