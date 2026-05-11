@@ -105,11 +105,7 @@ pub fn put_gpu_f32_mut_view(
   offset : Int,
   value : Double,
 ) -> Unit {
-  let u = Float::from_double(value).reinterpret_as_uint()
-  buf[offset] = (u & 0xFFU).to_byte()
-  buf[offset + 1] = ((u >> 8) & 0xFFU).to_byte()
-  buf[offset + 2] = ((u >> 16) & 0xFFU).to_byte()
-  buf[offset + 3] = ((u >> 24) & 0xFFU).to_byte()
+  @writes.put_f32_le_mut_view(buf, offset, value)
 }
 
 ///|
