@@ -290,10 +290,10 @@ test "Matrix44D rotation_z matches explicit col major" {
   let zero = (0.0 : Double)
   let m0 = Matrix44::new_col_major(
     c,
-    -s,
-    zero,
-    zero,
     s,
+    zero,
+    zero,
+    -s,
     c,
     zero,
     zero,

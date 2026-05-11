@@ -150,10 +150,10 @@ describe("Matrix44F (MoonBit js_bridge wrapper)", () => {
 		const s = Math.sin(rad);
 		const m0 = Matrix44F.newColMajor(
 			c,
-			-s,
-			0,
-			0,
 			s,
+			0,
+			0,
+			-s,
 			c,
 			0,
 			0,

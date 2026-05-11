@@ -76,10 +76,10 @@ pub fn Matrix44::rotation_z(angle : Double) -> Matrix44D {
   let zero = (0.0 : Double)
   Matrix44::new_col_major(
     c,
-    -s,
-    zero,
-    zero,
     s,
+    zero,
+    zero,
+    -s,
     c,
     zero,
     zero,
