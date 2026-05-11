@@ -13,6 +13,29 @@ pub fn World::set_transform(
 }
 
 ///|
+/// Assigns builtin [`Transform3D`] for `entity` in archetype SoA (`cpu_stride` = layout stride).
+pub fn World::set_transform_trs(
+  self : World,
+  entity : EntityId,
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> Bool {
+  self.add_component_bytes(
+    entity,
+    self.transform_component_id,
+    @comp.transform3d_trs_bytes(px, py, pz, qx, qy, qz, qw, sx, sy, sz),
+  )
+}
+
+///|
 pub fn World::get_transform(
   self : World,
   entity : EntityId,
