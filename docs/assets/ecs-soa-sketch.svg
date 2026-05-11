@@ -1,41 +1,168 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="520" height="300" viewBox="0 0 520 300" role="img" aria-label="SoA archetype: entities as rows, components as columns">
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" role="img" aria-labelledby="title desc">
+  <title id="title">Rhodonite Core ECS SoA and GPU storage sketch</title>
+  <desc id="desc">An archetype table stores dense entity rows and CpuOnly component byte columns. GpuVisible payloads live in a separate flat store addressed by EntityId.index times stride, so GPU slots stay stable when archetype rows move.</desc>
   <defs>
     <style>
-      .title { font: 14px system-ui, sans-serif; fill: #1a1a1a; }
-      .label { font: 12px system-ui, sans-serif; fill: #333; }
-      .small { font: 11px system-ui, sans-serif; fill: #555; }
-      .cell { fill: #e8f4fc; stroke: #2b6cb0; stroke-width: 1.2; }
-      .hdr { fill: #bee3f8; stroke: #2b6cb0; stroke-width: 1.2; }
-      .ent { fill: #fefcbf; stroke: #b7791f; stroke-width: 1.2; }
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .title { font-size: 20px; font-weight: 700; fill: #102033; }
+      .subtitle { font-size: 12px; fill: #43566d; }
+      .section { font-size: 14px; font-weight: 700; fill: #18283a; }
+      .label { font-size: 12px; fill: #25364a; }
+      .small { font-size: 11px; fill: #52657b; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 11px; fill: #27384c; }
+      .panel { fill: #fbfcfe; stroke: #cbd6e2; stroke-width: 1.2; rx: 8; }
+      .soft { fill: #f3f7fb; stroke: #d6e0ea; stroke-width: 1; rx: 6; }
+      .sig { fill: #edf2ff; stroke: #6d7fc5; stroke-width: 1.2; rx: 6; }
+      .cpu-h { fill: #dff0ff; stroke: #3182bd; stroke-width: 1.2; }
+      .cpu { fill: #eff8ff; stroke: #3182bd; stroke-width: 1.1; }
+      .entity-h { fill: #fff4d8; stroke: #b7791f; stroke-width: 1.2; }
+      .entity { fill: #fffaf0; stroke: #b7791f; stroke-width: 1.1; }
+      .gpu-h { fill: #dcfce7; stroke: #2f855a; stroke-width: 1.2; }
+      .gpu { fill: #f0fdf4; stroke: #2f855a; stroke-width: 1.1; }
+      .ghost { fill: #f6f8fb; stroke: #9aa8b8; stroke-width: 1.1; stroke-dasharray: 5 4; }
+      .arrow { stroke: #66788c; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .arrow-strong { stroke: #235789; stroke-width: 1.7; fill: none; marker-end: url(#arrowStrong); }
+      .arrow-gpu { stroke: #2f855a; stroke-width: 1.7; fill: none; marker-end: url(#arrowGpu); }
+      .muted-line { stroke: #c8d3df; stroke-width: 1; }
+      .callout { fill: #ffffff; stroke: #d0d9e4; stroke-width: 1; rx: 6; }
     </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#66788c"/>
+    </marker>
+    <marker id="arrowStrong" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#235789"/>
+    </marker>
+    <marker id="arrowGpu" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#2f855a"/>
+    </marker>
   </defs>
-  <text x="12" y="22" class="title">Archetype table (SoA)</text>
-  <text x="12" y="40" class="small">Rows = entities (dense). Columns = CpuOnly component byte columns (stride-wide cells).</text>
-  <rect x="40" y="56" width="72" height="28" class="hdr"/>
-  <text x="52" y="74" class="label">entities[]</text>
-  <rect x="120" y="56" width="100" height="28" class="hdr"/>
-  <text x="132" y="74" class="label">Transform3D</text>
-  <rect x="228" y="56" width="100" height="28" class="hdr"/>
-  <text x="248" y="74" class="label">ChildOf</text>
-  <rect x="40" y="88" width="72" height="36" class="ent"/>
-  <text x="52" y="110" class="label">E0</text>
-  <rect x="120" y="88" width="100" height="36" class="cell"/>
-  <rect x="228" y="88" width="100" height="36" class="cell"/>
-  <rect x="40" y="128" width="72" height="36" class="ent"/>
-  <text x="52" y="150" class="label">E1</text>
-  <rect x="120" y="128" width="100" height="36" class="cell"/>
-  <rect x="228" y="128" width="100" height="36" class="cell"/>
-  <rect x="40" y="168" width="72" height="36" class="ent"/>
-  <text x="52" y="190" class="label">E2</text>
-  <rect x="120" y="168" width="100" height="36" class="cell"/>
-  <rect x="228" y="168" width="100" height="36" class="cell"/>
-  <text x="12" y="230" class="label">GpuVisible (e.g. GlobalTransform)</text>
-  <text x="12" y="248" class="small">Separate flat array: slot at entity.index × stride (stable when archetype rows move).</text>
-  <rect x="360" y="88" width="140" height="116" fill="#f0fff4" stroke="#276749" stroke-width="1.2"/>
-  <text x="372" y="108" class="label">GpuComponentStore</text>
-  <text x="372" y="128" class="small">[0×stride ..)</text>
-  <text x="372" y="148" class="small">[1×stride ..)</text>
-  <text x="372" y="168" class="small">[2×stride ..)</text>
-  <text x="372" y="196" class="small">...</text>
+
+  <rect x="0" y="0" width="880" height="520" fill="#ffffff"/>
+  <text x="30" y="35" class="title">Archetype SoA rows + flat GPU-visible storage</text>
+  <text x="30" y="55" class="subtitle">CpuOnly payloads are packed by archetype row. GpuVisible payloads are packed by EntityId.index.</text>
+
+  <rect x="28" y="82" width="178" height="200" class="panel"/>
+  <text x="46" y="110" class="section">World index tables</text>
+  <text x="46" y="132" class="small">EntityId.index is the stable slot key</text>
+
+  <rect x="48" y="151" width="136" height="30" class="soft"/>
+  <text x="61" y="170" class="mono">locations[12]</text>
+  <text x="61" y="193" class="mono">arch 7, row 0</text>
+
+  <rect x="48" y="212" width="136" height="30" class="soft"/>
+  <text x="61" y="231" class="mono">locations[4]</text>
+  <text x="61" y="254" class="mono">arch 7, row 1</text>
+
+  <rect x="244" y="82" width="388" height="328" class="panel"/>
+  <text x="262" y="110" class="section">Archetype 7: dense SoA table</text>
+  <text x="262" y="132" class="small">Signature is sorted ComponentTypeId list; rows can move on add/remove/destroy.</text>
+
+  <rect x="262" y="151" width="352" height="39" class="sig"/>
+  <text x="276" y="174" class="mono">signature = [Transform3D, GlobalTransform, ChildOf]</text>
+  <text x="276" y="187" class="small">GlobalTransform participates in queries, but has 0 CPU bytes here.</text>
+
+  <rect x="262" y="218" width="76" height="32" class="entity-h"/>
+  <text x="281" y="239" class="label">entities[]</text>
+  <rect x="338" y="218" width="82" height="32" class="entity-h"/>
+  <text x="360" y="239" class="label">row</text>
+  <rect x="420" y="218" width="96" height="32" class="cpu-h"/>
+  <text x="438" y="239" class="label">Transform3D</text>
+  <rect x="516" y="218" width="70" height="32" class="ghost"/>
+  <text x="531" y="239" class="label">GT</text>
+  <rect x="586" y="218" width="28" height="32" class="cpu-h"/>
+  <text x="594" y="239" class="label">CO</text>
+
+  <rect x="262" y="250" width="76" height="42" class="entity"/>
+  <text x="281" y="267" class="mono">E12:g0</text>
+  <text x="281" y="282" class="small">index 12</text>
+  <rect x="338" y="250" width="82" height="42" class="entity"/>
+  <text x="365" y="275" class="mono">0</text>
+  <rect x="420" y="250" width="96" height="42" class="cpu"/>
+  <text x="439" y="275" class="mono">row*stride</text>
+  <rect x="516" y="250" width="70" height="42" class="ghost"/>
+  <text x="526" y="268" class="mono">0 bytes</text>
+  <text x="528" y="283" class="small">signature</text>
+  <rect x="586" y="250" width="28" height="42" class="cpu"/>
+
+  <rect x="262" y="292" width="76" height="42" class="entity"/>
+  <text x="285" y="309" class="mono">E4:g2</text>
+  <text x="281" y="324" class="small">index 4</text>
+  <rect x="338" y="292" width="82" height="42" class="entity"/>
+  <text x="365" y="317" class="mono">1</text>
+  <rect x="420" y="292" width="96" height="42" class="cpu"/>
+  <text x="439" y="317" class="mono">row*stride</text>
+  <rect x="516" y="292" width="70" height="42" class="ghost"/>
+  <text x="526" y="310" class="mono">0 bytes</text>
+  <text x="528" y="325" class="small">signature</text>
+  <rect x="586" y="292" width="28" height="42" class="cpu"/>
+
+  <rect x="262" y="334" width="76" height="42" class="entity"/>
+  <text x="285" y="351" class="mono">E9:g0</text>
+  <text x="281" y="366" class="small">index 9</text>
+  <rect x="338" y="334" width="82" height="42" class="entity"/>
+  <text x="365" y="359" class="mono">2</text>
+  <rect x="420" y="334" width="96" height="42" class="cpu"/>
+  <text x="439" y="359" class="mono">row*stride</text>
+  <rect x="516" y="334" width="70" height="42" class="ghost"/>
+  <text x="526" y="352" class="mono">0 bytes</text>
+  <text x="528" y="367" class="small">signature</text>
+  <rect x="586" y="334" width="28" height="42" class="cpu"/>
+
+  <line x1="420" y1="250" x2="614" y2="250" class="muted-line"/>
+  <line x1="420" y1="292" x2="614" y2="292" class="muted-line"/>
+  <line x1="420" y1="334" x2="614" y2="334" class="muted-line"/>
+
+  <rect x="674" y="82" width="178" height="328" class="panel"/>
+  <text x="692" y="110" class="section">GpuComponentStore</text>
+  <text x="692" y="132" class="small">One flat array per GpuVisible component</text>
+
+  <rect x="694" y="151" width="136" height="39" class="gpu-h"/>
+  <text x="709" y="174" class="mono">GlobalTransform</text>
+  <text x="709" y="187" class="small">stride = GPU layout stride</text>
+
+  <rect x="694" y="218" width="50" height="30" class="gpu-h"/>
+  <text x="708" y="237" class="label">slot</text>
+  <rect x="744" y="218" width="86" height="30" class="gpu-h"/>
+  <text x="758" y="237" class="label">byte range</text>
+
+  <rect x="694" y="248" width="50" height="27" class="gpu"/>
+  <text x="714" y="266" class="mono">0</text>
+  <rect x="744" y="248" width="86" height="27" class="gpu"/>
+  <text x="755" y="266" class="mono">0 * stride</text>
+
+  <rect x="694" y="275" width="50" height="27" class="gpu"/>
+  <text x="714" y="293" class="mono">1</text>
+  <rect x="744" y="275" width="86" height="27" class="gpu"/>
+  <text x="755" y="293" class="mono">1 * stride</text>
+
+  <rect x="694" y="302" width="50" height="27" class="gpu"/>
+  <text x="711" y="320" class="mono">...</text>
+  <rect x="744" y="302" width="86" height="27" class="gpu"/>
+  <text x="765" y="320" class="mono">...</text>
+
+  <rect x="694" y="329" width="50" height="27" class="gpu"/>
+  <text x="714" y="347" class="mono">4</text>
+  <rect x="744" y="329" width="86" height="27" class="gpu"/>
+  <text x="755" y="347" class="mono">4 * stride</text>
+
+  <rect x="694" y="356" width="50" height="27" class="gpu"/>
+  <text x="711" y="374" class="mono">...</text>
+  <rect x="744" y="356" width="86" height="27" class="gpu"/>
+  <text x="765" y="374" class="mono">...</text>
+
+  <rect x="694" y="383" width="50" height="27" class="gpu"/>
+  <text x="711" y="401" class="mono">12</text>
+  <rect x="744" y="383" width="86" height="27" class="gpu"/>
+  <text x="752" y="401" class="mono">12 * stride</text>
+
+  <path d="M184 174 C210 174, 218 258, 256 270" class="arrow-strong"/>
+  <path d="M184 235 C210 235, 218 300, 256 312" class="arrow-strong"/>
+  <path d="M338 270 C638 270, 646 397, 688 397" class="arrow-gpu"/>
+  <path d="M338 312 C640 312, 646 342, 688 342" class="arrow-gpu"/>
+
+  <rect x="28" y="435" width="824" height="58" class="callout"/>
+  <text x="46" y="459" class="label">Key rule</text>
+  <text x="108" y="459" class="small">Archetype row is an implementation detail for cache-friendly CPU iteration.</text>
+  <text x="108" y="477" class="small">GpuVisible bytes are addressed as EntityId.index * stride, so their storage slot does not change when a row is swap-removed or migrated.</text>
 </svg>
