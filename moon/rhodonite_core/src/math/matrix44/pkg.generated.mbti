@@ -7,6 +7,11 @@ import {
 }
 
 // Values
+pub fn cols_exc(Int) -> (Int, Int, Int)
+
+pub fn[T : Mul + Add + Sub] det3_values(T, T, T, T, T, T, T, T, T) -> T
+
+pub fn rows_exc(Int) -> (Int, Int, Int)
 
 // Errors
 

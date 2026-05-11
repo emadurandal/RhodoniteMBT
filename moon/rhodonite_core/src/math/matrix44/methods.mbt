@@ -1,5 +1,5 @@
 ///|
-fn rows_exc(skip : Int) -> (Int, Int, Int) {
+pub fn rows_exc(skip : Int) -> (Int, Int, Int) {
   match skip {
     0 => (1, 2, 3)
     1 => (0, 2, 3)
@@ -10,12 +10,12 @@ fn rows_exc(skip : Int) -> (Int, Int, Int) {
 }
 
 ///|
-fn cols_exc(skip : Int) -> (Int, Int, Int) {
+pub fn cols_exc(skip : Int) -> (Int, Int, Int) {
   rows_exc(skip)
 }
 
 ///|
-fn[T : Mul + Add + Sub] det3_values(
+pub fn[T : Mul + Add + Sub] det3_values(
   a00 : T,
   a10 : T,
   a20 : T,
