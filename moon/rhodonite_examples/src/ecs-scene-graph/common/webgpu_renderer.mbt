@@ -24,77 +24,6 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
-fn mat4_mul(a : Array[Double], b : Array[Double]) -> Array[Double] {
-  let o = Array::make(16, 0.0)
-  for j = 0; j < 4; j = j + 1 {
-    for i = 0; i < 4; i = i + 1 {
-      let mut s = 0.0
-      for k = 0; k < 4; k = k + 1 {
-        s = s + a[k * 4 + i] * b[j * 4 + k]
-      }
-      o[j * 4 + i] = s
-    }
-  }
-  o
-}
-
-///|
-fn mat4_translate(tx : Double, ty : Double, tz : Double) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[5] = 1.0
-  m[10] = 1.0
-  m[12] = tx
-  m[13] = ty
-  m[14] = tz
-  m[15] = 1.0
-  m
-}
-
-///|
-fn mat4_rotate_x(c : Double, s : Double) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[5] = c
-  m[6] = s
-  m[9] = -s
-  m[10] = c
-  m[15] = 1.0
-  m
-}
-
-///|
-fn mat4_ortho(
-  l : Double,
-  r : Double,
-  b : Double,
-  t : Double,
-  n : Double,
-  f : Double,
-) -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 2.0 / (r - l)
-  m[5] = 2.0 / (t - b)
-  m[10] = -2.0 / (f - n)
-  m[12] = -(r + l) / (r - l)
-  m[13] = -(t + b) / (t - b)
-  m[14] = -(f + n) / (f - n)
-  m[15] = 1.0
-  m
-}
-
-///|
-fn mat4_clip_gl_depth_to_webgpu() -> Array[Double] {
-  let m = Array::make(16, 0.0)
-  m[0] = 1.0
-  m[5] = 1.0
-  m[10] = 0.5
-  m[14] = 0.5
-  m[15] = 1.0
-  m
-}
-
-///|
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -136,13 +65,11 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 ///|
 fn put_mat4_col_major_f64_to_bytes(
   out : FixedArray[Byte],
-  m : Array[Double],
+  m : @m44.Matrix44D,
 ) -> Unit {
-  for col = 0; col < 4; col = col + 1 {
-    for row = 0; row < 4; row = row + 1 {
-      let i = col * 4 + row
-      @writes.put_f32_le(out, i * 4, m[i])
-    }
+  let d = m.data()
+  for i = 0; i < 16; i = i + 1 {
+    @writes.put_f32_le(out, i * 4, d[i])
   }
 }
 
@@ -491,14 +418,13 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   }
   let v_cos = @math.cos(camera_elevation_rad)
   let v_sin = @math.sin(camera_elevation_rad)
-  let view = mat4_mul(
-    mat4_rotate_x(v_cos, v_sin),
-    mat4_translate(0.0, 0.0, -5.6),
+  let view = @m44.Matrix44::rotation_x_cos_sin(v_cos, v_sin, 1.0, 0.0).mat_mul(
+    @m44.Matrix44::translation(0.0, 0.0, -5.6, 1.0, 0.0),
   )
-  let proj = mat4_ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)
-  let pv = mat4_mul(proj, view)
-  let z_ndc_webgpu = mat4_clip_gl_depth_to_webgpu()
-  let vp = mat4_mul(z_ndc_webgpu, pv)
+  let proj = @m44.Matrix44::ortho_gl(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0, 1.0, 0.0)
+  let pv = proj.mat_mul(view)
+  let z_ndc_webgpu = @m44.Matrix44::ndc_depth_gl_to_webgpu(1.0, 0.0)
+  let vp = z_ndc_webgpu.mat_mul(pv)
   let cam_bytes = FixedArray::make(256, (0 : Byte))
   put_mat4_col_major_f64_to_bytes(cam_bytes, vp)
   renderer.queue.write_buffer_from_fixed_array(

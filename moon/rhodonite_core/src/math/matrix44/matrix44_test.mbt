@@ -170,3 +170,53 @@ test "Matrix44 Show" {
     "Matrix44::new_col_major(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
   )
 }
+
+///|
+test "Matrix44F translation" {
+  let m = Matrix44::translation(
+    (10.0 : Float),
+    (20.0 : Float),
+    (30.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let p = @v3.Vector3::new((1.0 : Float), (2.0 : Float), (3.0 : Float))
+  let q = m.transform_point(p)
+  assert_eq(q.x(), (11.0 : Float))
+  assert_eq(q.y(), (22.0 : Float))
+  assert_eq(q.z(), (33.0 : Float))
+}
+
+///|
+test "Matrix44F rotation_x_cos_sin identity" {
+  let m = Matrix44::rotation_x_cos_sin(
+    (1.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_eq(m, Matrix44F::identity())
+}
+
+///|
+test "Matrix44F ortho_gl scales xy" {
+  let m = Matrix44::ortho_gl(
+    (-1.0 : Float),
+    (1.0 : Float),
+    (-1.0 : Float),
+    (1.0 : Float),
+    (0.1 : Float),
+    (10.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_eq(m.at(0, 0), (1.0 : Float))
+  assert_eq(m.at(1, 1), (1.0 : Float))
+}
+
+///|
+test "Matrix44F ndc_depth_gl_to_webgpu" {
+  let m = Matrix44::ndc_depth_gl_to_webgpu((1.0 : Float), (0.0 : Float))
+  assert_eq(m.at(2, 2), (0.5 : Float))
+  assert_eq(m.at(2, 3), (0.5 : Float))
+}
