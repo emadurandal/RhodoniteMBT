@@ -621,17 +621,6 @@ fn World::multiply_world_chain_matrix(
 }
 
 ///|
-/// `leaf_tf`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
-fn World::multiply_world_from_chain(
-  self : World,
-  leaf : EntityId,
-  chain : Array[EntityId],
-  leaf_tf : @comp.Transform3D?,
-) -> @m44.Matrix44F? {
-  self.multiply_world_chain_matrix(leaf, chain, leaf_tf)
-}
-
-///|
 /// Computes world-space matrix from [`Transform3D`] along [`ChildOf`] ancestors (root → entity).
 /// Returns [`None`] when `entity` is dead, lacks [`Transform3D`], an ancestor lacks [`Transform3D`],
 /// a [`ChildOf`] parent is not alive, or a parent cycle is detected.
@@ -659,7 +648,7 @@ pub fn World::compute_global_transform(
       } else {
         match self.build_child_of_ancestor_chain(entity) {
           None => None
-          Some(chain) => self.multiply_world_from_chain(entity, chain, None)
+          Some(chain) => self.multiply_world_chain_matrix(entity, chain, None)
         }
       }
     }
