@@ -174,31 +174,27 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
 }
 
 ///|
-pub fn webgpu_device_create_bind_group_storage_buffer(
+pub fn webgpu_device_create_bind_group(
   device : WebGPUDevice,
   layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
+  entries : Array[GPUBindGroupBufferBinding],
 ) -> GPUBindGroup {
-  GPUBindGroup::{
-    raw: device.device.raw.create_bind_group_storage_buffer(
-      layout.raw,
-      buffer.raw,
-    ),
+  let n = entries.length()
+  let builder = @wgpu.BindGroupBuilder::new(max_entries=n.to_uint64())
+  for i = 0; i < n; i = i + 1 {
+    let e = entries[i]
+    let ok = builder.add_buffer(
+      e.binding,
+      e.buffer.raw,
+      offset=e.offset,
+      size=e.size,
+    )
+    if !ok {
+      abort("native WebGPU: bind group builder add_buffer failed")
+    }
   }
-}
-
-///|
-pub fn webgpu_device_create_bind_group_uniform_buffer(
-  device : WebGPUDevice,
-  layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
-) -> GPUBindGroup {
-  GPUBindGroup::{
-    raw: device.device.raw.create_bind_group_uniform_buffer(
-      layout.raw,
-      buffer.raw,
-    ),
-  }
+  let bg = builder.finish(device.device.raw, layout.raw)
+  GPUBindGroup::{ raw: bg }
 }
 
 ///|

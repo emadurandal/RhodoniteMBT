@@ -295,27 +295,35 @@ extern "js" fn renderPipeline_getBindGroupLayout(
   #| (pipeline, group_index) => pipeline.getBindGroupLayout(group_index)
 
 ///|
-extern "js" fn device_createBindGroupStorageBuffer(
-  device : GPUDevice,
-  layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
-) -> GPUBindGroup =
-  #| (device, layout, buffer) =>
-  #|   device.createBindGroup({
-  #|     layout,
-  #|     entries: [{ binding: 0, resource: { buffer } }],
-  #|   })
+pub(all) struct BindGroupBufferEntryJs {
+  binding : UInt
+  buffer : GPUBuffer
+  /// When true, omit `size` in `GPUBufferBinding` (and `offset` when zero).
+  whole_buffer : Bool
+  offset : Double
+  size : Double
+}
 
 ///|
-extern "js" fn device_createBindGroupUniformBuffer(
+extern "js" fn device_createBindGroup(
   device : GPUDevice,
   layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
+  entries : Array[BindGroupBufferEntryJs],
 ) -> GPUBindGroup =
-  #| (device, layout, buffer) =>
+  #| (device, layout, entries) =>
   #|   device.createBindGroup({
   #|     layout,
-  #|     entries: [{ binding: 0, resource: { buffer } }],
+  #|     entries: entries.map((e) => {
+  #|       let resource;
+  #|       if (e.whole_buffer && e.offset === 0) {
+  #|         resource = { buffer: e.buffer };
+  #|       } else if (e.whole_buffer) {
+  #|         resource = { buffer: e.buffer, offset: e.offset };
+  #|       } else {
+  #|         resource = { buffer: e.buffer, offset: e.offset, size: e.size };
+  #|       }
+  #|       return { binding: e.binding, resource };
+  #|     }),
   #|   })
 
 ///|

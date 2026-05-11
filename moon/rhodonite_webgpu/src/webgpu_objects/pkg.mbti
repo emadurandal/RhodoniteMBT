@@ -33,8 +33,8 @@ pub fn webgpu_context_get(WebGPUContext) -> (WebGPUDevice, WebGPUCanvasContext, 
 pub fn webgpu_device_create_shader_module(WebGPUDevice, String) -> GPUShaderModule
 pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String], vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout], depth_stencil_format~ : String) -> GPURenderPipeline
 pub fn webgpu_render_pipeline_get_bind_group_layout(GPURenderPipeline, UInt) -> GPUBindGroupLayout
-pub fn webgpu_device_create_bind_group_storage_buffer(WebGPUDevice, GPUBindGroupLayout, GPUBuffer) -> GPUBindGroup
-pub fn webgpu_device_create_bind_group_uniform_buffer(WebGPUDevice, GPUBindGroupLayout, GPUBuffer) -> GPUBindGroup
+pub fn gp_bind_group_buffer_binding(UInt, GPUBuffer, UInt64, UInt64) -> GPUBindGroupBufferBinding
+pub fn webgpu_device_create_bind_group(WebGPUDevice, GPUBindGroupLayout, Array[GPUBindGroupBufferBinding]) -> GPUBindGroup
 pub fn webgpu_device_create_buffer(WebGPUDevice, UInt64, UInt64) -> GPUBuffer
 pub fn webgpu_device_create_texture(WebGPUDevice, UInt, UInt, String, UInt64) -> WebGPUTexture
 pub fn webgpu_texture_release(WebGPUTexture) -> Unit
@@ -80,6 +80,7 @@ type GPUCommandEncoder
 type GPURenderPassEncoder
 type GPUCommandBuffer
 type GPUBuffer
+type GPUBindGroupBufferBinding
 type GPUBindGroupLayout
 type GPUBindGroup
 type HTMLCanvasElement

@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub const GPU_BUFFER_BINDING_WHOLE_SIZE : UInt64 = 0xFFFFFFFFFFFFFFFF
+
 pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8
 
 pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16
@@ -76,6 +78,17 @@ pub(all) struct GPUBindGroup {
   raw : @webgpu_objects.GPUBindGroup
 }
 
+pub(all) struct GPUBindGroupBufferBinding {
+  binding : UInt
+  buffer : GPUBuffer
+  offset : UInt64
+  size : UInt64
+}
+
+pub(all) enum GPUBindGroupEntry {
+  Buffer(GPUBindGroupBufferBinding)
+}
+
 pub(all) struct GPUBindGroupLayout {
   raw : @webgpu_objects.GPUBindGroupLayout
 }
@@ -109,8 +122,7 @@ pub fn GPUContext::get(Self) -> (GPUDevice, GPUCanvasContext, String, GPUQueue)
 pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
-pub fn GPUDevice::create_bind_group_storage_buffer(Self, GPUBindGroupLayout, GPUBuffer) -> GPUBindGroup
-pub fn GPUDevice::create_bind_group_uniform_buffer(Self, GPUBindGroupLayout, GPUBuffer) -> GPUBindGroup
+pub fn GPUDevice::create_bind_group(Self, GPUBindGroupLayout, Array[GPUBindGroupEntry]) -> GPUBindGroup
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline

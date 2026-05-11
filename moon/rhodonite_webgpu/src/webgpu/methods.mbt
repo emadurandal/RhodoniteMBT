@@ -331,31 +331,27 @@ pub fn GPURenderPipeline::get_bind_group_layout(
 }
 
 ///|
-pub fn GPUDevice::create_bind_group_storage_buffer(
+pub fn GPUDevice::create_bind_group(
   self : GPUDevice,
   layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
+  entries : Array[GPUBindGroupEntry],
 ) -> GPUBindGroup {
+  let raw_bindings : Array[@raw.GPUBindGroupBufferBinding] = entries.map(fn(e) {
+    match e {
+      Buffer(bg) =>
+        @raw.gp_bind_group_buffer_binding(
+          bg.binding,
+          bg.buffer.raw,
+          bg.offset,
+          bg.size,
+        )
+    }
+  })
   {
-    raw: @raw.webgpu_device_create_bind_group_storage_buffer(
+    raw: @raw.webgpu_device_create_bind_group(
       self.raw,
       layout.raw,
-      buffer.raw,
-    ),
-  }
-}
-
-///|
-pub fn GPUDevice::create_bind_group_uniform_buffer(
-  self : GPUDevice,
-  layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
-) -> GPUBindGroup {
-  {
-    raw: @raw.webgpu_device_create_bind_group_uniform_buffer(
-      self.raw,
-      layout.raw,
-      buffer.raw,
+      raw_bindings,
     ),
   }
 }

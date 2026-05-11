@@ -36,6 +36,23 @@ pub(all) struct GPUBindGroup {
 }
 
 ///|
+/// Whole-buffer bind range (matches WebGPU / `wgpu` `WGPU_WHOLE_SIZE`).
+pub const GPU_BUFFER_BINDING_WHOLE_SIZE : UInt64 = 0xFFFFFFFFFFFFFFFFUL
+
+///|
+pub(all) struct GPUBindGroupBufferBinding {
+  binding : UInt
+  buffer : GPUBuffer
+  offset : UInt64
+  size : UInt64
+}
+
+///|
+pub(all) enum GPUBindGroupEntry {
+  Buffer(GPUBindGroupBufferBinding)
+}
+
+///|
 pub(all) struct GPURenderPassColorAttachment {
   view : GPUTextureView
   clear_value : GPUColor?

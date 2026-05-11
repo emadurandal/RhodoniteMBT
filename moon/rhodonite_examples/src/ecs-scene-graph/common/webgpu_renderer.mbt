@@ -356,12 +356,22 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
     @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let camera_uniform = device.create_buffer(256UL, cam_usage)
-  let bind_transforms = device.create_bind_group_storage_buffer(
-    layout_transforms, transform_storage,
-  )
-  let bind_camera = device.create_bind_group_uniform_buffer(
-    layout_camera, camera_uniform,
-  )
+  let bind_transforms = device.create_bind_group(layout_transforms, [
+    @wgpu.GPUBindGroupEntry::Buffer({
+      binding: 0U,
+      buffer: transform_storage,
+      offset: 0UL,
+      size: @wgpu.GPU_BUFFER_BINDING_WHOLE_SIZE,
+    }),
+  ])
+  let bind_camera = device.create_bind_group(layout_camera, [
+    @wgpu.GPUBindGroupEntry::Buffer({
+      binding: 0U,
+      buffer: camera_uniform,
+      offset: 0UL,
+      size: @wgpu.GPU_BUFFER_BINDING_WHOLE_SIZE,
+    }),
+  ])
   let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vertex_byte_len = (verts_per_cube * vertex_stride_local).to_uint64()
   let vertex_buffer = device.create_buffer(vertex_byte_len, vusage)

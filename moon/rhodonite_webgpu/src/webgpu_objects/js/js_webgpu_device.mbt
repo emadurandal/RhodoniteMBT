@@ -116,19 +116,23 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
 }
 
 ///|
-pub fn webgpu_device_create_bind_group_storage_buffer(
-  device : WebGPUDevice,
-  layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
-) -> GPUBindGroup {
-  device_createBindGroupStorageBuffer(device.device, layout, buffer)
-}
+let gpu_buffer_binding_whole_size : UInt64 = 0xFFFFFFFFFFFFFFFFUL
 
 ///|
-pub fn webgpu_device_create_bind_group_uniform_buffer(
+pub fn webgpu_device_create_bind_group(
   device : WebGPUDevice,
   layout : GPUBindGroupLayout,
-  buffer : GPUBuffer,
+  entries : Array[GPUBindGroupBufferBinding],
 ) -> GPUBindGroup {
-  device_createBindGroupUniformBuffer(device.device, layout, buffer)
+  let js_entries = entries.map(fn(e) {
+    let whole = e.size == gpu_buffer_binding_whole_size
+    BindGroupBufferEntryJs::{
+      binding: e.binding,
+      buffer: e.buffer,
+      whole_buffer: whole,
+      offset: js_u64_to_double(e.offset),
+      size: js_u64_to_double(e.size),
+    }
+  })
+  device_createBindGroup(device.device, layout, js_entries)
 }
