@@ -416,7 +416,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       w.bytes,
     )
   }
-  let view = @m44.Matrix44::rotation_x_rad(camera_elevation_rad).mat_mul(
+  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -5.6, 1.0, 0.0),
   )
   let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)

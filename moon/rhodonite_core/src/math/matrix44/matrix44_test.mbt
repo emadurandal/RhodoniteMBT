@@ -206,13 +206,13 @@ test "Matrix44F translation" {
 }
 
 ///|
-test "Matrix44D rotation_x_rad zero is identity" {
-  let m = Matrix44::rotation_x_rad((0.0 : Double))
+test "Matrix44D rotation_x zero is identity" {
+  let m = Matrix44::rotation_x((0.0 : Double))
   assert_eq(m, Matrix44::identity_with((1.0 : Double), (0.0 : Double)))
 }
 
 ///|
-test "Matrix44D rotation_x_rad matches explicit col major" {
+test "Matrix44D rotation_x matches explicit col major" {
   let rad = (0.7 : Double)
   let c = @math.cos(rad)
   let s = @math.sin(rad)
@@ -236,7 +236,7 @@ test "Matrix44D rotation_x_rad matches explicit col major" {
     zero,
     one,
   )
-  let m1 = Matrix44::rotation_x_rad(rad)
+  let m1 = Matrix44::rotation_x(rad)
   assert_eq(m0, m1)
 }
 

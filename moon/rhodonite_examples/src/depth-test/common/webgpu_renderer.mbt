@@ -154,12 +154,12 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.03
-  let r = @m44.Matrix44::rotation_y_rad(t)
+  let r = @m44.Matrix44::rotation_y(t)
   let ta = @m44.Matrix44::translation(-half_separation, 0.0, 0.0, 1.0, 0.0)
   let tb = @m44.Matrix44::translation(half_separation, 0.0, 0.0, 1.0, 0.0)
   let ma = r.mat_mul(ta)
   let mb = r.mat_mul(tb)
-  let view = @m44.Matrix44::rotation_x_rad(camera_elevation_rad).mat_mul(
+  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -8.0, 1.0, 0.0),
   )
   let proj = @m44.Matrix44::ortho(-5.0, 5.0, -5.0, 5.0, 0.1, 50.0)
