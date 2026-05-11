@@ -421,10 +421,8 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let view = @m44.Matrix44::rotation_x_cos_sin(v_cos, v_sin, 1.0, 0.0).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -5.6, 1.0, 0.0),
   )
-  let proj = @m44.Matrix44::ortho_gl(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0, 1.0, 0.0)
-  let pv = proj.mat_mul(view)
-  let z_ndc_webgpu = @m44.Matrix44::ndc_depth_gl_to_webgpu(1.0, 0.0)
-  let vp = z_ndc_webgpu.mat_mul(pv)
+  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)
+  let vp = proj.mat_mul(view)
   let cam_bytes = FixedArray::make(256, (0 : Byte))
   put_mat4_col_major_f64_to_bytes(cam_bytes, vp)
   renderer.queue.write_buffer_from_fixed_array(

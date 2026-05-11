@@ -217,24 +217,15 @@ test "Matrix44F rotation_x_cos_sin identity" {
 }
 
 ///|
-test "Matrix44F ortho_gl scales xy" {
-  let m = Matrix44::ortho_gl(
+test "Matrix44F ortho scales xy" {
+  let m = Matrix44::ortho(
     (-1.0 : Float),
     (1.0 : Float),
     (-1.0 : Float),
     (1.0 : Float),
     (0.1 : Float),
     (10.0 : Float),
-    (1.0 : Float),
-    (0.0 : Float),
   )
   assert_eq(m.at(0, 0), (1.0 : Float))
   assert_eq(m.at(1, 1), (1.0 : Float))
-}
-
-///|
-test "Matrix44F ndc_depth_gl_to_webgpu" {
-  let m = Matrix44::ndc_depth_gl_to_webgpu((1.0 : Float), (0.0 : Float))
-  assert_eq(m.at(2, 2), (0.5 : Float))
-  assert_eq(m.at(2, 3), (0.5 : Float))
 }

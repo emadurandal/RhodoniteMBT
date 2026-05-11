@@ -42,49 +42,40 @@ pub fn[T : Neg] Matrix44::rotation_x_cos_sin(
 }
 
 ///|
-/// OpenGL-style orthographic projection to NDC `[-1,1]^3`. Pass `one = 1`, `zero = 0` in `T`.
-pub fn[T : Add + Sub + Div + Neg] Matrix44::ortho_gl(
+/// Orthographic projection (column-major) mapping the frustum to NDC:
+/// **x** and **y** in `[-1, 1]`, **z** in `[0, 1]` (WebGPU depth).
+/// `near` and `far` are depths along **negative Z** (larger magnitude = farther).
+/// Requires `right != left` (unity `one` is derived as `(right - left) / (right - left)`).
+pub fn[T : Add + Sub + Div] Matrix44::ortho(
   left : T,
   right : T,
   bottom : T,
   top : T,
   near : T,
   far : T,
-  one : T,
-  zero : T,
 ) -> Matrix44[T] {
+  let dx = right - left
+  let dy = top - bottom
+  let dz = near - far
+  let zero = right - right
+  let one = dx / dx
   let two = one + one
   Matrix44::new_col_major(
-    two / (right - left),
+    two / dx,
     zero,
     zero,
     zero,
     zero,
-    two / (top - bottom),
+    two / dy,
     zero,
     zero,
     zero,
     zero,
-    -two / (far - near),
+    one / dz,
     zero,
-    -(right + left) / (right - left),
-    -(top + bottom) / (top - bottom),
-    -(far + near) / (far - near),
+    (right + left) / (left - right),
+    (top + bottom) / (bottom - top),
+    near / dz,
     one,
-  )
-}
-
-///|
-/// Maps clip **Z** from OpenGL NDC (`z ∈ [-1, 1]`) to WebGPU (`z ∈ [0, 1]`).
-/// Pass `one = 1`, `zero = 0` in `T`.
-pub fn[T : Add + Div] Matrix44::ndc_depth_gl_to_webgpu(
-  one : T,
-  zero : T,
-) -> Matrix44[T] {
-  let two = one + one
-  let half = one / two
-  Matrix44::new_col_major(
-    one, zero, zero, zero, zero, one, zero, zero, zero, zero, half, zero, zero, zero,
-    half, one,
   )
 }
