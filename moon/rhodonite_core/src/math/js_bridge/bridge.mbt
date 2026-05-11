@@ -284,6 +284,48 @@ pub fn m4f_identity() -> @m44.Matrix44F {
 }
 
 ///|
+fn matrix44d_to_matrix44f(m : @m44.Matrix44D) -> @m44.Matrix44F {
+  let src = m.data()
+  let dst : FixedArray[Float] = FixedArray::make(16, (0.0 : Float))
+  for i = 0; i < 16; i = i + 1 {
+    dst[i] = Float::from_double(src[i])
+  }
+  @m44.Matrix44::{ data: dst }
+}
+
+///|
+pub fn m4f_rotation_x(angle : Float) -> @m44.Matrix44F {
+  matrix44d_to_matrix44f(@m44.Matrix44::rotation_x(angle.to_double()))
+}
+
+///|
+pub fn m4f_rotation_y(angle : Float) -> @m44.Matrix44F {
+  matrix44d_to_matrix44f(@m44.Matrix44::rotation_y(angle.to_double()))
+}
+
+///|
+pub fn m4f_rotation_z(angle : Float) -> @m44.Matrix44F {
+  matrix44d_to_matrix44f(@m44.Matrix44::rotation_z(angle.to_double()))
+}
+
+///|
+pub fn m4f_translation(tx : Float, ty : Float, tz : Float) -> @m44.Matrix44F {
+  @m44.Matrix44::translation(tx, ty, tz, (1.0 : Float), (0.0 : Float))
+}
+
+///|
+pub fn m4f_ortho(
+  left : Float,
+  right : Float,
+  bottom : Float,
+  top : Float,
+  near : Float,
+  far : Float,
+) -> @m44.Matrix44F {
+  @m44.Matrix44::ortho(left, right, bottom, top, near, far)
+}
+
+///|
 pub fn m4f_data(m : @m44.Matrix44F) -> FixedArray[Float] {
   m.data()
 }
