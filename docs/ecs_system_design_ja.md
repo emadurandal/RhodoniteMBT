@@ -25,7 +25,7 @@
 | 位置管理 | `EntityId.index` から `EntityLocation?` |
 | CPU component | アーキタイプごとの SoA column |
 | GPU-visible component | `EntityId.index * stride` で引ける flat `GpuComponentStore` |
-| クエリ | `World::for_each_entity_with_components` |
+| クエリ | `World::for_each_entity_with_components`（query 中の構造変更は `query_depth` guard で abort） |
 | GPU upload | `drain_gpu_writes` / `drain_resize_events` |
 | Transform 更新 | `World::update_global_transforms_from_transforms` |
 
@@ -102,7 +102,7 @@ pub fn Schedule::run(
 
 ## CommandBuffer
 
-`for_each_entity_with_components` の callback 中に、`add_component_bytes`、`remove_component`、`destroy_entity` を直接呼ぶ設計は避けるべきです。
+`for_each_entity_with_components` の callback 中に、`add_component_bytes`、`remove_component`、`destroy_entity` などを直接呼ぶ設計は避けるべきです。
 
 理由は、現在のアーキタイプ走査が `archetypes` と `entities` を直接走査しており、走査中の構造変更で次が起きるためです。
 
@@ -111,7 +111,9 @@ pub fn Schedule::run(
 - Entity の archetype 移行
 - 新しい archetype の追加
 
-そのため、System 内の構造変更は `CommandBuffer` に積み、System 実行後に適用します。
+現行実装では、query 実行中に構造変更系 API を呼ぶと `query_depth` guard により `abort` します。対象は `create_entity`、`destroy_entity`、`add_component_bytes`、`remove_component`、component 登録、`set_gpu_component_bytes`、`clear_gpu_component` です。
+
+そのため、System 内の構造変更は `CommandBuffer` に積み、System 実行後に適用します。これは guard を回避するためではなく、System から構造変更を安全に表現するための API 層です。
 
 ```moonbit
 pub struct CommandBuffer {
@@ -126,7 +128,7 @@ pub(all) enum WorldCommand {
 }
 ```
 
-`CreateEntity` は、生成された `EntityId` を同じ System 内ですぐ使いたい要求が出やすいため、最初は `World::create_entity` を直接許可するか、次のような callback 付き command にします。
+`CreateEntity` は、生成された `EntityId` を同じ System 内ですぐ使いたい要求が出やすいため、query 走査外では `World::create_entity` を直接使えます。query 走査中に生成したい場合は、次のような callback 付き command が候補になります。
 
 ```moonbit
 pub(all) enum WorldCommand {
@@ -137,7 +139,7 @@ pub(all) enum WorldCommand {
 
 ただし、callback 付き command は設計が複雑になりやすいので、初期実装では次の方針が現実的です。
 
-- Query 走査中の archetype 構造変更は禁止する。
+- Query 走査中の archetype 構造変更は禁止する。現行実装では `query_depth` guard 済み。
 - System の外側、または Query 走査前後では `World::create_entity` を直接使ってよい。
 - 必要になった段階で `CommandBuffer` の create API を拡張する。
 
@@ -147,7 +149,9 @@ Command の apply タイミングは、最初は **各 System の終了時** が
 
 低レベル API として `World::for_each_entity_with_components` は残すべきです。これは CPU SoA と GPU-visible flat store の両方を `MutArrayView[Byte]` として扱える、現在の ECS の中核 API です。
 
-一方で System からは、薄い `Query` helper があると書きやすくなります。
+現行実装では `required` に同じ `ComponentTypeId` を重複指定すると abort します。同じ mutable component view を複数 payload として渡す意味が曖昧なためです。
+
+一方で System からは、薄い `Query` helper があると書きやすくなります。Query helper は重複 `required` を作れないようにするか、構築時に検査するのがよいです。
 
 ```moonbit
 pub(all) struct Query {
@@ -251,7 +255,7 @@ pub struct App {
 1. `moon/rhodonite_core/src/ecs/system.mbt` を追加し、`SystemContext`、`SystemPhase`、`System`、`Schedule` を定義する。
 2. `Schedule::add_system` と `Schedule::run` を実装する。
 3. `World::update_global_transforms_from_transforms` は残したまま、同等の builtin System factory を追加する。
-4. `CommandBuffer` を追加し、System 内の構造変更は command 経由にする。
+4. `CommandBuffer` を追加し、System 内、特に query callback 内の構造変更要求は command 経由にする。
 5. 必要に応じて `Query` helper を追加する。
 6. `reads` / `writes` の conflict 検査を追加する。
 7. 並列実行や before/after 依存関係は最後に検討する。
@@ -261,7 +265,7 @@ pub struct App {
 初期段階では、次の機能は入れない方がよいです。
 
 - `World` に System list を持たせる。
-- Query callback 中に archetype 構造変更を直接許可する。
+- Query callback 中に archetype 構造変更を直接許可する。現行の `query_depth` guard は維持する。
 - read/write 宣言だけで GPU-visible component を自動 dirty にする。
 - 最初から並列 System 実行を実装する。
 - 汎用 ResourceMap を core ECS に入れる。
