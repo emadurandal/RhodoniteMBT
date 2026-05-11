@@ -62,7 +62,7 @@ test "Matrix44Ref mat_mul diagonal" {
 }
 
 ///|
-test "Matrix44Ref transpose twice" {
+test "Matrix44Ref transpose col_major_1_to_16" {
   let buf = Array::make(16, (0.0 : Float))
   let r = Matrix44Ref::from_mut_view(buf.mut_view(start=0, end=16))
   r.write_col_major(
@@ -83,7 +83,25 @@ test "Matrix44Ref transpose twice" {
     (15.0 : Float),
     (16.0 : Float),
   )
-  assert_eq(r.transpose().transpose(), r.to_matrix44())
+  let t = @m44.Matrix44::new_col_major(
+    (1.0 : Float),
+    (5.0 : Float),
+    (9.0 : Float),
+    (13.0 : Float),
+    (2.0 : Float),
+    (6.0 : Float),
+    (10.0 : Float),
+    (14.0 : Float),
+    (3.0 : Float),
+    (7.0 : Float),
+    (11.0 : Float),
+    (15.0 : Float),
+    (4.0 : Float),
+    (8.0 : Float),
+    (12.0 : Float),
+    (16.0 : Float),
+  )
+  assert_eq(r.transpose(), t)
 }
 
 ///|
