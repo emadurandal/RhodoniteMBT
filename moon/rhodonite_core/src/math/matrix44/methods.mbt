@@ -204,10 +204,10 @@ pub fn[T : Div] Matrix44::div_scalar(self : Matrix44[T], s : T) -> Matrix44[T] {
 ///|
 pub fn[T] Matrix44::transpose(self : Matrix44[T]) -> Matrix44[T] {
   Matrix44::from_cols(
-    @v4.Vector4::new(self.at(0, 0), self.at(1, 0), self.at(2, 0), self.at(3, 0)),
-    @v4.Vector4::new(self.at(0, 1), self.at(1, 1), self.at(2, 1), self.at(3, 1)),
-    @v4.Vector4::new(self.at(0, 2), self.at(1, 2), self.at(2, 2), self.at(3, 2)),
-    @v4.Vector4::new(self.at(0, 3), self.at(1, 3), self.at(2, 3), self.at(3, 3)),
+    @v4.Vector4::new(self.at(0, 0), self.at(0, 1), self.at(0, 2), self.at(0, 3)),
+    @v4.Vector4::new(self.at(1, 0), self.at(1, 1), self.at(1, 2), self.at(1, 3)),
+    @v4.Vector4::new(self.at(2, 0), self.at(2, 1), self.at(2, 2), self.at(2, 3)),
+    @v4.Vector4::new(self.at(3, 0), self.at(3, 1), self.at(3, 2), self.at(3, 3)),
   )
 }
 
