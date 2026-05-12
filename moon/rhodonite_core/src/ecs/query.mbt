@@ -51,6 +51,11 @@ pub fn Query::for_each_marking_gpu_dirty(
     abort("Query::for_each_marking_gpu_dirty: duplicate dirty component")
   }
   for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
+    if component_array_index_of(self.required, dirty_gpu_components[i]) < 0 {
+      abort(
+        "Query::for_each_marking_gpu_dirty: dirty component must be part of this query",
+      )
+    }
     match world.registry.get(dirty_gpu_components[i]) {
       None =>
         abort(

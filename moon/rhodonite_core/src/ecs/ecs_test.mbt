@@ -121,6 +121,10 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
   let e1 = world.create_entity()
   let _ = world.create_entity()
   let e3 = world.create_entity()
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e0, gpu, empty))
+  assert_true(world.add_component_bytes(e1, gpu, empty))
+  assert_true(world.add_component_bytes(e3, gpu, empty))
   let _ = world.drain_resize_events()
   assert_true(world.set_gpu_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
   assert_true(world.set_gpu_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
@@ -145,6 +149,8 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
     @comp.GpuLayout::empty(16),
   )
   let entity = world.create_entity()
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(entity, gpu, empty))
   let _ = world.drain_resize_events()
   assert_true(
     world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)),
@@ -157,6 +163,23 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
   assert_eq(writes[0].byte_offset, entity.index * 16)
   assert_eq(writes[0].bytes.length(), 16)
   assert_eq(writes[0].bytes[0], (2U & 0xFFU).to_byte())
+}
+
+///|
+test "GPU visible public APIs require entity component ownership" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuOwnership",
+    @comp.GpuLayout::empty(16),
+  )
+  let entity = world.create_entity()
+  assert_true(
+    !world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)),
+  )
+  assert_true(!world.mark_gpu_component_dirty(entity, gpu))
+  assert_true(!world.clear_gpu_component(entity, gpu))
+  assert_true(world.gpu_component_bytes(entity, gpu) is None)
+  assert_eq(world.drain_gpu_writes(gpu).length(), 0)
 }
 
 ///|
@@ -585,6 +608,8 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
     @comp.GpuLayout::empty(16),
   )
   let e = world.create_entity()
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
   let missing = EntityId::new(e.index + 100, 0)
   let commands = CommandBuffer::new()
   commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))

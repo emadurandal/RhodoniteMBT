@@ -74,6 +74,8 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 
 `set_component_bytes` は既存 component の payload 更新だけを行い、archetype 構造を変えません。`add_component_bytes` は追加専用で、既に component を持つ entity に対しては `false` を返します。`remove_component` と `add_component_bytes` は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
 
+`set_gpu_component_bytes` / `clear_gpu_component` / `mark_gpu_component_dirty` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 
 ## Schedule
@@ -145,7 +147,7 @@ query.for_each(world, fn(row) {
 })
 ```
 
-`Query::for_each_marking_gpu_dirty` は callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
+`Query::for_each_marking_gpu_dirty` は callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。dirty 対象 component は、その Query の `required` に含まれている必要があります。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 
