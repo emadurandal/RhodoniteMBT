@@ -1,13 +1,4 @@
 ///|
-fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] {
-  let out : Array[ComponentTypeId] = []
-  for i = 0; i < src.length(); i = i + 1 {
-    out.push(src[i])
-  }
-  out
-}
-
-///|
 fn component_array_index_of(
   components : Array[ComponentTypeId],
   component : ComponentTypeId,

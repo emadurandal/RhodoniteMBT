@@ -113,13 +113,16 @@ pub struct System {
   phase : SystemPhase
   reads : Array[ComponentTypeId]
   writes : Array[ComponentTypeId]
+  structural_write : Bool
   run : (World, SystemContext, CommandBuffer) -> Unit
 }
 pub fn System::conflicts_with(Self, Self) -> Bool
 pub fn System::name(Self) -> String
 pub fn System::new(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::new_with_structural_write(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
 pub fn System::phase(Self) -> SystemPhase
 pub fn System::reads(Self) -> Array[ComponentTypeId]
+pub fn System::structural_write(Self) -> Bool
 pub fn System::writes(Self) -> Array[ComponentTypeId]
 
 pub(all) struct SystemContext {
@@ -147,6 +150,10 @@ pub struct World {
   resize_events : Array[GpuResizeEvent]
   mut query_depth : Int
   mut component_registration_lock_depth : Int
+  mut system_access_depth : Int
+  mut system_access_reads : Array[ComponentTypeId]
+  mut system_access_writes : Array[ComponentTypeId]
+  mut system_access_structural_write : Bool
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId

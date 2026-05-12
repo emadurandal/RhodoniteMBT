@@ -30,6 +30,15 @@ fn component_array_contains_all(
 }
 
 ///|
+fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] {
+  let out : Array[ComponentTypeId] = []
+  for i = 0; i < src.length(); i = i + 1 {
+    out.push(src[i])
+  }
+  out
+}
+
+///|
 /// Rejects duplicate `required` entries so one callback cannot receive the same component view twice.
 fn component_array_has_duplicates(components : Array[ComponentTypeId]) -> Bool {
   for i = 0; i < components.length(); i = i + 1 {
@@ -115,6 +124,57 @@ fn World::assert_component_registration_open(
 }
 
 ///|
+fn World::system_access_active(self : World) -> Bool {
+  self.system_access_depth > 0
+}
+
+///|
+fn World::assert_system_component_read(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() &&
+    !component_array_contains(self.system_access_reads, component) &&
+    !component_array_contains(self.system_access_writes, component) {
+    abort(operation + " requires a System reads or writes declaration")
+  }
+}
+
+///|
+fn World::assert_system_component_write(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() &&
+    !component_array_contains(self.system_access_writes, component) {
+    abort(operation + " requires a System writes declaration")
+  }
+}
+
+///|
+fn World::assert_system_components_read(
+  self : World,
+  components : Array[ComponentTypeId],
+  operation : String,
+) -> Unit {
+  for i = 0; i < components.length(); i = i + 1 {
+    self.assert_system_component_read(components[i], operation)
+  }
+}
+
+///|
+fn World::assert_system_structural_write(
+  self : World,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() && !self.system_access_structural_write {
+    abort(operation + " requires a System structural write declaration")
+  }
+}
+
+///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
@@ -159,6 +219,10 @@ pub fn World::new() -> World {
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
+  let system_access_depth = 0
+  let system_access_reads : Array[ComponentTypeId] = []
+  let system_access_writes : Array[ComponentTypeId] = []
+  let system_access_structural_write = false
   {
     registry,
     generations,
@@ -170,6 +234,10 @@ pub fn World::new() -> World {
     resize_events,
     query_depth,
     component_registration_lock_depth,
+    system_access_depth,
+    system_access_reads,
+    system_access_writes,
+    system_access_structural_write,
     transform_component_id,
     global_transform_component_id,
     child_of_component_id,
@@ -200,6 +268,35 @@ fn World::unlock_component_registration(self : World) -> Unit {
 ///|
 pub fn World::component_registration_locked(self : World) -> Bool {
   self.component_registration_lock_depth > 0
+}
+
+///|
+fn World::enter_system_access(
+  self : World,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  structural_write : Bool,
+) -> Unit {
+  self.system_access_depth = self.system_access_depth + 1
+  self.system_access_reads = copy_component_array(reads)
+  self.system_access_writes = copy_component_array(writes)
+  self.system_access_structural_write = structural_write
+}
+
+///|
+fn World::exit_system_access(self : World) -> Unit {
+  if self.system_access_depth > 0 {
+    self.system_access_depth = self.system_access_depth - 1
+  }
+  if self.system_access_depth == 0 {
+    while self.system_access_reads.length() > 0 {
+      let _ = self.system_access_reads.pop()
+    }
+    while self.system_access_writes.length() > 0 {
+      let _ = self.system_access_writes.pop()
+    }
+    self.system_access_structural_write = false
+  }
 }
 
 ///|
@@ -258,6 +355,7 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 /// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
   self.assert_not_querying("World::create_entity")
+  self.assert_system_structural_write("World::create_entity")
   let entity = if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
     let index = self.free_indices[last]
@@ -281,6 +379,7 @@ pub fn World::create_entity(self : World) -> EntityId {
 /// Removes the entity from its archetype (swap-remove), clears GPU slots at `entity.index`, frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.assert_not_querying("World::destroy_entity")
+  self.assert_system_structural_write("World::destroy_entity")
   if !self.is_alive(entity) {
     return false
   }
@@ -313,6 +412,7 @@ pub fn World::has_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_system_component_read(component, "World::has_component")
   if !self.is_alive(entity) {
     return false
   }
@@ -335,6 +435,7 @@ pub fn World::add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   self.assert_not_querying("World::add_component_bytes")
+  self.assert_system_component_write(component, "World::add_component_bytes")
   if !self.is_alive(entity) {
     return false
   }
@@ -374,6 +475,7 @@ pub fn World::remove_component(
   component : ComponentTypeId,
 ) -> Bool {
   self.assert_not_querying("World::remove_component")
+  self.assert_system_component_write(component, "World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
   }
@@ -403,6 +505,7 @@ pub fn World::component_bytes(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> FixedArray[Byte]? {
+  self.assert_system_component_read(component, "World::component_bytes")
   if !self.is_alive(entity) {
     return None
   }
@@ -444,6 +547,9 @@ pub fn World::for_each_entity_with_components(
   if component_array_has_duplicates(required) {
     abort("for_each_entity_with_components: duplicate required component")
   }
+  self.assert_system_components_read(
+    required, "World::for_each_entity_with_components",
+  )
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {

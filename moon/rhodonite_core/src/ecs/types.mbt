@@ -157,6 +157,7 @@ pub struct System {
   phase : SystemPhase
   reads : Array[ComponentTypeId]
   writes : Array[ComponentTypeId]
+  structural_write : Bool
   run : (World, SystemContext, CommandBuffer) -> Unit
 }
 
@@ -181,6 +182,11 @@ pub struct World {
   mut query_depth : Int
   /// Schedule execution depth; component registration is closed while this is nonzero.
   mut component_registration_lock_depth : Int
+  /// Active system access guard; nonzero means component reads/writes are checked against declarations.
+  mut system_access_depth : Int
+  mut system_access_reads : Array[ComponentTypeId]
+  mut system_access_writes : Array[ComponentTypeId]
+  mut system_access_structural_write : Bool
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId

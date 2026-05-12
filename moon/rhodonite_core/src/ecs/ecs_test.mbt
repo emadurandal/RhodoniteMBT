@@ -675,6 +675,7 @@ test "System access arrays are copied" {
   assert_true(system.phase() == Update)
   assert_true(system.reads()[0] == qa)
   assert_true(system.writes()[0] == qb)
+  assert_true(!system.structural_write())
 }
 
 ///|
@@ -700,6 +701,44 @@ test "System conflict helpers detect same-phase access overlaps" {
   different_phase.add_system(read_a)
   different_phase.add_system(later_write_a)
   assert_true(!different_phase.has_parallel_access_conflicts())
+}
+
+///|
+test "System writes declaration also permits reads during schedule run" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemWriteCanReadA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let mut saw_first = (0 : Byte)
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("write-can-read", Update, [], [qa], (w, _ctx, _cmds) => {
+      match w.component_bytes(e, qa) {
+        Some(bytes) => saw_first = bytes[0]
+        None => abort("expected SystemWriteCanReadA bytes")
+      }
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_eq(saw_first, (1 : Byte))
+}
+
+///|
+test "System structural write declaration permits entity creation" {
+  let world = World::new()
+  let mut spawned = EntityId::new(-1, 0)
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write("spawn", Update, [], [], (w, _ctx, _cmds) => {
+      spawned = w.create_entity()
+    }),
+  )
+  schedule.add_system(
+    System::new("observe", Update, [], [], (_w, _ctx, _cmds) => ()),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(world.is_alive(spawned))
+  assert_true(schedule.has_parallel_access_conflicts())
 }
 
 ///|

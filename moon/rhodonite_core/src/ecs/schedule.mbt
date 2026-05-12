@@ -29,6 +29,8 @@ fn component_array_intersects(
 
 ///|
 fn system_access_conflicts(a : System, b : System) -> Bool {
+  a.structural_write ||
+  b.structural_write ||
   component_array_intersects(a.writes, b.writes) ||
   component_array_intersects(a.writes, b.reads) ||
   component_array_intersects(a.reads, b.writes)
@@ -56,11 +58,45 @@ pub fn System::new(
   if component_array_has_duplicates(writes) {
     abort("System::new: duplicate write component")
   }
+  if component_array_intersects(reads, writes) {
+    abort("System::new: reads and writes must not overlap")
+  }
   {
     name,
     phase,
     reads: copy_component_array(reads),
     writes: copy_component_array(writes),
+    structural_write: false,
+    run,
+  }
+}
+
+///|
+/// Builds a system that may create or destroy entities in addition to its declared component access.
+pub fn System::new_with_structural_write(
+  name : String,
+  phase : SystemPhase,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  run : (World, SystemContext, CommandBuffer) -> Unit,
+) -> System {
+  if component_array_has_duplicates(reads) {
+    abort("System::new_with_structural_write: duplicate read component")
+  }
+  if component_array_has_duplicates(writes) {
+    abort("System::new_with_structural_write: duplicate write component")
+  }
+  if component_array_intersects(reads, writes) {
+    abort(
+      "System::new_with_structural_write: reads and writes must not overlap",
+    )
+  }
+  {
+    name,
+    phase,
+    reads: copy_component_array(reads),
+    writes: copy_component_array(writes),
+    structural_write: true,
     run,
   }
 }
@@ -83,6 +119,11 @@ pub fn System::reads(self : System) -> Array[ComponentTypeId] {
 ///|
 pub fn System::writes(self : System) -> Array[ComponentTypeId] {
   copy_component_array(self.writes)
+}
+
+///|
+pub fn System::structural_write(self : System) -> Bool {
+  self.structural_write
 }
 
 ///|
@@ -156,10 +197,16 @@ pub fn Schedule::run(
       let system = self.systems[i]
       if system_phase_rank(system.phase) == phase_rank {
         let commands = CommandBuffer::new()
+        world.enter_system_access(
+          system.reads,
+          system.writes,
+          system.structural_write,
+        )
         (system.run)(world, ctx, commands)
         if !commands.apply(world) {
           ok = false
         }
+        world.exit_system_access()
       }
     }
   }
