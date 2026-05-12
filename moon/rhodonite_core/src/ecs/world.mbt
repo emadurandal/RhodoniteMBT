@@ -469,6 +469,14 @@ pub fn World::set_component_bytes(
 ) -> Bool {
   self.assert_not_querying("World::set_component_bytes")
   self.assert_system_component_write(component, "World::set_component_bytes")
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => ()
+        GpuVisible => return false
+      }
+    None => return false
+  }
   if !self.is_alive(entity) {
     return false
   }
@@ -491,16 +499,13 @@ pub fn World::set_component_bytes(
 }
 
 ///|
-/// Adds a new CPU component: migrates the entity to an archetype with an expanded sorted signature.
-pub fn World::add_component_bytes(
+/// Adds one component id to an entity archetype signature and initializes its CPU SoA bytes.
+fn World::add_component_signature(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
-  self.assert_not_querying("World::add_component_bytes")
-  self.assert_system_structural_write("World::add_component_bytes")
-  self.assert_system_component_write(component, "World::add_component_bytes")
   if !self.is_alive(entity) {
     return false
   }
@@ -525,6 +530,83 @@ pub fn World::add_component_bytes(
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   true
+}
+
+///|
+/// Adds a new CPU component: migrates the entity to an archetype with an expanded sorted signature.
+pub fn World::add_cpu_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  self.assert_not_querying("World::add_cpu_component_bytes")
+  self.assert_system_structural_write("World::add_cpu_component_bytes")
+  self.assert_system_component_write(
+    component, "World::add_cpu_component_bytes",
+  )
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => self.add_component_signature(entity, component, bytes)
+        GpuVisible => false
+      }
+    None => false
+  }
+}
+
+///|
+/// Adds a GPU-visible component ownership marker; payload lives in the flat GPU store.
+pub fn World::add_gpu_component(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  self.assert_not_querying("World::add_gpu_component")
+  self.assert_system_structural_write("World::add_gpu_component")
+  self.assert_system_component_write(component, "World::add_gpu_component")
+  if !self.is_alive(entity) {
+    return false
+  }
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => false
+        GpuVisible =>
+          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+            Some(_) => {
+              let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+              self.add_component_signature(entity, component, empty)
+            }
+            None => false
+          }
+      }
+    None => false
+  }
+}
+
+///|
+/// Adds a component using the registry kind. Prefer `add_cpu_component_bytes` or `add_gpu_component`
+/// in new code so CPU payload and GPU-visible ownership are explicit.
+pub fn World::add_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => self.add_cpu_component_bytes(entity, component, bytes)
+        GpuVisible =>
+          if bytes.length() == 0 {
+            self.add_gpu_component(entity, component)
+          } else {
+            false
+          }
+      }
+    None => false
+  }
 }
 
 ///|
@@ -617,16 +699,12 @@ fn World::for_each_query_row_payloads(
                       )
                   }
                 GpuVisible =>
-                  match self.gpu_store(required[k]) {
+                  match
+                    self.ensure_gpu_store_capacity(
+                      required[k],
+                      entity.index + 1,
+                    ) {
                     Some(store) => {
-                      let grew = store.ensure_capacity(entity.index + 1)
-                      if grew {
-                        self.resize_events.push({
-                          component: store.component,
-                          required_capacity: entity.index + 1,
-                          needs_full_upload: true,
-                        })
-                      }
                       let base = entity.index * store.stride
                       let view = store.bytes.mut_view(
                         start=base,

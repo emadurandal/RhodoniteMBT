@@ -122,20 +122,20 @@ sequenceDiagram
 
 ## Adding/removing components and archetype migration
 
-`add_component_bytes` / `remove_component` in short:
+`add_cpu_component_bytes` / `add_gpu_component` / `remove_component` in short:
 
-1. If the signature **already** contains the type, **overwrite** bytes in the same archetype row.
+1. If the signature **already** contains the type, return `false`; existing CPU payloads are updated with `set_component_bytes`.
 2. Otherwise **materialize** a new signature’s archetype via `ensure_archetype`.
 3. Allocate a **new row** for the entity, `copy_row_to` overlapping columns.
-4. Apply the new write (on add).
+4. Apply the new CPU bytes on `add_cpu_component_bytes`, or add only the signature marker on `add_gpu_component`.
 5. **Remove** the old row with `swap_remove_row`. If the last row moved, **`update_moved_location`** fixes that entity’s `locations` entry.
 
 ```mermaid
 flowchart TD
-  start[add_component_bytes E C bytes]
+  start[add_cpu_component_bytes/add_gpu_component E C]
   alive{is_alive E}
   has{has_component E C}
-  same[set_component_bytes same archetype row]
+  same[return false]
   migrate[ensure_archetype new signature]
   copy[copy_row_to new row set bytes]
   swap[swap_remove_row old row fix locations]
@@ -181,7 +181,7 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
+Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_cpu_component_bytes`, `add_gpu_component`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
 
 Use `CommandBuffer` when a query/system wants to request changes during iteration:
 
@@ -189,7 +189,7 @@ Use `CommandBuffer` when a query/system wants to request changes during iteratio
 let commands = CommandBuffer::new()
 query.for_each(world, fn(row) {
   commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
+  commands.add_cpu_component_bytes(row.entity(), new_component, bytes)
 })
 let _ = commands.apply(world)
 ```
@@ -224,6 +224,8 @@ The built-in transform update can also be registered with `transform_propagation
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
 - **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**.
+
+GPU-visible component ownership is added with `add_gpu_component`; payload writes use `set_gpu_component_bytes`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path.
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) calls `update_global_transforms_from_transforms`, then `drain_gpu_writes(global_transform)`, then `queue.write_buffer_from_fixed_array`.
 
@@ -281,7 +283,7 @@ ignore(world.set_global_transform(e, Matrix44F::identity()))
 
 // Custom CPU component
 let tag = world.register_cpu_component("Tag", 4)
-ignore(world.add_component_bytes(e, tag, tag_bytes))
+ignore(world.add_cpu_component_bytes(e, tag, tag_bytes))
 
 // Query (e.g. TF + GT together)
 let required = [world.transform_component(), world.global_transform_component()]

@@ -15,7 +15,7 @@ pub fn World::set_child_of(
     ) {
     false
   } else {
-    self.add_component_bytes(entity, id, bytes)
+    self.add_cpu_component_bytes(entity, id, bytes)
   }
 }
 

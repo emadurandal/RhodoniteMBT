@@ -13,12 +13,11 @@ pub fn World::set_global_transform(
       ) {
       return false
     }
-    let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-    if !self.add_component_bytes(entity, id, empty) {
+    if !self.add_gpu_component(entity, id) {
       return false
     }
   }
-  match self.gpu_store(id) {
+  match self.ensure_gpu_store_capacity(id, entity.index + 1) {
     Some(store) => {
       store.mut_entity_row(entity.index, fn(view) {
         @comp.matrix44f_write_std140_mat4_to_gpu_row(m, view)

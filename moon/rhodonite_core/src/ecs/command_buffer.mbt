@@ -33,6 +33,25 @@ pub fn CommandBuffer::add_component_bytes(
 }
 
 ///|
+pub fn CommandBuffer::add_cpu_component_bytes(
+  self : CommandBuffer,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Unit {
+  self.commands.push(AddComponentBytes(entity, component, bytes))
+}
+
+///|
+pub fn CommandBuffer::add_gpu_component(
+  self : CommandBuffer,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Unit {
+  self.commands.push(AddGpuComponent(entity, component))
+}
+
+///|
 pub fn CommandBuffer::set_component_bytes(
   self : CommandBuffer,
   entity : EntityId,
@@ -82,6 +101,8 @@ pub fn CommandBuffer::apply(self : CommandBuffer, world : World) -> Bool {
       DestroyEntity(entity) => world.destroy_entity(entity)
       AddComponentBytes(entity, component, bytes) =>
         world.add_component_bytes(entity, component, bytes)
+      AddGpuComponent(entity, component) =>
+        world.add_gpu_component(entity, component)
       SetComponentBytes(entity, component, bytes) =>
         world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>

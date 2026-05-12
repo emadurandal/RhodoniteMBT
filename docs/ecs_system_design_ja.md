@@ -69,12 +69,16 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `set_component_bytes` | `writes` |
 | `set_gpu_component_bytes` / `clear_gpu_component` | `writes` |
 | `mark_gpu_component_dirty` / `drain_gpu_writes` | `writes` |
-| `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
+| `add_cpu_component_bytes` / `add_gpu_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
 | `create_entity` / `destroy_entity` | `structural_write` |
 
-`set_component_bytes` は既存 component の payload 更新だけを行い、archetype 構造を変えません。`add_component_bytes` は追加専用で、既に component を持つ entity に対しては `false` を返します。`remove_component` と `add_component_bytes` は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
+`set_component_bytes` は既存 CPU component の payload 更新だけを行い、archetype 構造を変えません。GPU-visible component の payload は `set_gpu_component_bytes` で更新します。
+
+component 所有の追加は、CPU payload を伴う `add_cpu_component_bytes` と、GPU-visible component の所有 marker を追加する `add_gpu_component` に分けています。互換用の `add_component_bytes` は registry kind に応じて dispatch しますが、新しいコードでは明示的な API を使う方針です。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
 
 `set_gpu_component_bytes` / `clear_gpu_component` / `mark_gpu_component_dirty` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_gpu_component`、`set_gpu_component_bytes`、`clear_gpu_component`、`mark_gpu_component_dirty`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
 
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 
@@ -102,6 +106,7 @@ System から遅延適用したい変更は `CommandBuffer` に積みます。
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  AddGpuComponent(EntityId, ComponentTypeId)
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
@@ -109,7 +114,7 @@ pub(all) enum WorldCommand {
 }
 ```
 
-`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。
+`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。CPU component の追加は `CommandBuffer::add_cpu_component_bytes`、GPU-visible component の所有追加は `CommandBuffer::add_gpu_component` を使えます。
 
 `CreateEntity` command はまだありません。System 内で entity を作る場合は、query callback の外で `World::create_entity` を直接呼びます。この場合は `structural_write` が必要です。query callback 内で entity 作成を予約したい場合は、将来的に予約 ID 付き create command を設計する必要があります。
 

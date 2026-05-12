@@ -122,20 +122,20 @@ sequenceDiagram
 
 ## コンポーネント追加・削除とアーキタイプ移行
 
-`add_component_bytes` / `remove_component` の要点:
+`add_cpu_component_bytes` / `add_gpu_component` / `remove_component` の要点:
 
-1. 既にシグネチャに含まれていれば **同一アーキタイプ内でバイトを上書き**するだけ。
+1. 既にシグネチャに含まれていれば `false` を返します。既存 CPU payload の更新は `set_component_bytes` を使います。
 2. 含まれていなければ **新シグネチャ**用のアーキタイプを `ensure_archetype` で確保。
 3. 対象エンティティの **新行**を確保し、`copy_row_to` で重なる列をコピー。
-4. 新行に対する書き込み（追加時）を反映。
+4. `add_cpu_component_bytes` では新行に CPU bytes を書き、`add_gpu_component` では signature marker だけを追加。
 5. **旧行**を `swap_remove_row` で削除。最終行が移動した場合は **`update_moved_location`** でそのエンティティの `locations` を更新。
 
 ```mermaid
 flowchart TD
-  start[add_component_bytes E C bytes]
+  start[add_cpu_component_bytes/add_gpu_component E C]
   alive{is_alive E}
   has{has_component E C}
-  same[set_component_bytes same archetype row]
+  same[return false]
   migrate[ensure_archetype new signature]
   copy[copy_row_to new row set bytes]
   swap[swap_remove_row old row fix locations]
@@ -181,7 +181,7 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-`create_entity`、`destroy_entity`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
+`create_entity`、`destroy_entity`、`add_cpu_component_bytes`、`add_gpu_component`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
 
 query / system の走査中に変更を要求したい場合は、`CommandBuffer` に積みます。
 
@@ -189,7 +189,7 @@ query / system の走査中に変更を要求したい場合は、`CommandBuffer
 let commands = CommandBuffer::new()
 query.for_each(world, fn(row) {
   commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
+  commands.add_cpu_component_bytes(row.entity(), new_component, bytes)
 })
 let _ = commands.apply(world)
 ```
@@ -230,6 +230,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 - **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージして `GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
 - **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。
+
+GPU-visible component の所有追加は `add_gpu_component`、payload 書き込みは `set_gpu_component_bytes` を使います。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) で `update_global_transforms_from_transforms` の後に `drain_gpu_writes(global_transform)` し、`queue.write_buffer_from_fixed_array` しています。
 
@@ -287,7 +289,7 @@ ignore(world.set_global_transform(e, Matrix44F::identity()))
 
 // 任意 CPU コンポーネント
 let tag = world.register_cpu_component("Tag", 4)
-ignore(world.add_component_bytes(e, tag, tag_bytes))
+ignore(world.add_cpu_component_bytes(e, tag, tag_bytes))
 
 // クエリ（例: TF + GT を同時に見る）
 let required = [world.transform_component(), world.global_transform_component()]

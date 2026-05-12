@@ -18,6 +18,8 @@ pub struct CommandBuffer {
   commands : Array[WorldCommand]
 }
 pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+pub fn CommandBuffer::add_cpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+pub fn CommandBuffer::add_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::apply(Self, World) -> Bool
 pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
@@ -161,6 +163,8 @@ pub struct World {
   child_of_component_id : ComponentTypeId
 }
 pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn World::add_cpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn World::add_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
@@ -196,6 +200,7 @@ pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  AddGpuComponent(EntityId, ComponentTypeId)
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
