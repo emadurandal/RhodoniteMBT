@@ -155,6 +155,7 @@ pub struct World {
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId
+  // private fields
 }
 pub fn World::add_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool

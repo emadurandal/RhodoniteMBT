@@ -186,6 +186,7 @@ pub struct World {
   mut component_registration_lock_depth : Int
   /// Active system access guard; nonzero means component reads/writes are checked against declarations.
   mut system_access_depth : Int
+  priv mut system_access_name : String
   mut system_access_reads : Array[ComponentTypeId]
   mut system_access_writes : Array[ComponentTypeId]
   mut system_access_structural_write : Bool

@@ -41,6 +41,7 @@ fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] 
 ///|
 priv struct SystemAccessSnapshot {
   depth : Int
+  name : String
   reads : Array[ComponentTypeId]
   writes : Array[ComponentTypeId]
   structural_write : Bool
@@ -50,6 +51,7 @@ priv struct SystemAccessSnapshot {
 fn World::system_access_snapshot(self : World) -> SystemAccessSnapshot {
   {
     depth: self.system_access_depth,
+    name: self.system_access_name,
     reads: copy_component_array(self.system_access_reads),
     writes: copy_component_array(self.system_access_writes),
     structural_write: self.system_access_structural_write,
@@ -62,9 +64,24 @@ fn World::restore_system_access(
   snapshot : SystemAccessSnapshot,
 ) -> Unit {
   self.system_access_depth = snapshot.depth
+  self.system_access_name = snapshot.name
   self.system_access_reads = snapshot.reads
   self.system_access_writes = snapshot.writes
   self.system_access_structural_write = snapshot.structural_write
+}
+
+///|
+fn component_id_text(component : ComponentTypeId) -> String {
+  "component id " + component.index.to_string()
+}
+
+///|
+fn World::active_system_text(self : World) -> String {
+  if self.system_access_active() {
+    "System '" + self.system_access_name + "'"
+  } else {
+    "no active System"
+  }
 }
 
 ///|
@@ -137,7 +154,10 @@ fn sorted_with_removed(
 /// Blocks structural mutation while a query is active so row views and entity locations stay valid.
 fn World::assert_not_querying(self : World, operation : String) -> Unit {
   if self.query_depth > 0 {
-    abort(operation + " cannot be called while querying ECS component views")
+    abort(
+      operation +
+      " cannot be called while querying ECS component views. Hint: do not mutate archetype/entity structure inside Query::for_each; queue the change in CommandBuffer and apply it after the query callback returns.",
+    )
   }
 }
 
@@ -148,7 +168,10 @@ fn World::assert_component_registration_open(
   operation : String,
 ) -> Unit {
   if self.component_registration_lock_depth > 0 {
-    abort(operation + " cannot be called while schedule execution is active")
+    abort(
+      operation +
+      " cannot be called while schedule execution is active. Hint: register component types before Schedule::run starts, or between schedule runs; systems should use already-registered ComponentTypeId values.",
+    )
   }
 }
 
@@ -166,7 +189,14 @@ fn World::assert_system_component_read(
   if self.system_access_active() &&
     !component_array_contains(self.system_access_reads, component) &&
     !component_array_contains(self.system_access_writes, component) {
-    abort(operation + " requires a System reads or writes declaration")
+    abort(
+      operation +
+      " tried to read " +
+      component_id_text(component) +
+      " while running " +
+      self.active_system_text() +
+      ", but that component is not declared in reads or writes. Hint: add this component to System::new reads for read-only access, or to writes if the system may mutate it.",
+    )
   }
 }
 
@@ -178,7 +208,14 @@ fn World::assert_system_component_write(
 ) -> Unit {
   if self.system_access_active() &&
     !component_array_contains(self.system_access_writes, component) {
-    abort(operation + " requires a System writes declaration")
+    abort(
+      operation +
+      " tried to write " +
+      component_id_text(component) +
+      " while running " +
+      self.active_system_text() +
+      ", but that component is not declared in writes. Hint: add this component to the System::new writes array; writes also permits reading the same component.",
+    )
   }
 }
 
@@ -199,7 +236,12 @@ fn World::assert_system_structural_write(
   operation : String,
 ) -> Unit {
   if self.system_access_active() && !self.system_access_structural_write {
-    abort(operation + " requires a System structural write declaration")
+    abort(
+      operation +
+      " tried to mutate entity/archetype structure while running " +
+      self.active_system_text() +
+      ", but structural_write is false. Hint: create the system with System::new_with_structural_write, and for query callbacks queue structural changes in CommandBuffer instead of calling World mutation APIs directly.",
+    )
   }
 }
 
@@ -259,6 +301,7 @@ pub fn World::new() -> World {
   let query_depth = 0
   let component_registration_lock_depth = 0
   let system_access_depth = 0
+  let system_access_name = ""
   let system_access_reads : Array[ComponentTypeId] = []
   let system_access_writes : Array[ComponentTypeId] = []
   let system_access_structural_write = false
@@ -274,6 +317,7 @@ pub fn World::new() -> World {
     query_depth,
     component_registration_lock_depth,
     system_access_depth,
+    system_access_name,
     system_access_reads,
     system_access_writes,
     system_access_structural_write,
@@ -312,12 +356,14 @@ pub fn World::component_registration_locked(self : World) -> Bool {
 ///|
 fn World::enter_system_access(
   self : World,
+  name : String,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   structural_write : Bool,
 ) -> SystemAccessSnapshot {
   let snapshot = self.system_access_snapshot()
   self.system_access_depth = self.system_access_depth + 1
+  self.system_access_name = name
   self.system_access_reads = copy_component_array(reads)
   self.system_access_writes = copy_component_array(writes)
   self.system_access_structural_write = structural_write
@@ -701,7 +747,9 @@ fn World::for_each_query_row_payloads(
     return
   }
   if component_array_has_duplicates(required) {
-    abort("Query::for_each: duplicate required component")
+    abort(
+      "Query::for_each: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
+    )
   }
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
@@ -716,7 +764,12 @@ fn World::for_each_query_row_payloads(
         let gpu_flush : Array[GpuComponentStore] = []
         for k = 0; k < required.length(); k = k + 1 {
           match self.registry.get(required[k]) {
-            None => abort("Query::for_each: unknown component type id")
+            None =>
+              abort(
+                "Query::for_each: unknown " +
+                component_id_text(required[k]) +
+                ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+              )
             Some(rc) =>
               match rc.kind {
                 CpuOnly =>
@@ -724,7 +777,9 @@ fn World::for_each_query_row_payloads(
                     Some(v) => payloads.push(v)
                     None =>
                       abort(
-                        "Query::for_each: required component missing from archetype",
+                        "Query::for_each: required " +
+                        component_id_text(required[k]) +
+                        " is missing from a matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
                       )
                   }
                 GpuVisible =>
@@ -744,7 +799,9 @@ fn World::for_each_query_row_payloads(
                     }
                     None =>
                       abort(
-                        "Query::for_each: GpuVisible component has no gpu store",
+                        "Query::for_each: GpuVisible " +
+                        component_id_text(required[k]) +
+                        " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
                       )
                   }
               }

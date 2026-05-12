@@ -15,7 +15,9 @@ fn component_array_index_of(
 /// Builds a query descriptor and rejects duplicate component ids up front.
 pub fn Query::new(required : Array[ComponentTypeId]) -> Query {
   if component_array_has_duplicates(required) {
-    abort("Query::new: duplicate required component")
+    abort(
+      "Query::new: duplicate required component. Hint: pass each ComponentTypeId at most once; use QueryRow::read_view or write_view with the component id instead of requesting the same row multiple times.",
+    )
   }
   { required: copy_component_array(required) }
 }
@@ -60,7 +62,12 @@ fn QueryRow::component_payload_index(
 ) -> Int {
   let index = component_array_index_of(self.components, component)
   if index < 0 {
-    abort(operation + ": component is not part of this query")
+    abort(
+      operation +
+      ": " +
+      component_id_text(component) +
+      " is not part of this QueryRow. Hint: include this component in Query::new([...]) required components before calling read_view or write_view for it.",
+    )
   }
   index
 }
@@ -91,7 +98,12 @@ pub fn QueryRow::write_view(
   self.world.assert_system_component_write(component, "QueryRow::write_view")
   let index = self.component_payload_index(component, "QueryRow::write_view")
   match self.world.registry.get(component) {
-    None => abort("QueryRow::write_view: unknown component type id")
+    None =>
+      abort(
+        "QueryRow::write_view: unknown " +
+        component_id_text(component) +
+        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
+      )
     Some(rc) =>
       match rc.kind {
         CpuOnly => ()
