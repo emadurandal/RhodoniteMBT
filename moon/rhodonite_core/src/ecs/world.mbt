@@ -204,6 +204,16 @@ fn World::assert_system_structural_write(
 }
 
 ///|
+fn World::can_add_missing_component_from_setter(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Bool {
+  self.assert_system_component_write(component, operation)
+  !self.system_access_active() || self.system_access_structural_write
+}
+
+///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
