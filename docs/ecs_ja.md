@@ -160,7 +160,15 @@ flowchart TD
 - コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
-アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。`Query::new` は重複 component id を拒否し、payload 順を固定します。GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` が対応します。
+アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。`World::for_each_entity_with_components` を直接呼ぶ場合と比べると、`Query` には次の実用上のメリットがあります。
+
+- `required` component set を名前付きの値として再利用できます。
+- `Query::new` の時点で重複 component id を拒否できます。
+- 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
+- callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
+- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+
+callback が full archetype signature を必要とする場合や、GPU dirty 化するかどうかを entity ごとに細かく判断したい場合は、低レベルの `World::for_each_entity_with_components` を直接使います。
 
 ---
 

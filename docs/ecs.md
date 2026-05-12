@@ -160,7 +160,15 @@ flowchart TD
 - If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
-For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. `Query::new` rejects duplicate component ids and keeps payload order stable. `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` is the matching helper for callbacks that always write selected GPU-visible rows.
+For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. Compared with calling `World::for_each_entity_with_components` directly, `Query` has a few practical benefits:
+
+- `required` becomes a named value that can be reused by a system.
+- `Query::new` rejects duplicate component ids up front.
+- The input array is copied, so later changes to the caller's array cannot change query payload order.
+- The callback omits `full_signature`, keeping common system code shorter.
+- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs the query with the helper for callbacks that always write selected GPU-visible rows.
+
+Use the lower-level `World::for_each_entity_with_components` when the callback needs the full archetype signature, or when GPU dirty marking must be decided per entity.
 
 ---
 
