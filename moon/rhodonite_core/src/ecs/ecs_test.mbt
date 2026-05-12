@@ -620,6 +620,46 @@ test "Schedule permits set_component_bytes without structural write" {
 }
 
 ///|
+test "Schedule permits set_global_transform update with GlobalTransform write" {
+  let world = World::new()
+  let gt = world.global_transform_component()
+  let e = world.create_entity()
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(gt)
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("set-gt", Update, [], [gt], (w, _ctx, _commands) => {
+      let m = @m44.Matrix44::new_col_major(
+        (1.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (0.0 : Float),
+        (4.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+      )
+      if !w.set_global_transform(e, m) {
+        abort("expected scheduled set_global_transform")
+      }
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.get_global_transform(e) {
+    Some(m) => assert_eq(m.at(0, 3), (4.0 : Float))
+    None => abort("expected scheduled GlobalTransform")
+  }
+}
+
+///|
 test "Schedule runs systems by phase and applies commands after each system" {
   let world = World::new()
   let qa = world.register_cpu_component("ScheduleA", 4)

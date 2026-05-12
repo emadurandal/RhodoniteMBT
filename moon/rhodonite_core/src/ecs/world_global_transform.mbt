@@ -6,6 +6,7 @@ pub fn World::set_global_transform(
   m : @m44.Matrix44F,
 ) -> Bool {
   let id = self.global_transform_component_id
+  self.assert_system_component_write(id, "World::set_global_transform")
   if !self.has_component(entity, id) {
     let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
     if !self.add_component_bytes(entity, id, empty) {
