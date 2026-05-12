@@ -121,9 +121,9 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
   let e1 = world.create_entity()
   let _ = world.create_entity()
   let e3 = world.create_entity()
-  assert_true(world.add_gpu_component(e0, gpu))
-  assert_true(world.add_gpu_component(e1, gpu))
-  assert_true(world.add_gpu_component(e3, gpu))
+  assert_true(world.add_component(e0, gpu))
+  assert_true(world.add_component(e1, gpu))
+  assert_true(world.add_component(e3, gpu))
   let _ = world.drain_resize_events()
   assert_true(world.set_gpu_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
   assert_true(world.set_gpu_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
@@ -148,7 +148,7 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
     @comp.GpuLayout::empty(16),
   )
   let entity = world.create_entity()
-  assert_true(world.add_gpu_component(entity, gpu))
+  assert_true(world.add_component(entity, gpu))
   let _ = world.drain_resize_events()
   assert_true(
     world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)),
@@ -181,22 +181,33 @@ test "GPU visible public APIs require entity component ownership" {
 }
 
 ///|
-test "GPU visible ownership uses explicit API and CPU payload setters reject it" {
+test "add_component and add_component_bytes support CPU and GPU visible components" {
   let world = World::new()
+  let cpu = world.register_cpu_component("AddComponentCpu", 4)
   let gpu = world.register_gpu_component(
-    "GpuExplicitOwnership",
+    "AddComponentGpu",
     @comp.GpuLayout::empty(16),
   )
-  let entity = world.create_entity()
-  assert_true(world.add_gpu_component(entity, gpu))
-  assert_true(world.has_component(entity, gpu))
-  assert_true(!world.set_component_bytes(entity, gpu, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(!world.add_cpu_component_bytes(entity, gpu, empty))
+  let cpu_entity = world.create_entity()
+  let gpu_entity = world.create_entity()
+  assert_true(world.add_component(cpu_entity, cpu))
+  match world.component_bytes(cpu_entity, cpu) {
+    Some(bytes) => assert_eq(bytes, bytes4(0, 0, 0, 0))
+    None => abort("expected AddComponentCpu bytes")
+  }
+  assert_true(
+    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(44U)),
+  )
+  match world.gpu_component_bytes(gpu_entity, gpu) {
+    Some(bytes) => assert_eq(bytes[0], (44U & 0xFFU).to_byte())
+    None => abort("expected AddComponentGpu bytes")
+  }
+  assert_true(!world.add_component(cpu_entity, cpu))
+  assert_true(!world.set_component_bytes(gpu_entity, gpu, bytes4(1, 2, 3, 4)))
 }
 
 ///|
-test "add_gpu_component emits resize events through centralized GPU capacity path" {
+test "add_component emits resize events through centralized GPU capacity path" {
   let world = World::new()
   let entity = world.create_entity()
   let _ = world.drain_resize_events()
@@ -204,7 +215,7 @@ test "add_gpu_component emits resize events through centralized GPU capacity pat
     "GpuResizeAfterEntity",
     @comp.GpuLayout::empty(16),
   )
-  assert_true(world.add_gpu_component(entity, gpu))
+  assert_true(world.add_component(entity, gpu))
   let events = world.drain_resize_events()
   assert_eq(events.length(), 1)
   assert_true(events[0].component == gpu)

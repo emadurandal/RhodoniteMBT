@@ -23,6 +23,15 @@ pub fn CommandBuffer::destroy_entity(
 }
 
 ///|
+pub fn CommandBuffer::add_component(
+  self : CommandBuffer,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Unit {
+  self.commands.push(AddComponent(entity, component))
+}
+
+///|
 pub fn CommandBuffer::add_component_bytes(
   self : CommandBuffer,
   entity : EntityId,
@@ -30,25 +39,6 @@ pub fn CommandBuffer::add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Unit {
   self.commands.push(AddComponentBytes(entity, component, bytes))
-}
-
-///|
-pub fn CommandBuffer::add_cpu_component_bytes(
-  self : CommandBuffer,
-  entity : EntityId,
-  component : ComponentTypeId,
-  bytes : FixedArray[Byte],
-) -> Unit {
-  self.commands.push(AddComponentBytes(entity, component, bytes))
-}
-
-///|
-pub fn CommandBuffer::add_gpu_component(
-  self : CommandBuffer,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> Unit {
-  self.commands.push(AddGpuComponent(entity, component))
 }
 
 ///|
@@ -99,10 +89,9 @@ pub fn CommandBuffer::apply(self : CommandBuffer, world : World) -> Bool {
   for i = 0; i < self.commands.length(); i = i + 1 {
     let command_ok = match self.commands[i] {
       DestroyEntity(entity) => world.destroy_entity(entity)
+      AddComponent(entity, component) => world.add_component(entity, component)
       AddComponentBytes(entity, component, bytes) =>
         world.add_component_bytes(entity, component, bytes)
-      AddGpuComponent(entity, component) =>
-        world.add_gpu_component(entity, component)
       SetComponentBytes(entity, component, bytes) =>
         world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>

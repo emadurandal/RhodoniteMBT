@@ -13,7 +13,7 @@ pub fn World::set_global_transform(
       ) {
       return false
     }
-    if !self.add_gpu_component(entity, id) {
+    if !self.add_component(entity, id) {
       return false
     }
   }

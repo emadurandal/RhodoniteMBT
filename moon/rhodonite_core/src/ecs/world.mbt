@@ -533,50 +533,36 @@ fn World::add_component_signature(
 }
 
 ///|
-/// Adds a new CPU component: migrates the entity to an archetype with an expanded sorted signature.
-pub fn World::add_cpu_component_bytes(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-  bytes : FixedArray[Byte],
-) -> Bool {
-  self.assert_not_querying("World::add_cpu_component_bytes")
-  self.assert_system_structural_write("World::add_cpu_component_bytes")
-  self.assert_system_component_write(
-    component, "World::add_cpu_component_bytes",
-  )
-  match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => self.add_component_signature(entity, component, bytes)
-        GpuVisible => false
-      }
-    None => false
-  }
-}
-
-///|
-/// Adds a GPU-visible component ownership marker; payload lives in the flat GPU store.
-pub fn World::add_gpu_component(
+/// Adds a component with a kind-appropriate zero/default payload.
+pub fn World::add_component(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
-  self.assert_not_querying("World::add_gpu_component")
-  self.assert_system_structural_write("World::add_gpu_component")
-  self.assert_system_component_write(component, "World::add_gpu_component")
+  self.assert_not_querying("World::add_component")
+  self.assert_system_structural_write("World::add_component")
+  self.assert_system_component_write(component, "World::add_component")
   if !self.is_alive(entity) {
     return false
   }
   match self.registry.get(component) {
     Some(rc) =>
       match rc.kind {
-        CpuOnly => false
+        CpuOnly => {
+          let bytes = FixedArray::make(rc.cpu_stride, (0 : Byte))
+          self.add_component_signature(entity, component, bytes)
+        }
         GpuVisible =>
           match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-            Some(_) => {
+            Some(store) => {
               let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-              self.add_component_signature(entity, component, empty)
+              if !self.add_component_signature(entity, component, empty) {
+                false
+              } else {
+                store.clear_slot(entity.index)
+                self.replace_gpu_store(store)
+                true
+              }
             }
             None => false
           }
@@ -586,23 +572,43 @@ pub fn World::add_gpu_component(
 }
 
 ///|
-/// Adds a component using the registry kind. Prefer `add_cpu_component_bytes` or `add_gpu_component`
-/// in new code so CPU payload and GPU-visible ownership are explicit.
+/// Adds a component and initializes its payload bytes.
+///
+/// CpuOnly bytes initialize the archetype SoA row. GpuVisible bytes initialize the flat GPU row;
+/// pass an empty byte array to use the same zero/default behavior as `add_component`.
 pub fn World::add_component_bytes(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_querying("World::add_component_bytes")
+  self.assert_system_structural_write("World::add_component_bytes")
+  self.assert_system_component_write(component, "World::add_component_bytes")
+  if !self.is_alive(entity) {
+    return false
+  }
   match self.registry.get(component) {
     Some(rc) =>
       match rc.kind {
-        CpuOnly => self.add_cpu_component_bytes(entity, component, bytes)
+        CpuOnly => self.add_component_signature(entity, component, bytes)
         GpuVisible =>
-          if bytes.length() == 0 {
-            self.add_gpu_component(entity, component)
-          } else {
-            false
+          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+            Some(store) => {
+              let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+              if !self.add_component_signature(entity, component, empty) {
+                false
+              } else {
+                if bytes.length() == 0 {
+                  store.clear_slot(entity.index)
+                } else {
+                  store.set_bytes(entity.index, bytes)
+                }
+                self.replace_gpu_store(store)
+                true
+              }
+            }
+            None => false
           }
       }
     None => false
@@ -610,7 +616,7 @@ pub fn World::add_component_bytes(
 }
 
 ///|
-/// Removes a CPU component: migrates to a smaller archetype (signature loses one id); GPU flat stores are unaffected by archetype row moves.
+/// Removes a component: migrates to a smaller archetype (signature loses one id); GPU flat stores are unaffected by archetype row moves.
 pub fn World::remove_component(
   self : World,
   entity : EntityId,

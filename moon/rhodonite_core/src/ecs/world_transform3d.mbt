@@ -14,7 +14,7 @@ pub fn World::set_transform(
     ) {
     false
   } else {
-    self.add_cpu_component_bytes(entity, id, bytes)
+    self.add_component_bytes(entity, id, bytes)
   }
 }
 
@@ -45,7 +45,7 @@ pub fn World::set_transform_trs(
     ) {
     false
   } else {
-    self.add_cpu_component_bytes(entity, id, bytes)
+    self.add_component_bytes(entity, id, bytes)
   }
 }
 
