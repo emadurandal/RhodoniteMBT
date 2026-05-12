@@ -82,6 +82,8 @@ GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共
 
 `drain_resize_events` は World が所有する resize event queue を消費します。Schedule 実行中に呼ぶ場合は、event queue に対する構造的 access として `structural_write` が必要です。Schedule 外では従来通り呼べます。
 
+builtin convenience API も同じ access guard に従います。`get_transform` / `get_child_of` / `get_global_transform` は各 component の read を要求し、`set_transform` / `set_child_of` / `set_global_transform` は write を要求します。`compute_global_transform` は階層を扱う API として `Transform3D` と `ChildOf` の read を保守的に要求し、`update_global_transforms_from_transforms` は `Transform3D` / `ChildOf` read と `GlobalTransform` write を要求します。
+
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 
 ## Schedule

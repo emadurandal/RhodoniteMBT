@@ -6,6 +6,7 @@ pub fn World::set_child_of(
   parent : EntityId,
 ) -> Bool {
   let id = self.child_of_component_id
+  self.assert_system_component_write(id, "World::set_child_of")
   let c = @comp.ChildOf::new(parent.index, parent.generation)
   let bytes = c.to_component_bytes()
   if self.has_component(entity, id) {
@@ -22,6 +23,7 @@ pub fn World::set_child_of(
 ///|
 pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
   let id = self.child_of_component_id
+  self.assert_system_component_read(id, "World::get_child_of")
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
