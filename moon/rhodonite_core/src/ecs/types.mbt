@@ -118,14 +118,13 @@ pub struct QueryRow {
 }
 
 ///|
-/// Deferred structural or GPU mutation command applied after query/system iteration.
+/// Deferred structural or payload mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
 }
 

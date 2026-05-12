@@ -506,7 +506,11 @@ pub fn World::has_component(
 }
 
 ///|
-/// Updates an existing CPU component payload in its current archetype row.
+/// Updates an existing component payload without changing archetype ownership.
+///
+/// CpuOnly components update the archetype SoA row. GpuVisible components update the flat GPU row
+/// and mark it dirty. Returns false for dead entities, missing ownership, unknown components, or
+/// byte lengths that do not match the registered payload stride.
 pub fn World::set_component_bytes(
   self : World,
   entity : EntityId,
@@ -515,12 +519,8 @@ pub fn World::set_component_bytes(
 ) -> Bool {
   self.assert_not_querying("World::set_component_bytes")
   self.assert_system_component_write(component, "World::set_component_bytes")
-  match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => ()
-        GpuVisible => return false
-      }
+  let rc = match self.registry.get(component) {
+    Some(rc) => rc
     None => return false
   }
   if !self.is_alive(entity) {
@@ -536,12 +536,36 @@ pub fn World::set_component_bytes(
     ) {
     return false
   }
-  self.archetypes[loc.archetype_index].set_component_bytes(
-    loc.row,
-    component,
-    bytes,
-  )
-  true
+  match rc.kind {
+    CpuOnly => {
+      if bytes.length() != rc.cpu_stride {
+        return false
+      }
+      self.archetypes[loc.archetype_index].set_component_bytes(
+        loc.row,
+        component,
+        bytes,
+      )
+      true
+    }
+    GpuVisible => {
+      let expected_stride = match rc.gpu_layout {
+        Some(layout) => layout.stride
+        None => return false
+      }
+      if bytes.length() != expected_stride {
+        return false
+      }
+      match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+        Some(store) => {
+          store.set_bytes(entity.index, bytes)
+          self.replace_gpu_store(store)
+          true
+        }
+        None => false
+      }
+    }
+  }
 }
 
 ///|
@@ -717,7 +741,10 @@ pub fn World::remove_component(
 }
 
 ///|
-/// Looks up CPU component bytes from the archetype SoA for this entity row.
+/// Looks up component bytes for a living entity that owns `component`.
+///
+/// CpuOnly components return their archetype SoA row. GpuVisible components return their flat GPU
+/// row at `EntityId.index`.
 pub fn World::component_bytes(
   self : World,
   entity : EntityId,
@@ -727,9 +754,41 @@ pub fn World::component_bytes(
   if !self.is_alive(entity) {
     return None
   }
-  match self.locations[entity.index] {
-    Some(loc) =>
-      self.archetypes[loc.archetype_index].component_bytes(loc.row, component)
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return None
+  }
+  if !component_array_contains(
+      self.archetypes[loc.archetype_index].components,
+      component,
+    ) {
+    return None
+  }
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly =>
+          self.archetypes[loc.archetype_index].component_bytes(
+            loc.row,
+            component,
+          )
+        GpuVisible =>
+          match self.gpu_store(component) {
+            Some(store) => {
+              if entity.index >= store.capacity() {
+                return None
+              }
+              Some(
+                copy_array_range_to_fixed(
+                  store.bytes,
+                  entity.index * store.stride,
+                  store.stride,
+                ),
+              )
+            }
+            None => None
+          }
+      }
     None => None
   }
 }

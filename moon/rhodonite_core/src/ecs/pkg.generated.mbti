@@ -27,7 +27,6 @@ pub fn CommandBuffer::len(Self) -> Int
 pub fn CommandBuffer::new() -> Self
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 
 pub(all) enum ComponentKind {
   CpuOnly
@@ -172,7 +171,6 @@ pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
 pub fn World::global_transform_component(Self) -> ComponentTypeId
-pub fn World::gpu_component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
@@ -184,7 +182,6 @@ pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
-pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
@@ -196,7 +193,6 @@ pub(all) enum WorldCommand {
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
 }
 

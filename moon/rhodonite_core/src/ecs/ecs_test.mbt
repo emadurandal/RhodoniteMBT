@@ -125,9 +125,9 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
   assert_true(world.add_component(e1, gpu))
   assert_true(world.add_component(e3, gpu))
   let _ = world.drain_resize_events()
-  assert_true(world.set_gpu_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
-  assert_true(world.set_gpu_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
-  assert_true(world.set_gpu_component_bytes(e3, gpu, gpu_bytes_with_u32(13U)))
+  assert_true(world.set_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
+  assert_true(world.set_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
+  assert_true(world.set_component_bytes(e3, gpu, gpu_bytes_with_u32(13U)))
   let writes = world.drain_gpu_writes(gpu)
   assert_eq(writes.length(), 2)
   assert_eq(writes[0].byte_offset, e0.index * 16)
@@ -150,12 +150,8 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
   let entity = world.create_entity()
   assert_true(world.add_component(entity, gpu))
   let _ = world.drain_resize_events()
-  assert_true(
-    world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)),
-  )
-  assert_true(
-    world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(2U)),
-  )
+  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)))
+  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(2U)))
   let writes = world.drain_gpu_writes(gpu)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, entity.index * 16)
@@ -171,11 +167,9 @@ test "GPU visible public APIs require entity component ownership" {
     @comp.GpuLayout::empty(16),
   )
   let entity = world.create_entity()
-  assert_true(
-    !world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)),
-  )
+  assert_true(!world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)))
   assert_true(!world.clear_gpu_component(entity, gpu))
-  assert_true(world.gpu_component_bytes(entity, gpu) is None)
+  assert_true(world.component_bytes(entity, gpu) is None)
   assert_eq(world.drain_gpu_writes(gpu).length(), 0)
 }
 
@@ -197,7 +191,7 @@ test "add_component and add_component_bytes support CPU and GPU visible componen
   assert_true(
     world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(44U)),
   )
-  match world.gpu_component_bytes(gpu_entity, gpu) {
+  match world.component_bytes(gpu_entity, gpu) {
     Some(bytes) => assert_eq(bytes[0], (44U & 0xFFU).to_byte())
     None => abort("expected AddComponentGpu bytes")
   }
@@ -231,7 +225,7 @@ test "add_component_bytes rejects invalid byte lengths before mutating ownership
   assert_true(
     world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(55U)),
   )
-  match world.gpu_component_bytes(gpu_entity, gpu) {
+  match world.component_bytes(gpu_entity, gpu) {
     Some(bytes) => assert_eq(bytes[0], (55U & 0xFFU).to_byte())
     None => abort("expected AddComponentBytesGpuStride bytes")
   }
@@ -679,7 +673,7 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let missing = EntityId::new(e.index + 100, 0)
   let commands = CommandBuffer::new()
-  commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+  commands.set_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
   commands.destroy_entity(missing)
   assert_true(!commands.apply(world))
   let writes = world.drain_gpu_writes(gpu16)

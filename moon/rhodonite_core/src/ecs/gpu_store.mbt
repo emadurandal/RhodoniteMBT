@@ -264,35 +264,6 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
 }
 
 ///|
-/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead, does not have
-/// `component`, or `component` is not GPU-visible.
-pub fn World::set_gpu_component_bytes(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-  bytes : FixedArray[Byte],
-) -> Bool {
-  self.assert_not_querying("World::set_gpu_component_bytes")
-  self.assert_system_component_write(
-    component, "World::set_gpu_component_bytes",
-  )
-  if !self.is_alive(entity) {
-    return false
-  }
-  if !self.has_component(entity, component) {
-    return false
-  }
-  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-    Some(store) => {
-      store.set_bytes(entity.index, bytes)
-      self.replace_gpu_store(store)
-      true
-    }
-    None => false
-  }
-}
-
-///|
 /// Internal row-level dirty marker used by query mutable GPU views.
 fn World::mark_gpu_component_dirty(
   self : World,
@@ -340,37 +311,6 @@ pub fn World::clear_gpu_component(
       true
     }
     None => false
-  }
-}
-
-///|
-/// Reads the flat GPU bytes for a living entity that owns `component`.
-pub fn World::gpu_component_bytes(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> FixedArray[Byte]? {
-  self.assert_system_component_read(component, "World::gpu_component_bytes")
-  if !self.is_alive(entity) {
-    return None
-  }
-  if !self.has_component(entity, component) {
-    return None
-  }
-  match self.gpu_store(component) {
-    Some(store) => {
-      if entity.index >= store.capacity() {
-        return None
-      }
-      Some(
-        copy_array_range_to_fixed(
-          store.bytes,
-          entity.index * store.stride,
-          store.stride,
-        ),
-      )
-    }
-    None => None
   }
 }
 

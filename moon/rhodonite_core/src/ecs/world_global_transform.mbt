@@ -38,7 +38,7 @@ pub fn World::get_global_transform(
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
-  match self.gpu_component_bytes(entity, id) {
+  match self.component_bytes(entity, id) {
     Some(bytes) => Some(@comp.matrix44f_from_std140_gpu_bytes(bytes))
     None => None
   }

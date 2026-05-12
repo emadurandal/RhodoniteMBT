@@ -61,16 +61,6 @@ pub fn CommandBuffer::remove_component(
 }
 
 ///|
-pub fn CommandBuffer::set_gpu_component_bytes(
-  self : CommandBuffer,
-  entity : EntityId,
-  component : ComponentTypeId,
-  bytes : FixedArray[Byte],
-) -> Unit {
-  self.commands.push(SetGpuComponentBytes(entity, component, bytes))
-}
-
-///|
 pub fn CommandBuffer::clear_gpu_component(
   self : CommandBuffer,
   entity : EntityId,
@@ -96,8 +86,6 @@ pub fn CommandBuffer::apply(self : CommandBuffer, world : World) -> Bool {
         world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>
         world.remove_component(entity, component)
-      SetGpuComponentBytes(entity, component, bytes) =>
-        world.set_gpu_component_bytes(entity, component, bytes)
       ClearGpuComponent(entity, component) =>
         world.clear_gpu_component(entity, component)
     }
