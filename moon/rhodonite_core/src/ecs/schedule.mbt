@@ -37,6 +37,58 @@ fn system_access_conflicts(a : System, b : System) -> Bool {
 }
 
 ///|
+fn system_batch_conflicts_with(batch : Array[System], system : System) -> Bool {
+  for i = 0; i < batch.length(); i = i + 1 {
+    if batch[i].conflicts_with(system) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn run_system_batch(
+  batch : Array[System],
+  world : World,
+  ctx : SystemContext,
+) -> Bool {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.length(); i = i + 1 {
+    let system = batch[i]
+    let commands = CommandBuffer::new_for_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let mut ok = true
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch[i]
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    if !command_buffers[i].apply() {
+      ok = false
+    }
+    world.exit_system_access(system_access)
+  }
+  ok
+}
+
+///|
 pub fn SystemContext::new(
   delta_seconds : Float,
   frame_index : Int,
@@ -193,8 +245,11 @@ pub fn transform_propagation_system(world : World) -> System {
 ///|
 /// Runs systems by phase order, preserving registration order within the same phase.
 ///
-/// A fresh [`CommandBuffer`] is passed to each system and applied immediately after that system
-/// returns, so later systems can observe earlier structural changes.
+/// Within each phase, systems are greedily split into conflict-free batches. A fresh
+/// [`CommandBuffer`] is passed to each system; commands from a batch are applied only after every
+/// system in that batch has returned, preserving registration order for apply. Later batches can
+/// observe earlier batch commands, while systems in the same batch cannot observe each other's
+/// queued changes.
 pub fn Schedule::run(
   self : Schedule,
   world : World,
@@ -205,26 +260,27 @@ pub fn Schedule::run(
   for phase_rank = 0
       phase_rank < system_phase_count()
       phase_rank = phase_rank + 1 {
+    let batch : Array[System] = []
     for i = 0; i < self.systems.length(); i = i + 1 {
       let system = self.systems[i]
       if system_phase_rank(system.phase) == phase_rank {
-        let commands = CommandBuffer::new_for_system(
-          world,
-          system.name,
-          system.writes,
-          system.structural_write,
-        )
-        let system_access = world.enter_system_access(
-          system.name,
-          system.reads,
-          system.writes,
-          system.structural_write,
-        )
-        (system.run)(world, ctx, commands)
-        if !commands.apply() {
-          ok = false
+        if system_batch_conflicts_with(batch, system) {
+          if !run_system_batch(batch, world, ctx) {
+            ok = false
+          }
+          while batch.length() > 0 {
+            let _ = batch.pop()
+          }
         }
-        world.exit_system_access(system_access)
+        batch.push(system)
+      }
+    }
+    if batch.length() > 0 {
+      if !run_system_batch(batch, world, ctx) {
+        ok = false
+      }
+      while batch.length() > 0 {
+        let _ = batch.pop()
       }
     }
   }

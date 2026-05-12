@@ -199,7 +199,7 @@ let system = System::new_with_structural_write(
 )
 ```
 
-`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査し、System が戻った直後に積まれた順で適用します。`commands.create_entity()` は queue 時点で `EntityId` を予約して返します。予約 entity は apply まで alive ではありませんが、同じ buffer の後続 command で component を追加できます。
+`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査します。同一 phase 内では conflict しない System を greedy に batch 化し、batch 内の全 System が戻った後、System 登録順かつ各 buffer の insertion order で commands を適用します。`commands.create_entity()` は queue 時点で `EntityId` を予約して返します。予約 entity は apply まで alive ではありませんが、同じ buffer の後続 command で component を追加できます。
 
 ---
 
@@ -221,11 +221,11 @@ schedule.add_system(System::new_with_structural_write("RemoveExpired", Update, [
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
-`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順です。各 system には新しい `CommandBuffer` が渡され、system が返った直後に schedule が適用します。そのため、後続 system は前の system の構造変更を観測できます。
+`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順を保ちつつ、conflict しない greedy batch に分割されます。各 system には新しい `CommandBuffer` が渡され、同一 batch 内の system は互いの queued change を観測しません。後続 batch の system は前 batch で適用された command 結果を観測できます。
 
 `Schedule::run` は system 実行中だけ component 登録を一時的に閉じ、return 前に再び開きます。`World::component_registration_locked()` で状態を確認できます。
 
-`System::reads` と `System::writes` は scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に並列実行できないアクセス衝突があるかを返します。`Schedule::run` 自体は引き続き単一スレッド・登録順実行です。
+`System::reads` と `System::writes` は scheduling / batching 用のメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に同一 batch に入れられないアクセス衝突があるかを返します。`Schedule::run` 自体は単一スレッドですが、同じ conflict ルールで batch 分割します。
 
 ビルトインの変換更新は `transform_propagation_system(world)` でも登録できます。この system は `World::update_global_transforms_from_transforms` と同じ処理を `PostUpdate` phase で実行し、`Transform3D` / `ChildOf` を read、`GlobalTransform` を write として宣言します。
 

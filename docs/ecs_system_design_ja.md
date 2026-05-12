@@ -96,7 +96,7 @@ pub struct Schedule {
 }
 ```
 
-`Schedule::run` は単一スレッドで phase 順、同一 phase 内は登録順に System を実行します。各 System には新しい `CommandBuffer` が渡され、System が戻った直後に commands が適用されます。そのため、前の System が行った変更を後続 System が観測できます。
+`Schedule::run` は単一スレッドで phase 順に実行します。同一 phase 内では、登録順を保ちながら conflict しない System を greedy に batch 化します。各 System には新しい `CommandBuffer` が渡され、同一 batch 内の全 System が戻った後、登録順で commands が適用されます。そのため、同一 batch 内の System は互いの command 結果を観測せず、後続 batch の System は前 batch の command 結果を観測できます。
 
 Schedule 実行中は component 登録がロックされます。`register_cpu_component` / `register_gpu_component` は schedule 実行中に呼ばれると `abort` します。Schedule 実行と実行の間では、新しい component type を登録できます。
 
@@ -118,7 +118,7 @@ pub(all) enum WorldCommand {
 }
 ```
 
-`CommandBuffer` は `Schedule::run` が System ごとに作り、System callback に渡します。ユーザーが直接作成・適用する API ではありません。System が戻った直後、Schedule が insertion order で commands を適用します。失敗した command があれば `Schedule::run` は `false` を返しますが、後続 command の適用は続き、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
+`CommandBuffer` は `Schedule::run` が System ごとに作り、System callback に渡します。ユーザーが直接作成・適用する API ではありません。batch 内の全 System が戻った後、Schedule が System 登録順かつ各 buffer の insertion order で commands を適用します。失敗した command があれば `Schedule::run` は `false` を返しますが、後続 command の適用は続き、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
 
 `Schedule::run` が System に渡す `CommandBuffer` は、その System の `writes` / `structural_write` 宣言を snapshot として持ちます。`add_component` / `remove_component` / `destroy_entity` などは queue 時点で必要権限を検査し、権限が足りない場合は `abort` します。適用時の `World` 側 access guard も引き続き有効です。
 
@@ -173,7 +173,7 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 ## Conflict 検査
 
-`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` は、将来の並列 batching 用の境界です。`Schedule::run` 自体はまだ単一スレッドで登録順に実行します。
+`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` は、batching 用の境界です。`Schedule::run` 自体はまだ単一スレッドですが、同一 phase 内ではこの conflict 判定に基づいて greedy batch を作ります。
 
 同一 phase 内では、次の関係を conflict とみなします。
 

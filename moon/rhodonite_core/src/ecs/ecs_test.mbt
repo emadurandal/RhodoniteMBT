@@ -884,7 +884,7 @@ test "Schedule convenience setters return false for missing components without s
 }
 
 ///|
-test "Schedule runs systems by phase and applies commands after each system" {
+test "Schedule runs systems by phase and applies commands after conflict-free batches" {
   let world = World::new()
   let qa = world.register_cpu_component("ScheduleA", 4)
   let qb = world.register_cpu_component("ScheduleB", 4)
