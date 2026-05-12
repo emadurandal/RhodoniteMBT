@@ -35,10 +35,11 @@ pub fn World::get_global_transform(
   entity : EntityId,
 ) -> @m44.Matrix44F? {
   let id = self.global_transform_component_id
+  self.assert_system_component_read(id, "World::get_global_transform")
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
-  match self.gpu_component_bytes(entity, id) {
+  match self.component_bytes(entity, id) {
     Some(bytes) => Some(@comp.matrix44f_from_std140_gpu_bytes(bytes))
     None => None
   }
@@ -98,6 +99,14 @@ pub fn World::compute_global_transform(
   self : World,
   entity : EntityId,
 ) -> @m44.Matrix44F? {
+  self.assert_system_component_read(
+    self.transform_component_id,
+    "World::compute_global_transform",
+  )
+  self.assert_system_component_read(
+    self.child_of_component_id,
+    "World::compute_global_transform",
+  )
   if !self.is_alive(entity) {
     return None
   }
@@ -166,6 +175,15 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let tf = self.transform_component_id
   let gt = self.global_transform_component_id
   let co = self.child_of_component_id
+  self.assert_system_component_read(
+    tf, "World::update_global_transforms_from_transforms",
+  )
+  self.assert_system_component_read(
+    co, "World::update_global_transforms_from_transforms",
+  )
+  self.assert_system_component_write(
+    gt, "World::update_global_transforms_from_transforms",
+  )
   let required : Array[ComponentTypeId] = [tf, gt]
   let query = Query::new(required)
   query.for_each(self, row => {

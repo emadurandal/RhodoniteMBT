@@ -6,6 +6,7 @@ pub fn World::set_transform(
   t : @comp.Transform3D,
 ) -> Bool {
   let id = self.transform_component_id
+  self.assert_system_component_write(id, "World::set_transform")
   let bytes = t.to_component_bytes()
   if self.has_component(entity, id) {
     self.set_component_bytes(entity, id, bytes)
@@ -35,6 +36,7 @@ pub fn World::set_transform_trs(
   sz : Float,
 ) -> Bool {
   let id = self.transform_component_id
+  self.assert_system_component_write(id, "World::set_transform_trs")
   let bytes = @comp.transform3d_trs_bytes(
     px, py, pz, qx, qy, qz, qw, sx, sy, sz,
   )
@@ -55,6 +57,7 @@ pub fn World::get_transform(
   entity : EntityId,
 ) -> @comp.Transform3D? {
   let tf = self.transform_component_id
+  self.assert_system_component_read(tf, "World::get_transform")
   if !self.is_alive(entity) || !self.has_component(entity, tf) {
     return None
   }

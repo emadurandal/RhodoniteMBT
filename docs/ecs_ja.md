@@ -178,20 +178,28 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-`create_entity`、`destroy_entity`、`add_component`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
+`create_entity`、`destroy_entity`、`add_component`、`add_component_bytes`、`remove_component`、`set_component_bytes`、`clear_gpu_component` などの World 変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
 
-query / system の走査中に変更を要求したい場合は、`CommandBuffer` に積みます。
+query / system の走査中に変更を要求したい場合は、System に渡される `CommandBuffer` に積みます。
 
 ```moonbit
-let commands = CommandBuffer::new()
-query.for_each(world, fn(row) {
-  commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
-})
-let _ = commands.apply(world)
+let system = System::new_with_structural_write(
+  "replace-component",
+  Update,
+  [],
+  [old_component, new_component],
+  fn(world, _ctx, commands) {
+    query.for_each(world, fn(row) {
+      let spawned = commands.create_entity()
+      commands.remove_component(row.entity(), old_component)
+      commands.add_component_bytes(row.entity(), new_component, bytes)
+      commands.add_component_bytes(spawned, new_component, spawn_bytes)
+    })
+  },
+)
 ```
 
-command は query 終了後に、積まれた順で適用されます。`CommandBuffer::apply` は buffer を空にし、失敗した command があれば `false` を返しますが、後続 command の適用は続けます。entity 生成はまだ含めていません。query 走査外では `World::create_entity` を直接使います。
+`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査します。同一 phase 内では conflict しない System を greedy に batch 化し、batch 内の全 System が戻った後、System 登録順かつ各 buffer の insertion order で commands を適用します。`commands.create_entity()` は queue 時点で `EntityId` を予約して返します。予約 entity は apply まで alive ではありませんが、同じ buffer の後続 command で component を追加できます。
 
 ---
 
@@ -213,11 +221,11 @@ schedule.add_system(System::new_with_structural_write("RemoveExpired", Update, [
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
-`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順です。各 system には新しい `CommandBuffer` が渡され、system が返った直後に schedule が適用します。そのため、後続 system は前の system の構造変更を観測できます。
+`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順を保ちつつ、conflict しない greedy batch に分割されます。各 system には新しい `CommandBuffer` が渡され、同一 batch 内の system は互いの queued change を観測しません。後続 batch の system は前 batch で適用された command 結果を観測できます。
 
 `Schedule::run` は system 実行中だけ component 登録を一時的に閉じ、return 前に再び開きます。`World::component_registration_locked()` で状態を確認できます。
 
-`System::reads` と `System::writes` は scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に並列実行できないアクセス衝突があるかを返します。`Schedule::run` 自体は引き続き単一スレッド・登録順実行です。
+`System::reads` と `System::writes` は scheduling / batching 用のメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に同一 batch に入れられないアクセス衝突があるかを返します。`Schedule::run` 自体は単一スレッドですが、同じ conflict ルールで batch 分割します。
 
 ビルトインの変換更新は `transform_propagation_system(world)` でも登録できます。この system は `World::update_global_transforms_from_transforms` と同じ処理を `PostUpdate` phase で実行し、`Transform3D` / `ChildOf` を read、`GlobalTransform` を write として宣言します。
 
@@ -226,9 +234,9 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ## GPU アップロードとリサイズ
 
 - **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージして `GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
-- **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。
+- **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。`Schedule::run` 中は World 所有の event queue を消費する操作として `structural_write` が必要です。Schedule 外では直接呼べます。
 
-`add_component` と `add_component_bytes` は CPU-only / GPU-visible component の両方を扱います。既存 GPU-visible payload の書き込みは `set_gpu_component_bytes` を使います。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。
+`add_component`、`add_component_bytes`、`component_bytes`、`set_component_bytes` は CPU-only / GPU-visible component の両方を扱います。CPU-only payload は archetype SoA row、GPU-visible payload は `EntityId.index` ベースの flat GPU row に置かれます。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) で `update_global_transforms_from_transforms` の後に `drain_gpu_writes(global_transform)` し、`queue.write_buffer_from_fixed_array` しています。
 

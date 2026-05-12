@@ -291,6 +291,7 @@ pub fn World::new() -> World {
   ]
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
+  let reserved : Array[Bool] = []
   let free_indices : Array[Int] = []
   let locations : Array[EntityLocation?] = []
   let empty_components : Array[ComponentTypeId] = []
@@ -309,6 +310,7 @@ pub fn World::new() -> World {
     registry,
     generations,
     alive,
+    reserved,
     free_indices,
     locations,
     archetypes,
@@ -328,8 +330,35 @@ pub fn World::new() -> World {
 }
 
 ///|
-pub fn World::registry(self : World) -> ComponentRegistry {
-  self.registry
+/// Returns immutable metadata for a component registered in this world.
+pub fn World::component_info(
+  self : World,
+  component : ComponentTypeId,
+) -> RegisteredComponent? {
+  self.registry.get(component)
+}
+
+///|
+/// Returns the CPU SoA stride for a registered component, or `None` for an unknown id.
+///
+/// GpuVisible components report `0` because their payload lives in flat GPU storage.
+pub fn World::component_cpu_stride(
+  self : World,
+  component : ComponentTypeId,
+) -> Int? {
+  match self.registry.get(component) {
+    Some(rc) => Some(rc.cpu_stride)
+    None => None
+  }
+}
+
+///|
+/// Returns the GPU layout for a GpuVisible component, or `None` for CPU-only/unknown ids.
+pub fn World::component_gpu_layout(
+  self : World,
+  component : ComponentTypeId,
+) -> @comp.GpuLayout? {
+  self.registry.gpu_layout(component)
 }
 
 ///|
@@ -431,6 +460,50 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 }
 
 ///|
+fn World::is_reserved_entity(self : World, entity : EntityId) -> Bool {
+  entity.index >= 0 &&
+  entity.index < self.reserved.length() &&
+  self.reserved[entity.index] &&
+  self.generations[entity.index] == entity.generation
+}
+
+///|
+/// Reserves an entity slot for a queued create command without touching archetype rows.
+fn World::reserve_entity_for_command(self : World) -> EntityId {
+  self.assert_system_structural_write("World::reserve_entity_for_command")
+  if self.free_indices.length() > 0 {
+    let last = self.free_indices.length() - 1
+    let index = self.free_indices[last]
+    let _ = self.free_indices.pop()
+    self.reserved[index] = true
+    EntityId::new(index, self.generations[index])
+  } else {
+    let index = self.generations.length()
+    self.generations.push(0)
+    self.alive.push(false)
+    self.reserved.push(true)
+    self.locations.push(None)
+    EntityId::new(index, 0)
+  }
+}
+
+///|
+/// Makes a previously reserved entity alive and inserts it into the empty archetype.
+fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
+  self.assert_not_querying("World::finalize_reserved_entity")
+  self.assert_system_structural_write("World::finalize_reserved_entity")
+  if !self.is_reserved_entity(entity) || self.alive[entity.index] {
+    return false
+  }
+  self.reserved[entity.index] = false
+  self.alive[entity.index] = true
+  let row = self.archetypes[0].push_empty_row(entity)
+  self.locations[entity.index] = Some({ archetype_index: 0, row })
+  self.ensure_gpu_capacity(entity.index + 1)
+  true
+}
+
+///|
 /// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
   self.assert_not_querying("World::create_entity")
@@ -440,11 +513,13 @@ pub fn World::create_entity(self : World) -> EntityId {
     let index = self.free_indices[last]
     let _ = self.free_indices.pop()
     self.alive[index] = true
+    self.reserved[index] = false
     EntityId::new(index, self.generations[index])
   } else {
     let index = self.generations.length()
     self.generations.push(0)
     self.alive.push(true)
+    self.reserved.push(false)
     self.locations.push(None)
     EntityId::new(index, 0)
   }
@@ -470,6 +545,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.clear_gpu_slots(entity.index)
   self.alive[entity.index] = false
+  self.reserved[entity.index] = false
   self.generations[entity.index] = self.generations[entity.index] + 1
   self.locations[entity.index] = None
   self.free_indices.push(entity.index)
@@ -506,7 +582,11 @@ pub fn World::has_component(
 }
 
 ///|
-/// Updates an existing CPU component payload in its current archetype row.
+/// Updates an existing component payload without changing archetype ownership.
+///
+/// CpuOnly components update the archetype SoA row. GpuVisible components update the flat GPU row
+/// and mark it dirty. Returns false for dead entities, missing ownership, unknown components, or
+/// byte lengths that do not match the registered payload stride.
 pub fn World::set_component_bytes(
   self : World,
   entity : EntityId,
@@ -515,12 +595,8 @@ pub fn World::set_component_bytes(
 ) -> Bool {
   self.assert_not_querying("World::set_component_bytes")
   self.assert_system_component_write(component, "World::set_component_bytes")
-  match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => ()
-        GpuVisible => return false
-      }
+  let rc = match self.registry.get(component) {
+    Some(rc) => rc
     None => return false
   }
   if !self.is_alive(entity) {
@@ -536,12 +612,36 @@ pub fn World::set_component_bytes(
     ) {
     return false
   }
-  self.archetypes[loc.archetype_index].set_component_bytes(
-    loc.row,
-    component,
-    bytes,
-  )
-  true
+  match rc.kind {
+    CpuOnly => {
+      if bytes.length() != rc.cpu_stride {
+        return false
+      }
+      self.archetypes[loc.archetype_index].set_component_bytes(
+        loc.row,
+        component,
+        bytes,
+      )
+      true
+    }
+    GpuVisible => {
+      let expected_stride = match rc.gpu_layout {
+        Some(layout) => layout.stride
+        None => return false
+      }
+      if bytes.length() != expected_stride {
+        return false
+      }
+      match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+        Some(store) => {
+          store.set_bytes(entity.index, bytes)
+          self.replace_gpu_store(store)
+          true
+        }
+        None => false
+      }
+    }
+  }
 }
 
 ///|
@@ -685,7 +785,10 @@ pub fn World::add_component_bytes(
 }
 
 ///|
-/// Removes a component: migrates to a smaller archetype (signature loses one id); GPU flat stores are unaffected by archetype row moves.
+/// Removes a component: migrates to a smaller archetype (signature loses one id).
+///
+/// Removing a GpuVisible component also zero-clears that entity's flat GPU slot and marks it
+/// dirty so stale payload bytes are not visible after ownership is dropped.
 pub fn World::remove_component(
   self : World,
   entity : EntityId,
@@ -696,6 +799,18 @@ pub fn World::remove_component(
   self.assert_system_component_write(component, "World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
+  }
+  let gpu_store_to_clear = match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => None
+        GpuVisible =>
+          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+            Some(store) => Some(store)
+            None => return false
+          }
+      }
+    None => return false
   }
   let loc = match self.locations[entity.index] {
     Some(loc) => loc
@@ -713,11 +828,21 @@ pub fn World::remove_component(
   })
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
+  match gpu_store_to_clear {
+    Some(store) => {
+      store.clear_slot(entity.index)
+      self.replace_gpu_store(store)
+    }
+    None => ()
+  }
   true
 }
 
 ///|
-/// Looks up CPU component bytes from the archetype SoA for this entity row.
+/// Looks up component bytes for a living entity that owns `component`.
+///
+/// CpuOnly components return their archetype SoA row. GpuVisible components return their flat GPU
+/// row at `EntityId.index`.
 pub fn World::component_bytes(
   self : World,
   entity : EntityId,
@@ -727,21 +852,53 @@ pub fn World::component_bytes(
   if !self.is_alive(entity) {
     return None
   }
-  match self.locations[entity.index] {
-    Some(loc) =>
-      self.archetypes[loc.archetype_index].component_bytes(loc.row, component)
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return None
+  }
+  if !component_array_contains(
+      self.archetypes[loc.archetype_index].components,
+      component,
+    ) {
+    return None
+  }
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly =>
+          self.archetypes[loc.archetype_index].component_bytes(
+            loc.row,
+            component,
+          )
+        GpuVisible =>
+          match self.gpu_store(component) {
+            Some(store) => {
+              if entity.index >= store.capacity() {
+                return None
+              }
+              Some(
+                copy_array_range_to_fixed(
+                  store.bytes,
+                  entity.index * store.stride,
+                  store.stride,
+                ),
+              )
+            }
+            None => None
+          }
+      }
     None => None
   }
 }
 
 ///|
 /// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
-/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access at the point where the
-/// callback asks for a read-only or mutable view.
-fn World::for_each_query_row_payloads(
+/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access and build row views lazily
+/// at the point where the callback asks for a read-only or mutable view.
+fn World::for_each_query_rows(
   self : World,
   required : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
+  f : (EntityId, Int, Int) -> Unit,
 ) -> Unit {
   if required.length() == 0 {
     return
@@ -751,6 +908,17 @@ fn World::for_each_query_row_payloads(
       "Query::for_each: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
     )
   }
+  for k = 0; k < required.length(); k = k + 1 {
+    match self.registry.get(required[k]) {
+      Some(_) => ()
+      None =>
+        abort(
+          "Query::for_each: unknown " +
+          component_id_text(required[k]) +
+          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+        )
+    }
+  }
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -759,59 +927,7 @@ fn World::for_each_query_row_payloads(
       let arch = self.archetypes[ai]
       let ents = arch.entities
       for j = 0; j < ents.length(); j = j + 1 {
-        let entity = ents[j]
-        let payloads : Array[MutArrayView[Byte]] = []
-        let gpu_flush : Array[GpuComponentStore] = []
-        for k = 0; k < required.length(); k = k + 1 {
-          match self.registry.get(required[k]) {
-            None =>
-              abort(
-                "Query::for_each: unknown " +
-                component_id_text(required[k]) +
-                ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-              )
-            Some(rc) =>
-              match rc.kind {
-                CpuOnly =>
-                  match arch.component_byte_mut_view(j, required[k]) {
-                    Some(v) => payloads.push(v)
-                    None =>
-                      abort(
-                        "Query::for_each: required " +
-                        component_id_text(required[k]) +
-                        " is missing from a matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
-                      )
-                  }
-                GpuVisible =>
-                  match
-                    self.ensure_gpu_store_capacity(
-                      required[k],
-                      entity.index + 1,
-                    ) {
-                    Some(store) => {
-                      let base = entity.index * store.stride
-                      let view = store.bytes.mut_view(
-                        start=base,
-                        end=base + store.stride,
-                      )
-                      payloads.push(view)
-                      gpu_flush.push(store)
-                    }
-                    None =>
-                      abort(
-                        "Query::for_each: GpuVisible " +
-                        component_id_text(required[k]) +
-                        " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
-                      )
-                  }
-              }
-          }
-        }
-        f(entity, sig, payloads)
-        for gi = 0; gi < gpu_flush.length(); gi = gi + 1 {
-          let st = gpu_flush[gi]
-          self.replace_gpu_store(st)
-        }
+        f(ents[j], ai, j)
       }
     }
   }

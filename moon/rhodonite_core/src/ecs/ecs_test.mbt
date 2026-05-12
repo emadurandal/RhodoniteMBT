@@ -72,6 +72,43 @@ test "EntityId generation invalidates stale handles and reuses gpu index" {
 }
 
 ///|
+test "World exposes component metadata without exposing registry mutation" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("MetadataCPU", 4)
+  let gpu_layout = @comp.global_transform_gpu_layout()
+  let gpu = world.register_gpu_component("MetadataGPU", gpu_layout)
+  match world.component_info(cpu) {
+    Some(info) => {
+      assert_eq(info.name, "MetadataCPU")
+      assert_true(info.kind == CpuOnly)
+      assert_eq(info.cpu_stride, 4)
+      assert_true(info.gpu_layout is None)
+    }
+    None => abort("expected CPU component metadata")
+  }
+  match world.component_info(gpu) {
+    Some(info) => {
+      assert_eq(info.name, "MetadataGPU")
+      assert_true(info.kind == GpuVisible)
+      assert_eq(info.cpu_stride, 0)
+      match info.gpu_layout {
+        Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
+        None => abort("expected GPU layout")
+      }
+    }
+    None => abort("expected GPU component metadata")
+  }
+  assert_eq(world.component_cpu_stride(cpu), Some(4))
+  assert_eq(world.component_cpu_stride(gpu), Some(0))
+  match world.component_gpu_layout(gpu) {
+    Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
+    None => abort("expected GPU layout")
+  }
+  assert_true(world.component_gpu_layout(cpu) is None)
+  assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
+}
+
+///|
 test "CPU components move entities between archetypes and preserve bytes" {
   let world = World::new()
   let transform = world.register_cpu_component("TransformCPU", 4)
@@ -125,9 +162,9 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
   assert_true(world.add_component(e1, gpu))
   assert_true(world.add_component(e3, gpu))
   let _ = world.drain_resize_events()
-  assert_true(world.set_gpu_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
-  assert_true(world.set_gpu_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
-  assert_true(world.set_gpu_component_bytes(e3, gpu, gpu_bytes_with_u32(13U)))
+  assert_true(world.set_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
+  assert_true(world.set_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
+  assert_true(world.set_component_bytes(e3, gpu, gpu_bytes_with_u32(13U)))
   let writes = world.drain_gpu_writes(gpu)
   assert_eq(writes.length(), 2)
   assert_eq(writes[0].byte_offset, e0.index * 16)
@@ -150,12 +187,8 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
   let entity = world.create_entity()
   assert_true(world.add_component(entity, gpu))
   let _ = world.drain_resize_events()
-  assert_true(
-    world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)),
-  )
-  assert_true(
-    world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(2U)),
-  )
+  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)))
+  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(2U)))
   let writes = world.drain_gpu_writes(gpu)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, entity.index * 16)
@@ -171,12 +204,33 @@ test "GPU visible public APIs require entity component ownership" {
     @comp.GpuLayout::empty(16),
   )
   let entity = world.create_entity()
-  assert_true(
-    !world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)),
-  )
+  assert_true(!world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)))
   assert_true(!world.clear_gpu_component(entity, gpu))
-  assert_true(world.gpu_component_bytes(entity, gpu) is None)
+  assert_true(world.component_bytes(entity, gpu) is None)
   assert_eq(world.drain_gpu_writes(gpu).length(), 0)
+}
+
+///|
+test "removing GPU visible component clears and dirties flat slot" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuRemoveClears",
+    @comp.GpuLayout::empty(16),
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, gpu, gpu_bytes_with_u32(77U)))
+  let _ = world.drain_resize_events()
+  let _ = world.drain_gpu_writes(gpu)
+  assert_true(world.remove_component(entity, gpu))
+  assert_true(!world.has_component(entity, gpu))
+  assert_true(world.component_bytes(entity, gpu) is None)
+  let writes = world.drain_gpu_writes(gpu)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, entity.index * 16)
+  assert_eq(writes[0].bytes.length(), 16)
+  for i = 0; i < writes[0].bytes.length(); i = i + 1 {
+    assert_eq(writes[0].bytes[i], (0 : Byte))
+  }
 }
 
 ///|
@@ -197,7 +251,7 @@ test "add_component and add_component_bytes support CPU and GPU visible componen
   assert_true(
     world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(44U)),
   )
-  match world.gpu_component_bytes(gpu_entity, gpu) {
+  match world.component_bytes(gpu_entity, gpu) {
     Some(bytes) => assert_eq(bytes[0], (44U & 0xFFU).to_byte())
     None => abort("expected AddComponentGpu bytes")
   }
@@ -231,7 +285,7 @@ test "add_component_bytes rejects invalid byte lengths before mutating ownership
   assert_true(
     world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(55U)),
   )
-  match world.gpu_component_bytes(gpu_entity, gpu) {
+  match world.component_bytes(gpu_entity, gpu) {
     Some(bytes) => assert_eq(bytes[0], (55U & 0xFFU).to_byte())
     None => abort("expected AddComponentBytesGpuStride bytes")
   }
@@ -627,18 +681,33 @@ test "CommandBuffer applies queued structural changes after query" {
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let query = Query::new([qa])
-  let commands = CommandBuffer::new()
-  query.for_each(world, row => {
-    commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
-    commands.remove_component(row.entity(), qa)
-  })
-  assert_true(world.has_component(e, qa))
-  assert_true(!world.has_component(e, qb))
-  assert_eq(commands.len(), 2)
-  assert_true(commands.apply(world))
+  let mut queued_count = 0
+  let mut saw_qa_before_apply = false
+  let mut saw_qb_before_apply = true
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "queue-structural-after-query",
+      Update,
+      [],
+      [qa, qb],
+      (w, _ctx, commands) => {
+        query.for_each(w, row => {
+          commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
+          commands.remove_component(row.entity(), qa)
+        })
+        saw_qa_before_apply = w.has_component(e, qa)
+        saw_qb_before_apply = w.has_component(e, qb)
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(saw_qa_before_apply)
+  assert_true(!saw_qb_before_apply)
+  assert_eq(queued_count, 2)
   assert_true(!world.has_component(e, qa))
   assert_true(world.has_component(e, qb))
-  assert_true(commands.is_empty())
 }
 
 ///|
@@ -678,15 +747,27 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let missing = EntityId::new(e.index + 100, 0)
-  let commands = CommandBuffer::new()
-  commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
-  commands.destroy_entity(missing)
-  assert_true(!commands.apply(world))
+  let mut queued_count = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "queue-gpu-write-and-failed-destroy",
+      Update,
+      [],
+      [gpu16],
+      (_w, _ctx, commands) => {
+        commands.set_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+        commands.destroy_entity(missing)
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(!schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_eq(queued_count, 2)
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
   assert_eq(writes[0].bytes[0], (33U & 0xFFU).to_byte())
-  assert_true(commands.is_empty())
 }
 
 ///|
@@ -803,7 +884,7 @@ test "Schedule convenience setters return false for missing components without s
 }
 
 ///|
-test "Schedule runs systems by phase and applies commands after each system" {
+test "Schedule runs systems by phase and applies commands after conflict-free batches" {
   let world = World::new()
   let qa = world.register_cpu_component("ScheduleA", 4)
   let qb = world.register_cpu_component("ScheduleB", 4)
@@ -864,6 +945,36 @@ test "Schedule run temporarily locks component registration" {
   assert_true(!world.component_registration_locked())
   let late = world.register_cpu_component("RegisteredAfterScheduleRun", 4)
   assert_true(late.index >= 0)
+}
+
+///|
+test "drain_resize_events is allowed outside schedule and structural systems" {
+  let world = World::new()
+  let e0 = world.create_entity()
+  let _ = world.drain_resize_events()
+  let gpu = world.register_gpu_component(
+    "ResizeDrainAccessGpu",
+    @comp.global_transform_gpu_layout(),
+  )
+  assert_true(world.add_component(e0, gpu))
+  let outside_events = world.drain_resize_events()
+  assert_true(outside_events.length() > 0)
+  let e1 = world.create_entity()
+  assert_true(world.add_component(e1, gpu))
+  let mut drained_in_system = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "drain-resize-events",
+      RenderExtract,
+      [],
+      [],
+      (w, _ctx, _cmds) => drained_in_system = w.drain_resize_events().length(),
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(drained_in_system > 0)
+  assert_eq(world.drain_resize_events().length(), 0)
 }
 
 ///|
@@ -1030,6 +1141,45 @@ test "System structural write declaration permits entity creation" {
   assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
   assert_true(world.is_alive(spawned))
   assert_true(schedule.has_parallel_access_conflicts())
+}
+
+///|
+test "CommandBuffer create_entity reserves id and applies components after query" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandCreateSource", 4)
+  let qb = world.register_cpu_component("CommandCreateSpawned", 4)
+  let source = world.create_entity()
+  assert_true(world.add_component_bytes(source, qa, bytes4(1, 2, 3, 4)))
+  let query = Query::new([qa])
+  let mut spawned = EntityId::new(-1, 0)
+  let mut alive_before_apply = true
+  let mut queued_count = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "command-create-entity",
+      Update,
+      [qa],
+      [qb],
+      (w, _ctx, commands) => {
+        query.for_each(w, _row => {
+          spawned = commands.create_entity()
+          alive_before_apply = w.is_alive(spawned)
+          commands.add_component_bytes(spawned, qb, bytes4(9, 8, 7, 6))
+        })
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_eq(queued_count, 2)
+  assert_true(!alive_before_apply)
+  assert_true(world.is_alive(spawned))
+  assert_true(world.has_component(spawned, qb))
+  match world.component_bytes(spawned, qb) {
+    Some(bytes) => assert_eq(bytes, bytes4(9, 8, 7, 6))
+    None => abort("expected CommandCreateSpawned bytes")
+  }
 }
 
 ///|

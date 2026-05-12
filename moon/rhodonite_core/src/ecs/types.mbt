@@ -49,7 +49,7 @@ pub(all) struct RegisteredComponent {
 
 ///|
 /// Issues monotonic `ComponentTypeId`s; CPU stride and optional GPU layout are fixed at registration time (no runtime reflection).
-pub struct ComponentRegistry {
+priv struct ComponentRegistry {
   components : Array[RegisteredComponent]
 }
 
@@ -104,7 +104,7 @@ pub(all) struct GpuResizeEvent {
 ///|
 /// Thin query descriptor for system-style iteration over a fixed `required` component set.
 pub struct Query {
-  required : Array[ComponentTypeId]
+  priv required : Array[ComponentTypeId]
 }
 
 ///|
@@ -114,25 +114,30 @@ pub struct QueryRow {
   priv world : World
   priv entity : EntityId
   priv components : Array[ComponentTypeId]
-  priv payloads : Array[MutArrayView[Byte]]
+  priv archetype_index : Int
+  priv row : Int
 }
 
 ///|
-/// Deferred structural or GPU mutation command applied after query/system iteration.
+/// Deferred structural or payload mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
 }
 
 ///|
 /// FIFO command buffer for changes that must not run while ECS component views are being queried.
 pub struct CommandBuffer {
-  commands : Array[WorldCommand]
+  priv commands : Array[WorldCommand]
+  priv world : World
+  priv system_name : String
+  priv writes : Array[ComponentTypeId]
+  priv structural_write : Bool
 }
 
 ///|
@@ -155,42 +160,43 @@ pub(all) enum SystemPhase {
 ///|
 /// Function-backed ECS system metadata plus declared component access.
 pub struct System {
-  name : String
-  phase : SystemPhase
-  reads : Array[ComponentTypeId]
-  writes : Array[ComponentTypeId]
-  structural_write : Bool
-  run : (World, SystemContext, CommandBuffer) -> Unit
+  priv name : String
+  priv phase : SystemPhase
+  priv reads : Array[ComponentTypeId]
+  priv writes : Array[ComponentTypeId]
+  priv structural_write : Bool
+  priv run : (World, SystemContext, CommandBuffer) -> Unit
 }
 
 ///|
 /// External system list. `World` stays focused on ECS storage and mutation.
 pub struct Schedule {
-  systems : Array[System]
+  priv systems : Array[System]
 }
 
 ///|
 /// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
 pub struct World {
-  registry : ComponentRegistry
-  generations : Array[Int]
-  alive : Array[Bool]
-  free_indices : Array[Int]
-  locations : Array[EntityLocation?]
-  archetypes : Array[Archetype]
-  gpu_stores : Array[GpuComponentStore?]
-  resize_events : Array[GpuResizeEvent]
+  priv registry : ComponentRegistry
+  priv generations : Array[Int]
+  priv alive : Array[Bool]
+  priv reserved : Array[Bool]
+  priv free_indices : Array[Int]
+  priv locations : Array[EntityLocation?]
+  priv archetypes : Array[Archetype]
+  priv gpu_stores : Array[GpuComponentStore?]
+  priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
-  mut query_depth : Int
+  priv mut query_depth : Int
   /// Schedule execution depth; component registration is closed while this is nonzero.
-  mut component_registration_lock_depth : Int
+  priv mut component_registration_lock_depth : Int
   /// Active system access guard; nonzero means component reads/writes are checked against declarations.
-  mut system_access_depth : Int
+  priv mut system_access_depth : Int
   priv mut system_access_name : String
-  mut system_access_reads : Array[ComponentTypeId]
-  mut system_access_writes : Array[ComponentTypeId]
-  mut system_access_structural_write : Bool
-  transform_component_id : ComponentTypeId
-  global_transform_component_id : ComponentTypeId
-  child_of_component_id : ComponentTypeId
+  priv mut system_access_reads : Array[ComponentTypeId]
+  priv mut system_access_writes : Array[ComponentTypeId]
+  priv mut system_access_structural_write : Bool
+  priv transform_component_id : ComponentTypeId
+  priv global_transform_component_id : ComponentTypeId
+  priv child_of_component_id : ComponentTypeId
 }

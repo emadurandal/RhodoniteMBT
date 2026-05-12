@@ -178,20 +178,28 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
+World mutation APIs such as `create_entity`, `destroy_entity`, `add_component`, `add_component_bytes`, `remove_component`, `set_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
 
-Use `CommandBuffer` when a query/system wants to request changes during iteration:
+Use the `CommandBuffer` passed to a `System` when a query/system wants to request changes during iteration:
 
 ```moonbit
-let commands = CommandBuffer::new()
-query.for_each(world, fn(row) {
-  commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
-})
-let _ = commands.apply(world)
+let system = System::new_with_structural_write(
+  "replace-component",
+  Update,
+  [],
+  [old_component, new_component],
+  fn(world, _ctx, commands) {
+    query.for_each(world, fn(row) {
+      let spawned = commands.create_entity()
+      commands.remove_component(row.entity(), old_component)
+      commands.add_component_bytes(row.entity(), new_component, bytes)
+      commands.add_component_bytes(spawned, new_component, spawn_bytes)
+    })
+  },
+)
 ```
 
-Commands are applied in insertion order after the query has finished. `CommandBuffer::apply` clears the buffer and returns `false` if any command failed, while still attempting later commands. Entity creation is intentionally not included yet; create entities directly outside query iteration.
+`Schedule::run` creates the command buffer for each system and validates queued commands against that system's `writes` / `structural_write` declaration. Within a phase, conflict-free systems are grouped into greedy batches. Commands are applied after every system in the batch returns, preserving system registration order and each buffer's insertion order. `commands.create_entity()` reserves an `EntityId` immediately; the reserved entity is not alive until apply, but later commands in the same buffer can add components to it.
 
 ---
 
@@ -207,11 +215,11 @@ schedule.add_system(System::new("Move", Update, [], [transform], fn(world, ctx, 
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
-`Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order. Each system receives a fresh `CommandBuffer`, and the schedule applies it immediately after that system returns, so later systems can observe earlier structural changes.
+`Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order but are split into conflict-free greedy batches. Each system receives a fresh `CommandBuffer`; systems in the same batch cannot observe each other's queued changes, while later batches can observe commands applied by earlier batches.
 
 `Schedule::run` temporarily closes component registration while systems are running, then reopens it before returning. Use `World::component_registration_locked()` to inspect that state.
 
-`System::reads` and `System::writes` are metadata for scheduling improvements. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that would prevent parallel execution. `Schedule::run` itself remains single-threaded and registration-ordered.
+`System::reads` and `System::writes` are metadata for scheduling and batching. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that force separate batches. `Schedule::run` remains single-threaded but uses the same conflict rules for batch splitting.
 
 The built-in transform update can also be registered with `transform_propagation_system(world)`. That system runs the same work as `World::update_global_transforms_from_transforms` in the `PostUpdate` phase, declaring `Transform3D` / `ChildOf` as reads and `GlobalTransform` as a write.
 
@@ -220,9 +228,9 @@ The built-in transform update can also be registered with `transform_propagation
 ## GPU upload and resize
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
-- **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**.
+- **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**. During `Schedule::run`, this consumes a world-owned event queue and requires `structural_write`; outside schedule execution it can be called directly.
 
-`add_component` and `add_component_bytes` handle both CPU-only and GPU-visible components. Existing GPU-visible payload writes use `set_gpu_component_bytes`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path.
+`add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path.
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) calls `update_global_transforms_from_transforms`, then `drain_gpu_writes(global_transform)`, then `queue.write_buffer_from_fixed_array`.
 

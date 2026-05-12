@@ -50,6 +50,20 @@ fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit 
 }
 
 ///|
+/// Zero-copy read-only view of one logical GPU row. Returns [`None`] if the row is outside current capacity.
+fn GpuComponentStore::entity_row_view(
+  self : GpuComponentStore,
+  entity_index : Int,
+) -> ArrayView[Byte]? {
+  if entity_index < 0 || entity_index >= self.capacity() {
+    None
+  } else {
+    let base = entity_index * self.stride
+    Some(self.bytes[base:base + self.stride])
+  }
+}
+
+///|
 /// Zero-copy mutable view of one logical GPU row; caller must not retain the view past store mutations.
 fn GpuComponentStore::mut_entity_row(
   self : GpuComponentStore,
@@ -264,61 +278,6 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
 }
 
 ///|
-/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead, does not have
-/// `component`, or `component` is not GPU-visible.
-pub fn World::set_gpu_component_bytes(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-  bytes : FixedArray[Byte],
-) -> Bool {
-  self.assert_not_querying("World::set_gpu_component_bytes")
-  self.assert_system_component_write(
-    component, "World::set_gpu_component_bytes",
-  )
-  if !self.is_alive(entity) {
-    return false
-  }
-  if !self.has_component(entity, component) {
-    return false
-  }
-  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-    Some(store) => {
-      store.set_bytes(entity.index, bytes)
-      self.replace_gpu_store(store)
-      true
-    }
-    None => false
-  }
-}
-
-///|
-/// Internal row-level dirty marker used by query mutable GPU views.
-fn World::mark_gpu_component_dirty(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> Bool {
-  self.assert_system_component_write(
-    component, "World::mark_gpu_component_dirty",
-  )
-  if !self.is_alive(entity) {
-    return false
-  }
-  if !self.has_component(entity, component) {
-    return false
-  }
-  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-    Some(store) => {
-      store.mark_dirty(entity.index)
-      self.replace_gpu_store(store)
-      true
-    }
-    None => false
-  }
-}
-
-///|
 /// Clears one GPU slot to zeros and marks it dirty (same as destroy-side scrubbing but callable explicitly).
 pub fn World::clear_gpu_component(
   self : World,
@@ -344,37 +303,6 @@ pub fn World::clear_gpu_component(
 }
 
 ///|
-/// Reads the flat GPU bytes for a living entity that owns `component`.
-pub fn World::gpu_component_bytes(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> FixedArray[Byte]? {
-  self.assert_system_component_read(component, "World::gpu_component_bytes")
-  if !self.is_alive(entity) {
-    return None
-  }
-  if !self.has_component(entity, component) {
-    return None
-  }
-  match self.gpu_store(component) {
-    Some(store) => {
-      if entity.index >= store.capacity() {
-        return None
-      }
-      Some(
-        copy_array_range_to_fixed(
-          store.bytes,
-          entity.index * store.stride,
-          store.stride,
-        ),
-      )
-    }
-    None => None
-  }
-}
-
-///|
 /// Returns batched byte slices suitable for `write_buffer_from_fixed_array`; consumes pending dirties for this component.
 pub fn World::drain_gpu_writes(
   self : World,
@@ -392,8 +320,12 @@ pub fn World::drain_gpu_writes(
 }
 
 ///|
-/// Drains resize notifications after GPU backing arrays grow (caller may recreate `GPUBuffer` and full-upload).
+/// Drains resize notifications after GPU backing arrays grow.
+///
+/// Schedule execution treats this as structural access to the world's event queue; systems that
+/// drain resize events must be built with `System::new_with_structural_write`.
 pub fn World::drain_resize_events(self : World) -> Array[GpuResizeEvent] {
+  self.assert_system_structural_write("World::drain_resize_events")
   let out : Array[GpuResizeEvent] = []
   for i = 0; i < self.resize_events.length(); i = i + 1 {
     out.push(self.resize_events[i])

@@ -15,34 +15,22 @@ pub fn transform_propagation_system(World) -> System
 type Archetype
 
 pub struct CommandBuffer {
-  commands : Array[WorldCommand]
+  // private fields
 }
 pub fn CommandBuffer::add_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-pub fn CommandBuffer::apply(Self, World) -> Bool
 pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::create_entity(Self) -> EntityId
 pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
 pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
-pub fn CommandBuffer::new() -> Self
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 
 pub(all) enum ComponentKind {
   CpuOnly
   GpuVisible
 } derive(Eq)
-
-pub struct ComponentRegistry {
-  components : Array[RegisteredComponent]
-}
-pub fn ComponentRegistry::get(Self, ComponentTypeId) -> RegisteredComponent?
-pub fn ComponentRegistry::gpu_layout(Self, ComponentTypeId) -> @components.GpuLayout?
-pub fn ComponentRegistry::new() -> Self
-pub fn ComponentRegistry::register_cpu(Self, String, Int) -> ComponentTypeId
-pub fn ComponentRegistry::register_gpu(Self, String, @components.GpuLayout) -> ComponentTypeId
-pub fn ComponentRegistry::stride(Self, ComponentTypeId) -> Int
 
 pub(all) struct ComponentTypeId {
   index : Int
@@ -75,7 +63,7 @@ pub(all) struct GpuWrite {
 }
 
 pub struct Query {
-  required : Array[ComponentTypeId]
+  // private fields
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
@@ -98,7 +86,7 @@ pub(all) struct RegisteredComponent {
 }
 
 pub struct Schedule {
-  systems : Array[System]
+  // private fields
 }
 pub fn Schedule::add_system(Self, System) -> Unit
 pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
@@ -107,12 +95,7 @@ pub fn Schedule::new() -> Self
 pub fn Schedule::run(Self, World, SystemContext) -> Bool
 
 pub struct System {
-  name : String
-  phase : SystemPhase
-  reads : Array[ComponentTypeId]
-  writes : Array[ComponentTypeId]
-  structural_write : Bool
-  run : (World, SystemContext, CommandBuffer) -> Unit
+  // private fields
 }
 pub fn System::conflicts_with(Self, Self) -> Bool
 pub fn System::name(Self) -> String
@@ -138,23 +121,6 @@ pub(all) enum SystemPhase {
 } derive(Eq)
 
 pub struct World {
-  registry : ComponentRegistry
-  generations : Array[Int]
-  alive : Array[Bool]
-  free_indices : Array[Int]
-  locations : Array[EntityLocation?]
-  archetypes : Array[Archetype]
-  gpu_stores : Array[GpuComponentStore?]
-  resize_events : Array[GpuResizeEvent]
-  mut query_depth : Int
-  mut component_registration_lock_depth : Int
-  mut system_access_depth : Int
-  mut system_access_reads : Array[ComponentTypeId]
-  mut system_access_writes : Array[ComponentTypeId]
-  mut system_access_structural_write : Bool
-  transform_component_id : ComponentTypeId
-  global_transform_component_id : ComponentTypeId
-  child_of_component_id : ComponentTypeId
   // private fields
 }
 pub fn World::add_component(Self, EntityId, ComponentTypeId) -> Bool
@@ -162,6 +128,9 @@ pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
+pub fn World::component_cpu_stride(Self, ComponentTypeId) -> Int?
+pub fn World::component_gpu_layout(Self, ComponentTypeId) -> @components.GpuLayout?
+pub fn World::component_info(Self, ComponentTypeId) -> RegisteredComponent?
 pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
@@ -172,31 +141,28 @@ pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
 pub fn World::global_transform_component(Self) -> ComponentTypeId
-pub fn World::gpu_component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId
-pub fn World::registry(Self) -> ComponentRegistry
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
-pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
 }
 

@@ -124,6 +124,24 @@ fn Archetype::component_bytes(
 }
 
 ///|
+/// Zero-copy read-only view of one component row ([`ArrayView`] over [`ComponentColumn::bytes`]).
+fn Archetype::component_byte_view(
+  self : Archetype,
+  row : Int,
+  component : ComponentTypeId,
+) -> ArrayView[Byte]? {
+  let col_index = self.column_index(component)
+  if col_index < 0 {
+    None
+  } else {
+    let col = self.columns[col_index]
+    let base = row * col.stride
+    let end = base + col.stride
+    Some(col.bytes[base:end])
+  }
+}
+
+///|
 /// Zero-copy **mutable** view of one component row ([`MutArrayView`] over [`ComponentColumn::bytes`]).
 fn Archetype::component_byte_mut_view(
   self : Archetype,

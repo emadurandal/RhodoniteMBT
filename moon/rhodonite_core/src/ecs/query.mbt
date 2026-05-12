@@ -36,8 +36,8 @@ pub fn Query::for_each(
   f : (QueryRow) -> Unit,
 ) -> Unit {
   world.assert_system_components_read(self.required, "Query::for_each")
-  world.for_each_query_row_payloads(self.required, (e, _sig, views) => {
-    f({ world, entity: e, components: self.required, payloads: views })
+  world.for_each_query_rows(self.required, (e, archetype_index, row) => {
+    f({ world, entity: e, components: self.required, archetype_index, row })
   })
 }
 
@@ -73,6 +73,124 @@ fn QueryRow::component_payload_index(
 }
 
 ///|
+/// Builds the requested read-only row view on demand without growing stores or marking dirty rows.
+fn QueryRow::component_view(
+  self : QueryRow,
+  component : ComponentTypeId,
+  operation : String,
+) -> ArrayView[Byte] {
+  ignore(self.component_payload_index(component, operation))
+  match self.world.registry.get(component) {
+    None =>
+      abort(
+        operation +
+        ": unknown " +
+        component_id_text(component) +
+        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
+      )
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly =>
+          match
+            self.world.archetypes[self.archetype_index].component_byte_view(
+              self.row,
+              component,
+            ) {
+            Some(v) => v
+            None =>
+              abort(
+                operation +
+                ": required " +
+                component_id_text(component) +
+                " is missing from the matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
+              )
+          }
+        GpuVisible =>
+          match self.world.gpu_store(component) {
+            Some(store) =>
+              match store.entity_row_view(self.entity.index) {
+                Some(v) => v
+                None =>
+                  abort(
+                    operation +
+                    ": GpuVisible " +
+                    component_id_text(component) +
+                    " row is outside the current GPU store capacity. Hint: GPU-visible ownership should be initialized through add_component/add_component_bytes before querying.",
+                  )
+              }
+            None =>
+              abort(
+                operation +
+                ": GpuVisible " +
+                component_id_text(component) +
+                " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+              )
+          }
+      }
+  }
+}
+
+///|
+/// Builds the requested mutable row view on demand.
+fn QueryRow::component_mut_view(
+  self : QueryRow,
+  component : ComponentTypeId,
+  operation : String,
+  mark_gpu_dirty : Bool,
+) -> MutArrayView[Byte] {
+  ignore(self.component_payload_index(component, operation))
+  match self.world.registry.get(component) {
+    None =>
+      abort(
+        operation +
+        ": unknown " +
+        component_id_text(component) +
+        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
+      )
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly =>
+          match
+            self.world.archetypes[self.archetype_index].component_byte_mut_view(
+              self.row,
+              component,
+            ) {
+            Some(v) => v
+            None =>
+              abort(
+                operation +
+                ": required " +
+                component_id_text(component) +
+                " is missing from the matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
+              )
+          }
+        GpuVisible =>
+          match
+            self.world.ensure_gpu_store_capacity(
+              component,
+              self.entity.index + 1,
+            ) {
+            Some(store) => {
+              if mark_gpu_dirty {
+                store.mark_dirty(self.entity.index)
+                self.world.replace_gpu_store(store)
+              }
+              let base = self.entity.index * store.stride
+              store.bytes.mut_view(start=base, end=base + store.stride)
+            }
+            None =>
+              abort(
+                operation +
+                ": GpuVisible " +
+                component_id_text(component) +
+                " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+              )
+          }
+      }
+  }
+}
+
+///|
 /// Returns a zero-copy read-only payload view for `component`.
 ///
 /// CpuOnly components return their archetype SoA row; GpuVisible components return the flat GPU
@@ -82,8 +200,7 @@ pub fn QueryRow::read_view(
   component : ComponentTypeId,
 ) -> ArrayView[Byte] {
   self.world.assert_system_component_read(component, "QueryRow::read_view")
-  let index = self.component_payload_index(component, "QueryRow::read_view")
-  self.payloads[index].view()
+  self.component_view(component, "QueryRow::read_view")
 }
 
 ///|
@@ -96,21 +213,5 @@ pub fn QueryRow::write_view(
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
   self.world.assert_system_component_write(component, "QueryRow::write_view")
-  let index = self.component_payload_index(component, "QueryRow::write_view")
-  match self.world.registry.get(component) {
-    None =>
-      abort(
-        "QueryRow::write_view: unknown " +
-        component_id_text(component) +
-        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
-      )
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => ()
-        GpuVisible => {
-          let _ = self.world.mark_gpu_component_dirty(self.entity, component)
-        }
-      }
-  }
-  self.payloads[index]
+  self.component_mut_view(component, "QueryRow::write_view", true)
 }

@@ -62,23 +62,27 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 
 | 操作 | 必要な宣言 |
 |------|------------|
-| `component_bytes` / `gpu_component_bytes` | `reads` または `writes` |
+| `component_bytes` | `reads` または `writes` |
 | `Query` required component | `reads` または `writes` |
 | `QueryRow::read_view` | `reads` または `writes` |
 | `QueryRow::write_view` | `writes` |
-| `set_component_bytes` | `writes` |
-| `set_gpu_component_bytes` / `clear_gpu_component` | `writes` |
+| `set_component_bytes` / `clear_gpu_component` | `writes` |
 | `drain_gpu_writes` | `writes` |
+| `drain_resize_events` | `structural_write` |
 | `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
 | `create_entity` / `destroy_entity` | `structural_write` |
 
-`set_component_bytes` は既存 CPU component の payload 更新だけを行い、archetype 構造を変えません。GPU-visible component の payload は `set_gpu_component_bytes` で更新します。
+`component_bytes` / `set_component_bytes` は CPU-only / GPU-visible の両方を registry kind に応じて扱います。CPU-only は archetype SoA row、GPU-visible は `EntityId.index` ベースの flat GPU row を読み書きします。`set_component_bytes` は既存 payload 更新だけを行い、archetype 構造を変えません。byte length が登録済み stride と一致しない場合は `false` を返します。
 
-component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
+component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。`GpuVisible` component を `remove_component` で外す場合は、所有解除と同時に対象 entity の flat GPU slot を zero clear し、その row を dirty にします。
 
-`set_gpu_component_bytes` / `clear_gpu_component` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。`remove_component` 後は ownership が消えるため `component_bytes` は `None` になり、GPU 側には zero clear された dirty row が残ります。
 
-GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_gpu_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
+
+`drain_resize_events` は World が所有する resize event queue を消費します。Schedule 実行中に呼ぶ場合は、event queue に対する構造的 access として `structural_write` が必要です。Schedule 外では従来通り呼べます。
+
+builtin convenience API も同じ access guard に従います。`get_transform` / `get_child_of` / `get_global_transform` は各 component の read を要求し、`set_transform` / `set_child_of` / `set_global_transform` は write を要求します。`compute_global_transform` は階層を扱う API として `Transform3D` と `ChildOf` の read を保守的に要求し、`update_global_transforms_from_transforms` は `Transform3D` / `ChildOf` read と `GlobalTransform` write を要求します。
 
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 
@@ -92,7 +96,7 @@ pub struct Schedule {
 }
 ```
 
-`Schedule::run` は単一スレッドで phase 順、同一 phase 内は登録順に System を実行します。各 System には新しい `CommandBuffer` が渡され、System が戻った直後に commands が適用されます。そのため、前の System が行った変更を後続 System が観測できます。
+`Schedule::run` は単一スレッドで phase 順に実行します。同一 phase 内では、登録順を保ちながら conflict しない System を greedy に batch 化します。各 System には新しい `CommandBuffer` が渡され、同一 batch 内の全 System が戻った後、登録順で commands が適用されます。そのため、同一 batch 内の System は互いの command 結果を観測せず、後続 batch の System は前 batch の command 結果を観測できます。
 
 Schedule 実行中は component 登録がロックされます。`register_cpu_component` / `register_gpu_component` は schedule 実行中に呼ばれると `abort` します。Schedule 実行と実行の間では、新しい component type を登録できます。
 
@@ -104,19 +108,21 @@ System から遅延適用したい変更は `CommandBuffer` に積みます。
 
 ```moonbit
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
 }
 ```
 
-`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
+`CommandBuffer` は `Schedule::run` が System ごとに作り、System callback に渡します。ユーザーが直接作成・適用する API ではありません。batch 内の全 System が戻った後、Schedule が System 登録順かつ各 buffer の insertion order で commands を適用します。失敗した command があれば `Schedule::run` は `false` を返しますが、後続 command の適用は続き、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
 
-`CreateEntity` command はまだありません。System 内で entity を作る場合は、query callback の外で `World::create_entity` を直接呼びます。この場合は `structural_write` が必要です。query callback 内で entity 作成を予約したい場合は、将来的に予約 ID 付き create command を設計する必要があります。
+`Schedule::run` が System に渡す `CommandBuffer` は、その System の `writes` / `structural_write` 宣言を snapshot として持ちます。`add_component` / `remove_component` / `destroy_entity` などは queue 時点で必要権限を検査し、権限が足りない場合は `abort` します。適用時の `World` 側 access guard も引き続き有効です。
+
+`CommandBuffer::create_entity` は queue 時点で `EntityId` を予約して返し、`CreateEntity` command を積みます。予約 entity は apply されるまで `is_alive == false` ですが、同じ command buffer の後続 `add_component` / `add_component_bytes` の対象にできます。entity 作成 command は `structural_write` を要求します。`Schedule::run` の戻り値が `false` になっても、既に適用された command は巻き戻しません。
 
 ## Query
 
@@ -133,7 +139,7 @@ query.for_each(world, fn(row) {
 })
 ```
 
-`QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。
+`QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。読み取り専用経路は GPU store の capacity 拡張や dirty 記録を行いません。
 
 `QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
@@ -167,7 +173,7 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 ## Conflict 検査
 
-`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` は、将来の並列 batching 用の境界です。`Schedule::run` 自体はまだ単一スレッドで登録順に実行します。
+`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` は、batching 用の境界です。`Schedule::run` 自体はまだ単一スレッドですが、同一 phase 内ではこの conflict 判定に基づいて greedy batch を作ります。
 
 同一 phase 内では、次の関係を conflict とみなします。
 
@@ -197,7 +203,6 @@ pub struct App {
 ## まだ残る課題
 
 - typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
-- `CreateEntity` command、または予約 `EntityId` を返す spawn API。
 - read/write/structural access に基づく実際の System batch 分割と並列実行。
 - GPU dirty tracking の thread-local 化と merge。
 - query plan cache、archetype index cache、required component column index cache。
