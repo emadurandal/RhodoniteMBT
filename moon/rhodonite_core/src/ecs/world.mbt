@@ -822,12 +822,12 @@ pub fn World::component_bytes(
 
 ///|
 /// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
-/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access at the point where the
-/// callback asks for a read-only or mutable view.
-fn World::for_each_query_row_payloads(
+/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access and build row views lazily
+/// at the point where the callback asks for a read-only or mutable view.
+fn World::for_each_query_rows(
   self : World,
   required : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
+  f : (EntityId, Int, Int) -> Unit,
 ) -> Unit {
   if required.length() == 0 {
     return
@@ -837,6 +837,17 @@ fn World::for_each_query_row_payloads(
       "Query::for_each: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
     )
   }
+  for k = 0; k < required.length(); k = k + 1 {
+    match self.registry.get(required[k]) {
+      Some(_) => ()
+      None =>
+        abort(
+          "Query::for_each: unknown " +
+          component_id_text(required[k]) +
+          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+        )
+    }
+  }
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -845,59 +856,7 @@ fn World::for_each_query_row_payloads(
       let arch = self.archetypes[ai]
       let ents = arch.entities
       for j = 0; j < ents.length(); j = j + 1 {
-        let entity = ents[j]
-        let payloads : Array[MutArrayView[Byte]] = []
-        let gpu_flush : Array[GpuComponentStore] = []
-        for k = 0; k < required.length(); k = k + 1 {
-          match self.registry.get(required[k]) {
-            None =>
-              abort(
-                "Query::for_each: unknown " +
-                component_id_text(required[k]) +
-                ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-              )
-            Some(rc) =>
-              match rc.kind {
-                CpuOnly =>
-                  match arch.component_byte_mut_view(j, required[k]) {
-                    Some(v) => payloads.push(v)
-                    None =>
-                      abort(
-                        "Query::for_each: required " +
-                        component_id_text(required[k]) +
-                        " is missing from a matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
-                      )
-                  }
-                GpuVisible =>
-                  match
-                    self.ensure_gpu_store_capacity(
-                      required[k],
-                      entity.index + 1,
-                    ) {
-                    Some(store) => {
-                      let base = entity.index * store.stride
-                      let view = store.bytes.mut_view(
-                        start=base,
-                        end=base + store.stride,
-                      )
-                      payloads.push(view)
-                      gpu_flush.push(store)
-                    }
-                    None =>
-                      abort(
-                        "Query::for_each: GpuVisible " +
-                        component_id_text(required[k]) +
-                        " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
-                      )
-                  }
-              }
-          }
-        }
-        f(entity, sig, payloads)
-        for gi = 0; gi < gpu_flush.length(); gi = gi + 1 {
-          let st = gpu_flush[gi]
-          self.replace_gpu_store(st)
-        }
+        f(ents[j], ai, j)
       }
     }
   }

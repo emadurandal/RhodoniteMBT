@@ -3,7 +3,7 @@
 
 ///|
 /// ECS bulk paths use [`GlobalTransform::view_std140_gpu_row`] so [`matrix`] aliases the GPU row
-/// (`payloads[1]` in [`World::update_global_transforms_from_transforms`]) with **no** separate float storage.
+/// returned by [`QueryRow::write_view`] with **no** separate float storage.
 /// Encode/decode owned [`@m44.Matrix44F`] values with [`matrix44f_write_std140_mat4_to_gpu_row`] /
 /// [`matrix44f_from_std140_gpu_bytes`].
 pub(all) struct GlobalTransform {

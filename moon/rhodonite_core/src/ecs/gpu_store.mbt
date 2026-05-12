@@ -264,32 +264,6 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
 }
 
 ///|
-/// Internal row-level dirty marker used by query mutable GPU views.
-fn World::mark_gpu_component_dirty(
-  self : World,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> Bool {
-  self.assert_system_component_write(
-    component, "World::mark_gpu_component_dirty",
-  )
-  if !self.is_alive(entity) {
-    return false
-  }
-  if !self.has_component(entity, component) {
-    return false
-  }
-  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-    Some(store) => {
-      store.mark_dirty(entity.index)
-      self.replace_gpu_store(store)
-      true
-    }
-    None => false
-  }
-}
-
-///|
 /// Clears one GPU slot to zeros and marks it dirty (same as destroy-side scrubbing but callable explicitly).
 pub fn World::clear_gpu_component(
   self : World,

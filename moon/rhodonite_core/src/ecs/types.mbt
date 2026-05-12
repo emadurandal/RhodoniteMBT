@@ -114,7 +114,8 @@ pub struct QueryRow {
   priv world : World
   priv entity : EntityId
   priv components : Array[ComponentTypeId]
-  priv payloads : Array[MutArrayView[Byte]]
+  priv archetype_index : Int
+  priv row : Int
 }
 
 ///|
