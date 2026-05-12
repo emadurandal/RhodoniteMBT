@@ -20,6 +20,7 @@ pub struct CommandBuffer {
 pub fn CommandBuffer::add_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::create_entity(Self) -> EntityId
 pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
 pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
@@ -156,6 +157,7 @@ pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])

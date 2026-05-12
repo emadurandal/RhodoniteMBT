@@ -1121,6 +1121,45 @@ test "System structural write declaration permits entity creation" {
 }
 
 ///|
+test "CommandBuffer create_entity reserves id and applies components after query" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandCreateSource", 4)
+  let qb = world.register_cpu_component("CommandCreateSpawned", 4)
+  let source = world.create_entity()
+  assert_true(world.add_component_bytes(source, qa, bytes4(1, 2, 3, 4)))
+  let query = Query::new([qa])
+  let mut spawned = EntityId::new(-1, 0)
+  let mut alive_before_apply = true
+  let mut queued_count = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "command-create-entity",
+      Update,
+      [qa],
+      [qb],
+      (w, _ctx, commands) => {
+        query.for_each(w, _row => {
+          spawned = commands.create_entity()
+          alive_before_apply = w.is_alive(spawned)
+          commands.add_component_bytes(spawned, qb, bytes4(9, 8, 7, 6))
+        })
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_eq(queued_count, 2)
+  assert_true(!alive_before_apply)
+  assert_true(world.is_alive(spawned))
+  assert_true(world.has_component(spawned, qb))
+  match world.component_bytes(spawned, qb) {
+    Some(bytes) => assert_eq(bytes, bytes4(9, 8, 7, 6))
+    None => abort("expected CommandCreateSpawned bytes")
+  }
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()

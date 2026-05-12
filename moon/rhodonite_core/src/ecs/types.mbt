@@ -121,6 +121,7 @@ pub struct QueryRow {
 ///|
 /// Deferred structural or payload mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
@@ -133,6 +134,7 @@ pub(all) enum WorldCommand {
 /// FIFO command buffer for changes that must not run while ECS component views are being queried.
 pub struct CommandBuffer {
   priv commands : Array[WorldCommand]
+  priv world : World
   priv system_name : String
   priv writes : Array[ComponentTypeId]
   priv structural_write : Bool
@@ -178,6 +180,7 @@ pub struct World {
   priv registry : ComponentRegistry
   priv generations : Array[Int]
   priv alive : Array[Bool]
+  priv reserved : Array[Bool]
   priv free_indices : Array[Int]
   priv locations : Array[EntityLocation?]
   priv archetypes : Array[Archetype]

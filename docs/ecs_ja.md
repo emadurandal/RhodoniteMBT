@@ -190,14 +190,16 @@ let system = System::new_with_structural_write(
   [old_component, new_component],
   fn(world, _ctx, commands) {
     query.for_each(world, fn(row) {
+      let spawned = commands.create_entity()
       commands.remove_component(row.entity(), old_component)
       commands.add_component_bytes(row.entity(), new_component, bytes)
+      commands.add_component_bytes(spawned, new_component, spawn_bytes)
     })
   },
 )
 ```
 
-`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査し、System が戻った直後に積まれた順で適用します。entity 生成はまだ含めていません。query 走査外では `World::create_entity` を直接使います。
+`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査し、System が戻った直後に積まれた順で適用します。`commands.create_entity()` は queue 時点で `EntityId` を予約して返します。予約 entity は apply まで alive ではありませんが、同じ buffer の後続 command で component を追加できます。
 
 ---
 

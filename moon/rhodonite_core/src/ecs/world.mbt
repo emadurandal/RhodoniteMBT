@@ -291,6 +291,7 @@ pub fn World::new() -> World {
   ]
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
+  let reserved : Array[Bool] = []
   let free_indices : Array[Int] = []
   let locations : Array[EntityLocation?] = []
   let empty_components : Array[ComponentTypeId] = []
@@ -309,6 +310,7 @@ pub fn World::new() -> World {
     registry,
     generations,
     alive,
+    reserved,
     free_indices,
     locations,
     archetypes,
@@ -458,6 +460,50 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 }
 
 ///|
+fn World::is_reserved_entity(self : World, entity : EntityId) -> Bool {
+  entity.index >= 0 &&
+  entity.index < self.reserved.length() &&
+  self.reserved[entity.index] &&
+  self.generations[entity.index] == entity.generation
+}
+
+///|
+/// Reserves an entity slot for a queued create command without touching archetype rows.
+fn World::reserve_entity_for_command(self : World) -> EntityId {
+  self.assert_system_structural_write("World::reserve_entity_for_command")
+  if self.free_indices.length() > 0 {
+    let last = self.free_indices.length() - 1
+    let index = self.free_indices[last]
+    let _ = self.free_indices.pop()
+    self.reserved[index] = true
+    EntityId::new(index, self.generations[index])
+  } else {
+    let index = self.generations.length()
+    self.generations.push(0)
+    self.alive.push(false)
+    self.reserved.push(true)
+    self.locations.push(None)
+    EntityId::new(index, 0)
+  }
+}
+
+///|
+/// Makes a previously reserved entity alive and inserts it into the empty archetype.
+fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
+  self.assert_not_querying("World::finalize_reserved_entity")
+  self.assert_system_structural_write("World::finalize_reserved_entity")
+  if !self.is_reserved_entity(entity) || self.alive[entity.index] {
+    return false
+  }
+  self.reserved[entity.index] = false
+  self.alive[entity.index] = true
+  let row = self.archetypes[0].push_empty_row(entity)
+  self.locations[entity.index] = Some({ archetype_index: 0, row })
+  self.ensure_gpu_capacity(entity.index + 1)
+  true
+}
+
+///|
 /// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
   self.assert_not_querying("World::create_entity")
@@ -467,11 +513,13 @@ pub fn World::create_entity(self : World) -> EntityId {
     let index = self.free_indices[last]
     let _ = self.free_indices.pop()
     self.alive[index] = true
+    self.reserved[index] = false
     EntityId::new(index, self.generations[index])
   } else {
     let index = self.generations.length()
     self.generations.push(0)
     self.alive.push(true)
+    self.reserved.push(false)
     self.locations.push(None)
     EntityId::new(index, 0)
   }
@@ -497,6 +545,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.clear_gpu_slots(entity.index)
   self.alive[entity.index] = false
+  self.reserved[entity.index] = false
   self.generations[entity.index] = self.generations[entity.index] + 1
   self.locations[entity.index] = None
   self.free_indices.push(entity.index)

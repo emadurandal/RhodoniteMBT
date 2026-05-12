@@ -108,6 +108,7 @@ System から遅延適用したい変更は `CommandBuffer` に積みます。
 
 ```moonbit
 pub(all) enum WorldCommand {
+  CreateEntity(EntityId)
   DestroyEntity(EntityId)
   AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
@@ -121,7 +122,7 @@ pub(all) enum WorldCommand {
 
 `Schedule::run` が System に渡す `CommandBuffer` は、その System の `writes` / `structural_write` 宣言を snapshot として持ちます。`add_component` / `remove_component` / `destroy_entity` などは queue 時点で必要権限を検査し、権限が足りない場合は `abort` します。適用時の `World` 側 access guard も引き続き有効です。
 
-`CreateEntity` command はまだありません。System 内で entity を作る場合は、query callback の外で `World::create_entity` を直接呼びます。この場合は `structural_write` が必要です。query callback 内で entity 作成を予約したい場合は、将来的に予約 ID 付き create command を設計する必要があります。
+`CommandBuffer::create_entity` は queue 時点で `EntityId` を予約して返し、`CreateEntity` command を積みます。予約 entity は apply されるまで `is_alive == false` ですが、同じ command buffer の後続 `add_component` / `add_component_bytes` の対象にできます。entity 作成 command は `structural_write` を要求します。`Schedule::run` の戻り値が `false` になっても、既に適用された command は巻き戻しません。
 
 ## Query
 
@@ -202,7 +203,6 @@ pub struct App {
 ## まだ残る課題
 
 - typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
-- `CreateEntity` command、または予約 `EntityId` を返す spawn API。
 - read/write/structural access に基づく実際の System batch 分割と並列実行。
 - GPU dirty tracking の thread-local 化と merge。
 - query plan cache、archetype index cache、required component column index cache。
