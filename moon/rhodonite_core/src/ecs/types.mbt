@@ -133,6 +133,9 @@ pub(all) enum WorldCommand {
 /// FIFO command buffer for changes that must not run while ECS component views are being queried.
 pub struct CommandBuffer {
   priv commands : Array[WorldCommand]
+  priv system_name : String
+  priv writes : Array[ComponentTypeId]
+  priv structural_write : Bool
 }
 
 ///|

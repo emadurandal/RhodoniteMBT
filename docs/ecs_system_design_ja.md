@@ -117,7 +117,9 @@ pub(all) enum WorldCommand {
 }
 ```
 
-`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
+`CommandBuffer` は `Schedule::run` が System ごとに作り、System callback に渡します。ユーザーが直接作成・適用する API ではありません。System が戻った直後、Schedule が insertion order で commands を適用します。失敗した command があれば `Schedule::run` は `false` を返しますが、後続 command の適用は続き、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
+
+`Schedule::run` が System に渡す `CommandBuffer` は、その System の `writes` / `structural_write` 宣言を snapshot として持ちます。`add_component` / `remove_component` / `destroy_entity` などは queue 時点で必要権限を検査し、権限が足りない場合は `abort` します。適用時の `World` 側 access guard も引き続き有効です。
 
 `CreateEntity` command はまだありません。System 内で entity を作る場合は、query callback の外で `World::create_entity` を直接呼びます。この場合は `structural_write` が必要です。query callback 内で entity 作成を予約したい場合は、将来的に予約 ID 付き create command を設計する必要があります。
 

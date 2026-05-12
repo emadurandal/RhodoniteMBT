@@ -208,7 +208,11 @@ pub fn Schedule::run(
     for i = 0; i < self.systems.length(); i = i + 1 {
       let system = self.systems[i]
       if system_phase_rank(system.phase) == phase_rank {
-        let commands = CommandBuffer::new()
+        let commands = CommandBuffer::new_for_system(
+          system.name,
+          system.writes,
+          system.structural_write,
+        )
         let system_access = world.enter_system_access(
           system.name,
           system.reads,

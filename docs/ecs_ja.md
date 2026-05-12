@@ -180,18 +180,24 @@ query.for_each(world, fn(row) {
 
 `create_entity`、`destroy_entity`、`add_component`、`add_component_bytes`、`remove_component`、`set_component_bytes`、`clear_gpu_component` などの World 変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
 
-query / system の走査中に変更を要求したい場合は、`CommandBuffer` に積みます。
+query / system の走査中に変更を要求したい場合は、System に渡される `CommandBuffer` に積みます。
 
 ```moonbit
-let commands = CommandBuffer::new()
-query.for_each(world, fn(row) {
-  commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
-})
-let _ = commands.apply(world)
+let system = System::new_with_structural_write(
+  "replace-component",
+  Update,
+  [],
+  [old_component, new_component],
+  fn(world, _ctx, commands) {
+    query.for_each(world, fn(row) {
+      commands.remove_component(row.entity(), old_component)
+      commands.add_component_bytes(row.entity(), new_component, bytes)
+    })
+  },
+)
 ```
 
-command は query 終了後に、積まれた順で適用されます。`CommandBuffer::apply` は buffer を空にし、失敗した command があれば `false` を返しますが、後続 command の適用は続けます。entity 生成はまだ含めていません。query 走査外では `World::create_entity` を直接使います。
+`Schedule::run` は System ごとに command buffer を作り、積まれた command をその System の `writes` / `structural_write` 宣言に照らして検査し、System が戻った直後に積まれた順で適用します。entity 生成はまだ含めていません。query 走査外では `World::create_entity` を直接使います。
 
 ---
 

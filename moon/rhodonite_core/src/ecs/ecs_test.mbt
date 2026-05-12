@@ -658,18 +658,33 @@ test "CommandBuffer applies queued structural changes after query" {
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let query = Query::new([qa])
-  let commands = CommandBuffer::new()
-  query.for_each(world, row => {
-    commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
-    commands.remove_component(row.entity(), qa)
-  })
-  assert_true(world.has_component(e, qa))
-  assert_true(!world.has_component(e, qb))
-  assert_eq(commands.len(), 2)
-  assert_true(commands.apply(world))
+  let mut queued_count = 0
+  let mut saw_qa_before_apply = false
+  let mut saw_qb_before_apply = true
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "queue-structural-after-query",
+      Update,
+      [],
+      [qa, qb],
+      (w, _ctx, commands) => {
+        query.for_each(w, row => {
+          commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
+          commands.remove_component(row.entity(), qa)
+        })
+        saw_qa_before_apply = w.has_component(e, qa)
+        saw_qb_before_apply = w.has_component(e, qb)
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(saw_qa_before_apply)
+  assert_true(!saw_qb_before_apply)
+  assert_eq(queued_count, 2)
   assert_true(!world.has_component(e, qa))
   assert_true(world.has_component(e, qb))
-  assert_true(commands.is_empty())
 }
 
 ///|
@@ -709,15 +724,27 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let missing = EntityId::new(e.index + 100, 0)
-  let commands = CommandBuffer::new()
-  commands.set_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
-  commands.destroy_entity(missing)
-  assert_true(!commands.apply(world))
+  let mut queued_count = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "queue-gpu-write-and-failed-destroy",
+      Update,
+      [],
+      [gpu16],
+      (_w, _ctx, commands) => {
+        commands.set_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+        commands.destroy_entity(missing)
+        queued_count = commands.len()
+      },
+    ),
+  )
+  assert_true(!schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_eq(queued_count, 2)
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
   assert_eq(writes[0].bytes[0], (33U & 0xFFU).to_byte())
-  assert_true(commands.is_empty())
 }
 
 ///|

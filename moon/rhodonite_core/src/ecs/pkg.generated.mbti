@@ -19,12 +19,10 @@ pub struct CommandBuffer {
 }
 pub fn CommandBuffer::add_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-pub fn CommandBuffer::apply(Self, World) -> Bool
 pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
 pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
-pub fn CommandBuffer::new() -> Self
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 

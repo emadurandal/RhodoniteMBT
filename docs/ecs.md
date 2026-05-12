@@ -180,18 +180,24 @@ query.for_each(world, fn(row) {
 
 World mutation APIs such as `create_entity`, `destroy_entity`, `add_component`, `add_component_bytes`, `remove_component`, `set_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
 
-Use `CommandBuffer` when a query/system wants to request changes during iteration:
+Use the `CommandBuffer` passed to a `System` when a query/system wants to request changes during iteration:
 
 ```moonbit
-let commands = CommandBuffer::new()
-query.for_each(world, fn(row) {
-  commands.remove_component(row.entity(), old_component)
-  commands.add_component_bytes(row.entity(), new_component, bytes)
-})
-let _ = commands.apply(world)
+let system = System::new_with_structural_write(
+  "replace-component",
+  Update,
+  [],
+  [old_component, new_component],
+  fn(world, _ctx, commands) {
+    query.for_each(world, fn(row) {
+      commands.remove_component(row.entity(), old_component)
+      commands.add_component_bytes(row.entity(), new_component, bytes)
+    })
+  },
+)
 ```
 
-Commands are applied in insertion order after the query has finished. `CommandBuffer::apply` clears the buffer and returns `false` if any command failed, while still attempting later commands. Entity creation is intentionally not included yet; create entities directly outside query iteration.
+`Schedule::run` creates the command buffer for each system, validates queued commands against that system's `writes` / `structural_write` declaration, and applies commands in insertion order immediately after the system returns. Entity creation is intentionally not included yet; create entities directly outside query iteration.
 
 ---
 
