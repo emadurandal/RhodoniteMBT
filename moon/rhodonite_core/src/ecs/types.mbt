@@ -84,6 +84,7 @@ struct GpuComponentStore {
   bytes : Array[Byte]
   dirty_flags : Array[Bool]
   dirty_indices : Array[Int]
+  sort_bucket : Array[Bool]
 }
 
 ///|

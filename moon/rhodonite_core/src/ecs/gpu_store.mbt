@@ -7,7 +7,8 @@ fn GpuComponentStore::new(
   let bytes : Array[Byte] = []
   let dirty_flags : Array[Bool] = []
   let dirty_indices : Array[Int] = []
-  { component, stride, bytes, dirty_flags, dirty_indices }
+  let sort_bucket : Array[Bool] = []
+  { component, stride, bytes, dirty_flags, dirty_indices, sort_bucket }
 }
 
 ///|
@@ -108,8 +109,6 @@ fn GpuComponentStore::clear_slot(
 }
 
 ///|
-
-///|
 fn swap_int_array(arr : Array[Int], i : Int, j : Int) -> Unit {
   let t = arr[i]
   arr[i] = arr[j]
@@ -160,6 +159,56 @@ fn heap_sort_ints_asc(arr : Array[Int]) -> Unit {
 }
 
 ///|
+/// Sorts `dirty_indices` ascending in place. Uses counting sort when the index span is dense (typical
+/// for full-GPU flushes like [`World::update_global_transforms_from_transforms`]); falls back to
+/// heap sort for sparse index sets.
+fn GpuComponentStore::sort_dirty_indices_for_drain(
+  self : GpuComponentStore,
+) -> Unit {
+  let n = self.dirty_indices.length()
+  if n <= 1 {
+    return
+  }
+  let mut min_v = self.dirty_indices[0]
+  let mut max_v = self.dirty_indices[0]
+  for i = 1; i < n; i = i + 1 {
+    let v = self.dirty_indices[i]
+    if v < min_v {
+      min_v = v
+    }
+    if v > max_v {
+      max_v = v
+    }
+  }
+  let span = max_v - min_v + 1
+  let use_counting = span <= n * 32 && span <= 1_000_000
+  if !use_counting {
+    heap_sort_ints_asc(self.dirty_indices)
+    return
+  }
+  while self.sort_bucket.length() < span {
+    self.sort_bucket.push(false)
+  }
+  for k = 0; k < span; k = k + 1 {
+    self.sort_bucket[k] = false
+  }
+  for i = 0; i < n; i = i + 1 {
+    let v = self.dirty_indices[i]
+    self.sort_bucket[v - min_v] = true
+  }
+  let mut w = 0
+  for k = 0; k < span; k = k + 1 {
+    if self.sort_bucket[k] {
+      self.dirty_indices[w] = min_v + k
+      w = w + 1
+    }
+  }
+  if w != n {
+    heap_sort_ints_asc(self.dirty_indices)
+  }
+}
+
+///|
 /// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
 fn GpuComponentStore::range_bytes(
   self : GpuComponentStore,
@@ -172,6 +221,13 @@ fn GpuComponentStore::range_bytes(
   let src_base = first * self.stride
   let src_view = self.bytes[src_base:src_base + len]
   let mut i = 0
+  while i + 8 <= len {
+    let u0 = @writes.get_u32_le_byte_view(src_view, i)
+    let u1 = @writes.get_u32_le_byte_view(src_view, i + 4)
+    @writes.put_u32_le(out, i, u0)
+    @writes.put_u32_le(out, i + 4, u1)
+    i = i + 8
+  }
   while i + 4 <= len {
     let u = @writes.get_u32_le_byte_view(src_view, i)
     @writes.put_u32_le(out, i, u)
@@ -191,7 +247,7 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
   if self.dirty_indices.length() == 0 {
     return writes
   }
-  heap_sort_ints_asc(self.dirty_indices)
+  self.sort_dirty_indices_for_drain()
   let sorted = self.dirty_indices
   let mut first = sorted[0]
   let mut prev = sorted[0]
