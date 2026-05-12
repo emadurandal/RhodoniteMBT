@@ -108,23 +108,48 @@ fn GpuComponentStore::clear_slot(
 }
 
 ///|
-/// Inserts sorted values one-by-one (simple O(n²); fine for modest dirty counts).
-fn sort_ints(values : Array[Int]) -> Array[Int] {
+fn merge_sorted_ints(left : Array[Int], right : Array[Int]) -> Array[Int] {
   let out : Array[Int] = []
-  for i = 0; i < values.length(); i = i + 1 {
-    let v = values[i]
-    let mut inserted = false
-    for j = 0; j < out.length(); j = j + 1 {
-      if !inserted && v < out[j] {
-        out.insert(j, v)
-        inserted = true
-      }
-    }
-    if !inserted {
-      out.push(v)
+  let mut i = 0
+  let mut j = 0
+  while i < left.length() && j < right.length() {
+    if left[i] <= right[j] {
+      out.push(left[i])
+      i = i + 1
+    } else {
+      out.push(right[j])
+      j = j + 1
     }
   }
+  while i < left.length() {
+    out.push(left[i])
+    i = i + 1
+  }
+  while j < right.length() {
+    out.push(right[j])
+    j = j + 1
+  }
   out
+}
+
+///|
+/// Stable O(n log n) sort for dirty entity indices (was insertion sort; large dirty sets made
+/// [`GpuComponentStore::drain_writes`] dominate frame time in JS/WASM).
+fn sort_ints(values : Array[Int]) -> Array[Int] {
+  let n = values.length()
+  if n <= 1 {
+    return values
+  }
+  let mid = n / 2
+  let left : Array[Int] = []
+  let right : Array[Int] = []
+  for k = 0; k < mid; k = k + 1 {
+    left.push(values[k])
+  }
+  for k = mid; k < n; k = k + 1 {
+    right.push(values[k])
+  }
+  merge_sorted_ints(sort_ints(left), sort_ints(right))
 }
 
 ///|
