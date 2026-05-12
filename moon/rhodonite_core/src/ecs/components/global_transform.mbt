@@ -81,6 +81,6 @@ pub fn matrix44f_write_std140_mat4_to_gpu_row(
   let base = layout.fields[0].offset
   let d = m.data
   for i = 0; i < 16; i = i + 1 {
-    put_gpu_f32_mut_view(buf, base + i * 4, d[i].to_double())
+    @writes.put_u32_le_mut_view(buf, base + i * 4, d[i].reinterpret_as_uint())
   }
 }

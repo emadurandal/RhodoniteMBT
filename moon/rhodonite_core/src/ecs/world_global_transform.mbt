@@ -46,19 +46,6 @@ pub fn World::get_global_transform(
 }
 
 ///|
-/// Copies column-major [`@m44.Matrix44F`] into a [`@m44ref.Matrix44RefF`] (same layout).
-fn matrix44f_copy_to_ref(
-  dst : @m44ref.Matrix44RefF,
-  m : @m44.Matrix44F,
-) -> Unit {
-  for c = 0; c < 4; c = c + 1 {
-    for r = 0; r < 4; r = r + 1 {
-      dst.set_at(r, c, m.data[c * 4 + r])
-    }
-  }
-}
-
-///|
 /// `leaf_local_matrix`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
 fn World::multiply_world_chain_matrix(
   self : World,
@@ -137,16 +124,16 @@ pub fn World::compute_global_transform(
 ///|
 /// Used only by [`update_global_transforms_from_transforms`]: entity comes from a TF+GT query row and
 /// `leaf_local_matrix` was decoded from that row's Transform SoA view (no [`get_transform`] on the leaf).
-/// Writes the world matrix into `gt_gpu_row` and returns whether a matrix was written.
+/// Writes the world matrix into `gt_row` (one std140 GPU row) and returns whether a matrix was written.
 fn World::compute_global_transform_for_tf_gt_bulk_row(
   self : World,
   entity : EntityId,
   has_child_of : Bool,
   leaf_local_matrix : @m44.Matrix44F,
-  gt : @comp.GlobalTransform,
+  gt_row : MutArrayView[Byte],
 ) -> Bool {
   if !has_child_of {
-    matrix44f_copy_to_ref(gt.matrix, leaf_local_matrix)
+    @comp.matrix44f_write_std140_mat4_to_gpu_row(leaf_local_matrix, gt_row)
     true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
@@ -160,7 +147,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
           ) {
           None => false
           Some(world_m) => {
-            matrix44f_copy_to_ref(gt.matrix, world_m)
+            @comp.matrix44f_write_std140_mat4_to_gpu_row(world_m, gt_row)
             true
           }
         }
@@ -191,15 +178,13 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
     let local_m = @comp.Transform3D::local_matrix_from_component_view(
       row.read_view(tf),
     )
-    let global_tf = @comp.GlobalTransform::view_std140_gpu_row(
-      row.write_view(gt),
-    )
+    let gt_row = row.write_view(gt)
     ignore(
       self.compute_global_transform_for_tf_gt_bulk_row(
         e,
         self.has_component(e, co),
         local_m,
-        global_tf,
+        gt_row,
       ),
     )
   })

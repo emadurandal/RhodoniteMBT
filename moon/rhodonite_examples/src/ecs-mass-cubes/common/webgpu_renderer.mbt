@@ -1,6 +1,6 @@
 ///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
-let entity_count : Int = 16_384
+let entity_count : Int = 65536
 
 ///|
 /// Canvas resolution (matches demo HTML).
