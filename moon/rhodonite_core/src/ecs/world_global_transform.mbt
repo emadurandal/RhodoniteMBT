@@ -8,6 +8,11 @@ pub fn World::set_global_transform(
   let id = self.global_transform_component_id
   self.assert_system_component_write(id, "World::set_global_transform")
   if !self.has_component(entity, id) {
+    if !self.can_add_missing_component_from_setter(
+        id, "World::set_global_transform",
+      ) {
+      return false
+    }
     let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
     if !self.add_component_bytes(entity, id, empty) {
       return false

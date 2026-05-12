@@ -5,12 +5,17 @@ pub fn World::set_child_of(
   entity : EntityId,
   parent : EntityId,
 ) -> Bool {
+  let id = self.child_of_component_id
   let c = @comp.ChildOf::new(parent.index, parent.generation)
   let bytes = c.to_component_bytes()
-  if self.has_component(entity, self.child_of_component_id) {
-    self.set_component_bytes(entity, self.child_of_component_id, bytes)
+  if self.has_component(entity, id) {
+    self.set_component_bytes(entity, id, bytes)
+  } else if !self.can_add_missing_component_from_setter(
+      id, "World::set_child_of",
+    ) {
+    false
   } else {
-    self.add_component_bytes(entity, self.child_of_component_id, bytes)
+    self.add_component_bytes(entity, id, bytes)
   }
 }
 

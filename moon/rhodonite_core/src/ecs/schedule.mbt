@@ -45,6 +45,35 @@ pub fn SystemContext::new(
 }
 
 ///|
+fn build_system(
+  constructor_name : String,
+  name : String,
+  phase : SystemPhase,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  structural_write : Bool,
+  run : (World, SystemContext, CommandBuffer) -> Unit,
+) -> System {
+  if component_array_has_duplicates(reads) {
+    abort(constructor_name + ": duplicate read component")
+  }
+  if component_array_has_duplicates(writes) {
+    abort(constructor_name + ": duplicate write component")
+  }
+  if component_array_intersects(reads, writes) {
+    abort(constructor_name + ": reads and writes must not overlap")
+  }
+  {
+    name,
+    phase,
+    reads: copy_component_array(reads),
+    writes: copy_component_array(writes),
+    structural_write,
+    run,
+  }
+}
+
+///|
 pub fn System::new(
   name : String,
   phase : SystemPhase,
@@ -52,23 +81,7 @@ pub fn System::new(
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
-  if component_array_has_duplicates(reads) {
-    abort("System::new: duplicate read component")
-  }
-  if component_array_has_duplicates(writes) {
-    abort("System::new: duplicate write component")
-  }
-  if component_array_intersects(reads, writes) {
-    abort("System::new: reads and writes must not overlap")
-  }
-  {
-    name,
-    phase,
-    reads: copy_component_array(reads),
-    writes: copy_component_array(writes),
-    structural_write: false,
-    run,
-  }
+  build_system("System::new", name, phase, reads, writes, false, run)
 }
 
 ///|
@@ -80,25 +93,9 @@ pub fn System::new_with_structural_write(
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
-  if component_array_has_duplicates(reads) {
-    abort("System::new_with_structural_write: duplicate read component")
-  }
-  if component_array_has_duplicates(writes) {
-    abort("System::new_with_structural_write: duplicate write component")
-  }
-  if component_array_intersects(reads, writes) {
-    abort(
-      "System::new_with_structural_write: reads and writes must not overlap",
-    )
-  }
-  {
-    name,
-    phase,
-    reads: copy_component_array(reads),
-    writes: copy_component_array(writes),
-    structural_write: true,
-    run,
-  }
+  build_system(
+    "System::new_with_structural_write", name, phase, reads, writes, true, run,
+  )
 }
 
 ///|

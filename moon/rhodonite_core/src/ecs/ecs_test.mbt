@@ -657,6 +657,60 @@ test "Schedule permits set_global_transform update with GlobalTransform write" {
 }
 
 ///|
+test "Schedule convenience setters return false for missing components without structural write" {
+  let world = World::new()
+  let tf_id = world.transform_component()
+  let gt_id = world.global_transform_component()
+  let co_id = world.child_of_component()
+  let target = world.create_entity()
+  let parent = world.create_entity()
+  let buf = transform3d_bytes_identity()
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
+  let mut transform_ok = true
+  let mut trs_ok = true
+  let mut child_ok = true
+  let mut global_ok = true
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new(
+      "missing-convenience-setters",
+      Update,
+      [],
+      [tf_id, gt_id, co_id],
+      (w, _ctx, _commands) => {
+        transform_ok = w.set_transform(target, tf)
+        trs_ok = w.set_transform_trs(
+          target,
+          (0.0 : Float),
+          (0.0 : Float),
+          (0.0 : Float),
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          (1.0 : Float),
+          (1.0 : Float),
+          (1.0 : Float),
+        )
+        child_ok = w.set_child_of(target, parent)
+        global_ok = w.set_global_transform(target, @m44.Matrix44F::identity())
+      },
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(!transform_ok)
+  assert_true(!trs_ok)
+  assert_true(!child_ok)
+  assert_true(!global_ok)
+  assert_true(!world.has_component(target, tf_id))
+  assert_true(!world.has_component(target, co_id))
+  assert_true(!world.has_component(target, gt_id))
+}
+
+///|
 test "Schedule runs systems by phase and applies commands after each system" {
   let world = World::new()
   let qa = world.register_cpu_component("ScheduleA", 4)
