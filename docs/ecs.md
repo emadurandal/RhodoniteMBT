@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) is an **archetype**-based ECS. On the CPU, components live in **SoA (Structure of Arrays)** tables for cache-friendly column iteration. For WebGPU, **`EntityId.index` is a stable logical subscript** into storage buffers: **GPU-visible** component payloads live in a **flat array separate from archetype rows**, while CPU-only data stays in archetype SoA columns.
 
-There is no separate `System` type: querying and updates are done through `World` methods (especially `for_each_entity_with_components`) and built-in helpers.
+External `System` / `Schedule` types are available, but `World` itself does not own systems. Low-level querying and updates can still be done through `World` methods (especially `for_each_entity_with_components`) and built-in helpers.
 
 For a machine-readable API listing, see [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti).
 
@@ -205,7 +205,9 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order. Each system receives a fresh `CommandBuffer`, and the schedule applies it immediately after that system returns, so later systems can observe earlier structural changes.
 
-`System::reads` and `System::writes` are metadata for the next scheduling step. They are validated for duplicates and copied on construction, but the current schedule does not yet use them for conflict detection or parallel execution.
+`System::reads` and `System::writes` are metadata for scheduling improvements. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that would prevent parallel execution. `Schedule::run` itself remains single-threaded and registration-ordered.
+
+The built-in transform update can also be registered with `transform_propagation_system(world)`. That system runs the same work as `World::update_global_transforms_from_transforms` in the `PostUpdate` phase, declaring `Transform3D` / `ChildOf` as reads and `GlobalTransform` as a write.
 
 ---
 

@@ -534,6 +534,31 @@ test "Schedule runs systems by phase and applies commands after each system" {
 }
 
 ///|
+test "transform_propagation_system updates GlobalTransform in a schedule" {
+  let world = World::new()
+  let e = world.create_entity()
+  let buf = transform3d_bytes_translation(
+    (3.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
+  assert_true(world.set_transform(e, tf))
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let schedule = Schedule::new()
+  schedule.add_system(transform_propagation_system(world))
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.get_global_transform(e) {
+    Some(m) => assert_eq(m.at(0, 3), (3.0 : Float))
+    None => abort("expected Matrix44F")
+  }
+}
+
+///|
 test "System access arrays are copied" {
   let world = World::new()
   let qa = world.register_cpu_component("SystemAccessA", 4)
@@ -549,6 +574,31 @@ test "System access arrays are copied" {
   assert_true(system.phase() == Update)
   assert_true(system.reads()[0] == qa)
   assert_true(system.writes()[0] == qb)
+}
+
+///|
+test "System conflict helpers detect same-phase access overlaps" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemConflictA", 4)
+  let qb = world.register_cpu_component("SystemConflictB", 4)
+  let read_a = System::new("read-a", Update, [qa], [], (_w, _c, _b) => ())
+  let write_a = System::new("write-a", Update, [], [qa], (_w, _c, _b) => ())
+  let write_b = System::new("write-b", Update, [], [qb], (_w, _c, _b) => ())
+  let later_write_a = System::new("later-write-a", PostUpdate, [], [qa], (
+    _w,
+    _c,
+    _b,
+  ) => ())
+  assert_true(read_a.conflicts_with(write_a))
+  assert_true(!read_a.conflicts_with(write_b))
+  let same_phase = Schedule::new()
+  same_phase.add_system(read_a)
+  same_phase.add_system(write_a)
+  assert_true(same_phase.has_parallel_access_conflicts())
+  let different_phase = Schedule::new()
+  different_phase.add_system(read_a)
+  different_phase.add_system(later_write_a)
+  assert_true(!different_phase.has_parallel_access_conflicts())
 }
 
 ///|

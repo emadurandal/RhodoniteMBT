@@ -29,7 +29,7 @@
 | GPU upload | `drain_gpu_writes` / `drain_resize_events` |
 | Transform 更新 | `World::update_global_transforms_from_transforms` |
 
-`System` はまだ存在せず、アプリケーション側が `World` のメソッドを直接呼ぶ形です。
+現行実装には、外付けの `Schedule`、関数型 `System`、`CommandBuffer`、薄い `Query` helper があります。アプリケーション側は `World` の低レベル API を直接使うことも、`Schedule` に system を登録して順序実行することもできます。
 
 ## 推奨する型
 
@@ -204,26 +204,15 @@ pub fn World::for_each_entity_with_components_marking_gpu_dirty(
 
 現在の `World::update_global_transforms_from_transforms` は、最初に System 化する対象として適しています。
 
-既存 API は残したまま、factory 関数を追加する形が安全です。
+現行実装では既存 API は残したまま、`transform_propagation_system(world)` factory を追加済みです。
 
 ```moonbit
-pub fn transform_propagation_system(world : World) -> System {
-  let tf = world.transform_component()
-  let gt = world.global_transform_component()
-  let co = world.child_of_component()
-  {
-    name: "TransformPropagation",
-    phase: PostUpdate,
-    reads: [tf, co],
-    writes: [gt],
-    run: fn(world, _ctx, _commands) {
-      world.update_global_transforms_from_transforms()
-    },
-  }
-}
+let schedule = Schedule::new()
+schedule.add_system(transform_propagation_system(world))
+let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
-`reads` / `writes` は初期段階ではドキュメント用途でも十分です。将来、conflict 検査や並列実行を入れる場合の情報にもなります。
+現行実装では、`reads` / `writes` は構築時に重複検査され、`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` で同一 phase 内の read/write 衝突を検査できます。これは将来の並列 batching 用の境界であり、`Schedule::run` はまだ単一スレッドで登録順に実行します。
 
 ## Resource / Context
 
@@ -252,13 +241,13 @@ pub struct App {
 
 ## 段階的な導入案
 
-1. `moon/rhodonite_core/src/ecs/system.mbt` を追加し、`SystemContext`、`SystemPhase`、`System`、`Schedule` を定義する。
-2. `Schedule::add_system` と `Schedule::run` を実装する。
-3. `World::update_global_transforms_from_transforms` は残したまま、同等の builtin System factory を追加する。
-4. `CommandBuffer` を追加し、System 内、特に query callback 内の構造変更要求は command 経由にする。
-5. 必要に応じて `Query` helper を追加する。
-6. `reads` / `writes` の conflict 検査を追加する。
-7. 並列実行や before/after 依存関係は最後に検討する。
+1. `SystemContext`、`SystemPhase`、`System`、`Schedule` を定義する。現行実装では `schedule.mbt` / `types.mbt` に追加済み。
+2. `Schedule::add_system` と `Schedule::run` を実装する。現行実装では単一スレッド・phase 順・登録順で実行済み。
+3. `World::update_global_transforms_from_transforms` は残したまま、同等の builtin System factory を追加する。現行実装では `transform_propagation_system(world)` を追加済み。
+4. `CommandBuffer` を追加し、System 内、特に query callback 内の構造変更要求は command 経由にする。現行実装では `destroy`、`add/remove component`、`set/clear GPU component` を追加済み。
+5. 必要に応じて `Query` helper を追加する。現行実装では `Query::new`、`for_each`、`for_each_marking_gpu_dirty` を追加済み。
+6. `reads` / `writes` の conflict 検査を追加する。現行実装では `System::conflicts_with` と `Schedule::has_parallel_access_conflicts` を追加済み。
+7. 並列実行、before/after 依存関係、System batch 分割は最後に検討する。
 
 ## 避けたい初期実装
 

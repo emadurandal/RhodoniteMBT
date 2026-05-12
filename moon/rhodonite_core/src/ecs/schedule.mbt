@@ -15,6 +15,26 @@ fn system_phase_count() -> Int {
 }
 
 ///|
+fn component_array_intersects(
+  a : Array[ComponentTypeId],
+  b : Array[ComponentTypeId],
+) -> Bool {
+  for i = 0; i < a.length(); i = i + 1 {
+    if component_array_contains(b, a[i]) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn system_access_conflicts(a : System, b : System) -> Bool {
+  component_array_intersects(a.writes, b.writes) ||
+  component_array_intersects(a.writes, b.reads) ||
+  component_array_intersects(a.reads, b.writes)
+}
+
+///|
 pub fn SystemContext::new(
   delta_seconds : Float,
   frame_index : Int,
@@ -66,6 +86,12 @@ pub fn System::writes(self : System) -> Array[ComponentTypeId] {
 }
 
 ///|
+/// Returns true if two systems cannot safely run in parallel based on declared component access.
+pub fn System::conflicts_with(self : System, other : System) -> Bool {
+  system_access_conflicts(self, other)
+}
+
+///|
 pub fn Schedule::new() -> Schedule {
   let systems : Array[System] = []
   { systems, }
@@ -79,6 +105,36 @@ pub fn Schedule::len(self : Schedule) -> Int {
 ///|
 pub fn Schedule::add_system(self : Schedule, system : System) -> Unit {
   self.systems.push(system)
+}
+
+///|
+/// Reports whether any two systems in the same phase have read/write or write/write conflicts.
+///
+/// `Schedule::run` remains single-threaded and registration-ordered; this helper is a scheduling
+/// boundary for future parallel batching or validation.
+pub fn Schedule::has_parallel_access_conflicts(self : Schedule) -> Bool {
+  for i = 0; i < self.systems.length(); i = i + 1 {
+    for j = i + 1; j < self.systems.length(); j = j + 1 {
+      if self.systems[i].phase == self.systems[j].phase &&
+        self.systems[i].conflicts_with(self.systems[j]) {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
+/// Builtin system that mirrors [`World::update_global_transforms_from_transforms`].
+pub fn transform_propagation_system(world : World) -> System {
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  let co = world.child_of_component()
+  System::new("TransformPropagation", PostUpdate, [tf, co], [gt], (
+    system_world,
+    _ctx,
+    _commands,
+  ) => system_world.update_global_transforms_from_transforms())
 }
 
 ///|

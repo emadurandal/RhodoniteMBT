@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) は、**アーキタイプ（Archetype）** ベースの ECS 実装です。CPU 側では **SoA（Structure of Arrays）** でキャッシュ効率のよい列走査を行い、WebGPU 向けには **`EntityId.index` をストレージバッファの論理添字として安定利用**できるよう、GPU 可視コンポーネントを **アーキタイプ行から切り離したフラット配列**に載せる二層構造になっています。
 
-「`System` 型」はありません。クエリと更新は `World` のメソッド（特に `for_each_entity_with_components`）と、ビルトイン用のヘルパーで行います。
+外付けの `System` / `Schedule` もありますが、`World` 自体は system を所有しません。低レベルのクエリと更新は引き続き `World` のメソッド（特に `for_each_entity_with_components`）と、ビルトイン用のヘルパーで行えます。
 
 公開 API の機械的な一覧は [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti) を参照してください。
 
@@ -211,7 +211,9 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順です。各 system には新しい `CommandBuffer` が渡され、system が返った直後に schedule が適用します。そのため、後続 system は前の system の構造変更を観測できます。
 
-`System::reads` と `System::writes` は次の scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーしますが、現時点の schedule はまだ conflict 検査や並列実行には使いません。
+`System::reads` と `System::writes` は scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に並列実行できないアクセス衝突があるかを返します。`Schedule::run` 自体は引き続き単一スレッド・登録順実行です。
+
+ビルトインの変換更新は `transform_propagation_system(world)` でも登録できます。この system は `World::update_global_transforms_from_transforms` と同じ処理を `PostUpdate` phase で実行し、`Transform3D` / `ChildOf` を read、`GlobalTransform` を write として宣言します。
 
 ---
 
