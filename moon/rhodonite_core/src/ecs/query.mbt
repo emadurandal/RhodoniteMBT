@@ -33,7 +33,7 @@ pub fn Query::for_each(
   world : World,
   f : (QueryRow) -> Unit,
 ) -> Unit {
-  world.for_each_entity_with_components(self.required, (e, _sig, views) => {
+  world.for_each_entity_with_components_internal(self.required, (e, _sig, views) => {
     f({ world, entity: e, components: self.required, payloads: views })
   })
 }
@@ -46,13 +46,31 @@ pub fn Query::for_each_marking_gpu_dirty(
   dirty_gpu_components : Array[ComponentTypeId],
   f : (QueryRow) -> Unit,
 ) -> Unit {
-  world.for_each_entity_with_components_marking_gpu_dirty(
-    self.required,
-    dirty_gpu_components,
-    (e, _sig, views) => {
-      f({ world, entity: e, components: self.required, payloads: views })
-    },
-  )
+  if component_array_has_duplicates(dirty_gpu_components) {
+    abort("Query::for_each_marking_gpu_dirty: duplicate dirty component")
+  }
+  for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
+    match world.registry.get(dirty_gpu_components[i]) {
+      None =>
+        abort(
+          "Query::for_each_marking_gpu_dirty: unknown dirty component type id",
+        )
+      Some(rc) =>
+        match rc.kind {
+          CpuOnly =>
+            abort(
+              "Query::for_each_marking_gpu_dirty: dirty component must be GpuVisible",
+            )
+          GpuVisible => ()
+        }
+    }
+  }
+  world.for_each_entity_with_components_internal(self.required, (e, _sig, views) => {
+    f({ world, entity: e, components: self.required, payloads: views })
+    for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
+      let _ = world.mark_gpu_component_dirty(e, dirty_gpu_components[i])
+    }
+  })
 }
 
 ///|

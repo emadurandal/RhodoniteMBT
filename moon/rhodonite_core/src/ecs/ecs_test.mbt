@@ -813,6 +813,54 @@ test "System writes declaration also permits reads during schedule run" {
 }
 
 ///|
+test "System Query preserves read and write access separation during schedule run" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemQueryReadA", 4)
+  let qb = world.register_cpu_component("SystemQueryWriteB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let query = Query::new([qa, qb])
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("query-read-write", Update, [qa], [qb], (w, _ctx, _cmds) => {
+      query.for_each(w, row => {
+        let src = row.read_view(qa)
+        row.write_view(qb)[0] = src[0]
+      })
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.component_bytes(e, qb) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected SystemQueryWriteB bytes")
+  }
+}
+
+///|
+test "System low-level row iterator requires write declarations for mutable payloads" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemLowLevelWriteA", 4)
+  let qb = world.register_cpu_component("SystemLowLevelWriteB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("low-level-mut", Update, [], [qa, qb], (w, _ctx, _cmds) => {
+      w.for_each_entity_with_components([qa, qb], (_ent, _sig, payloads) => {
+        payloads[1][0] = payloads[0][0]
+      })
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.component_bytes(e, qb) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected SystemLowLevelWriteB bytes")
+  }
+}
+
+///|
 test "System structural write declaration permits entity creation" {
   let world = World::new()
   let mut spawned = EntityId::new(-1, 0)

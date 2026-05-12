@@ -156,11 +156,12 @@ flowchart TD
 - コールバックには `(entity, full_signature, payloads)` が渡り、`payloads[k]` は `required[k]` に対応する **`MutArrayView[Byte]`** です。
   - **CpuOnly**: そのアーキタイプ行の SoA 列ビュー。
   - **GpuVisible**: **フラット `GpuComponentStore`** の `entity.index` スロットのビュー（アーキタイプ SoA ではない）。
+- これは低レベルかつ内部用途寄りの API です。schedule 実行中に直接使う場合、callback へ全 payload が mutable view として渡るため、`required` の全 component が active System の `writes` に含まれる必要があります。
 - コールバック内で **GpuVisible のバイトを直接変更**した場合、**自動では dirty になりません**。`World::mark_gpu_component_dirty` を呼び、`drain_gpu_writes` でアップロード対象に含めてください。
 - コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
-アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスできます。
+アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスでき、read/write の access check も component ごとに維持されます。
 
 - `required` component set を名前付きの値として再利用できます。
 - `Query::new` の時点で重複 component id を拒否できます。
@@ -182,7 +183,7 @@ query.for_each(world, fn(row) {
 })
 ```
 
-callback が full archetype signature を必要とする場合や、GPU dirty 化するかどうかを entity ごとに細かく判断したい場合は、低レベルの `World::for_each_entity_with_components` を直接使います。
+callback が full archetype signature や raw mutable payload 配列を必要とする ECS 内部処理に限り、低レベルの `World::for_each_entity_with_components` を直接使います。
 
 ---
 

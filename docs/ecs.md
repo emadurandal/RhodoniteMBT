@@ -156,11 +156,12 @@ flowchart TD
 - The callback receives `(entity, full_signature, payloads)` where `payloads[k]` matches `required[k]` as a **`MutArrayView[Byte]`**:
   - **CpuOnly**: view into that row’s SoA column.
   - **GpuVisible**: view into the **flat `GpuComponentStore`** slot for `entity.index` (not archetype SoA).
+- This is a low-level, internal-oriented API. During schedule execution, every component in `required` must be declared in the active System's `writes` set because the callback receives mutable views for all payloads.
 - If you **mutate GpuVisible bytes** inside the callback, rows are **not** automatically marked dirty unless the path already does so. Call `World::mark_gpu_component_dirty` so `drain_gpu_writes` picks them up.
 - If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
-For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. The callback receives a `QueryRow`, so payloads can be accessed by component id instead of payload array index.
+For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. The callback receives a `QueryRow`, so payloads can be accessed by component id instead of payload array index while preserving read/write access checks.
 
 - `required` becomes a named value that can be reused by a system.
 - `Query::new` rejects duplicate component ids up front.
@@ -182,7 +183,7 @@ query.for_each(world, fn(row) {
 })
 ```
 
-Use the lower-level `World::for_each_entity_with_components` when the callback needs the full archetype signature, or when GPU dirty marking must be decided per entity.
+Use the lower-level `World::for_each_entity_with_components` only for ECS-internal code that needs the full archetype signature or raw mutable payload array.
 
 ---
 

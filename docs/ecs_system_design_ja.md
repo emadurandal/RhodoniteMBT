@@ -111,11 +111,11 @@ pub(all) enum WorldCommand {
 
 ## Query
 
-低レベル API として `World::for_each_entity_with_components` は残っています。これは CPU SoA と GPU-visible flat store の両方を `MutArrayView[Byte]` として扱う、ECS の中核 API です。
+低レベル API として `World::for_each_entity_with_components` は残っています。これは CPU SoA と GPU-visible flat store の両方を `MutArrayView[Byte]` として扱う、ECS の中核 API です。ただし用途は内部寄りです。System 実行中に直接使う場合、callback に全 payload が mutable view として渡るため、`required` の全 component が active System の `writes` に含まれる必要があります。
 
 `required` に同じ `ComponentTypeId` を重複指定すると `abort` します。同じ mutable component view を複数 payload として渡す意味が曖昧なためです。
 
-System からは薄い `Query` helper を使えます。
+通常の System からは薄い `Query` helper を使います。`Query` は内部の同じ row iterator を使いますが、外へは `QueryRow::read_view` / `QueryRow::write_view` として公開し、component ごとの access guard を維持します。
 
 ```moonbit
 let query = Query::new([tf, gt])

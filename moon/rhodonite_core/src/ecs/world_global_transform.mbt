@@ -158,7 +158,7 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let tf = self.transform_component_id
   let gt = self.global_transform_component_id
   let required : Array[ComponentTypeId] = [tf, gt]
-  self.for_each_entity_with_components(required, (e, sig, payloads) => {
+  self.for_each_entity_with_components_internal(required, (e, sig, payloads) => {
     let local_tf = @comp.Transform3D::from_component_mut_view(payloads[0])
     let global_tf = @comp.GlobalTransform::view_std140_gpu_row(payloads[1])
     if self.compute_global_transform_for_tf_gt_bulk_row(

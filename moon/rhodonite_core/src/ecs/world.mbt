@@ -154,13 +154,13 @@ fn World::assert_system_component_write(
 }
 
 ///|
-fn World::assert_system_components_read(
+fn World::assert_system_components_write(
   self : World,
   components : Array[ComponentTypeId],
   operation : String,
 ) -> Unit {
   for i = 0; i < components.length(); i = i + 1 {
-    self.assert_system_component_read(components[i], operation)
+    self.assert_system_component_write(components[i], operation)
   }
 }
 
@@ -545,26 +545,10 @@ pub fn World::component_bytes(
 }
 
 ///|
-/// Iterates every living entity whose archetype signature **includes all** `required`
-/// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
-///
-/// The callback receives the entity, that row's **full sorted archetype component list**, and one
-/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into that
-/// component's payload at this entity.
-///
-/// * **`CpuOnly`**: view over archetype SoA column bytes (`stride` bytes per row).
-/// * **`GpuVisible`**: view over this entity's row in [`GpuComponentStore`] (`gpu_layout.stride`
-///   bytes; **not** archetype SoA bytes). After the callback returns, the world persists each
-///   touched GPU store with `replace_gpu_store` only (no automatic dirty queue). If you mutate a
-///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
-///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
-///   [`ensure_gpu_capacity`]).
-///
-/// The callback must not call structural mutation APIs such as `create_entity`,
-/// `destroy_entity`, `add_component_bytes`, `remove_component`, or component registration.
-/// `for_each_entity_with_components` detects those calls and aborts because they can invalidate
-/// the archetype rows and mutable views currently being iterated.
-pub fn World::for_each_entity_with_components(
+/// Internal row iterator used by both the low-level world API and the higher-level [`Query`]
+/// wrapper. This intentionally performs no system access check; callers must enforce the right
+/// boundary for the view shape they expose.
+fn World::for_each_entity_with_components_internal(
   self : World,
   required : Array[ComponentTypeId],
   f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
@@ -575,9 +559,6 @@ pub fn World::for_each_entity_with_components(
   if component_array_has_duplicates(required) {
     abort("for_each_entity_with_components: duplicate required component")
   }
-  self.assert_system_components_read(
-    required, "World::for_each_entity_with_components",
-  )
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -642,6 +623,42 @@ pub fn World::for_each_entity_with_components(
   }
   // Restore the outer mutation state after the query finishes.
   self.query_depth = self.query_depth - 1
+}
+
+///|
+/// Iterates every living entity whose archetype signature **includes all** `required`
+/// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
+///
+/// The callback receives the entity, that row's **full sorted archetype component list**, and one
+/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into that
+/// component's payload at this entity.
+///
+/// * **`CpuOnly`**: view over archetype SoA column bytes (`stride` bytes per row).
+/// * **`GpuVisible`**: view over this entity's row in [`GpuComponentStore`] (`gpu_layout.stride`
+///   bytes; **not** archetype SoA bytes). After the callback returns, the world persists each
+///   touched GPU store with `replace_gpu_store` only (no automatic dirty queue). If you mutate a
+///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
+///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
+///   [`ensure_gpu_capacity`]).
+///
+/// The callback must not call structural mutation APIs such as `create_entity`,
+/// `destroy_entity`, `add_component_bytes`, `remove_component`, or component registration.
+/// `for_each_entity_with_components` detects those calls and aborts because they can invalidate
+/// the archetype rows and mutable views currently being iterated.
+///
+/// This is a low-level/internal-oriented API. During schedule execution every component in
+/// `required` must be declared in the active System's `writes` set because the callback receives
+/// mutable views for all of them. System code that needs read/write separation should use
+/// [`Query`] and [`QueryRow::read_view`] / [`QueryRow::write_view`] instead.
+pub fn World::for_each_entity_with_components(
+  self : World,
+  required : Array[ComponentTypeId],
+  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
+) -> Unit {
+  self.assert_system_components_write(
+    required, "World::for_each_entity_with_components",
+  )
+  self.for_each_entity_with_components_internal(required, f)
 }
 
 ///|
