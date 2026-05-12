@@ -77,8 +77,21 @@ pub struct Query {
 }
 pub fn Query::for_each(Self, World, (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
 pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
+pub fn Query::for_each_row(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_row_marking_dirty(Self, World, Array[ComponentTypeId], (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
+
+pub struct QueryRow {
+  world : World
+  entity : EntityId
+  components : Array[ComponentTypeId]
+  payloads : Array[MutArrayView[Byte]]
+}
+pub fn QueryRow::entity(Self) -> EntityId
+pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
+pub fn QueryRow::mark_dirty(Self, ComponentTypeId) -> Bool
+pub fn QueryRow::view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId

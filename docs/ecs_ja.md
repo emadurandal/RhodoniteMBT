@@ -160,13 +160,27 @@ flowchart TD
 - コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
-アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。`World::for_each_entity_with_components` を直接呼ぶ場合と比べると、`Query` には次の実用上のメリットがあります。
+アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。payload 配列の添字ではなく component id でアクセスしたい場合は、`query.for_each_row(world, f)` を使うと `QueryRow` が渡ります。
 
 - `required` component set を名前付きの値として再利用できます。
 - `Query::new` の時点で重複 component id を拒否できます。
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
 - callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
 - GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+- `QueryRow::view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `MutArrayView[Byte]` を返します。
+- `QueryRow::mark_dirty(component)` は `QueryRow::view` で変更した GPU-visible row を dirty にします。
+- GPU-visible 行を必ず書く `QueryRow` callback には `query.for_each_row_marking_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+
+```moonbit
+let query = Query::new([tf, gt])
+query.for_each_row(world, fn(row) {
+  let local_tf = @comp.Transform3D::from_component_mut_view(row.view(tf))
+  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.view(gt))
+  ignore(local_tf)
+  ignore(global_tf)
+  let _ = row.mark_dirty(gt)
+})
+```
 
 callback が full archetype signature を必要とする場合や、GPU dirty 化するかどうかを entity ごとに細かく判断したい場合は、低レベルの `World::for_each_entity_with_components` を直接使います。
 

@@ -450,6 +450,89 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows" {
 }
 
 ///|
+test "QueryRow view accesses payloads by component id" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryRowA", 4)
+  let qb = world.register_cpu_component("QueryRowB", 4)
+  let query = Query::new([qa, qb])
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let hits : Array[EntityId] = []
+  let mut a_first = (0 : Byte)
+  let mut b_first = (0 : Byte)
+  query.for_each_row(world, row => {
+    hits.push(row.entity())
+    if !row.has(qa) {
+      abort("expected QueryRowA")
+    }
+    if !row.has(qb) {
+      abort("expected QueryRowB")
+    }
+    a_first = row.view(qa)[0]
+    b_first = row.view(qb)[0]
+    row.view(qb)[0] = (42 : Byte)
+  })
+  assert_eq(hits.length(), 1)
+  assert_true(hits[0] == e)
+  assert_eq(a_first, (1 : Byte))
+  assert_eq(b_first, (5 : Byte))
+  match world.component_bytes(e, qb) {
+    Some(bytes) => assert_eq(bytes[0], (42 : Byte))
+    None => abort("expected QueryRowB bytes")
+  }
+}
+
+///|
+test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryRowDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryRowDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let query = Query::new([qa, gpu16])
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  query.for_each_row(world, row => {
+    row.view(gpu16)[0] = (88 : Byte)
+    if !row.mark_dirty(gpu16) {
+      abort("expected QueryRow dirty mark")
+    }
+  })
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (88 : Byte))
+}
+
+///|
+test "Query for_each_row_marking_dirty queues written gpu rows" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryRowAutoDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let query = Query::new([qa, gpu16])
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  query.for_each_row_marking_dirty(world, [gpu16], row => {
+    row.view(gpu16)[0] = (66 : Byte)
+  })
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (66 : Byte))
+}
+
+///|
 test "CommandBuffer applies queued structural changes after query" {
   let world = World::new()
   let qa = world.register_cpu_component("CommandBufferA", 4)

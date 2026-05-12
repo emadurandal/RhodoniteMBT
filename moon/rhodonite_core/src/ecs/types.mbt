@@ -108,6 +108,16 @@ pub struct Query {
 }
 
 ///|
+/// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
+/// views used by the lower-level world query.
+pub struct QueryRow {
+  world : World
+  entity : EntityId
+  components : Array[ComponentTypeId]
+  payloads : Array[MutArrayView[Byte]]
+}
+
+///|
 /// Deferred structural or GPU mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)

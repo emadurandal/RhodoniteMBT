@@ -160,13 +160,27 @@ flowchart TD
 - If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
-For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. Compared with calling `World::for_each_entity_with_components` directly, `Query` has a few practical benefits:
+For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. If you want component-id based access instead of payload array indexes, use `query.for_each_row(world, f)` to receive a `QueryRow`.
 
 - `required` becomes a named value that can be reused by a system.
 - `Query::new` rejects duplicate component ids up front.
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
 - The callback omits `full_signature`, keeping common system code shorter.
 - `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs the query with the helper for callbacks that always write selected GPU-visible rows.
+- `QueryRow::view(component)` returns the zero-copy `MutArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
+- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::view`.
+- `query.for_each_row_marking_dirty(world, dirty_gpu_components, f)` pairs `QueryRow` access with automatic dirty marking for callbacks that always write selected GPU-visible rows.
+
+```moonbit
+let query = Query::new([tf, gt])
+query.for_each_row(world, fn(row) {
+  let local_tf = @comp.Transform3D::from_component_mut_view(row.view(tf))
+  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.view(gt))
+  ignore(local_tf)
+  ignore(global_tf)
+  let _ = row.mark_dirty(gt)
+})
+```
 
 Use the lower-level `World::for_each_entity_with_components` when the callback needs the full archetype signature, or when GPU dirty marking must be decided per entity.
 
