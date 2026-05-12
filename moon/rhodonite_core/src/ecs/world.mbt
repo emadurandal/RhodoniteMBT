@@ -328,8 +328,35 @@ pub fn World::new() -> World {
 }
 
 ///|
-pub fn World::registry(self : World) -> ComponentRegistry {
-  self.registry
+/// Returns immutable metadata for a component registered in this world.
+pub fn World::component_info(
+  self : World,
+  component : ComponentTypeId,
+) -> RegisteredComponent? {
+  self.registry.get(component)
+}
+
+///|
+/// Returns the CPU SoA stride for a registered component, or `None` for an unknown id.
+///
+/// GpuVisible components report `0` because their payload lives in flat GPU storage.
+pub fn World::component_cpu_stride(
+  self : World,
+  component : ComponentTypeId,
+) -> Int? {
+  match self.registry.get(component) {
+    Some(rc) => Some(rc.cpu_stride)
+    None => None
+  }
+}
+
+///|
+/// Returns the GPU layout for a GpuVisible component, or `None` for CPU-only/unknown ids.
+pub fn World::component_gpu_layout(
+  self : World,
+  component : ComponentTypeId,
+) -> @comp.GpuLayout? {
+  self.registry.gpu_layout(component)
 }
 
 ///|

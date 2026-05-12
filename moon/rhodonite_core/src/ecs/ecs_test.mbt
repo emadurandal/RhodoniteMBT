@@ -72,6 +72,43 @@ test "EntityId generation invalidates stale handles and reuses gpu index" {
 }
 
 ///|
+test "World exposes component metadata without exposing registry mutation" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("MetadataCPU", 4)
+  let gpu_layout = @comp.global_transform_gpu_layout()
+  let gpu = world.register_gpu_component("MetadataGPU", gpu_layout)
+  match world.component_info(cpu) {
+    Some(info) => {
+      assert_eq(info.name, "MetadataCPU")
+      assert_true(info.kind == CpuOnly)
+      assert_eq(info.cpu_stride, 4)
+      assert_true(info.gpu_layout is None)
+    }
+    None => abort("expected CPU component metadata")
+  }
+  match world.component_info(gpu) {
+    Some(info) => {
+      assert_eq(info.name, "MetadataGPU")
+      assert_true(info.kind == GpuVisible)
+      assert_eq(info.cpu_stride, 0)
+      match info.gpu_layout {
+        Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
+        None => abort("expected GPU layout")
+      }
+    }
+    None => abort("expected GPU component metadata")
+  }
+  assert_eq(world.component_cpu_stride(cpu), Some(4))
+  assert_eq(world.component_cpu_stride(gpu), Some(0))
+  match world.component_gpu_layout(gpu) {
+    Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
+    None => abort("expected GPU layout")
+  }
+  assert_true(world.component_gpu_layout(cpu) is None)
+  assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
+}
+
+///|
 test "CPU components move entities between archetypes and preserve bytes" {
   let world = World::new()
   let transform = world.register_cpu_component("TransformCPU", 4)

@@ -1,13 +1,13 @@
 ///|
 /// Creates an empty registry; call `register_*` before spawning entities that use those components.
-pub fn ComponentRegistry::new() -> ComponentRegistry {
+fn ComponentRegistry::new() -> ComponentRegistry {
   let components : Array[RegisteredComponent] = []
   { components, }
 }
 
 ///|
 /// Registers a CPU-only component: data lives only in archetype SoA columns (`cpu_stride` bytes per row).
-pub fn ComponentRegistry::register_cpu(
+fn ComponentRegistry::register_cpu(
   self : ComponentRegistry,
   name : String,
   cpu_stride : Int,
@@ -20,7 +20,7 @@ pub fn ComponentRegistry::register_cpu(
 ///|
 /// Registers a GPU-visible component: payload lives only in the flat [`GpuComponentStore`]
 /// (`cpu_stride` is always `0`; archetypes hold this id for signatures only; see `GpuLayout.stride` for packing).
-pub fn ComponentRegistry::register_gpu(
+fn ComponentRegistry::register_gpu(
   self : ComponentRegistry,
   name : String,
   gpu_layout : @comp.GpuLayout,
@@ -37,7 +37,7 @@ pub fn ComponentRegistry::register_gpu(
 }
 
 ///|
-pub fn ComponentRegistry::get(
+fn ComponentRegistry::get(
   self : ComponentRegistry,
   id : ComponentTypeId,
 ) -> RegisteredComponent? {
@@ -49,7 +49,7 @@ pub fn ComponentRegistry::get(
 }
 
 ///|
-pub fn ComponentRegistry::stride(
+fn ComponentRegistry::stride(
   self : ComponentRegistry,
   id : ComponentTypeId,
 ) -> Int {
@@ -60,7 +60,7 @@ pub fn ComponentRegistry::stride(
 }
 
 ///|
-pub fn ComponentRegistry::gpu_layout(
+fn ComponentRegistry::gpu_layout(
   self : ComponentRegistry,
   id : ComponentTypeId,
 ) -> @comp.GpuLayout? {
