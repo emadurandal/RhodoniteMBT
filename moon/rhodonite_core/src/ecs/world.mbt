@@ -477,6 +477,48 @@ pub fn World::for_each_entity_with_components(
 }
 
 ///|
+/// Variant of [`World::for_each_entity_with_components`] that marks selected GPU-visible
+/// components dirty for every entity whose callback ran.
+///
+/// This is useful for systems that always write the listed GPU payloads through the callback's
+/// [`MutArrayView`]s. If only some entities are changed, use the lower-level query and call
+/// [`World::mark_gpu_component_dirty`] only for those entities.
+pub fn World::for_each_entity_with_components_marking_gpu_dirty(
+  self : World,
+  required : Array[ComponentTypeId],
+  dirty_gpu_components : Array[ComponentTypeId],
+  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
+) -> Unit {
+  if component_array_has_duplicates(dirty_gpu_components) {
+    abort(
+      "for_each_entity_with_components_marking_gpu_dirty: duplicate dirty component",
+    )
+  }
+  for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
+    match self.registry.get(dirty_gpu_components[i]) {
+      None =>
+        abort(
+          "for_each_entity_with_components_marking_gpu_dirty: unknown dirty component type id",
+        )
+      Some(rc) =>
+        match rc.kind {
+          CpuOnly =>
+            abort(
+              "for_each_entity_with_components_marking_gpu_dirty: dirty component must be GpuVisible",
+            )
+          GpuVisible => ()
+        }
+    }
+  }
+  self.for_each_entity_with_components(required, (e, sig, payloads) => {
+    f(e, sig, payloads)
+    for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
+      let _ = self.mark_gpu_component_dirty(e, dirty_gpu_components[i])
+    }
+  })
+}
+
+///|
 pub fn World::transform_component(self : World) -> ComponentTypeId {
   self.transform_component_id
 }

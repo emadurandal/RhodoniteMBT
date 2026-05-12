@@ -157,6 +157,7 @@ flowchart TD
   - **CpuOnly**: view into that row’s SoA column.
   - **GpuVisible**: view into the **flat `GpuComponentStore`** slot for `entity.index` (not archetype SoA).
 - If you **mutate GpuVisible bytes** inside the callback, rows are **not** automatically marked dirty unless the path already does so. Call `World::mark_gpu_component_dirty` so `drain_gpu_writes` picks them up.
+- If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
 ---

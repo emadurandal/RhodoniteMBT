@@ -157,6 +157,7 @@ flowchart TD
   - **CpuOnly**: そのアーキタイプ行の SoA 列ビュー。
   - **GpuVisible**: **フラット `GpuComponentStore`** の `entity.index` スロットのビュー（アーキタイプ SoA ではない）。
 - コールバック内で **GpuVisible のバイトを直接変更**した場合、**自動では dirty になりません**。`World::mark_gpu_component_dirty` を呼び、`drain_gpu_writes` でアップロード対象に含めてください。
+- コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
 ---

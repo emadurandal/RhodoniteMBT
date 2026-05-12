@@ -377,6 +377,31 @@ test "for_each_entity_with_components gives full GpuComponentStore row for GpuVi
 }
 
 ///|
+test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  world.for_each_entity_with_components_marking_gpu_dirty(
+    [qa, gpu16],
+    [gpu16],
+    (_ent, _sig, payloads) => payloads[1][0] = (99 : Byte),
+  )
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes.length(), 16)
+  assert_eq(writes[0].bytes[0], (99 : Byte))
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()
