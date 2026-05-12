@@ -160,20 +160,19 @@ flowchart TD
 - コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
-アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。payload 配列の添字ではなく component id でアクセスしたい場合は、`query.for_each_row(world, f)` を使うと `QueryRow` が渡ります。
+アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスできます。
 
 - `required` component set を名前付きの値として再利用できます。
 - `Query::new` の時点で重複 component id を拒否できます。
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
 - callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
-- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
 - `QueryRow::view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `MutArrayView[Byte]` を返します。
 - `QueryRow::mark_dirty(component)` は `QueryRow::view` で変更した GPU-visible row を dirty にします。
-- GPU-visible 行を必ず書く `QueryRow` callback には `query.for_each_row_marking_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
 
 ```moonbit
 let query = Query::new([tf, gt])
-query.for_each_row(world, fn(row) {
+query.for_each(world, fn(row) {
   let local_tf = @comp.Transform3D::from_component_mut_view(row.view(tf))
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.view(gt))
   ignore(local_tf)
@@ -194,9 +193,9 @@ query / system の走査中に変更を要求したい場合は、`CommandBuffer
 
 ```moonbit
 let commands = CommandBuffer::new()
-query.for_each(world, fn(entity, _payloads) {
-  commands.remove_component(entity, old_component)
-  commands.add_component_bytes(entity, new_component, bytes)
+query.for_each(world, fn(row) {
+  commands.remove_component(row.entity(), old_component)
+  commands.add_component_bytes(row.entity(), new_component, bytes)
 })
 let _ = commands.apply(world)
 ```
@@ -213,10 +212,10 @@ command は query 終了後に、積まれた順で適用されます。`Command
 let schedule = Schedule::new()
 schedule.add_system(System::new("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
   let query = Query::new([lifetime])
-  query.for_each(world, fn(entity, payloads) {
-    let remaining = @comp.get_gpu_f32_mut_view(payloads[0], 0)
+  query.for_each(world, fn(row) {
+    let remaining = @comp.get_gpu_f32_mut_view(row.view(lifetime), 0)
     if remaining <= ctx.delta_seconds {
-      commands.destroy_entity(entity)
+      commands.destroy_entity(row.entity())
     }
   })
 }))

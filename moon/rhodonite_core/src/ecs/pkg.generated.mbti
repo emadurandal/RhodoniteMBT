@@ -75,10 +75,8 @@ pub(all) struct GpuWrite {
 pub struct Query {
   required : Array[ComponentTypeId]
 }
-pub fn Query::for_each(Self, World, (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
-pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
-pub fn Query::for_each_row(Self, World, (QueryRow) -> Unit) -> Unit
-pub fn Query::for_each_row_marking_dirty(Self, World, Array[ComponentTypeId], (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 

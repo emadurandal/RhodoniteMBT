@@ -36,20 +36,8 @@ pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
 }
 
 ///|
-/// Runs this query without exposing the full archetype signature.
-pub fn Query::for_each(
-  self : Query,
-  world : World,
-  f : (EntityId, Array[MutArrayView[Byte]]) -> Unit,
-) -> Unit {
-  world.for_each_entity_with_components(self.required, (e, _sig, views) => {
-    f(e, views)
-  })
-}
-
-///|
 /// Runs this query with component-id based row access instead of payload-index access.
-pub fn Query::for_each_row(
+pub fn Query::for_each(
   self : Query,
   world : World,
   f : (QueryRow) -> Unit,
@@ -62,22 +50,6 @@ pub fn Query::for_each_row(
 ///|
 /// Runs this query and marks selected GPU-visible components dirty after each callback.
 pub fn Query::for_each_marking_gpu_dirty(
-  self : Query,
-  world : World,
-  dirty_gpu_components : Array[ComponentTypeId],
-  f : (EntityId, Array[MutArrayView[Byte]]) -> Unit,
-) -> Unit {
-  world.for_each_entity_with_components_marking_gpu_dirty(
-    self.required,
-    dirty_gpu_components,
-    (e, _sig, views) => f(e, views),
-  )
-}
-
-///|
-/// Runs this query with component-id based row access and marks selected GPU-visible components
-/// dirty after each callback.
-pub fn Query::for_each_row_marking_dirty(
   self : Query,
   world : World,
   dirty_gpu_components : Array[ComponentTypeId],

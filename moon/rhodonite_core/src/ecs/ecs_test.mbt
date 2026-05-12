@@ -402,7 +402,7 @@ test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows"
 }
 
 ///|
-test "Query for_each wraps required payload iteration" {
+test "Query for_each wraps required row iteration" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperA", 4)
   let qb = world.register_cpu_component("QueryHelperB", 4)
@@ -415,10 +415,10 @@ test "Query for_each wraps required payload iteration" {
   let hits : Array[EntityId] = []
   let mut first_len = -1
   let mut second_first_byte = (0 : Byte)
-  query.for_each(world, (ent, payloads) => {
-    hits.push(ent)
-    first_len = payloads[0].length()
-    second_first_byte = payloads[1][0]
+  query.for_each(world, row => {
+    hits.push(row.entity())
+    first_len = row.view(qa).length()
+    second_first_byte = row.view(qb)[0]
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -440,8 +440,8 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_marking_gpu_dirty(world, [gpu16], (_ent, payloads) => {
-    payloads[1][0] = (77 : Byte)
+  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
+    row.view(gpu16)[0] = (77 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
@@ -461,7 +461,7 @@ test "QueryRow view accesses payloads by component id" {
   let hits : Array[EntityId] = []
   let mut a_first = (0 : Byte)
   let mut b_first = (0 : Byte)
-  query.for_each_row(world, row => {
+  query.for_each(world, row => {
     hits.push(row.entity())
     if !row.has(qa) {
       abort("expected QueryRowA")
@@ -497,7 +497,7 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_row(world, row => {
+  query.for_each(world, row => {
     row.view(gpu16)[0] = (88 : Byte)
     if !row.mark_dirty(gpu16) {
       abort("expected QueryRow dirty mark")
@@ -510,7 +510,7 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
 }
 
 ///|
-test "Query for_each_row_marking_dirty queues written gpu rows" {
+test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -523,7 +523,7 @@ test "Query for_each_row_marking_dirty queues written gpu rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_row_marking_dirty(world, [gpu16], row => {
+  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
     row.view(gpu16)[0] = (66 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
@@ -541,9 +541,9 @@ test "CommandBuffer applies queued structural changes after query" {
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let query = Query::new([qa])
   let commands = CommandBuffer::new()
-  query.for_each(world, (ent, _payloads) => {
-    commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
-    commands.remove_component(ent, qa)
+  query.for_each(world, row => {
+    commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
+    commands.remove_component(row.entity(), qa)
   })
   assert_true(world.has_component(e, qa))
   assert_true(!world.has_component(e, qb))
@@ -592,8 +592,8 @@ test "Schedule runs systems by phase and applies commands after each system" {
     System::new("add-b", Update, [qa], [qb], (system_world, ctx, commands) => {
       order.push(ctx.frame_index)
       let query = Query::new([qa])
-      query.for_each(system_world, (ent, _payloads) => {
-        commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
+      query.for_each(system_world, row => {
+        commands.add_component_bytes(row.entity(), qb, bytes4(5, 6, 7, 8))
       })
     }),
   )

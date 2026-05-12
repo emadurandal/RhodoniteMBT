@@ -161,25 +161,26 @@ pub(all) struct Query {
 pub fn Query::for_each(
   self : Query,
   world : World,
-  f : (EntityId, Array[MutArrayView[Byte]]) -> Unit,
+  f : (QueryRow) -> Unit,
 ) -> Unit {
   world.for_each_entity_with_components(self.required, fn(e, _sig, views) {
-    f(e, views)
+    f({ world, entity: e, components: self.required, payloads: views })
   })
 }
 ```
 
-`full_signature` が必要な System もあるため、`for_each_entity_with_components` を隠蔽しきらない方がよいです。
+現行実装では `Query::for_each` は `QueryRow` を渡し、`row.view(component)` で `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row の `MutArrayView[Byte]` を返します。`full_signature` が必要な System もあるため、`for_each_entity_with_components` を隠蔽しきらない方がよいです。
 
 ## GPU-visible component の dirty 管理
 
 System が `GpuVisible` payload を直接変更する場合、現在と同じく `World::mark_gpu_component_dirty` を呼ぶ必要があります。
 
 ```moonbit
-world.for_each_entity_with_components([tf, gt], fn(e, sig, payloads) {
-  // payloads[1] は GlobalTransform の flat GPU row。
+let query = Query::new([tf, gt])
+query.for_each(world, fn(row) {
+  // row.view(gt) は GlobalTransform の flat GPU row。
   // 書き換えた場合は dirty にする。
-  let _ = world.mark_gpu_component_dirty(e, gt)
+  let _ = row.mark_dirty(gt)
 })
 ```
 
