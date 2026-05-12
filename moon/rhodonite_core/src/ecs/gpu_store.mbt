@@ -168,6 +168,7 @@ pub fn World::register_cpu_component(
   cpu_stride : Int,
 ) -> ComponentTypeId {
   self.assert_not_querying("World::register_cpu_component")
+  self.assert_component_registration_open("World::register_cpu_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   self.gpu_stores.push(None)
   id
@@ -182,6 +183,7 @@ pub fn World::register_gpu_component(
   gpu_layout : @comp.GpuLayout,
 ) -> ComponentTypeId {
   self.assert_not_querying("World::register_gpu_component")
+  self.assert_component_registration_open("World::register_gpu_component")
   if !gpu_layout.is_valid() {
     abort("invalid gpu layout")
   }

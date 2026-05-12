@@ -534,6 +534,24 @@ test "Schedule runs systems by phase and applies commands after each system" {
 }
 
 ///|
+test "Schedule run temporarily locks component registration" {
+  let world = World::new()
+  assert_true(!world.component_registration_locked())
+  let mut locked_during_run = false
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("observe-lock", Update, [], [], (w, _ctx, _cmds) => {
+      locked_during_run = w.component_registration_locked()
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(locked_during_run)
+  assert_true(!world.component_registration_locked())
+  let late = world.register_cpu_component("RegisteredAfterScheduleRun", 4)
+  assert_true(late.index >= 0)
+}
+
+///|
 test "transform_propagation_system updates GlobalTransform in a schedule" {
   let world = World::new()
   let e = world.create_entity()

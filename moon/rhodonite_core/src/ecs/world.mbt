@@ -104,6 +104,17 @@ fn World::assert_not_querying(self : World, operation : String) -> Unit {
 }
 
 ///|
+/// Blocks component registration while systems are running.
+fn World::assert_component_registration_open(
+  self : World,
+  operation : String,
+) -> Unit {
+  if self.component_registration_lock_depth > 0 {
+    abort(operation + " cannot be called while schedule execution is active")
+  }
+}
+
+///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
@@ -147,6 +158,7 @@ pub fn World::new() -> World {
   ]
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
+  let component_registration_lock_depth = 0
   {
     registry,
     generations,
@@ -157,6 +169,7 @@ pub fn World::new() -> World {
     gpu_stores,
     resize_events,
     query_depth,
+    component_registration_lock_depth,
     transform_component_id,
     global_transform_component_id,
     child_of_component_id,
@@ -166,6 +179,27 @@ pub fn World::new() -> World {
 ///|
 pub fn World::registry(self : World) -> ComponentRegistry {
   self.registry
+}
+
+///|
+/// Temporarily closes component registration. Schedule execution calls this before running systems.
+fn World::lock_component_registration(self : World) -> Unit {
+  self.component_registration_lock_depth = self.component_registration_lock_depth +
+    1
+}
+
+///|
+/// Reopens component registration after a matching temporary lock.
+fn World::unlock_component_registration(self : World) -> Unit {
+  if self.component_registration_lock_depth > 0 {
+    self.component_registration_lock_depth = self.component_registration_lock_depth -
+      1
+  }
+}
+
+///|
+pub fn World::component_registration_locked(self : World) -> Bool {
+  self.component_registration_lock_depth > 0
 }
 
 ///|

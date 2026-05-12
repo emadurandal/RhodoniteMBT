@@ -135,6 +135,7 @@ pub struct World {
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
   mut query_depth : Int
+  mut component_registration_lock_depth : Int
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId
@@ -143,6 +144,7 @@ pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
+pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool

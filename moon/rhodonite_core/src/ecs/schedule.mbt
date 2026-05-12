@@ -147,6 +147,7 @@ pub fn Schedule::run(
   world : World,
   ctx : SystemContext,
 ) -> Bool {
+  world.lock_component_registration()
   let mut ok = true
   for phase_rank = 0
       phase_rank < system_phase_count()
@@ -162,5 +163,6 @@ pub fn Schedule::run(
       }
     }
   }
+  world.unlock_component_registration()
   ok
 }

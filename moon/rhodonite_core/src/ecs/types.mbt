@@ -169,6 +169,8 @@ pub struct World {
   resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   mut query_depth : Int
+  /// Schedule execution depth; component registration is closed while this is nonzero.
+  mut component_registration_lock_depth : Int
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId

@@ -214,6 +214,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 現行実装では、`reads` / `writes` は構築時に重複検査され、`System::conflicts_with` と `Schedule::has_parallel_access_conflicts` で同一 phase 内の read/write 衝突を検査できます。これは将来の並列 batching 用の境界であり、`Schedule::run` はまだ単一スレッドで登録順に実行します。
 
+`Schedule::run` は system 実行中だけ component 登録を閉じ、return 前に再び開きます。これにより、system 実行中に registry と system の read/write 宣言がずれることを防ぎつつ、schedule 実行と実行の間では新しい component type を登録できます。
+
 ## Resource / Context
 
 System を導入すると、時間、入力、レンダラ、GPU buffer handle などをどこに置くかが問題になります。
@@ -247,7 +249,8 @@ pub struct App {
 4. `CommandBuffer` を追加し、System 内、特に query callback 内の構造変更要求は command 経由にする。現行実装では `destroy`、`add/remove component`、`set/clear GPU component` を追加済み。
 5. 必要に応じて `Query` helper を追加する。現行実装では `Query::new`、`for_each`、`for_each_marking_gpu_dirty` を追加済み。
 6. `reads` / `writes` の conflict 検査を追加する。現行実装では `System::conflicts_with` と `Schedule::has_parallel_access_conflicts` を追加済み。
-7. 並列実行、before/after 依存関係、System batch 分割は最後に検討する。
+7. Schedule 実行中だけ component 登録をロックする。現行実装では `Schedule::run` が内部ロックを開始・解除する。
+8. 並列実行、before/after 依存関係、System batch 分割は最後に検討する。
 
 ## 避けたい初期実装
 
