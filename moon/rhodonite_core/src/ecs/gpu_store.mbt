@@ -50,6 +50,20 @@ fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit 
 }
 
 ///|
+/// Zero-copy read-only view of one logical GPU row. Returns [`None`] if the row is outside current capacity.
+fn GpuComponentStore::entity_row_view(
+  self : GpuComponentStore,
+  entity_index : Int,
+) -> ArrayView[Byte]? {
+  if entity_index < 0 || entity_index >= self.capacity() {
+    None
+  } else {
+    let base = entity_index * self.stride
+    Some(self.bytes[base:base + self.stride])
+  }
+}
+
+///|
 /// Zero-copy mutable view of one logical GPU row; caller must not retain the view past store mutations.
 fn GpuComponentStore::mut_entity_row(
   self : GpuComponentStore,

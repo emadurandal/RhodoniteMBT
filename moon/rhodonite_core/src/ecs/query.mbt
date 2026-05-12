@@ -73,7 +73,65 @@ fn QueryRow::component_payload_index(
 }
 
 ///|
-/// Builds the requested row view on demand.
+/// Builds the requested read-only row view on demand without growing stores or marking dirty rows.
+fn QueryRow::component_view(
+  self : QueryRow,
+  component : ComponentTypeId,
+  operation : String,
+) -> ArrayView[Byte] {
+  ignore(self.component_payload_index(component, operation))
+  match self.world.registry.get(component) {
+    None =>
+      abort(
+        operation +
+        ": unknown " +
+        component_id_text(component) +
+        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
+      )
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly =>
+          match
+            self.world.archetypes[self.archetype_index].component_byte_view(
+              self.row,
+              component,
+            ) {
+            Some(v) => v
+            None =>
+              abort(
+                operation +
+                ": required " +
+                component_id_text(component) +
+                " is missing from the matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
+              )
+          }
+        GpuVisible =>
+          match self.world.gpu_store(component) {
+            Some(store) =>
+              match store.entity_row_view(self.entity.index) {
+                Some(v) => v
+                None =>
+                  abort(
+                    operation +
+                    ": GpuVisible " +
+                    component_id_text(component) +
+                    " row is outside the current GPU store capacity. Hint: GPU-visible ownership should be initialized through add_component/add_component_bytes before querying.",
+                  )
+              }
+            None =>
+              abort(
+                operation +
+                ": GpuVisible " +
+                component_id_text(component) +
+                " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+              )
+          }
+      }
+  }
+}
+
+///|
+/// Builds the requested mutable row view on demand.
 fn QueryRow::component_mut_view(
   self : QueryRow,
   component : ComponentTypeId,
@@ -142,7 +200,7 @@ pub fn QueryRow::read_view(
   component : ComponentTypeId,
 ) -> ArrayView[Byte] {
   self.world.assert_system_component_read(component, "QueryRow::read_view")
-  self.component_mut_view(component, "QueryRow::read_view", false).view()
+  self.component_view(component, "QueryRow::read_view")
 }
 
 ///|
