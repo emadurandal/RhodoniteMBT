@@ -108,48 +108,55 @@ fn GpuComponentStore::clear_slot(
 }
 
 ///|
-fn merge_sorted_ints(left : Array[Int], right : Array[Int]) -> Array[Int] {
-  let out : Array[Int] = []
-  let mut i = 0
-  let mut j = 0
-  while i < left.length() && j < right.length() {
-    if left[i] <= right[j] {
-      out.push(left[i])
-      i = i + 1
-    } else {
-      out.push(right[j])
-      j = j + 1
-    }
-  }
-  while i < left.length() {
-    out.push(left[i])
-    i = i + 1
-  }
-  while j < right.length() {
-    out.push(right[j])
-    j = j + 1
-  }
-  out
+
+///|
+fn swap_int_array(arr : Array[Int], i : Int, j : Int) -> Unit {
+  let t = arr[i]
+  arr[i] = arr[j]
+  arr[j] = t
 }
 
 ///|
-/// Stable O(n log n) sort for dirty entity indices (was insertion sort; large dirty sets made
-/// [`GpuComponentStore::drain_writes`] dominate frame time in JS/WASM).
-fn sort_ints(values : Array[Int]) -> Array[Int] {
-  let n = values.length()
+/// Max-heap sink for indices `[0, heap_size)` (0-based indexing).
+fn sift_down_max_heap(arr : Array[Int], heap_size : Int, root : Int) -> Unit {
+  let mut i = root
+  while true {
+    let left = i * 2 + 1
+    let right = i * 2 + 2
+    let mut largest = i
+    if left < heap_size && arr[left] > arr[largest] {
+      largest = left
+    }
+    if right < heap_size && arr[right] > arr[largest] {
+      largest = right
+    }
+    if largest == i {
+      break
+    }
+    swap_int_array(arr, i, largest)
+    i = largest
+  }
+}
+
+///|
+/// In-place ascending sort. Avoids merge-sort’s O(n log n) allocations (GC + WASM slowdown in
+/// [`GpuComponentStore::drain_writes`]).
+fn heap_sort_ints_asc(arr : Array[Int]) -> Unit {
+  let n = arr.length()
   if n <= 1 {
-    return values
+    return
   }
-  let mid = n / 2
-  let left : Array[Int] = []
-  let right : Array[Int] = []
-  for k = 0; k < mid; k = k + 1 {
-    left.push(values[k])
+  let mut i = n / 2 - 1
+  while i >= 0 {
+    sift_down_max_heap(arr, n, i)
+    i = i - 1
   }
-  for k = mid; k < n; k = k + 1 {
-    right.push(values[k])
+  let mut end = n - 1
+  while end > 0 {
+    swap_int_array(arr, 0, end)
+    sift_down_max_heap(arr, end, 0)
+    end = end - 1
   }
-  merge_sorted_ints(sort_ints(left), sort_ints(right))
 }
 
 ///|
@@ -163,8 +170,16 @@ fn GpuComponentStore::range_bytes(
   let len = count * self.stride
   let out = FixedArray::make(len, (0 : Byte))
   let src_base = first * self.stride
-  for i = 0; i < len; i = i + 1 {
-    out[i] = self.bytes[src_base + i]
+  let src_view = self.bytes[src_base:src_base + len]
+  let mut i = 0
+  while i + 4 <= len {
+    let u = @writes.get_u32_le_byte_view(src_view, i)
+    @writes.put_u32_le(out, i, u)
+    i = i + 4
+  }
+  while i < len {
+    out[i] = src_view[i]
+    i = i + 1
   }
   { byte_offset: src_base, bytes: out }
 }
@@ -176,7 +191,8 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
   if self.dirty_indices.length() == 0 {
     return writes
   }
-  let sorted = sort_ints(self.dirty_indices)
+  heap_sort_ints_asc(self.dirty_indices)
+  let sorted = self.dirty_indices
   let mut first = sorted[0]
   let mut prev = sorted[0]
   for i = 1; i < sorted.length(); i = i + 1 {
