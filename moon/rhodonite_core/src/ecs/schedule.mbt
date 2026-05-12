@@ -197,7 +197,7 @@ pub fn Schedule::run(
       let system = self.systems[i]
       if system_phase_rank(system.phase) == phase_rank {
         let commands = CommandBuffer::new()
-        world.enter_system_access(
+        let system_access = world.enter_system_access(
           system.reads,
           system.writes,
           system.structural_write,
@@ -206,7 +206,7 @@ pub fn Schedule::run(
         if !commands.apply(world) {
           ok = false
         }
-        world.exit_system_access()
+        world.exit_system_access(system_access)
       }
     }
   }

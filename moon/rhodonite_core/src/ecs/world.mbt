@@ -39,6 +39,35 @@ fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] 
 }
 
 ///|
+priv struct SystemAccessSnapshot {
+  depth : Int
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  structural_write : Bool
+}
+
+///|
+fn World::system_access_snapshot(self : World) -> SystemAccessSnapshot {
+  {
+    depth: self.system_access_depth,
+    reads: copy_component_array(self.system_access_reads),
+    writes: copy_component_array(self.system_access_writes),
+    structural_write: self.system_access_structural_write,
+  }
+}
+
+///|
+fn World::restore_system_access(
+  self : World,
+  snapshot : SystemAccessSnapshot,
+) -> Unit {
+  self.system_access_depth = snapshot.depth
+  self.system_access_reads = snapshot.reads
+  self.system_access_writes = snapshot.writes
+  self.system_access_structural_write = snapshot.structural_write
+}
+
+///|
 /// Rejects duplicate `required` entries so one callback cannot receive the same component view twice.
 fn component_array_has_duplicates(components : Array[ComponentTypeId]) -> Bool {
   for i = 0; i < components.length(); i = i + 1 {
@@ -276,27 +305,21 @@ fn World::enter_system_access(
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   structural_write : Bool,
-) -> Unit {
+) -> SystemAccessSnapshot {
+  let snapshot = self.system_access_snapshot()
   self.system_access_depth = self.system_access_depth + 1
   self.system_access_reads = copy_component_array(reads)
   self.system_access_writes = copy_component_array(writes)
   self.system_access_structural_write = structural_write
+  snapshot
 }
 
 ///|
-fn World::exit_system_access(self : World) -> Unit {
-  if self.system_access_depth > 0 {
-    self.system_access_depth = self.system_access_depth - 1
-  }
-  if self.system_access_depth == 0 {
-    while self.system_access_reads.length() > 0 {
-      let _ = self.system_access_reads.pop()
-    }
-    while self.system_access_writes.length() > 0 {
-      let _ = self.system_access_writes.pop()
-    }
-    self.system_access_structural_write = false
-  }
+fn World::exit_system_access(
+  self : World,
+  snapshot : SystemAccessSnapshot,
+) -> Unit {
+  self.restore_system_access(snapshot)
 }
 
 ///|

@@ -810,6 +810,40 @@ test "System writes declaration also permits reads during schedule run" {
 }
 
 ///|
+test "Nested Schedule::run restores outer system access declarations" {
+  let world = World::new()
+  let qa = world.register_cpu_component("NestedScheduleOuterA", 4)
+  let qb = world.register_cpu_component("NestedScheduleInnerB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let inner = Schedule::new()
+  inner.add_system(
+    System::new("inner-write-b", Update, [], [qb], (w, _ctx, _cmds) => {
+      if !w.set_component_bytes(e, qb, bytes4(2, 2, 2, 2)) {
+        abort("expected nested inner component write")
+      }
+    }),
+  )
+  let outer = Schedule::new()
+  outer.add_system(
+    System::new("outer-write-a", Update, [], [qa], (w, ctx, _cmds) => {
+      if !inner.run(w, ctx) {
+        abort("expected nested inner schedule to succeed")
+      }
+      if !w.set_component_bytes(e, qa, bytes4(3, 3, 3, 3)) {
+        abort("expected nested outer component write")
+      }
+    }),
+  )
+  assert_true(outer.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
+    None => abort("expected NestedScheduleOuterA bytes")
+  }
+}
+
+///|
 test "System Query preserves read and write access separation during schedule run" {
   let world = World::new()
   let qa = world.register_cpu_component("SystemQueryReadA", 4)
