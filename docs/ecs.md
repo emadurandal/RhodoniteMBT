@@ -161,9 +161,7 @@ The callback receives a `QueryRow`, so payloads are accessed by component id whi
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
 - During schedule execution, every required component must be declared in the active System's `reads` or `writes` set.
 - `QueryRow::read_view(component)` returns a zero-copy `ArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
-- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution.
-- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::write_view`.
-- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs `QueryRow` access with automatic dirty marking for callbacks that always write selected GPU-visible rows.
+- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution. For `GpuVisible` components, requesting this mutable view marks that entity row dirty immediately.
 - If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
 ```moonbit
@@ -173,7 +171,6 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
-  let _ = row.mark_dirty(gt)
 })
 ```
 

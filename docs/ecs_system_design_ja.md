@@ -135,24 +135,21 @@ query.for_each(world, fn(row) {
 
 `QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。
 
-`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。
+`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
 ## GPU-visible component の dirty 管理
 
-System が `GpuVisible` payload を直接変更する場合、`World::mark_gpu_component_dirty` または `QueryRow::mark_dirty` を呼ぶ必要があります。
+System が `QueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `read_view` を使うことで余分な dirty を避けられます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
   // row.write_view(gt) は GlobalTransform の flat GPU row。
-  // 書き換えた場合は dirty にする。
+  // GpuVisible の mutable view を取得した時点で dirty になる。
   let gt_row = row.write_view(gt)
   ignore(gt_row)
-  let _ = row.mark_dirty(gt)
 })
 ```
-
-`Query::for_each_marking_gpu_dirty` は callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。dirty 対象 component は、その Query の `required` に含まれている必要があります。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 

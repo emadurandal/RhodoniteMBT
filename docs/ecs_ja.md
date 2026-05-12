@@ -161,9 +161,7 @@ callback には `QueryRow` が渡り、payload 配列の添字ではなく compo
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
 - schedule 実行中は、required の全 component が active System の `reads` または `writes` に含まれる必要があります。
 - `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
-- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。
-- `QueryRow::mark_dirty(component)` は `QueryRow::write_view` で変更した GPU-visible row を dirty にします。
-- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 - イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
 ```moonbit
@@ -173,7 +171,6 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
-  let _ = row.mark_dirty(gt)
 })
 ```
 

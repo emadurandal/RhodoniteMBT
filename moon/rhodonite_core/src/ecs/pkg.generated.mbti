@@ -78,7 +78,6 @@ pub struct Query {
   required : Array[ComponentTypeId]
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
-pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 
@@ -90,7 +89,6 @@ pub struct QueryRow {
 }
 pub fn QueryRow::entity(Self) -> EntityId
 pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
-pub fn QueryRow::mark_dirty(Self, ComponentTypeId) -> Bool
 pub fn QueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
 pub fn QueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 

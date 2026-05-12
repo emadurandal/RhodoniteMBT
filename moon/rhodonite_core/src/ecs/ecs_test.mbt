@@ -440,7 +440,7 @@ test "Query for_each gives full GpuComponentStore row for GpuVisible" {
 }
 
 ///|
-test "Query for_each_marking_gpu_dirty queues written gpu rows from direct query" {
+test "Query write_view queues dirty gpu row from direct query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -452,7 +452,8 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows from direct query
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  Query::new([qa, gpu16]).for_each_marking_gpu_dirty(world, [gpu16], row => {
+  let _ = world.drain_gpu_writes(gpu16)
+  Query::new([qa, gpu16]).for_each(world, row => {
     row.write_view(gpu16)[0] = (99 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
@@ -488,7 +489,7 @@ test "Query for_each wraps required row iteration" {
 }
 
 ///|
-test "Query helper for_each_marking_gpu_dirty queues written gpu rows" {
+test "Query write_view queues dirty gpu row from helper query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -501,9 +502,8 @@ test "Query helper for_each_marking_gpu_dirty queues written gpu rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.write_view(gpu16)[0] = (77 : Byte)
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => row.write_view(gpu16)[0] = (77 : Byte))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -545,7 +545,7 @@ test "QueryRow view accesses payloads by component id" {
 }
 
 ///|
-test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
+test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -558,12 +558,8 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each(world, row => {
-    row.write_view(gpu16)[0] = (88 : Byte)
-    if !row.mark_dirty(gpu16) {
-      abort("expected QueryRow dirty mark")
-    }
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => row.write_view(gpu16)[0] = (88 : Byte))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -571,7 +567,7 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
 }
 
 ///|
-test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
+test "Query write_view marks gpu row dirty even if bytes are unchanged" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -584,13 +580,12 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.write_view(gpu16)[0] = (66 : Byte)
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => ignore(row.write_view(gpu16)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (66 : Byte))
+  assert_eq(writes[0].bytes[0], (0 : Byte))
 }
 
 ///|

@@ -176,13 +176,13 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
     let global_tf = @comp.GlobalTransform::view_std140_gpu_row(
       row.write_view(gt),
     )
-    if self.compute_global_transform_for_tf_gt_bulk_row(
+    ignore(
+      self.compute_global_transform_for_tf_gt_bulk_row(
         e,
         self.has_component(e, co),
         local_m,
         global_tf,
-      ) {
-      let _ = row.mark_dirty(gt)
-    }
+      ),
+    )
   })
 }
