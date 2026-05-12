@@ -108,10 +108,21 @@ pub struct Query {
 }
 
 ///|
+/// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
+/// views used by the lower-level world query.
+pub struct QueryRow {
+  world : World
+  entity : EntityId
+  components : Array[ComponentTypeId]
+  payloads : Array[MutArrayView[Byte]]
+}
+
+///|
 /// Deferred structural or GPU mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)
@@ -147,6 +158,7 @@ pub struct System {
   phase : SystemPhase
   reads : Array[ComponentTypeId]
   writes : Array[ComponentTypeId]
+  structural_write : Bool
   run : (World, SystemContext, CommandBuffer) -> Unit
 }
 
@@ -169,6 +181,13 @@ pub struct World {
   resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   mut query_depth : Int
+  /// Schedule execution depth; component registration is closed while this is nonzero.
+  mut component_registration_lock_depth : Int
+  /// Active system access guard; nonzero means component reads/writes are checked against declarations.
+  mut system_access_depth : Int
+  mut system_access_reads : Array[ComponentTypeId]
+  mut system_access_writes : Array[ComponentTypeId]
+  mut system_access_structural_write : Bool
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId

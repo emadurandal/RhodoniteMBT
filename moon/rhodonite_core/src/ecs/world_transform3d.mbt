@@ -5,11 +5,17 @@ pub fn World::set_transform(
   entity : EntityId,
   t : @comp.Transform3D,
 ) -> Bool {
-  self.add_component_bytes(
-    entity,
-    self.transform_component_id,
-    t.to_component_bytes(),
-  )
+  let id = self.transform_component_id
+  let bytes = t.to_component_bytes()
+  if self.has_component(entity, id) {
+    self.set_component_bytes(entity, id, bytes)
+  } else if !self.can_add_missing_component_from_setter(
+      id, "World::set_transform",
+    ) {
+    false
+  } else {
+    self.add_component_bytes(entity, id, bytes)
+  }
 }
 
 ///|
@@ -28,11 +34,19 @@ pub fn World::set_transform_trs(
   sy : Float,
   sz : Float,
 ) -> Bool {
-  self.add_component_bytes(
-    entity,
-    self.transform_component_id,
-    @comp.transform3d_trs_bytes(px, py, pz, qx, qy, qz, qw, sx, sy, sz),
+  let id = self.transform_component_id
+  let bytes = @comp.transform3d_trs_bytes(
+    px, py, pz, qx, qy, qz, qw, sx, sy, sz,
   )
+  if self.has_component(entity, id) {
+    self.set_component_bytes(entity, id, bytes)
+  } else if !self.can_add_missing_component_from_setter(
+      id, "World::set_transform_trs",
+    ) {
+    false
+  } else {
+    self.add_component_bytes(entity, id, bytes)
+  }
 }
 
 ///|

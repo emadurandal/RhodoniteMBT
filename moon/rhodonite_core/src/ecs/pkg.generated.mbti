@@ -25,6 +25,7 @@ pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
 pub fn CommandBuffer::new() -> Self
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 
 pub(all) enum ComponentKind {
@@ -75,10 +76,22 @@ pub(all) struct GpuWrite {
 pub struct Query {
   required : Array[ComponentTypeId]
 }
-pub fn Query::for_each(Self, World, (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
-pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
+pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
+
+pub struct QueryRow {
+  world : World
+  entity : EntityId
+  components : Array[ComponentTypeId]
+  payloads : Array[MutArrayView[Byte]]
+}
+pub fn QueryRow::entity(Self) -> EntityId
+pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
+pub fn QueryRow::mark_dirty(Self, ComponentTypeId) -> Bool
+pub fn QueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn QueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
@@ -102,13 +115,16 @@ pub struct System {
   phase : SystemPhase
   reads : Array[ComponentTypeId]
   writes : Array[ComponentTypeId]
+  structural_write : Bool
   run : (World, SystemContext, CommandBuffer) -> Unit
 }
 pub fn System::conflicts_with(Self, Self) -> Bool
 pub fn System::name(Self) -> String
 pub fn System::new(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::new_with_structural_write(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
 pub fn System::phase(Self) -> SystemPhase
 pub fn System::reads(Self) -> Array[ComponentTypeId]
+pub fn System::structural_write(Self) -> Bool
 pub fn System::writes(Self) -> Array[ComponentTypeId]
 
 pub(all) struct SystemContext {
@@ -135,6 +151,11 @@ pub struct World {
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
   mut query_depth : Int
+  mut component_registration_lock_depth : Int
+  mut system_access_depth : Int
+  mut system_access_reads : Array[ComponentTypeId]
+  mut system_access_writes : Array[ComponentTypeId]
+  mut system_access_structural_write : Bool
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId
@@ -143,13 +164,12 @@ pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
+pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
-pub fn World::for_each_entity_with_components(Self, Array[ComponentTypeId], (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit) -> Unit
-pub fn World::for_each_entity_with_components_marking_gpu_dirty(Self, Array[ComponentTypeId], Array[ComponentTypeId], (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit) -> Unit
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
@@ -165,6 +185,7 @@ pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> Com
 pub fn World::registry(Self) -> ComponentRegistry
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
+pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
@@ -175,6 +196,7 @@ pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)

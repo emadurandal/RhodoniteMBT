@@ -30,6 +30,44 @@ fn component_array_contains_all(
 }
 
 ///|
+fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] {
+  let out : Array[ComponentTypeId] = []
+  for i = 0; i < src.length(); i = i + 1 {
+    out.push(src[i])
+  }
+  out
+}
+
+///|
+priv struct SystemAccessSnapshot {
+  depth : Int
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  structural_write : Bool
+}
+
+///|
+fn World::system_access_snapshot(self : World) -> SystemAccessSnapshot {
+  {
+    depth: self.system_access_depth,
+    reads: copy_component_array(self.system_access_reads),
+    writes: copy_component_array(self.system_access_writes),
+    structural_write: self.system_access_structural_write,
+  }
+}
+
+///|
+fn World::restore_system_access(
+  self : World,
+  snapshot : SystemAccessSnapshot,
+) -> Unit {
+  self.system_access_depth = snapshot.depth
+  self.system_access_reads = snapshot.reads
+  self.system_access_writes = snapshot.writes
+  self.system_access_structural_write = snapshot.structural_write
+}
+
+///|
 /// Rejects duplicate `required` entries so one callback cannot receive the same component view twice.
 fn component_array_has_duplicates(components : Array[ComponentTypeId]) -> Bool {
   for i = 0; i < components.length(); i = i + 1 {
@@ -104,6 +142,78 @@ fn World::assert_not_querying(self : World, operation : String) -> Unit {
 }
 
 ///|
+/// Blocks component registration while systems are running.
+fn World::assert_component_registration_open(
+  self : World,
+  operation : String,
+) -> Unit {
+  if self.component_registration_lock_depth > 0 {
+    abort(operation + " cannot be called while schedule execution is active")
+  }
+}
+
+///|
+fn World::system_access_active(self : World) -> Bool {
+  self.system_access_depth > 0
+}
+
+///|
+fn World::assert_system_component_read(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() &&
+    !component_array_contains(self.system_access_reads, component) &&
+    !component_array_contains(self.system_access_writes, component) {
+    abort(operation + " requires a System reads or writes declaration")
+  }
+}
+
+///|
+fn World::assert_system_component_write(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() &&
+    !component_array_contains(self.system_access_writes, component) {
+    abort(operation + " requires a System writes declaration")
+  }
+}
+
+///|
+fn World::assert_system_components_read(
+  self : World,
+  components : Array[ComponentTypeId],
+  operation : String,
+) -> Unit {
+  for i = 0; i < components.length(); i = i + 1 {
+    self.assert_system_component_read(components[i], operation)
+  }
+}
+
+///|
+fn World::assert_system_structural_write(
+  self : World,
+  operation : String,
+) -> Unit {
+  if self.system_access_active() && !self.system_access_structural_write {
+    abort(operation + " requires a System structural write declaration")
+  }
+}
+
+///|
+fn World::can_add_missing_component_from_setter(
+  self : World,
+  component : ComponentTypeId,
+  operation : String,
+) -> Bool {
+  self.assert_system_component_write(component, operation)
+  !self.system_access_active() || self.system_access_structural_write
+}
+
+///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
@@ -147,6 +257,11 @@ pub fn World::new() -> World {
   ]
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
+  let component_registration_lock_depth = 0
+  let system_access_depth = 0
+  let system_access_reads : Array[ComponentTypeId] = []
+  let system_access_writes : Array[ComponentTypeId] = []
+  let system_access_structural_write = false
   {
     registry,
     generations,
@@ -157,6 +272,11 @@ pub fn World::new() -> World {
     gpu_stores,
     resize_events,
     query_depth,
+    component_registration_lock_depth,
+    system_access_depth,
+    system_access_reads,
+    system_access_writes,
+    system_access_structural_write,
     transform_component_id,
     global_transform_component_id,
     child_of_component_id,
@@ -166,6 +286,50 @@ pub fn World::new() -> World {
 ///|
 pub fn World::registry(self : World) -> ComponentRegistry {
   self.registry
+}
+
+///|
+/// Temporarily closes component registration. Schedule execution calls this before running systems.
+fn World::lock_component_registration(self : World) -> Unit {
+  self.component_registration_lock_depth = self.component_registration_lock_depth +
+    1
+}
+
+///|
+/// Reopens component registration after a matching temporary lock.
+fn World::unlock_component_registration(self : World) -> Unit {
+  if self.component_registration_lock_depth > 0 {
+    self.component_registration_lock_depth = self.component_registration_lock_depth -
+      1
+  }
+}
+
+///|
+pub fn World::component_registration_locked(self : World) -> Bool {
+  self.component_registration_lock_depth > 0
+}
+
+///|
+fn World::enter_system_access(
+  self : World,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  structural_write : Bool,
+) -> SystemAccessSnapshot {
+  let snapshot = self.system_access_snapshot()
+  self.system_access_depth = self.system_access_depth + 1
+  self.system_access_reads = copy_component_array(reads)
+  self.system_access_writes = copy_component_array(writes)
+  self.system_access_structural_write = structural_write
+  snapshot
+}
+
+///|
+fn World::exit_system_access(
+  self : World,
+  snapshot : SystemAccessSnapshot,
+) -> Unit {
+  self.restore_system_access(snapshot)
 }
 
 ///|
@@ -224,6 +388,7 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 /// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
 pub fn World::create_entity(self : World) -> EntityId {
   self.assert_not_querying("World::create_entity")
+  self.assert_system_structural_write("World::create_entity")
   let entity = if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
     let index = self.free_indices[last]
@@ -247,6 +412,7 @@ pub fn World::create_entity(self : World) -> EntityId {
 /// Removes the entity from its archetype (swap-remove), clears GPU slots at `entity.index`, frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.assert_not_querying("World::destroy_entity")
+  self.assert_system_structural_write("World::destroy_entity")
   if !self.is_alive(entity) {
     return false
   }
@@ -279,6 +445,7 @@ pub fn World::has_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_system_component_read(component, "World::has_component")
   if !self.is_alive(entity) {
     return false
   }
@@ -293,7 +460,38 @@ pub fn World::has_component(
 }
 
 ///|
-/// Adds or updates a CPU component: may migrate the entity to a new archetype with an expanded sorted signature.
+/// Updates an existing CPU component payload in its current archetype row.
+pub fn World::set_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  self.assert_not_querying("World::set_component_bytes")
+  self.assert_system_component_write(component, "World::set_component_bytes")
+  if !self.is_alive(entity) {
+    return false
+  }
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return false
+  }
+  if !component_array_contains(
+      self.archetypes[loc.archetype_index].components,
+      component,
+    ) {
+    return false
+  }
+  self.archetypes[loc.archetype_index].set_component_bytes(
+    loc.row,
+    component,
+    bytes,
+  )
+  true
+}
+
+///|
+/// Adds a new CPU component: migrates the entity to an archetype with an expanded sorted signature.
 pub fn World::add_component_bytes(
   self : World,
   entity : EntityId,
@@ -301,6 +499,8 @@ pub fn World::add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   self.assert_not_querying("World::add_component_bytes")
+  self.assert_system_structural_write("World::add_component_bytes")
+  self.assert_system_component_write(component, "World::add_component_bytes")
   if !self.is_alive(entity) {
     return false
   }
@@ -309,12 +509,7 @@ pub fn World::add_component_bytes(
     None => return false
   }
   if self.has_component(entity, component) {
-    self.archetypes[loc.archetype_index].set_component_bytes(
-      loc.row,
-      component,
-      bytes,
-    )
-    return true
+    return false
   }
   let old_arch = self.archetypes[loc.archetype_index]
   let new_components = sorted_with_added(old_arch.components, component)
@@ -340,6 +535,8 @@ pub fn World::remove_component(
   component : ComponentTypeId,
 ) -> Bool {
   self.assert_not_querying("World::remove_component")
+  self.assert_system_structural_write("World::remove_component")
+  self.assert_system_component_write(component, "World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
   }
@@ -369,6 +566,7 @@ pub fn World::component_bytes(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> FixedArray[Byte]? {
+  self.assert_system_component_read(component, "World::component_bytes")
   if !self.is_alive(entity) {
     return None
   }
@@ -380,26 +578,10 @@ pub fn World::component_bytes(
 }
 
 ///|
-/// Iterates every living entity whose archetype signature **includes all** `required`
-/// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
-///
-/// The callback receives the entity, that row's **full sorted archetype component list**, and one
-/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into that
-/// component's payload at this entity.
-///
-/// * **`CpuOnly`**: view over archetype SoA column bytes (`stride` bytes per row).
-/// * **`GpuVisible`**: view over this entity's row in [`GpuComponentStore`] (`gpu_layout.stride`
-///   bytes; **not** archetype SoA bytes). After the callback returns, the world persists each
-///   touched GPU store with `replace_gpu_store` only (no automatic dirty queue). If you mutate a
-///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
-///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
-///   [`ensure_gpu_capacity`]).
-///
-/// The callback must not call structural mutation APIs such as `create_entity`,
-/// `destroy_entity`, `add_component_bytes`, `remove_component`, or component registration.
-/// `for_each_entity_with_components` detects those calls and aborts because they can invalidate
-/// the archetype rows and mutable views currently being iterated.
-pub fn World::for_each_entity_with_components(
+/// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
+/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access at the point where the
+/// callback asks for a read-only or mutable view.
+fn World::for_each_query_row_payloads(
   self : World,
   required : Array[ComponentTypeId],
   f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
@@ -408,7 +590,7 @@ pub fn World::for_each_entity_with_components(
     return
   }
   if component_array_has_duplicates(required) {
-    abort("for_each_entity_with_components: duplicate required component")
+    abort("Query::for_each: duplicate required component")
   }
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
@@ -423,10 +605,7 @@ pub fn World::for_each_entity_with_components(
         let gpu_flush : Array[GpuComponentStore] = []
         for k = 0; k < required.length(); k = k + 1 {
           match self.registry.get(required[k]) {
-            None =>
-              abort(
-                "for_each_entity_with_components: unknown component type id",
-              )
+            None => abort("Query::for_each: unknown component type id")
             Some(rc) =>
               match rc.kind {
                 CpuOnly =>
@@ -434,7 +613,7 @@ pub fn World::for_each_entity_with_components(
                     Some(v) => payloads.push(v)
                     None =>
                       abort(
-                        "for_each_entity_with_components: required component missing from archetype",
+                        "Query::for_each: required component missing from archetype",
                       )
                   }
                 GpuVisible =>
@@ -458,7 +637,7 @@ pub fn World::for_each_entity_with_components(
                     }
                     None =>
                       abort(
-                        "for_each_entity_with_components: GpuVisible component has no gpu store",
+                        "Query::for_each: GpuVisible component has no gpu store",
                       )
                   }
               }
@@ -474,48 +653,6 @@ pub fn World::for_each_entity_with_components(
   }
   // Restore the outer mutation state after the query finishes.
   self.query_depth = self.query_depth - 1
-}
-
-///|
-/// Variant of [`World::for_each_entity_with_components`] that marks selected GPU-visible
-/// components dirty for every entity whose callback ran.
-///
-/// This is useful for systems that always write the listed GPU payloads through the callback's
-/// [`MutArrayView`]s. If only some entities are changed, use the lower-level query and call
-/// [`World::mark_gpu_component_dirty`] only for those entities.
-pub fn World::for_each_entity_with_components_marking_gpu_dirty(
-  self : World,
-  required : Array[ComponentTypeId],
-  dirty_gpu_components : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
-) -> Unit {
-  if component_array_has_duplicates(dirty_gpu_components) {
-    abort(
-      "for_each_entity_with_components_marking_gpu_dirty: duplicate dirty component",
-    )
-  }
-  for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-    match self.registry.get(dirty_gpu_components[i]) {
-      None =>
-        abort(
-          "for_each_entity_with_components_marking_gpu_dirty: unknown dirty component type id",
-        )
-      Some(rc) =>
-        match rc.kind {
-          CpuOnly =>
-            abort(
-              "for_each_entity_with_components_marking_gpu_dirty: dirty component must be GpuVisible",
-            )
-          GpuVisible => ()
-        }
-    }
-  }
-  self.for_each_entity_with_components(required, (e, sig, payloads) => {
-    f(e, sig, payloads)
-    for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-      let _ = self.mark_gpu_component_dirty(e, dirty_gpu_components[i])
-    }
-  })
 }
 
 ///|

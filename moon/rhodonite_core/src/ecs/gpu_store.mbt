@@ -168,6 +168,7 @@ pub fn World::register_cpu_component(
   cpu_stride : Int,
 ) -> ComponentTypeId {
   self.assert_not_querying("World::register_cpu_component")
+  self.assert_component_registration_open("World::register_cpu_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   self.gpu_stores.push(None)
   id
@@ -182,6 +183,7 @@ pub fn World::register_gpu_component(
   gpu_layout : @comp.GpuLayout,
 ) -> ComponentTypeId {
   self.assert_not_querying("World::register_gpu_component")
+  self.assert_component_registration_open("World::register_gpu_component")
   if !gpu_layout.is_valid() {
     abort("invalid gpu layout")
   }
@@ -255,6 +257,9 @@ pub fn World::set_gpu_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   self.assert_not_querying("World::set_gpu_component_bytes")
+  self.assert_system_component_write(
+    component, "World::set_gpu_component_bytes",
+  )
   if !self.is_alive(entity) {
     return false
   }
@@ -269,14 +274,17 @@ pub fn World::set_gpu_component_bytes(
 }
 
 ///|
-/// After mutating a [`GpuVisible`] row through a [`MutArrayView`] from [`World::for_each_entity_with_components`]
-/// (or any path that writes GPU bytes without going through [`World::set_gpu_component_bytes`]), call this
-/// so [`World::drain_gpu_writes`] includes that entity slot.
+/// After mutating a [`GpuVisible`] row through [`QueryRow::write_view`] (or any path that writes
+/// GPU bytes without going through [`World::set_gpu_component_bytes`]), call this so
+/// [`World::drain_gpu_writes`] includes that entity slot.
 pub fn World::mark_gpu_component_dirty(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_system_component_write(
+    component, "World::mark_gpu_component_dirty",
+  )
   if !self.is_alive(entity) {
     return false
   }
@@ -298,6 +306,7 @@ pub fn World::clear_gpu_component(
   component : ComponentTypeId,
 ) -> Bool {
   self.assert_not_querying("World::clear_gpu_component")
+  self.assert_system_component_write(component, "World::clear_gpu_component")
   if !self.is_alive(entity) {
     return false
   }
@@ -318,6 +327,7 @@ pub fn World::gpu_component_bytes(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> FixedArray[Byte]? {
+  self.assert_system_component_read(component, "World::gpu_component_bytes")
   if !self.is_alive(entity) {
     return None
   }
@@ -340,6 +350,7 @@ pub fn World::drain_gpu_writes(
   self : World,
   component : ComponentTypeId,
 ) -> Array[GpuWrite] {
+  self.assert_system_component_write(component, "World::drain_gpu_writes")
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_writes()

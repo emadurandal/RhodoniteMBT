@@ -29,6 +29,8 @@ fn component_array_intersects(
 
 ///|
 fn system_access_conflicts(a : System, b : System) -> Bool {
+  a.structural_write ||
+  b.structural_write ||
   component_array_intersects(a.writes, b.writes) ||
   component_array_intersects(a.writes, b.reads) ||
   component_array_intersects(a.reads, b.writes)
@@ -43,6 +45,35 @@ pub fn SystemContext::new(
 }
 
 ///|
+fn build_system(
+  constructor_name : String,
+  name : String,
+  phase : SystemPhase,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  structural_write : Bool,
+  run : (World, SystemContext, CommandBuffer) -> Unit,
+) -> System {
+  if component_array_has_duplicates(reads) {
+    abort(constructor_name + ": duplicate read component")
+  }
+  if component_array_has_duplicates(writes) {
+    abort(constructor_name + ": duplicate write component")
+  }
+  if component_array_intersects(reads, writes) {
+    abort(constructor_name + ": reads and writes must not overlap")
+  }
+  {
+    name,
+    phase,
+    reads: copy_component_array(reads),
+    writes: copy_component_array(writes),
+    structural_write,
+    run,
+  }
+}
+
+///|
 pub fn System::new(
   name : String,
   phase : SystemPhase,
@@ -50,19 +81,21 @@ pub fn System::new(
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
-  if component_array_has_duplicates(reads) {
-    abort("System::new: duplicate read component")
-  }
-  if component_array_has_duplicates(writes) {
-    abort("System::new: duplicate write component")
-  }
-  {
-    name,
-    phase,
-    reads: copy_component_array(reads),
-    writes: copy_component_array(writes),
-    run,
-  }
+  build_system("System::new", name, phase, reads, writes, false, run)
+}
+
+///|
+/// Builds a system that may create or destroy entities in addition to its declared component access.
+pub fn System::new_with_structural_write(
+  name : String,
+  phase : SystemPhase,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  run : (World, SystemContext, CommandBuffer) -> Unit,
+) -> System {
+  build_system(
+    "System::new_with_structural_write", name, phase, reads, writes, true, run,
+  )
 }
 
 ///|
@@ -83,6 +116,11 @@ pub fn System::reads(self : System) -> Array[ComponentTypeId] {
 ///|
 pub fn System::writes(self : System) -> Array[ComponentTypeId] {
   copy_component_array(self.writes)
+}
+
+///|
+pub fn System::structural_write(self : System) -> Bool {
+  self.structural_write
 }
 
 ///|
@@ -147,6 +185,7 @@ pub fn Schedule::run(
   world : World,
   ctx : SystemContext,
 ) -> Bool {
+  world.lock_component_registration()
   let mut ok = true
   for phase_rank = 0
       phase_rank < system_phase_count()
@@ -155,12 +194,19 @@ pub fn Schedule::run(
       let system = self.systems[i]
       if system_phase_rank(system.phase) == phase_rank {
         let commands = CommandBuffer::new()
+        let system_access = world.enter_system_access(
+          system.reads,
+          system.writes,
+          system.structural_write,
+        )
         (system.run)(world, ctx, commands)
         if !commands.apply(world) {
           ok = false
         }
+        world.exit_system_access(system_access)
       }
     }
   }
+  world.unlock_component_registration()
   ok
 }

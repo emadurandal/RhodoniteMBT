@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) is an **archetype**-based ECS. On the CPU, components live in **SoA (Structure of Arrays)** tables for cache-friendly column iteration. For WebGPU, **`EntityId.index` is a stable logical subscript** into storage buffers: **GPU-visible** component payloads live in a **flat array separate from archetype rows**, while CPU-only data stays in archetype SoA columns.
 
-External `System` / `Schedule` types are available, but `World` itself does not own systems. Low-level querying and updates can still be done through `World` methods (especially `for_each_entity_with_components`) and built-in helpers.
+External `System` / `Schedule` types are available, but `World` itself does not own systems. Row iteration is exposed through `Query`; built-in helpers are implemented on top of the same internal iterator.
 
 For a machine-readable API listing, see [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti).
 
@@ -150,25 +150,32 @@ flowchart TD
 
 ---
 
-## Query API: `for_each_entity_with_components`
+## Query API
 
-- Only archetypes whose signature **contains every** id in `required` are visited. If `required` is empty, the function returns immediately.
-- The callback receives `(entity, full_signature, payloads)` where `payloads[k]` matches `required[k]` as a **`MutArrayView[Byte]`**:
-  - **CpuOnly**: view into that row’s SoA column.
-  - **GpuVisible**: view into the **flat `GpuComponentStore`** slot for `entity.index` (not archetype SoA).
-- If you **mutate GpuVisible bytes** inside the callback, rows are **not** automatically marked dirty unless the path already does so. Call `World::mark_gpu_component_dirty` so `drain_gpu_writes` picks them up.
-- If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
-- If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
+Use `Query::new(required)` and `query.for_each(world, f)` for row iteration. Only archetypes whose signature **contains every** id in `required` are visited. If `required` is empty, the query returns immediately.
 
-For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. Compared with calling `World::for_each_entity_with_components` directly, `Query` has a few practical benefits:
+The callback receives a `QueryRow`, so payloads are accessed by component id while preserving read/write access checks.
 
 - `required` becomes a named value that can be reused by a system.
 - `Query::new` rejects duplicate component ids up front.
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
-- The callback omits `full_signature`, keeping common system code shorter.
-- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs the query with the helper for callbacks that always write selected GPU-visible rows.
+- During schedule execution, every required component must be declared in the active System's `reads` or `writes` set.
+- `QueryRow::read_view(component)` returns a zero-copy `ArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
+- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution.
+- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::write_view`.
+- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs `QueryRow` access with automatic dirty marking for callbacks that always write selected GPU-visible rows.
+- If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
-Use the lower-level `World::for_each_entity_with_components` when the callback needs the full archetype signature, or when GPU dirty marking must be decided per entity.
+```moonbit
+let query = Query::new([tf, gt])
+query.for_each(world, fn(row) {
+  let tf_bytes = row.read_view(tf)
+  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
+  ignore(tf_bytes)
+  ignore(global_tf)
+  let _ = row.mark_dirty(gt)
+})
+```
 
 ---
 
@@ -180,9 +187,9 @@ Use `CommandBuffer` when a query/system wants to request changes during iteratio
 
 ```moonbit
 let commands = CommandBuffer::new()
-query.for_each(world, fn(entity, _payloads) {
-  commands.remove_component(entity, old_component)
-  commands.add_component_bytes(entity, new_component, bytes)
+query.for_each(world, fn(row) {
+  commands.remove_component(row.entity(), old_component)
+  commands.add_component_bytes(row.entity(), new_component, bytes)
 })
 let _ = commands.apply(world)
 ```
@@ -197,13 +204,15 @@ Commands are applied in insertion order after the query has finished. `CommandBu
 
 ```moonbit
 let schedule = Schedule::new()
-schedule.add_system(System::new("Move", Update, [transform], [transform], fn(world, ctx, commands) {
+schedule.add_system(System::new("Move", Update, [], [transform], fn(world, ctx, commands) {
   // query world, optionally enqueue structural changes into commands
 }))
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
 `Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order. Each system receives a fresh `CommandBuffer`, and the schedule applies it immediately after that system returns, so later systems can observe earlier structural changes.
+
+`Schedule::run` temporarily closes component registration while systems are running, then reopens it before returning. Use `World::component_registration_locked()` to inspect that state.
 
 `System::reads` and `System::writes` are metadata for scheduling improvements. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that would prevent parallel execution. `Schedule::run` itself remains single-threaded and registration-ordered.
 
@@ -251,6 +260,8 @@ flowchart BT
 - **`World::register_cpu_component(name, cpu_stride)`**: Stride for SoA storage; appends `None` to `gpu_stores`.
 - **`World::register_gpu_component(name, gpu_layout)`**: Requires `GpuLayout::is_valid`; appends `Some(GpuComponentStore::new(...))`.
 
+Register components outside active schedule execution. `Schedule::run` temporarily closes registration while systems run, then reopens it before returning; registering new component types between schedule runs is allowed.
+
 Layout helpers: [`gpu_layout.mbt`](../moon/rhodonite_core/src/ecs/components/gpu_layout.mbt) (`GpuLayout::std140`, `GpuLayout::empty`, etc.).
 
 ---
@@ -274,8 +285,10 @@ ignore(world.add_component_bytes(e, tag, tag_bytes))
 
 // Query (e.g. TF + GT together)
 let required = [world.transform_component(), world.global_transform_component()]
-world.for_each_entity_with_components(required, fn(entity, sig, views) {
-  // views[0] = Transform SoA row, views[1] = GlobalTransform flat GPU row
+let query = Query::new(required)
+query.for_each(world, fn(row) {
+  let tf_row = row.read_view(world.transform_component())
+  let gt_row = row.write_view(world.global_transform_component())
   ...
 })
 

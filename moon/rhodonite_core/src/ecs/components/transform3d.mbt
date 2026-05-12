@@ -107,65 +107,53 @@ pub fn Transform3D::from_component_mut_view(
 }
 
 ///|
-fn trs_translation_matrix(t : @v3.Vector3Ref[Byte]) -> @m44.Matrix44F {
-  @m44.Matrix44::new_col_major(
-    (1.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (1.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (1.0 : Float),
-    (0.0 : Float),
-    t.x(),
-    t.y(),
-    t.z(),
-    (1.0 : Float),
-  )
+/// Decodes a read-only component row and returns its local model matrix.
+pub fn Transform3D::local_matrix_from_component_view(
+  row : ArrayView[Byte],
+) -> @m44.Matrix44F {
+  let layout = transform3d_gpu_layout()
+  if row.length() != layout.stride {
+    abort("Transform3D::local_matrix_from_component_view: row length mismatch")
+  }
+  let f = layout.fields
+  if f.length() != 3 {
+    abort("transform3d_gpu_layout: expected 3 fields")
+  }
+  let px = get_gpu_f32_byte_view(row, f[0].offset + 0)
+  let py = get_gpu_f32_byte_view(row, f[0].offset + 4)
+  let pz = get_gpu_f32_byte_view(row, f[0].offset + 8)
+  let qx = get_gpu_f32_byte_view(row, f[1].offset + 0)
+  let qy = get_gpu_f32_byte_view(row, f[1].offset + 4)
+  let qz = get_gpu_f32_byte_view(row, f[1].offset + 8)
+  let qw = get_gpu_f32_byte_view(row, f[1].offset + 12)
+  let sx = get_gpu_f32_byte_view(row, f[2].offset + 0)
+  let sy = get_gpu_f32_byte_view(row, f[2].offset + 4)
+  let sz = get_gpu_f32_byte_view(row, f[2].offset + 8)
+  transform3d_local_matrix_from_trs(px, py, pz, qx, qy, qz, qw, sx, sy, sz)
 }
 
 ///|
-fn trs_scale_matrix(s : @v3.Vector3Ref[Byte]) -> @m44.Matrix44F {
-  @m44.Matrix44::new_col_major(
-    s.x(),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    s.y(),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    s.z(),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (1.0 : Float),
-  )
-}
-
-///|
-/// Column-major rotation from unit quaternion `(x, y, z, w)` (same axis order as [`rotation`]).
-fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix44F {
-  let x = q.x()
-  let y = q.y()
-  let z = q.z()
-  let w = q.w()
-  let xx = x * x
-  let yy = y * y
-  let zz = z * z
-  let xy = x * y
-  let xz = x * z
-  let yz = y * z
-  let wx = w * x
-  let wy = w * y
-  let wz = w * z
+fn transform3d_local_matrix_from_trs(
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Float,
+  qy : Float,
+  qz : Float,
+  qw : Float,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> @m44.Matrix44F {
+  let xx = qx * qx
+  let yy = qy * qy
+  let zz = qz * qz
+  let xy = qx * qy
+  let xz = qx * qz
+  let yz = qy * qz
+  let wx = qw * qx
+  let wy = qw * qy
+  let wz = qw * qz
   let r00 = (1.0 : Float) - (2.0 : Float) * (yy + zz)
   let r01 = (2.0 : Float) * (xy - wz)
   let r02 = (2.0 : Float) * (xz + wy)
@@ -176,21 +164,21 @@ fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix44F {
   let r21 = (2.0 : Float) * (yz + wx)
   let r22 = (1.0 : Float) - (2.0 : Float) * (xx + yy)
   @m44.Matrix44::new_col_major(
-    r00,
-    r10,
-    r20,
+    r00 * sx,
+    r10 * sx,
+    r20 * sx,
     (0.0 : Float),
-    r01,
-    r11,
-    r21,
+    r01 * sy,
+    r11 * sy,
+    r21 * sy,
     (0.0 : Float),
-    r02,
-    r12,
-    r22,
+    r02 * sz,
+    r12 * sz,
+    r22 * sz,
     (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
-    (0.0 : Float),
+    px,
+    py,
+    pz,
     (1.0 : Float),
   )
 }
@@ -198,8 +186,16 @@ fn quaternion_to_rotation_matrix(q : @v4.Vector4Ref[Byte]) -> @m44.Matrix44F {
 ///|
 /// Local model matrix: column vectors, `translation * rotation * scale`.
 pub fn Transform3D::to_local_matrix(self : Transform3D) -> @m44.Matrix44F {
-  let s = trs_scale_matrix(self.scale)
-  let r = quaternion_to_rotation_matrix(self.rotation)
-  let t = trs_translation_matrix(self.position)
-  t.mat_mul(r.mat_mul(s))
+  transform3d_local_matrix_from_trs(
+    self.position.x(),
+    self.position.y(),
+    self.position.z(),
+    self.rotation.x(),
+    self.rotation.y(),
+    self.rotation.z(),
+    self.rotation.w(),
+    self.scale.x(),
+    self.scale.y(),
+    self.scale.z(),
+  )
 }
