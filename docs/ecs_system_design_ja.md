@@ -74,9 +74,9 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 
 `component_bytes` / `set_component_bytes` は CPU-only / GPU-visible の両方を registry kind に応じて扱います。CPU-only は archetype SoA row、GPU-visible は `EntityId.index` ベースの flat GPU row を読み書きします。`set_component_bytes` は既存 payload 更新だけを行い、archetype 構造を変えません。byte length が登録済み stride と一致しない場合は `false` を返します。
 
-component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
+component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。`GpuVisible` component を `remove_component` で外す場合は、所有解除と同時に対象 entity の flat GPU slot を zero clear し、その row を dirty にします。
 
-GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。`remove_component` 後は ownership が消えるため `component_bytes` は `None` になり、GPU 側には zero clear された dirty row が残ります。
 
 GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
 

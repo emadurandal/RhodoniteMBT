@@ -785,7 +785,10 @@ pub fn World::add_component_bytes(
 }
 
 ///|
-/// Removes a component: migrates to a smaller archetype (signature loses one id); GPU flat stores are unaffected by archetype row moves.
+/// Removes a component: migrates to a smaller archetype (signature loses one id).
+///
+/// Removing a GpuVisible component also zero-clears that entity's flat GPU slot and marks it
+/// dirty so stale payload bytes are not visible after ownership is dropped.
 pub fn World::remove_component(
   self : World,
   entity : EntityId,
@@ -796,6 +799,18 @@ pub fn World::remove_component(
   self.assert_system_component_write(component, "World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
+  }
+  let gpu_store_to_clear = match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => None
+        GpuVisible =>
+          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
+            Some(store) => Some(store)
+            None => return false
+          }
+      }
+    None => return false
   }
   let loc = match self.locations[entity.index] {
     Some(loc) => loc
@@ -813,6 +828,13 @@ pub fn World::remove_component(
   })
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
+  match gpu_store_to_clear {
+    Some(store) => {
+      store.clear_slot(entity.index)
+      self.replace_gpu_store(store)
+    }
+    None => ()
+  }
   true
 }
 

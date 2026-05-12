@@ -211,6 +211,29 @@ test "GPU visible public APIs require entity component ownership" {
 }
 
 ///|
+test "removing GPU visible component clears and dirties flat slot" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuRemoveClears",
+    @comp.GpuLayout::empty(16),
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, gpu, gpu_bytes_with_u32(77U)))
+  let _ = world.drain_resize_events()
+  let _ = world.drain_gpu_writes(gpu)
+  assert_true(world.remove_component(entity, gpu))
+  assert_true(!world.has_component(entity, gpu))
+  assert_true(world.component_bytes(entity, gpu) is None)
+  let writes = world.drain_gpu_writes(gpu)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, entity.index * 16)
+  assert_eq(writes[0].bytes.length(), 16)
+  for i = 0; i < writes[0].bytes.length(); i = i + 1 {
+    assert_eq(writes[0].bytes[i], (0 : Byte))
+  }
+}
+
+///|
 test "add_component and add_component_bytes support CPU and GPU visible components" {
   let world = World::new()
   let cpu = world.register_cpu_component("AddComponentCpu", 4)
