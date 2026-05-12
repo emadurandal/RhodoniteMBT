@@ -555,6 +555,32 @@ test "CommandBuffer applies queued structural changes after query" {
 }
 
 ///|
+test "set_component_bytes updates existing component without archetype migration" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SetComponentA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  match world.location(e) {
+    Some(before) => {
+      assert_true(world.set_component_bytes(e, qa, bytes4(9, 10, 11, 12)))
+      match world.location(e) {
+        Some(after) => {
+          assert_eq(after.archetype_index, before.archetype_index)
+          assert_eq(after.row, before.row)
+        }
+        None => abort("expected location after set")
+      }
+    }
+    None => abort("expected location before set")
+  }
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_eq(bytes, bytes4(9, 10, 11, 12))
+    None => abort("expected SetComponentA bytes")
+  }
+  assert_true(!world.add_component_bytes(e, qa, bytes4(0, 0, 0, 0)))
+}
+
+///|
 test "CommandBuffer applies queued gpu writes and reports failed commands" {
   let world = World::new()
   let gpu16 = world.register_gpu_component(
@@ -575,6 +601,25 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
 }
 
 ///|
+test "Schedule permits set_component_bytes without structural write" {
+  let world = World::new()
+  let qa = world.register_cpu_component("ScheduleSetComponentA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("set-a", Update, [], [qa], (_world, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(8, 7, 6, 5))
+    }),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_eq(bytes, bytes4(8, 7, 6, 5))
+    None => abort("expected ScheduleSetComponentA bytes")
+  }
+}
+
+///|
 test "Schedule runs systems by phase and applies commands after each system" {
   let world = World::new()
   let qa = world.register_cpu_component("ScheduleA", 4)
@@ -589,7 +634,11 @@ test "Schedule runs systems by phase and applies commands after each system" {
     }),
   )
   schedule.add_system(
-    System::new("add-b", Update, [qa], [qb], (system_world, ctx, commands) => {
+    System::new_with_structural_write("add-b", Update, [qa], [qb], (
+      system_world,
+      ctx,
+      commands,
+    ) => {
       order.push(ctx.frame_index)
       let query = Query::new([qa])
       query.for_each(system_world, row => {

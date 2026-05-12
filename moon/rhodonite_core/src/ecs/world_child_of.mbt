@@ -6,11 +6,12 @@ pub fn World::set_child_of(
   parent : EntityId,
 ) -> Bool {
   let c = @comp.ChildOf::new(parent.index, parent.generation)
-  self.add_component_bytes(
-    entity,
-    self.child_of_component_id,
-    c.to_component_bytes(),
-  )
+  let bytes = c.to_component_bytes()
+  if self.has_component(entity, self.child_of_component_id) {
+    self.set_component_bytes(entity, self.child_of_component_id, bytes)
+  } else {
+    self.add_component_bytes(entity, self.child_of_component_id, bytes)
+  }
 }
 
 ///|

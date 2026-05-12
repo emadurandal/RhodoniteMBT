@@ -25,6 +25,7 @@ pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
 pub fn CommandBuffer::new() -> Self
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 
 pub(all) enum ComponentKind {
@@ -185,6 +186,7 @@ pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> Com
 pub fn World::registry(Self) -> ComponentRegistry
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
+pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
@@ -195,6 +197,7 @@ pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)

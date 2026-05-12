@@ -122,6 +122,7 @@ pub struct QueryRow {
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
   SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   ClearGpuComponent(EntityId, ComponentTypeId)

@@ -427,7 +427,38 @@ pub fn World::has_component(
 }
 
 ///|
-/// Adds or updates a CPU component: may migrate the entity to a new archetype with an expanded sorted signature.
+/// Updates an existing CPU component payload in its current archetype row.
+pub fn World::set_component_bytes(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  self.assert_not_querying("World::set_component_bytes")
+  self.assert_system_component_write(component, "World::set_component_bytes")
+  if !self.is_alive(entity) {
+    return false
+  }
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return false
+  }
+  if !component_array_contains(
+      self.archetypes[loc.archetype_index].components,
+      component,
+    ) {
+    return false
+  }
+  self.archetypes[loc.archetype_index].set_component_bytes(
+    loc.row,
+    component,
+    bytes,
+  )
+  true
+}
+
+///|
+/// Adds a new CPU component: migrates the entity to an archetype with an expanded sorted signature.
 pub fn World::add_component_bytes(
   self : World,
   entity : EntityId,
@@ -435,6 +466,7 @@ pub fn World::add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   self.assert_not_querying("World::add_component_bytes")
+  self.assert_system_structural_write("World::add_component_bytes")
   self.assert_system_component_write(component, "World::add_component_bytes")
   if !self.is_alive(entity) {
     return false
@@ -444,12 +476,7 @@ pub fn World::add_component_bytes(
     None => return false
   }
   if self.has_component(entity, component) {
-    self.archetypes[loc.archetype_index].set_component_bytes(
-      loc.row,
-      component,
-      bytes,
-    )
-    return true
+    return false
   }
   let old_arch = self.archetypes[loc.archetype_index]
   let new_components = sorted_with_added(old_arch.components, component)
@@ -475,6 +502,7 @@ pub fn World::remove_component(
   component : ComponentTypeId,
 ) -> Bool {
   self.assert_not_querying("World::remove_component")
+  self.assert_system_structural_write("World::remove_component")
   self.assert_system_component_write(component, "World::remove_component")
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
