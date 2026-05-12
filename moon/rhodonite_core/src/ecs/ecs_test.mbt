@@ -174,7 +174,6 @@ test "GPU visible public APIs require entity component ownership" {
   assert_true(
     !world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)),
   )
-  assert_true(!world.mark_gpu_component_dirty(entity, gpu))
   assert_true(!world.clear_gpu_component(entity, gpu))
   assert_true(world.gpu_component_bytes(entity, gpu) is None)
   assert_eq(world.drain_gpu_writes(gpu).length(), 0)

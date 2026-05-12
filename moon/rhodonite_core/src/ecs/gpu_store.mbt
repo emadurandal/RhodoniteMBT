@@ -293,10 +293,8 @@ pub fn World::set_gpu_component_bytes(
 }
 
 ///|
-/// After mutating a [`GpuVisible`] row through [`QueryRow::write_view`] (or any path that writes
-/// GPU bytes without going through [`World::set_gpu_component_bytes`]), call this so
-/// [`World::drain_gpu_writes`] includes that entity slot.
-pub fn World::mark_gpu_component_dirty(
+/// Internal row-level dirty marker used by query mutable GPU views.
+fn World::mark_gpu_component_dirty(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,

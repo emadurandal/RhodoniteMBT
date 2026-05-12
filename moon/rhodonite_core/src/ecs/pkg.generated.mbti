@@ -178,7 +178,6 @@ pub fn World::gpu_component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
-pub fn World::mark_gpu_component_dirty(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::new() -> Self
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId

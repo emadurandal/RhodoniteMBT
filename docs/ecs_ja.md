@@ -256,7 +256,7 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査し、`GlobalTransform` の GPU 行を更新し、変更があった行は `mark_gpu_component_dirty` します。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`QueryRow::write_view` 経由で `GlobalTransform` に書くため、GPU 行は dirty になります。
 
 ---
 

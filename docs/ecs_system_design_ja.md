@@ -68,7 +68,7 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `QueryRow::write_view` | `writes` |
 | `set_component_bytes` | `writes` |
 | `set_gpu_component_bytes` / `clear_gpu_component` | `writes` |
-| `mark_gpu_component_dirty` / `drain_gpu_writes` | `writes` |
+| `drain_gpu_writes` | `writes` |
 | `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
 | `create_entity` / `destroy_entity` | `structural_write` |
 
@@ -76,9 +76,9 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 
 component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
 
-`set_gpu_component_bytes` / `clear_gpu_component` / `mark_gpu_component_dirty` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+`set_gpu_component_bytes` / `clear_gpu_component` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
 
-GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_gpu_component_bytes`、`clear_gpu_component`、`mark_gpu_component_dirty`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_gpu_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
 
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 

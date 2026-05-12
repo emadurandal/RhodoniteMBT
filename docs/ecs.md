@@ -250,7 +250,7 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms, writing `GlobalTransform` GPU rows and calling `mark_gpu_component_dirty` when changed.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Writing `GlobalTransform` through `QueryRow::write_view` marks the GPU row dirty.
 
 ---
 
