@@ -15,7 +15,8 @@ pub(all) struct GlobalTransform {
 pub fn GlobalTransform::view_std140_gpu_row(
   row : MutArrayView[Byte],
 ) -> GlobalTransform {
-  let stride = global_transform_gpu_layout().stride
+  // Hot path: do not call global_transform_gpu_layout() (avoids per-row Array alloc).
+  let stride = 64
   if row.length() != stride {
     abort("GlobalTransform::view_std140_gpu_row: length mismatch")
   }
@@ -25,8 +26,13 @@ pub fn GlobalTransform::view_std140_gpu_row(
 ///|
 /// std140: one `mat4x4<f32>` (64-byte stride).
 pub fn global_transform_gpu_layout() -> GpuLayout {
-  let fields : Array[(String, GpuFieldKind)] = [("world_matrix", Mat4x4F32)]
-  GpuLayout::std140(fields)
+  {
+    fields: [
+      { name: "world_matrix", kind: Mat4x4F32, offset: 0, size: 64, align: 16 },
+    ],
+    stride: 64,
+    align: 16,
+  }
 }
 
 ///|
@@ -34,14 +40,11 @@ pub fn global_transform_gpu_layout() -> GpuLayout {
 pub fn matrix44f_from_std140_gpu_bytes(
   bytes : FixedArray[Byte],
 ) -> @m44.Matrix44F {
-  let layout = global_transform_gpu_layout()
-  if bytes.length() != layout.stride {
+  let stride = 64
+  if bytes.length() != stride {
     abort("matrix44f_from_std140_gpu_bytes: length mismatch")
   }
-  if layout.fields.length() != 1 {
-    abort("global_transform_gpu_layout: expected 1 field")
-  }
-  let base = layout.fields[0].offset
+  let base = 0
   @m44.Matrix44F::{
     data: (
       [
@@ -71,14 +74,11 @@ pub fn matrix44f_write_std140_mat4_to_gpu_row(
   m : @m44.Matrix44F,
   buf : MutArrayView[Byte],
 ) -> Unit {
-  let layout = global_transform_gpu_layout()
-  if layout.fields.length() != 1 {
-    abort("global_transform_gpu_layout: expected 1 field")
-  }
-  if buf.length() != layout.stride {
+  // Hot path: fixed std140 mat4 row (must match global_transform_gpu_layout).
+  if buf.length() != 64 {
     abort("matrix44f_write_std140_mat4_to_gpu_row: length mismatch")
   }
-  let base = layout.fields[0].offset
+  let base = 0
   let d = m.data
   for i = 0; i < 16; i = i + 1 {
     @writes.put_u32_le_mut_view(buf, base + i * 4, d[i].reinterpret_as_uint())

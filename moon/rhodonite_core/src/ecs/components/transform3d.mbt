@@ -25,17 +25,14 @@ pub fn transform3d_gpu_layout() -> GpuLayout {
 
 ///|
 fn transform3d_from_row_mut(row : MutArrayView[Byte]) -> Transform3D {
-  let layout = transform3d_gpu_layout()
-  if row.length() != layout.stride {
+  // Hot path: fixed offsets (must match transform3d_gpu_layout).
+  let stride = 48
+  if row.length() != stride {
     abort("Transform3D: row length mismatch")
   }
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  let pos = row.mut_view(start=f[0].offset, end=f[0].offset + f[0].size)
-  let rot = row.mut_view(start=f[1].offset, end=f[1].offset + f[1].size)
-  let scl = row.mut_view(start=f[2].offset, end=f[2].offset + f[2].size)
+  let pos = row.mut_view(start=0, end=12)
+  let rot = row.mut_view(start=12, end=28)
+  let scl = row.mut_view(start=28, end=40)
   {
     position: @v3.Vector3Ref::from_mut_view(pos),
     rotation: @v4.Vector4Ref::from_mut_view(rot),
@@ -111,24 +108,20 @@ pub fn Transform3D::from_component_mut_view(
 pub fn Transform3D::local_matrix_from_component_view(
   row : ArrayView[Byte],
 ) -> @m44.Matrix44F {
-  let layout = transform3d_gpu_layout()
-  if row.length() != layout.stride {
+  // Hot path: fixed offsets (must match transform3d_gpu_layout).
+  if row.length() != 48 {
     abort("Transform3D::local_matrix_from_component_view: row length mismatch")
   }
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  let px = get_gpu_f32_byte_view(row, f[0].offset + 0)
-  let py = get_gpu_f32_byte_view(row, f[0].offset + 4)
-  let pz = get_gpu_f32_byte_view(row, f[0].offset + 8)
-  let qx = get_gpu_f32_byte_view(row, f[1].offset + 0)
-  let qy = get_gpu_f32_byte_view(row, f[1].offset + 4)
-  let qz = get_gpu_f32_byte_view(row, f[1].offset + 8)
-  let qw = get_gpu_f32_byte_view(row, f[1].offset + 12)
-  let sx = get_gpu_f32_byte_view(row, f[2].offset + 0)
-  let sy = get_gpu_f32_byte_view(row, f[2].offset + 4)
-  let sz = get_gpu_f32_byte_view(row, f[2].offset + 8)
+  let px = get_gpu_f32_byte_view(row, 0)
+  let py = get_gpu_f32_byte_view(row, 4)
+  let pz = get_gpu_f32_byte_view(row, 8)
+  let qx = get_gpu_f32_byte_view(row, 12)
+  let qy = get_gpu_f32_byte_view(row, 16)
+  let qz = get_gpu_f32_byte_view(row, 20)
+  let qw = get_gpu_f32_byte_view(row, 24)
+  let sx = get_gpu_f32_byte_view(row, 28)
+  let sy = get_gpu_f32_byte_view(row, 32)
+  let sz = get_gpu_f32_byte_view(row, 36)
   transform3d_local_matrix_from_trs(px, py, pz, qx, qy, qz, qw, sx, sy, sz)
 }
 
