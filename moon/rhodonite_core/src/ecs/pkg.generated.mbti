@@ -82,10 +82,7 @@ pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 
 pub struct QueryRow {
-  world : World
-  entity : EntityId
-  components : Array[ComponentTypeId]
-  payloads : Array[MutArrayView[Byte]]
+  // private fields
 }
 pub fn QueryRow::entity(Self) -> EntityId
 pub fn QueryRow::has(Self, ComponentTypeId) -> Bool

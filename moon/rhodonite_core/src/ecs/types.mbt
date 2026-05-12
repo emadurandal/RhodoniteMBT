@@ -111,10 +111,10 @@ pub struct Query {
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views used by the lower-level world query.
 pub struct QueryRow {
-  world : World
-  entity : EntityId
-  components : Array[ComponentTypeId]
-  payloads : Array[MutArrayView[Byte]]
+  priv world : World
+  priv entity : EntityId
+  priv components : Array[ComponentTypeId]
+  priv payloads : Array[MutArrayView[Byte]]
 }
 
 ///|
