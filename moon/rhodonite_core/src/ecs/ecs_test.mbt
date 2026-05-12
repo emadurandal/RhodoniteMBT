@@ -206,6 +206,38 @@ test "add_component and add_component_bytes support CPU and GPU visible componen
 }
 
 ///|
+test "add_component_bytes rejects invalid byte lengths before mutating ownership" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("AddComponentBytesCpuStride", 4)
+  let cpu_entity = world.create_entity()
+  assert_true(
+    !world.add_component_bytes(cpu_entity, cpu, ([1, 2, 3] : FixedArray[Byte])),
+  )
+  assert_true(!world.has_component(cpu_entity, cpu))
+  assert_true(world.add_component_bytes(cpu_entity, cpu, bytes4(1, 2, 3, 4)))
+  match world.component_bytes(cpu_entity, cpu) {
+    Some(bytes) => assert_eq(bytes, bytes4(1, 2, 3, 4))
+    None => abort("expected AddComponentBytesCpuStride bytes")
+  }
+  let gpu_entity = world.create_entity()
+  let _ = world.drain_resize_events()
+  let gpu = world.register_gpu_component(
+    "AddComponentBytesGpuStride",
+    @comp.GpuLayout::empty(16),
+  )
+  assert_true(!world.add_component_bytes(gpu_entity, gpu, bytes4(5, 6, 7, 8)))
+  assert_true(!world.has_component(gpu_entity, gpu))
+  assert_eq(world.drain_resize_events().length(), 0)
+  assert_true(
+    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(55U)),
+  )
+  match world.gpu_component_bytes(gpu_entity, gpu) {
+    Some(bytes) => assert_eq(bytes[0], (55U & 0xFFU).to_byte())
+    None => abort("expected AddComponentBytesGpuStride bytes")
+  }
+}
+
+///|
 test "add_component emits resize events through centralized GPU capacity path" {
   let world = World::new()
   let entity = world.create_entity()

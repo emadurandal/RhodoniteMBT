@@ -533,6 +533,25 @@ fn World::add_component_signature(
 }
 
 ///|
+fn component_accepts_add_bytes(
+  component : RegisteredComponent,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  match component.kind {
+    CpuOnly => bytes.length() == component.cpu_stride
+    GpuVisible =>
+      if bytes.length() == 0 {
+        true
+      } else {
+        match component.gpu_layout {
+          Some(layout) => bytes.length() == layout.stride
+          None => false
+        }
+      }
+  }
+}
+
+///|
 /// Adds a component with a kind-appropriate zero/default payload.
 pub fn World::add_component(
   self : World,
@@ -589,7 +608,10 @@ pub fn World::add_component_bytes(
     return false
   }
   match self.registry.get(component) {
-    Some(rc) =>
+    Some(rc) => {
+      if !component_accepts_add_bytes(rc, bytes) {
+        return false
+      }
       match rc.kind {
         CpuOnly => self.add_component_signature(entity, component, bytes)
         GpuVisible =>
@@ -611,6 +633,7 @@ pub fn World::add_component_bytes(
             None => false
           }
       }
+    }
     None => false
   }
 }

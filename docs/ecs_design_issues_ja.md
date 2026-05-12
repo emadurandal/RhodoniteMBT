@@ -12,7 +12,7 @@
 
 - `MutArrayView[Byte]` が内部 storage の可変参照を直接公開しており、借用範囲や排他性を型としては表現できていない。
 - `Query::for_each` の callback 中の構造変更は `query_depth` guard で実行時に禁止している。現行実装では最小の `CommandBuffer` を追加済みで、query / system 後に遅延適用できる。
-- `GpuVisible` component を `MutArrayView[Byte]` 経由で変更しても dirty が自動記録されず、呼び忘れで GPU upload が欠落する。
+- `GpuVisible` component の dirty は `QueryRow::write_view` 取得時に自動記録されるが、実際に bytes が変わったかまでは見ないため、最小 dirty ではない。
 - `World` 全体が `Array` ベースの可変所有物で、query borrow を型で表す境界はまだない。現行実装では、まず `System::reads` / `writes`、`structural_write` と同一 phase 内の conflict 検査 API を追加済み。
 
 したがって、`MutArrayView[Byte]` 自体は「低レベル backend API」として残せますが、将来の並列 System API の主インターフェースにするのは避けた方がよいです。
