@@ -35,6 +35,7 @@ pub(all) struct WebGPURenderer {
   layout_transforms : @webgpu.GPUBindGroupLayout
   layout_camera : @webgpu.GPUBindGroupLayout
   world : @ecs.World
+  schedule : @ecs.Schedule
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]

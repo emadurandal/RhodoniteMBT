@@ -102,6 +102,61 @@ pub(all) struct GpuResizeEvent {
 }
 
 ///|
+/// Thin query descriptor for system-style iteration over a fixed `required` component set.
+pub struct Query {
+  required : Array[ComponentTypeId]
+}
+
+///|
+/// Deferred structural or GPU mutation command applied after query/system iteration.
+pub(all) enum WorldCommand {
+  DestroyEntity(EntityId)
+  AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  RemoveComponent(EntityId, ComponentTypeId)
+  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  ClearGpuComponent(EntityId, ComponentTypeId)
+}
+
+///|
+/// FIFO command buffer for changes that must not run while ECS component views are being queried.
+pub struct CommandBuffer {
+  commands : Array[WorldCommand]
+}
+
+///|
+/// Per-run data passed to systems by [`Schedule`].
+pub(all) struct SystemContext {
+  delta_seconds : Float
+  frame_index : Int
+}
+
+///|
+/// Coarse single-thread execution phase. Schedules run phases in declaration order.
+pub(all) enum SystemPhase {
+  PreUpdate
+  Update
+  PostUpdate
+  PreRender
+  RenderExtract
+} derive(Eq)
+
+///|
+/// Function-backed ECS system metadata plus declared component access.
+pub struct System {
+  name : String
+  phase : SystemPhase
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  run : (World, SystemContext, CommandBuffer) -> Unit
+}
+
+///|
+/// External system list. `World` stays focused on ECS storage and mutation.
+pub struct Schedule {
+  systems : Array[System]
+}
+
+///|
 /// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
 pub struct World {
   registry : ComponentRegistry
@@ -112,6 +167,8 @@ pub struct World {
   archetypes : Array[Archetype]
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
+  /// Query nesting depth; nonzero means callback code is currently iterating component views.
+  mut query_depth : Int
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId

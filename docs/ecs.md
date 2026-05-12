@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) is an **archetype**-based ECS. On the CPU, components live in **SoA (Structure of Arrays)** tables for cache-friendly column iteration. For WebGPU, **`EntityId.index` is a stable logical subscript** into storage buffers: **GPU-visible** component payloads live in a **flat array separate from archetype rows**, while CPU-only data stays in archetype SoA columns.
 
-There is no separate `System` type: querying and updates are done through `World` methods (especially `for_each_entity_with_components`) and built-in helpers.
+External `System` / `Schedule` types are available, but `World` itself does not own systems. Low-level querying and updates can still be done through `World` methods (especially `for_each_entity_with_components`) and built-in helpers.
 
 For a machine-readable API listing, see [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti).
 
@@ -157,7 +157,57 @@ flowchart TD
   - **CpuOnly**: view into that row’s SoA column.
   - **GpuVisible**: view into the **flat `GpuComponentStore`** slot for `entity.index` (not archetype SoA).
 - If you **mutate GpuVisible bytes** inside the callback, rows are **not** automatically marked dirty unless the path already does so. Call `World::mark_gpu_component_dirty` so `drain_gpu_writes` picks them up.
+- If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
+
+For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. Compared with calling `World::for_each_entity_with_components` directly, `Query` has a few practical benefits:
+
+- `required` becomes a named value that can be reused by a system.
+- `Query::new` rejects duplicate component ids up front.
+- The input array is copied, so later changes to the caller's array cannot change query payload order.
+- The callback omits `full_signature`, keeping common system code shorter.
+- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs the query with the helper for callbacks that always write selected GPU-visible rows.
+
+Use the lower-level `World::for_each_entity_with_components` when the callback needs the full archetype signature, or when GPU dirty marking must be decided per entity.
+
+---
+
+## CommandBuffer
+
+Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
+
+Use `CommandBuffer` when a query/system wants to request changes during iteration:
+
+```moonbit
+let commands = CommandBuffer::new()
+query.for_each(world, fn(entity, _payloads) {
+  commands.remove_component(entity, old_component)
+  commands.add_component_bytes(entity, new_component, bytes)
+})
+let _ = commands.apply(world)
+```
+
+Commands are applied in insertion order after the query has finished. `CommandBuffer::apply` clears the buffer and returns `false` if any command failed, while still attempting later commands. Entity creation is intentionally not included yet; create entities directly outside query iteration.
+
+---
+
+## System and Schedule
+
+`World` does not own systems. The first system layer is an external `Schedule` containing function-backed `System` values.
+
+```moonbit
+let schedule = Schedule::new()
+schedule.add_system(System::new("Move", Update, [transform], [transform], fn(world, ctx, commands) {
+  // query world, optionally enqueue structural changes into commands
+}))
+let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
+```
+
+`Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order. Each system receives a fresh `CommandBuffer`, and the schedule applies it immediately after that system returns, so later systems can observe earlier structural changes.
+
+`System::reads` and `System::writes` are metadata for scheduling improvements. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that would prevent parallel execution. `Schedule::run` itself remains single-threaded and registration-ordered.
+
+The built-in transform update can also be registered with `transform_propagation_system(world)`. That system runs the same work as `World::update_global_transforms_from_transforms` in the `PostUpdate` phase, declaring `Transform3D` / `ChildOf` as reads and `GlobalTransform` as a write.
 
 ---
 

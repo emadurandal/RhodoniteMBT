@@ -113,6 +113,7 @@ pub(all) struct WebGPURenderer {
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
   world : @ecs.World
+  schedule : @ecs.Schedule
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
@@ -199,6 +200,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
+  let schedule = @ecs.Schedule::new()
+  schedule.add_system(@ecs.transform_propagation_system(world))
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -295,7 +298,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   )
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
-  world.update_global_transforms_from_transforms()
+  ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
   let writes = world.drain_gpu_writes(gt)
   for wi = 0; wi < writes.length(); wi = wi + 1 {
     let w = writes[wi]
@@ -322,6 +325,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     layout_transforms,
     layout_camera,
     world,
+    schedule,
     bodies,
     gt,
     frame: @ref.new(0),
@@ -406,7 +410,12 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let t = renderer.frame.val.to_double() * 0.022
   let gt = renderer.gt
   push_local_transforms(renderer.world, renderer.bodies, t)
-  renderer.world.update_global_transforms_from_transforms()
+  ignore(
+    renderer.schedule.run(
+      renderer.world,
+      @ecs.SystemContext::new((0.022 : Float), renderer.frame.val),
+    ),
+  )
   let writes = renderer.world.drain_gpu_writes(gt)
   for wi = 0; wi < writes.length(); wi = wi + 1 {
     let w = writes[wi]

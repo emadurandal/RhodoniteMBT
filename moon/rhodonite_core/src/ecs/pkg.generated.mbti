@@ -7,11 +7,25 @@ import {
 }
 
 // Values
+pub fn transform_propagation_system(World) -> System
 
 // Errors
 
 // Types and methods
 type Archetype
+
+pub struct CommandBuffer {
+  commands : Array[WorldCommand]
+}
+pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+pub fn CommandBuffer::apply(Self, World) -> Bool
+pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
+pub fn CommandBuffer::is_empty(Self) -> Bool
+pub fn CommandBuffer::len(Self) -> Int
+pub fn CommandBuffer::new() -> Self
+pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
 
 pub(all) enum ComponentKind {
   CpuOnly
@@ -58,6 +72,14 @@ pub(all) struct GpuWrite {
   bytes : FixedArray[Byte]
 }
 
+pub struct Query {
+  required : Array[ComponentTypeId]
+}
+pub fn Query::for_each(Self, World, (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
+pub fn Query::for_each_marking_gpu_dirty(Self, World, Array[ComponentTypeId], (EntityId, Array[MutArrayView[Byte]]) -> Unit) -> Unit
+pub fn Query::new(Array[ComponentTypeId]) -> Self
+pub fn Query::required_components(Self) -> Array[ComponentTypeId]
+
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
@@ -65,6 +87,43 @@ pub(all) struct RegisteredComponent {
   cpu_stride : Int
   gpu_layout : @components.GpuLayout?
 }
+
+pub struct Schedule {
+  systems : Array[System]
+}
+pub fn Schedule::add_system(Self, System) -> Unit
+pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
+pub fn Schedule::len(Self) -> Int
+pub fn Schedule::new() -> Self
+pub fn Schedule::run(Self, World, SystemContext) -> Bool
+
+pub struct System {
+  name : String
+  phase : SystemPhase
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  run : (World, SystemContext, CommandBuffer) -> Unit
+}
+pub fn System::conflicts_with(Self, Self) -> Bool
+pub fn System::name(Self) -> String
+pub fn System::new(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::phase(Self) -> SystemPhase
+pub fn System::reads(Self) -> Array[ComponentTypeId]
+pub fn System::writes(Self) -> Array[ComponentTypeId]
+
+pub(all) struct SystemContext {
+  delta_seconds : Float
+  frame_index : Int
+}
+pub fn SystemContext::new(Float, Int) -> Self
+
+pub(all) enum SystemPhase {
+  PreUpdate
+  Update
+  PostUpdate
+  PreRender
+  RenderExtract
+} derive(Eq)
 
 pub struct World {
   registry : ComponentRegistry
@@ -75,6 +134,7 @@ pub struct World {
   archetypes : Array[Archetype]
   gpu_stores : Array[GpuComponentStore?]
   resize_events : Array[GpuResizeEvent]
+  mut query_depth : Int
   transform_component_id : ComponentTypeId
   global_transform_component_id : ComponentTypeId
   child_of_component_id : ComponentTypeId
@@ -89,6 +149,7 @@ pub fn World::destroy_entity(Self, EntityId) -> Bool
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
 pub fn World::for_each_entity_with_components(Self, Array[ComponentTypeId], (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit) -> Unit
+pub fn World::for_each_entity_with_components_marking_gpu_dirty(Self, Array[ComponentTypeId], Array[ComponentTypeId], (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit) -> Unit
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
@@ -110,6 +171,14 @@ pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
+
+pub(all) enum WorldCommand {
+  DestroyEntity(EntityId)
+  AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  RemoveComponent(EntityId, ComponentTypeId)
+  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  ClearGpuComponent(EntityId, ComponentTypeId)
+}
 
 // Type aliases
 

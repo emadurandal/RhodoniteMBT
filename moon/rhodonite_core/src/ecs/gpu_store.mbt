@@ -167,6 +167,7 @@ pub fn World::register_cpu_component(
   name : String,
   cpu_stride : Int,
 ) -> ComponentTypeId {
+  self.assert_not_querying("World::register_cpu_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   self.gpu_stores.push(None)
   id
@@ -180,6 +181,7 @@ pub fn World::register_gpu_component(
   name : String,
   gpu_layout : @comp.GpuLayout,
 ) -> ComponentTypeId {
+  self.assert_not_querying("World::register_gpu_component")
   if !gpu_layout.is_valid() {
     abort("invalid gpu layout")
   }
@@ -252,6 +254,7 @@ pub fn World::set_gpu_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_querying("World::set_gpu_component_bytes")
   if !self.is_alive(entity) {
     return false
   }
@@ -294,6 +297,7 @@ pub fn World::clear_gpu_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_not_querying("World::clear_gpu_component")
   if !self.is_alive(entity) {
     return false
   }

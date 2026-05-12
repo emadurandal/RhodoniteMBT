@@ -349,6 +349,11 @@ test "for_each_entity_with_components matches supersets and skips empty required
     empty_hits.push(ent)
   })
   assert_eq(empty_hits.length(), 0)
+  // Query scope has ended, so normal structural mutation should work again.
+  let e_after_query = world.create_entity()
+  assert_true(
+    world.add_component_bytes(e_after_query, qa, bytes4(13, 14, 15, 16)),
+  )
 }
 
 ///|
@@ -369,6 +374,231 @@ test "for_each_entity_with_components gives full GpuComponentStore row for GpuVi
   })
   assert_eq(got0, 4)
   assert_eq(got1, 16)
+}
+
+///|
+test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  world.for_each_entity_with_components_marking_gpu_dirty(
+    [qa, gpu16],
+    [gpu16],
+    (_ent, _sig, payloads) => payloads[1][0] = (99 : Byte),
+  )
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes.length(), 16)
+  assert_eq(writes[0].bytes[0], (99 : Byte))
+}
+
+///|
+test "Query for_each wraps required payload iteration" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryHelperA", 4)
+  let qb = world.register_cpu_component("QueryHelperB", 4)
+  let required : Array[ComponentTypeId] = [qa, qb]
+  let query = Query::new(required)
+  required[0] = qb
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let hits : Array[EntityId] = []
+  let mut first_len = -1
+  let mut second_first_byte = (0 : Byte)
+  query.for_each(world, (ent, payloads) => {
+    hits.push(ent)
+    first_len = payloads[0].length()
+    second_first_byte = payloads[1][0]
+  })
+  assert_eq(hits.length(), 1)
+  assert_true(hits[0] == e)
+  assert_eq(first_len, 4)
+  assert_eq(second_first_byte, (5 : Byte))
+}
+
+///|
+test "Query for_each_marking_gpu_dirty queues written gpu rows" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryHelperDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let query = Query::new([qa, gpu16])
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  query.for_each_marking_gpu_dirty(world, [gpu16], (_ent, payloads) => {
+    payloads[1][0] = (77 : Byte)
+  })
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (77 : Byte))
+}
+
+///|
+test "CommandBuffer applies queued structural changes after query" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandBufferA", 4)
+  let qb = world.register_cpu_component("CommandBufferB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let query = Query::new([qa])
+  let commands = CommandBuffer::new()
+  query.for_each(world, (ent, _payloads) => {
+    commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
+    commands.remove_component(ent, qa)
+  })
+  assert_true(world.has_component(e, qa))
+  assert_true(!world.has_component(e, qb))
+  assert_eq(commands.len(), 2)
+  assert_true(commands.apply(world))
+  assert_true(!world.has_component(e, qa))
+  assert_true(world.has_component(e, qb))
+  assert_true(commands.is_empty())
+}
+
+///|
+test "CommandBuffer applies queued gpu writes and reports failed commands" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "CommandBufferGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let e = world.create_entity()
+  let missing = EntityId::new(e.index + 100, 0)
+  let commands = CommandBuffer::new()
+  commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+  commands.destroy_entity(missing)
+  assert_true(!commands.apply(world))
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (33U & 0xFFU).to_byte())
+  assert_true(commands.is_empty())
+}
+
+///|
+test "Schedule runs systems by phase and applies commands after each system" {
+  let world = World::new()
+  let qa = world.register_cpu_component("ScheduleA", 4)
+  let qb = world.register_cpu_component("ScheduleB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let order : Array[Int] = []
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("post", PostUpdate, [], [], (_world, _ctx, _commands) => {
+      order.push(3)
+    }),
+  )
+  schedule.add_system(
+    System::new("add-b", Update, [qa], [qb], (system_world, ctx, commands) => {
+      order.push(ctx.frame_index)
+      let query = Query::new([qa])
+      query.for_each(system_world, (ent, _payloads) => {
+        commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
+      })
+    }),
+  )
+  schedule.add_system(
+    System::new("see-b", Update, [qb], [], (system_world, _ctx, _commands) => {
+      if system_world.has_component(e, qb) {
+        order.push(2)
+      } else {
+        order.push(20)
+      }
+    }),
+  )
+  let ctx = SystemContext::new((0.016 : Float), 1)
+  assert_eq(schedule.len(), 3)
+  assert_true(schedule.run(world, ctx))
+  assert_eq(order.length(), 3)
+  assert_eq(order[0], 1)
+  assert_eq(order[1], 2)
+  assert_eq(order[2], 3)
+  assert_true(world.has_component(e, qb))
+}
+
+///|
+test "transform_propagation_system updates GlobalTransform in a schedule" {
+  let world = World::new()
+  let e = world.create_entity()
+  let buf = transform3d_bytes_translation(
+    (3.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
+  assert_true(world.set_transform(e, tf))
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let schedule = Schedule::new()
+  schedule.add_system(transform_propagation_system(world))
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  match world.get_global_transform(e) {
+    Some(m) => assert_eq(m.at(0, 3), (3.0 : Float))
+    None => abort("expected Matrix44F")
+  }
+}
+
+///|
+test "System access arrays are copied" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemAccessA", 4)
+  let qb = world.register_cpu_component("SystemAccessB", 4)
+  let reads : Array[ComponentTypeId] = [qa]
+  let writes : Array[ComponentTypeId] = [qb]
+  let system = System::new("copy-access", Update, reads, writes, (_w, _c, _b) => {
+    ()
+  })
+  reads[0] = qb
+  writes[0] = qa
+  assert_eq(system.name(), "copy-access")
+  assert_true(system.phase() == Update)
+  assert_true(system.reads()[0] == qa)
+  assert_true(system.writes()[0] == qb)
+}
+
+///|
+test "System conflict helpers detect same-phase access overlaps" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemConflictA", 4)
+  let qb = world.register_cpu_component("SystemConflictB", 4)
+  let read_a = System::new("read-a", Update, [qa], [], (_w, _c, _b) => ())
+  let write_a = System::new("write-a", Update, [], [qa], (_w, _c, _b) => ())
+  let write_b = System::new("write-b", Update, [], [qb], (_w, _c, _b) => ())
+  let later_write_a = System::new("later-write-a", PostUpdate, [], [qa], (
+    _w,
+    _c,
+    _b,
+  ) => ())
+  assert_true(read_a.conflicts_with(write_a))
+  assert_true(!read_a.conflicts_with(write_b))
+  let same_phase = Schedule::new()
+  same_phase.add_system(read_a)
+  same_phase.add_system(write_a)
+  assert_true(same_phase.has_parallel_access_conflicts())
+  let different_phase = Schedule::new()
+  different_phase.add_system(read_a)
+  different_phase.add_system(later_write_a)
+  assert_true(!different_phase.has_parallel_access_conflicts())
 }
 
 ///|

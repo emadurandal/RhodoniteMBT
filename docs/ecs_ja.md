@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) は、**アーキタイプ（Archetype）** ベースの ECS 実装です。CPU 側では **SoA（Structure of Arrays）** でキャッシュ効率のよい列走査を行い、WebGPU 向けには **`EntityId.index` をストレージバッファの論理添字として安定利用**できるよう、GPU 可視コンポーネントを **アーキタイプ行から切り離したフラット配列**に載せる二層構造になっています。
 
-「`System` 型」はありません。クエリと更新は `World` のメソッド（特に `for_each_entity_with_components`）と、ビルトイン用のヘルパーで行います。
+外付けの `System` / `Schedule` もありますが、`World` 自体は system を所有しません。低レベルのクエリと更新は引き続き `World` のメソッド（特に `for_each_entity_with_components`）と、ビルトイン用のヘルパーで行えます。
 
 公開 API の機械的な一覧は [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti) を参照してください。
 
@@ -157,7 +157,63 @@ flowchart TD
   - **CpuOnly**: そのアーキタイプ行の SoA 列ビュー。
   - **GpuVisible**: **フラット `GpuComponentStore`** の `entity.index` スロットのビュー（アーキタイプ SoA ではない）。
 - コールバック内で **GpuVisible のバイトを直接変更**した場合、**自動では dirty になりません**。`World::mark_gpu_component_dirty` を呼び、`drain_gpu_writes` でアップロード対象に含めてください。
+- コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
 - イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
+
+アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。`World::for_each_entity_with_components` を直接呼ぶ場合と比べると、`Query` には次の実用上のメリットがあります。
+
+- `required` component set を名前付きの値として再利用できます。
+- `Query::new` の時点で重複 component id を拒否できます。
+- 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
+- callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
+- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+
+callback が full archetype signature を必要とする場合や、GPU dirty 化するかどうかを entity ごとに細かく判断したい場合は、低レベルの `World::for_each_entity_with_components` を直接使います。
+
+---
+
+## CommandBuffer
+
+`create_entity`、`destroy_entity`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
+
+query / system の走査中に変更を要求したい場合は、`CommandBuffer` に積みます。
+
+```moonbit
+let commands = CommandBuffer::new()
+query.for_each(world, fn(entity, _payloads) {
+  commands.remove_component(entity, old_component)
+  commands.add_component_bytes(entity, new_component, bytes)
+})
+let _ = commands.apply(world)
+```
+
+command は query 終了後に、積まれた順で適用されます。`CommandBuffer::apply` は buffer を空にし、失敗した command があれば `false` を返しますが、後続 command の適用は続けます。entity 生成はまだ含めていません。query 走査外では `World::create_entity` を直接使います。
+
+---
+
+## System と Schedule
+
+`World` は system を所有しません。最初の system 層は、`World` の外側に置く `Schedule` と、関数型の `System` です。
+
+```moonbit
+let schedule = Schedule::new()
+schedule.add_system(System::new("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
+  let query = Query::new([lifetime])
+  query.for_each(world, fn(entity, payloads) {
+    let remaining = @comp.get_gpu_f32_mut_view(payloads[0], 0)
+    if remaining <= ctx.delta_seconds {
+      commands.destroy_entity(entity)
+    }
+  })
+}))
+let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
+```
+
+`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順です。各 system には新しい `CommandBuffer` が渡され、system が返った直後に schedule が適用します。そのため、後続 system は前の system の構造変更を観測できます。
+
+`System::reads` と `System::writes` は scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に並列実行できないアクセス衝突があるかを返します。`Schedule::run` 自体は引き続き単一スレッド・登録順実行です。
+
+ビルトインの変換更新は `transform_propagation_system(world)` でも登録できます。この system は `World::update_global_transforms_from_transforms` と同じ処理を `PostUpdate` phase で実行し、`Transform3D` / `ChildOf` を read、`GlobalTransform` を write として宣言します。
 
 ---
 
