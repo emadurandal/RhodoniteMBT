@@ -4,7 +4,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) は、**アーキタイプ（Archetype）** ベースの ECS 実装です。CPU 側では **SoA（Structure of Arrays）** でキャッシュ効率のよい列走査を行い、WebGPU 向けには **`EntityId.index` をストレージバッファの論理添字として安定利用**できるよう、GPU 可視コンポーネントを **アーキタイプ行から切り離したフラット配列**に載せる二層構造になっています。
 
-外付けの `System` / `Schedule` もありますが、`World` 自体は system を所有しません。低レベルのクエリと更新は引き続き `World` のメソッド（特に `for_each_entity_with_components`）と、ビルトイン用のヘルパーで行えます。
+外付けの `System` / `Schedule` もありますが、`World` 自体は system を所有しません。行イテレーションは `Query` 経由で公開し、ビルトイン用のヘルパーも同じ内部 iterator の上に実装されています。
 
 公開 API の機械的な一覧は [`pkg.generated.mbti`](../moon/rhodonite_core/src/ecs/pkg.generated.mbti) を参照してください。
 
@@ -150,27 +150,21 @@ flowchart TD
 
 ---
 
-## クエリ: `for_each_entity_with_components`
+## クエリ API
 
-- 引数 `required` に列挙した `ComponentTypeId` を **すべて含む**アーキタイプだけを走査します。`required` が空なら何もしません。
-- コールバックには `(entity, full_signature, payloads)` が渡り、`payloads[k]` は `required[k]` に対応する **`MutArrayView[Byte]`** です。
-  - **CpuOnly**: そのアーキタイプ行の SoA 列ビュー。
-  - **GpuVisible**: **フラット `GpuComponentStore`** の `entity.index` スロットのビュー（アーキタイプ SoA ではない）。
-- これは低レベルかつ内部用途寄りの API です。schedule 実行中に直接使う場合、callback へ全 payload が mutable view として渡るため、`required` の全 component が active System の `writes` に含まれる必要があります。
-- コールバック内で **GpuVisible のバイトを直接変更**した場合、**自動では dirty になりません**。`World::mark_gpu_component_dirty` を呼び、`drain_gpu_writes` でアップロード対象に含めてください。
-- コールバックが特定の GPU-visible コンポーネントを必ず書く場合は、`World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` を使うと、各 callback 後に対象行を dirty にできます。
-- イテレーション中にストアが拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
+行イテレーションには `Query::new(required)` と `query.for_each(world, f)` を使います。引数 `required` に列挙した `ComponentTypeId` を **すべて含む**アーキタイプだけを走査します。`required` が空なら何もしません。
 
-アーキタイプの full signature が不要な System 風コードでは、`Query::new(required)` と `query.for_each(world, f)` を使えます。callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスでき、read/write の access check も component ごとに維持されます。
+callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスでき、read/write の access check も component ごとに維持されます。
 
 - `required` component set を名前付きの値として再利用できます。
 - `Query::new` の時点で重複 component id を拒否できます。
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
-- callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
+- schedule 実行中は、required の全 component が active System の `reads` または `writes` に含まれる必要があります。
 - `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
 - `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。
 - `QueryRow::mark_dirty(component)` は `QueryRow::write_view` で変更した GPU-visible row を dirty にします。
 - GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+- イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
 ```moonbit
 let query = Query::new([tf, gt])
@@ -182,8 +176,6 @@ query.for_each(world, fn(row) {
   let _ = row.mark_dirty(gt)
 })
 ```
-
-callback が full archetype signature や raw mutable payload 配列を必要とする ECS 内部処理に限り、低レベルの `World::for_each_entity_with_components` を直接使います。
 
 ---
 
@@ -299,8 +291,10 @@ ignore(world.add_component_bytes(e, tag, tag_bytes))
 
 // クエリ（例: TF + GT を同時に見る）
 let required = [world.transform_component(), world.global_transform_component()]
-world.for_each_entity_with_components(required, fn(entity, sig, views) {
-  // views[0] = Transform SoA 行, views[1] = GlobalTransform フラット GPU 行
+let query = Query::new(required)
+query.for_each(world, fn(row) {
+  let tf_row = row.read_view(world.transform_component())
+  let gt_row = row.write_view(world.global_transform_component())
   ...
 })
 

@@ -33,7 +33,8 @@ pub fn Query::for_each(
   world : World,
   f : (QueryRow) -> Unit,
 ) -> Unit {
-  world.for_each_entity_with_components_internal(self.required, (e, _sig, views) => {
+  world.assert_system_components_read(self.required, "Query::for_each")
+  world.for_each_query_row_payloads(self.required, (e, _sig, views) => {
     f({ world, entity: e, components: self.required, payloads: views })
   })
 }
@@ -65,7 +66,11 @@ pub fn Query::for_each_marking_gpu_dirty(
         }
     }
   }
-  world.for_each_entity_with_components_internal(self.required, (e, _sig, views) => {
+  world.assert_system_components_read(
+    self.required,
+    "Query::for_each_marking_gpu_dirty",
+  )
+  world.for_each_query_row_payloads(self.required, (e, _sig, views) => {
     f({ world, entity: e, components: self.required, payloads: views })
     for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
       let _ = world.mark_gpu_component_dirty(e, dirty_gpu_components[i])

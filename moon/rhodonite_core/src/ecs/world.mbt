@@ -154,13 +154,13 @@ fn World::assert_system_component_write(
 }
 
 ///|
-fn World::assert_system_components_write(
+fn World::assert_system_components_read(
   self : World,
   components : Array[ComponentTypeId],
   operation : String,
 ) -> Unit {
   for i = 0; i < components.length(); i = i + 1 {
-    self.assert_system_component_write(components[i], operation)
+    self.assert_system_component_read(components[i], operation)
   }
 }
 
@@ -545,10 +545,10 @@ pub fn World::component_bytes(
 }
 
 ///|
-/// Internal row iterator used by both the low-level world API and the higher-level [`Query`]
-/// wrapper. This intentionally performs no system access check; callers must enforce the right
-/// boundary for the view shape they expose.
-fn World::for_each_entity_with_components_internal(
+/// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
+/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access at the point where the
+/// callback asks for a read-only or mutable view.
+fn World::for_each_query_row_payloads(
   self : World,
   required : Array[ComponentTypeId],
   f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
@@ -557,7 +557,7 @@ fn World::for_each_entity_with_components_internal(
     return
   }
   if component_array_has_duplicates(required) {
-    abort("for_each_entity_with_components: duplicate required component")
+    abort("Query::for_each: duplicate required component")
   }
   // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
   self.query_depth = self.query_depth + 1
@@ -572,10 +572,7 @@ fn World::for_each_entity_with_components_internal(
         let gpu_flush : Array[GpuComponentStore] = []
         for k = 0; k < required.length(); k = k + 1 {
           match self.registry.get(required[k]) {
-            None =>
-              abort(
-                "for_each_entity_with_components: unknown component type id",
-              )
+            None => abort("Query::for_each: unknown component type id")
             Some(rc) =>
               match rc.kind {
                 CpuOnly =>
@@ -583,7 +580,7 @@ fn World::for_each_entity_with_components_internal(
                     Some(v) => payloads.push(v)
                     None =>
                       abort(
-                        "for_each_entity_with_components: required component missing from archetype",
+                        "Query::for_each: required component missing from archetype",
                       )
                   }
                 GpuVisible =>
@@ -607,7 +604,7 @@ fn World::for_each_entity_with_components_internal(
                     }
                     None =>
                       abort(
-                        "for_each_entity_with_components: GpuVisible component has no gpu store",
+                        "Query::for_each: GpuVisible component has no gpu store",
                       )
                   }
               }
@@ -623,84 +620,6 @@ fn World::for_each_entity_with_components_internal(
   }
   // Restore the outer mutation state after the query finishes.
   self.query_depth = self.query_depth - 1
-}
-
-///|
-/// Iterates every living entity whose archetype signature **includes all** `required`
-/// [`ComponentTypeId`]s (superset match). When `required` is empty, invokes nothing.
-///
-/// The callback receives the entity, that row's **full sorted archetype component list**, and one
-/// [`MutArrayView`] per entry in `required` (same order): a **non-copying** mutable view into that
-/// component's payload at this entity.
-///
-/// * **`CpuOnly`**: view over archetype SoA column bytes (`stride` bytes per row).
-/// * **`GpuVisible`**: view over this entity's row in [`GpuComponentStore`] (`gpu_layout.stride`
-///   bytes; **not** archetype SoA bytes). After the callback returns, the world persists each
-///   touched GPU store with `replace_gpu_store` only (no automatic dirty queue). If you mutate a
-///   GPU row, call [`World::mark_gpu_component_dirty`] so [`drain_gpu_writes`] picks it up. If the
-///   store grew, a [`GpuResizeEvent`] is queued before invoking the callback (same shape as
-///   [`ensure_gpu_capacity`]).
-///
-/// The callback must not call structural mutation APIs such as `create_entity`,
-/// `destroy_entity`, `add_component_bytes`, `remove_component`, or component registration.
-/// `for_each_entity_with_components` detects those calls and aborts because they can invalidate
-/// the archetype rows and mutable views currently being iterated.
-///
-/// This is a low-level/internal-oriented API. During schedule execution every component in
-/// `required` must be declared in the active System's `writes` set because the callback receives
-/// mutable views for all of them. System code that needs read/write separation should use
-/// [`Query`] and [`QueryRow::read_view`] / [`QueryRow::write_view`] instead.
-pub fn World::for_each_entity_with_components(
-  self : World,
-  required : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
-) -> Unit {
-  self.assert_system_components_write(
-    required, "World::for_each_entity_with_components",
-  )
-  self.for_each_entity_with_components_internal(required, f)
-}
-
-///|
-/// Variant of [`World::for_each_entity_with_components`] that marks selected GPU-visible
-/// components dirty for every entity whose callback ran.
-///
-/// This is useful for systems that always write the listed GPU payloads through the callback's
-/// [`MutArrayView`]s. If only some entities are changed, use the lower-level query and call
-/// [`World::mark_gpu_component_dirty`] only for those entities.
-pub fn World::for_each_entity_with_components_marking_gpu_dirty(
-  self : World,
-  required : Array[ComponentTypeId],
-  dirty_gpu_components : Array[ComponentTypeId],
-  f : (EntityId, Array[ComponentTypeId], Array[MutArrayView[Byte]]) -> Unit,
-) -> Unit {
-  if component_array_has_duplicates(dirty_gpu_components) {
-    abort(
-      "for_each_entity_with_components_marking_gpu_dirty: duplicate dirty component",
-    )
-  }
-  for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-    match self.registry.get(dirty_gpu_components[i]) {
-      None =>
-        abort(
-          "for_each_entity_with_components_marking_gpu_dirty: unknown dirty component type id",
-        )
-      Some(rc) =>
-        match rc.kind {
-          CpuOnly =>
-            abort(
-              "for_each_entity_with_components_marking_gpu_dirty: dirty component must be GpuVisible",
-            )
-          GpuVisible => ()
-        }
-    }
-  }
-  self.for_each_entity_with_components(required, (e, sig, payloads) => {
-    f(e, sig, payloads)
-    for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-      let _ = self.mark_gpu_component_dirty(e, dirty_gpu_components[i])
-    }
-  })
 }
 
 ///|

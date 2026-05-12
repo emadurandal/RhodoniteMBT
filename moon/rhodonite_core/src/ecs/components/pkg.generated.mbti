@@ -86,6 +86,7 @@ pub(all) struct Transform3D {
   scale : @vector3.Vector3Ref[Byte]
 }
 pub fn Transform3D::from_component_mut_view(MutArrayView[Byte]) -> Self
+pub fn Transform3D::local_matrix_from_component_view(ArrayView[Byte]) -> @matrix44.Matrix44[Float]
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
 pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix44[Float]
 

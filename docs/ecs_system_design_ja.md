@@ -2,7 +2,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) の ECS は、`World` がエンティティ、アーキタイプ SoA、GPU-visible flat store を所有し、`Schedule` / `System` / `CommandBuffer` が更新順序と遅延変更を扱います。
 
-この文書は、かつての System 導入案ではなく、現行実装を正とした設計メモです。低レベルな `World::for_each_entity_with_components` は残しつつ、アプリケーション側の更新処理は外付け `Schedule` に System を登録して実行できます。
+この文書は、かつての System 導入案ではなく、現行実装を正とした設計メモです。行イテレーションは公開 API としては `Query` に一本化し、アプリケーション側の更新処理は外付け `Schedule` に System を登録して実行できます。
 
 ## 結論
 
@@ -63,7 +63,9 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | 操作 | 必要な宣言 |
 |------|------------|
 | `component_bytes` / `gpu_component_bytes` | `reads` または `writes` |
-| query required component | `reads` または `writes` |
+| `Query` required component | `reads` または `writes` |
+| `QueryRow::read_view` | `reads` または `writes` |
+| `QueryRow::write_view` | `writes` |
 | `set_component_bytes` | `writes` |
 | `set_gpu_component_bytes` / `clear_gpu_component` | `writes` |
 | `mark_gpu_component_dirty` / `drain_gpu_writes` | `writes` |
@@ -90,7 +92,7 @@ Schedule 実行中は component 登録がロックされます。`register_cpu_c
 
 ## CommandBuffer
 
-`for_each_entity_with_components` や `Query::for_each` の callback 中に、構造変更 API を直接呼ぶことはできません。`query_depth` guard により `abort` します。これは走査中の archetype row view と entity location を守るためです。
+`Query::for_each` の callback 中に、構造変更 API を直接呼ぶことはできません。`query_depth` guard により `abort` します。これは走査中の archetype row view と entity location を守るためです。
 
 System から遅延適用したい変更は `CommandBuffer` に積みます。
 
@@ -111,11 +113,9 @@ pub(all) enum WorldCommand {
 
 ## Query
 
-低レベル API として `World::for_each_entity_with_components` は残っています。これは CPU SoA と GPU-visible flat store の両方を `MutArrayView[Byte]` として扱う、ECS の中核 API です。ただし用途は内部寄りです。System 実行中に直接使う場合、callback に全 payload が mutable view として渡るため、`required` の全 component が active System の `writes` に含まれる必要があります。
+公開の row iteration API は `Query` です。`Query` は内部 row iterator を使いますが、外へは `QueryRow::read_view` / `QueryRow::write_view` として公開し、component ごとの access guard を維持します。
 
-`required` に同じ `ComponentTypeId` を重複指定すると `abort` します。同じ mutable component view を複数 payload として渡す意味が曖昧なためです。
-
-通常の System からは薄い `Query` helper を使います。`Query` は内部の同じ row iterator を使いますが、外へは `QueryRow::read_view` / `QueryRow::write_view` として公開し、component ごとの access guard を維持します。
+`required` に同じ `ComponentTypeId` を重複指定すると `abort` します。同じ component row を複数 payload として扱う意味が曖昧なためです。
 
 ```moonbit
 let query = Query::new([tf, gt])
@@ -145,7 +145,7 @@ query.for_each(world, fn(row) {
 })
 ```
 
-`Query::for_each_marking_gpu_dirty` と `World::for_each_entity_with_components_marking_gpu_dirty` もあります。これらは callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
+`Query::for_each_marking_gpu_dirty` は callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 

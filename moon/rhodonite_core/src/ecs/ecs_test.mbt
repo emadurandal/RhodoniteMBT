@@ -327,7 +327,7 @@ test "compute_global_transform returns None on ChildOf cycle" {
 }
 
 ///|
-test "for_each_entity_with_components matches supersets and skips empty required" {
+test "Query for_each matches supersets and skips empty required" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryA", 4)
   let qb = world.register_cpu_component("QueryB", 4)
@@ -338,16 +338,15 @@ test "for_each_entity_with_components matches supersets and skips empty required
   assert_true(world.add_component_bytes(e_only_a, qa, bytes4(9, 10, 11, 12)))
   ignore(e_only_a)
   let hits : Array[EntityId] = []
-  world.for_each_entity_with_components([qa, qb], (ent, _sig, payloads) => {
-    hits.push(ent)
-    ignore(payloads)
+  Query::new([qa, qb]).for_each(world, row => {
+    hits.push(row.entity())
+    ignore(row.read_view(qa))
+    ignore(row.read_view(qb))
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e_both)
   let empty_hits : Array[EntityId] = []
-  world.for_each_entity_with_components([], (ent, _sig, _pay) => {
-    empty_hits.push(ent)
-  })
+  Query::new([]).for_each(world, row => empty_hits.push(row.entity()))
   assert_eq(empty_hits.length(), 0)
   // Query scope has ended, so normal structural mutation should work again.
   let e_after_query = world.create_entity()
@@ -357,7 +356,7 @@ test "for_each_entity_with_components matches supersets and skips empty required
 }
 
 ///|
-test "for_each_entity_with_components gives full GpuComponentStore row for GpuVisible" {
+test "Query for_each gives full GpuComponentStore row for GpuVisible" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryA", 4)
   let gpu16 = world.register_gpu_component("Gpu16", @comp.GpuLayout::empty(16))
@@ -368,16 +367,16 @@ test "for_each_entity_with_components gives full GpuComponentStore row for GpuVi
   let _ = world.drain_resize_events()
   let mut got0 = -1
   let mut got1 = -1
-  world.for_each_entity_with_components([qa, gpu16], (_ent, _sig, payloads) => {
-    got0 = payloads[0].length()
-    got1 = payloads[1].length()
+  Query::new([qa, gpu16]).for_each(world, row => {
+    got0 = row.read_view(qa).length()
+    got1 = row.read_view(gpu16).length()
   })
   assert_eq(got0, 4)
   assert_eq(got1, 16)
 }
 
 ///|
-test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows" {
+test "Query for_each_marking_gpu_dirty queues written gpu rows from direct query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -389,11 +388,9 @@ test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows"
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  world.for_each_entity_with_components_marking_gpu_dirty(
-    [qa, gpu16],
-    [gpu16],
-    (_ent, _sig, payloads) => payloads[1][0] = (99 : Byte),
-  )
+  Query::new([qa, gpu16]).for_each_marking_gpu_dirty(world, [gpu16], row => {
+    row.write_view(gpu16)[0] = (99 : Byte)
+  })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -427,7 +424,7 @@ test "Query for_each wraps required row iteration" {
 }
 
 ///|
-test "Query for_each_marking_gpu_dirty queues written gpu rows" {
+test "Query helper for_each_marking_gpu_dirty queues written gpu rows" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -834,29 +831,6 @@ test "System Query preserves read and write access separation during schedule ru
   match world.component_bytes(e, qb) {
     Some(bytes) => assert_eq(bytes[0], (1 : Byte))
     None => abort("expected SystemQueryWriteB bytes")
-  }
-}
-
-///|
-test "System low-level row iterator requires write declarations for mutable payloads" {
-  let world = World::new()
-  let qa = world.register_cpu_component("SystemLowLevelWriteA", 4)
-  let qb = world.register_cpu_component("SystemLowLevelWriteB", 4)
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
-  let schedule = Schedule::new()
-  schedule.add_system(
-    System::new("low-level-mut", Update, [], [qa, qb], (w, _ctx, _cmds) => {
-      w.for_each_entity_with_components([qa, qb], (_ent, _sig, payloads) => {
-        payloads[1][0] = payloads[0][0]
-      })
-    }),
-  )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
-  match world.component_bytes(e, qb) {
-    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
-    None => abort("expected SystemLowLevelWriteB bytes")
   }
 }
 
