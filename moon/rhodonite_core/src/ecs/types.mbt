@@ -108,6 +108,22 @@ pub struct Query {
 }
 
 ///|
+/// Deferred structural or GPU mutation command applied after query/system iteration.
+pub(all) enum WorldCommand {
+  DestroyEntity(EntityId)
+  AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  RemoveComponent(EntityId, ComponentTypeId)
+  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  ClearGpuComponent(EntityId, ComponentTypeId)
+}
+
+///|
+/// FIFO command buffer for changes that must not run while ECS component views are being queried.
+pub struct CommandBuffer {
+  commands : Array[WorldCommand]
+}
+
+///|
 /// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
 pub struct World {
   registry : ComponentRegistry

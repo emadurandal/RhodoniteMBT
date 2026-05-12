@@ -172,6 +172,25 @@ Use the lower-level `World::for_each_entity_with_components` when the callback n
 
 ---
 
+## CommandBuffer
+
+Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
+
+Use `CommandBuffer` when a query/system wants to request changes during iteration:
+
+```moonbit
+let commands = CommandBuffer::new()
+query.for_each(world, fn(entity, _payloads) {
+  commands.remove_component(entity, old_component)
+  commands.add_component_bytes(entity, new_component, bytes)
+})
+let _ = commands.apply(world)
+```
+
+Commands are applied in insertion order after the query has finished. `CommandBuffer::apply` clears the buffer and returns `false` if any command failed, while still attempting later commands. Entity creation is intentionally not included yet; create entities directly outside query iteration.
+
+---
+
 ## GPU upload and resize
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).

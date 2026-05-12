@@ -450,6 +450,48 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows" {
 }
 
 ///|
+test "CommandBuffer applies queued structural changes after query" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandBufferA", 4)
+  let qb = world.register_cpu_component("CommandBufferB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let query = Query::new([qa])
+  let commands = CommandBuffer::new()
+  query.for_each(world, (ent, _payloads) => {
+    commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
+    commands.remove_component(ent, qa)
+  })
+  assert_true(world.has_component(e, qa))
+  assert_true(!world.has_component(e, qb))
+  assert_eq(commands.len(), 2)
+  assert_true(commands.apply(world))
+  assert_true(!world.has_component(e, qa))
+  assert_true(world.has_component(e, qb))
+  assert_true(commands.is_empty())
+}
+
+///|
+test "CommandBuffer applies queued gpu writes and reports failed commands" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "CommandBufferGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let e = world.create_entity()
+  let missing = EntityId::new(e.index + 100, 0)
+  let commands = CommandBuffer::new()
+  commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+  commands.destroy_entity(missing)
+  assert_true(!commands.apply(world))
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (33U & 0xFFU).to_byte())
+  assert_true(commands.is_empty())
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()

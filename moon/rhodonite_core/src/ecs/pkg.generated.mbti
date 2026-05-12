@@ -13,6 +13,19 @@ import {
 // Types and methods
 type Archetype
 
+pub struct CommandBuffer {
+  commands : Array[WorldCommand]
+}
+pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+pub fn CommandBuffer::apply(Self, World) -> Bool
+pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
+pub fn CommandBuffer::is_empty(Self) -> Bool
+pub fn CommandBuffer::len(Self) -> Int
+pub fn CommandBuffer::new() -> Self
+pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::set_gpu_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+
 pub(all) enum ComponentKind {
   CpuOnly
   GpuVisible
@@ -120,6 +133,14 @@ pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
+
+pub(all) enum WorldCommand {
+  DestroyEntity(EntityId)
+  AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  RemoveComponent(EntityId, ComponentTypeId)
+  SetGpuComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
+  ClearGpuComponent(EntityId, ComponentTypeId)
+}
 
 // Type aliases
 
