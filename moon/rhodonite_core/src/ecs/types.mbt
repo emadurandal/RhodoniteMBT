@@ -102,6 +102,12 @@ pub(all) struct GpuResizeEvent {
 }
 
 ///|
+/// Thin query descriptor for system-style iteration over a fixed `required` component set.
+pub struct Query {
+  required : Array[ComponentTypeId]
+}
+
+///|
 /// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
 pub struct World {
   registry : ComponentRegistry

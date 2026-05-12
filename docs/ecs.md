@@ -160,6 +160,8 @@ flowchart TD
 - If the callback always writes specific GPU-visible components, use `World::for_each_entity_with_components_marking_gpu_dirty(required, dirty_gpu_components, f)` to mark those rows dirty after each callback.
 - If a store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
+For system-style code that does not need the full archetype signature, use `Query::new(required)` and `query.for_each(world, f)`. `Query::new` rejects duplicate component ids and keeps payload order stable. `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` is the matching helper for callbacks that always write selected GPU-visible rows.
+
 ---
 
 ## GPU upload and resize

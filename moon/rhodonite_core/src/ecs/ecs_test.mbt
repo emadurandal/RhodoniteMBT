@@ -402,6 +402,54 @@ test "for_each_entity_with_components_marking_gpu_dirty queues written gpu rows"
 }
 
 ///|
+test "Query for_each wraps required payload iteration" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryHelperA", 4)
+  let qb = world.register_cpu_component("QueryHelperB", 4)
+  let required : Array[ComponentTypeId] = [qa, qb]
+  let query = Query::new(required)
+  required[0] = qb
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let hits : Array[EntityId] = []
+  let mut first_len = -1
+  let mut second_first_byte = (0 : Byte)
+  query.for_each(world, (ent, payloads) => {
+    hits.push(ent)
+    first_len = payloads[0].length()
+    second_first_byte = payloads[1][0]
+  })
+  assert_eq(hits.length(), 1)
+  assert_true(hits[0] == e)
+  assert_eq(first_len, 4)
+  assert_eq(second_first_byte, (5 : Byte))
+}
+
+///|
+test "Query for_each_marking_gpu_dirty queues written gpu rows" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
+  let gpu16 = world.register_gpu_component(
+    "QueryHelperDirtyGpu16",
+    @comp.GpuLayout::empty(16),
+  )
+  let query = Query::new([qa, gpu16])
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
+  let _ = world.drain_resize_events()
+  query.for_each_marking_gpu_dirty(world, [gpu16], (_ent, payloads) => {
+    payloads[1][0] = (77 : Byte)
+  })
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, e.index * 16)
+  assert_eq(writes[0].bytes[0], (77 : Byte))
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()
