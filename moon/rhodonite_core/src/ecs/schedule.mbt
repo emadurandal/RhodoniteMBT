@@ -55,13 +55,28 @@ fn build_system(
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
   if component_array_has_duplicates(reads) {
-    abort(constructor_name + ": duplicate read component")
+    abort(
+      constructor_name +
+      " for System '" +
+      name +
+      "': duplicate read component. Hint: list each ComponentTypeId at most once in reads; if the system also writes it, put it only in writes.",
+    )
   }
   if component_array_has_duplicates(writes) {
-    abort(constructor_name + ": duplicate write component")
+    abort(
+      constructor_name +
+      " for System '" +
+      name +
+      "': duplicate write component. Hint: list each ComponentTypeId at most once in writes; writes already permits reading that component.",
+    )
   }
   if component_array_intersects(reads, writes) {
-    abort(constructor_name + ": reads and writes must not overlap")
+    abort(
+      constructor_name +
+      " for System '" +
+      name +
+      "': reads and writes overlap. Hint: if a system may mutate a component, put that ComponentTypeId only in writes; writes also allows read access.",
+    )
   }
   {
     name,
@@ -195,6 +210,7 @@ pub fn Schedule::run(
       if system_phase_rank(system.phase) == phase_rank {
         let commands = CommandBuffer::new()
         let system_access = world.enter_system_access(
+          system.name,
           system.reads,
           system.writes,
           system.structural_write,

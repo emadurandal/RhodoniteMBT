@@ -111,16 +111,17 @@ pub struct Query {
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views used by the lower-level world query.
 pub struct QueryRow {
-  world : World
-  entity : EntityId
-  components : Array[ComponentTypeId]
-  payloads : Array[MutArrayView[Byte]]
+  priv world : World
+  priv entity : EntityId
+  priv components : Array[ComponentTypeId]
+  priv payloads : Array[MutArrayView[Byte]]
 }
 
 ///|
 /// Deferred structural or GPU mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
+  AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
@@ -185,6 +186,7 @@ pub struct World {
   mut component_registration_lock_depth : Int
   /// Active system access guard; nonzero means component reads/writes are checked against declarations.
   mut system_access_depth : Int
+  priv mut system_access_name : String
   mut system_access_reads : Array[ComponentTypeId]
   mut system_access_writes : Array[ComponentTypeId]
   mut system_access_structural_write : Bool

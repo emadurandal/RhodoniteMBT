@@ -122,20 +122,20 @@ sequenceDiagram
 
 ## コンポーネント追加・削除とアーキタイプ移行
 
-`add_component_bytes` / `remove_component` の要点:
+`add_component` / `add_component_bytes` / `remove_component` の要点:
 
-1. 既にシグネチャに含まれていれば **同一アーキタイプ内でバイトを上書き**するだけ。
+1. 既にシグネチャに含まれていれば `false` を返します。既存 CPU payload の更新は `set_component_bytes` を使います。
 2. 含まれていなければ **新シグネチャ**用のアーキタイプを `ensure_archetype` で確保。
 3. 対象エンティティの **新行**を確保し、`copy_row_to` で重なる列をコピー。
-4. 新行に対する書き込み（追加時）を反映。
+4. `add_component` では zero/default payload、`add_component_bytes` では指定された CPU/GPU payload を反映。
 5. **旧行**を `swap_remove_row` で削除。最終行が移動した場合は **`update_moved_location`** でそのエンティティの `locations` を更新。
 
 ```mermaid
 flowchart TD
-  start[add_component_bytes E C bytes]
+  start[add_component/add_component_bytes E C]
   alive{is_alive E}
   has{has_component E C}
-  same[set_component_bytes same archetype row]
+  same[return false]
   migrate[ensure_archetype new signature]
   copy[copy_row_to new row set bytes]
   swap[swap_remove_row old row fix locations]
@@ -161,9 +161,7 @@ callback には `QueryRow` が渡り、payload 配列の添字ではなく compo
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
 - schedule 実行中は、required の全 component が active System の `reads` または `writes` に含まれる必要があります。
 - `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
-- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。
-- `QueryRow::mark_dirty(component)` は `QueryRow::write_view` で変更した GPU-visible row を dirty にします。
-- GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
+- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 - イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
 ```moonbit
@@ -173,7 +171,6 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
-  let _ = row.mark_dirty(gt)
 })
 ```
 
@@ -181,7 +178,7 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-`create_entity`、`destroy_entity`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
+`create_entity`、`destroy_entity`、`add_component`、`add_component_bytes`、`remove_component`、`set_gpu_component_bytes`、`clear_gpu_component` などの構造変更 API は、query 走査中には guard されます。query callback から直接呼ぶと、アーキタイプ行や mutable payload view を壊す可能性があるため abort します。
 
 query / system の走査中に変更を要求したい場合は、`CommandBuffer` に積みます。
 
@@ -231,6 +228,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 - **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージして `GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
 - **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。
 
+`add_component` と `add_component_bytes` は CPU-only / GPU-visible component の両方を扱います。既存 GPU-visible payload の書き込みは `set_gpu_component_bytes` を使います。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。
+
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) で `update_global_transforms_from_transforms` の後に `drain_gpu_writes(global_transform)` し、`queue.write_buffer_from_fixed_array` しています。
 
 ---
@@ -257,7 +256,7 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査し、`GlobalTransform` の GPU 行を更新し、変更があった行は `mark_gpu_component_dirty` します。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`QueryRow::write_view` 経由で `GlobalTransform` に書くため、GPU 行は dirty になります。
 
 ---
 

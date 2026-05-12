@@ -210,25 +210,35 @@ fn World::replace_gpu_store(self : World, store : GpuComponentStore) -> Unit {
 }
 
 ///|
+/// Ensures one GPU store has at least `capacity` entity slots and emits a resize event on growth.
+fn World::ensure_gpu_store_capacity(
+  self : World,
+  component : ComponentTypeId,
+  capacity : Int,
+) -> GpuComponentStore? {
+  match self.gpu_store(component) {
+    Some(store) => {
+      if store.ensure_capacity(capacity) {
+        self.resize_events.push({
+          component: store.component,
+          required_capacity: capacity,
+          needs_full_upload: true,
+        })
+        self.replace_gpu_store(store)
+      }
+      self.gpu_store(component)
+    }
+    None => None
+  }
+}
+
+///|
 /// Ensures every GPU store has at least `capacity` entity slots (may emit resize events for buffer recreation).
 fn World::ensure_gpu_capacity(self : World, capacity : Int) -> Unit {
   for i = 0; i < self.gpu_stores.length(); i = i + 1 {
     match self.gpu_stores[i] {
       Some(store) =>
-        if store.ensure_capacity(capacity) {
-          self.resize_events.push({
-            component: store.component,
-            required_capacity: capacity,
-            needs_full_upload: true,
-          })
-          self.replace_gpu_store({
-            component: store.component,
-            stride: store.stride,
-            bytes: store.bytes,
-            dirty_flags: store.dirty_flags,
-            dirty_indices: store.dirty_indices,
-          })
-        }
+        ignore(self.ensure_gpu_store_capacity(store.component, capacity))
       None => ()
     }
   }
@@ -240,6 +250,11 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
   for i = 0; i < self.gpu_stores.length(); i = i + 1 {
     match self.gpu_stores[i] {
       Some(store) => {
+        let store = match
+          self.ensure_gpu_store_capacity(store.component, entity_index + 1) {
+          Some(grown_store) => grown_store
+          None => store
+        }
         store.clear_slot(entity_index)
         self.replace_gpu_store(store)
       }
@@ -249,7 +264,8 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
 }
 
 ///|
-/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead or `component` is not GPU-visible.
+/// Writes GPU-visible bytes at `entity.index`; returns false if the entity is dead, does not have
+/// `component`, or `component` is not GPU-visible.
 pub fn World::set_gpu_component_bytes(
   self : World,
   entity : EntityId,
@@ -263,7 +279,10 @@ pub fn World::set_gpu_component_bytes(
   if !self.is_alive(entity) {
     return false
   }
-  match self.gpu_store(component) {
+  if !self.has_component(entity, component) {
+    return false
+  }
+  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
     Some(store) => {
       store.set_bytes(entity.index, bytes)
       self.replace_gpu_store(store)
@@ -274,10 +293,8 @@ pub fn World::set_gpu_component_bytes(
 }
 
 ///|
-/// After mutating a [`GpuVisible`] row through [`QueryRow::write_view`] (or any path that writes
-/// GPU bytes without going through [`World::set_gpu_component_bytes`]), call this so
-/// [`World::drain_gpu_writes`] includes that entity slot.
-pub fn World::mark_gpu_component_dirty(
+/// Internal row-level dirty marker used by query mutable GPU views.
+fn World::mark_gpu_component_dirty(
   self : World,
   entity : EntityId,
   component : ComponentTypeId,
@@ -288,7 +305,10 @@ pub fn World::mark_gpu_component_dirty(
   if !self.is_alive(entity) {
     return false
   }
-  match self.gpu_store(component) {
+  if !self.has_component(entity, component) {
+    return false
+  }
+  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
     Some(store) => {
       store.mark_dirty(entity.index)
       self.replace_gpu_store(store)
@@ -310,7 +330,10 @@ pub fn World::clear_gpu_component(
   if !self.is_alive(entity) {
     return false
   }
-  match self.gpu_store(component) {
+  if !self.has_component(entity, component) {
+    return false
+  }
+  match self.ensure_gpu_store_capacity(component, entity.index + 1) {
     Some(store) => {
       store.clear_slot(entity.index)
       self.replace_gpu_store(store)
@@ -321,7 +344,7 @@ pub fn World::clear_gpu_component(
 }
 
 ///|
-/// Reads the flat GPU bytes for a living entity (does not consult archetypes).
+/// Reads the flat GPU bytes for a living entity that owns `component`.
 pub fn World::gpu_component_bytes(
   self : World,
   entity : EntityId,
@@ -331,8 +354,14 @@ pub fn World::gpu_component_bytes(
   if !self.is_alive(entity) {
     return None
   }
+  if !self.has_component(entity, component) {
+    return None
+  }
   match self.gpu_store(component) {
-    Some(store) =>
+    Some(store) => {
+      if entity.index >= store.capacity() {
+        return None
+      }
       Some(
         copy_array_range_to_fixed(
           store.bytes,
@@ -340,6 +369,7 @@ pub fn World::gpu_component_bytes(
           store.stride,
         ),
       )
+    }
     None => None
   }
 }

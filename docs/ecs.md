@@ -122,20 +122,20 @@ sequenceDiagram
 
 ## Adding/removing components and archetype migration
 
-`add_component_bytes` / `remove_component` in short:
+`add_component` / `add_component_bytes` / `remove_component` in short:
 
-1. If the signature **already** contains the type, **overwrite** bytes in the same archetype row.
+1. If the signature **already** contains the type, return `false`; existing CPU payloads are updated with `set_component_bytes`.
 2. Otherwise **materialize** a new signature’s archetype via `ensure_archetype`.
 3. Allocate a **new row** for the entity, `copy_row_to` overlapping columns.
-4. Apply the new write (on add).
+4. Apply zero/default payload on `add_component`, or the supplied CPU/GPU payload on `add_component_bytes`.
 5. **Remove** the old row with `swap_remove_row`. If the last row moved, **`update_moved_location`** fixes that entity’s `locations` entry.
 
 ```mermaid
 flowchart TD
-  start[add_component_bytes E C bytes]
+  start[add_component/add_component_bytes E C]
   alive{is_alive E}
   has{has_component E C}
-  same[set_component_bytes same archetype row]
+  same[return false]
   migrate[ensure_archetype new signature]
   copy[copy_row_to new row set bytes]
   swap[swap_remove_row old row fix locations]
@@ -161,9 +161,7 @@ The callback receives a `QueryRow`, so payloads are accessed by component id whi
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
 - During schedule execution, every required component must be declared in the active System's `reads` or `writes` set.
 - `QueryRow::read_view(component)` returns a zero-copy `ArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
-- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution.
-- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::write_view`.
-- `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs `QueryRow` access with automatic dirty marking for callbacks that always write selected GPU-visible rows.
+- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution. For `GpuVisible` components, requesting this mutable view marks that entity row dirty immediately.
 - If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
 ```moonbit
@@ -173,7 +171,6 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
-  let _ = row.mark_dirty(gt)
 })
 ```
 
@@ -181,7 +178,7 @@ query.for_each(world, fn(row) {
 
 ## CommandBuffer
 
-Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
+Structural mutation APIs such as `create_entity`, `destroy_entity`, `add_component`, `add_component_bytes`, `remove_component`, `set_gpu_component_bytes`, and `clear_gpu_component` are guarded during active query iteration. Calling them from a query callback aborts because archetype rows and mutable payload views could be invalidated.
 
 Use `CommandBuffer` when a query/system wants to request changes during iteration:
 
@@ -225,6 +222,8 @@ The built-in transform update can also be registered with `transform_propagation
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
 - **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**.
 
+`add_component` and `add_component_bytes` handle both CPU-only and GPU-visible components. Existing GPU-visible payload writes use `set_gpu_component_bytes`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path.
+
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) calls `update_global_transforms_from_transforms`, then `drain_gpu_writes(global_transform)`, then `queue.write_buffer_from_fixed_array`.
 
 ---
@@ -251,7 +250,7 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms, writing `GlobalTransform` GPU rows and calling `mark_gpu_component_dirty` when changed.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Writing `GlobalTransform` through `QueryRow::write_view` marks the GPU row dirty.
 
 ---
 

@@ -15,7 +15,9 @@ fn component_array_index_of(
 /// Builds a query descriptor and rejects duplicate component ids up front.
 pub fn Query::new(required : Array[ComponentTypeId]) -> Query {
   if component_array_has_duplicates(required) {
-    abort("Query::new: duplicate required component")
+    abort(
+      "Query::new: duplicate required component. Hint: pass each ComponentTypeId at most once; use QueryRow::read_view or write_view with the component id instead of requesting the same row multiple times.",
+    )
   }
   { required: copy_component_array(required) }
 }
@@ -40,45 +42,6 @@ pub fn Query::for_each(
 }
 
 ///|
-/// Runs this query and marks selected GPU-visible components dirty after each callback.
-pub fn Query::for_each_marking_gpu_dirty(
-  self : Query,
-  world : World,
-  dirty_gpu_components : Array[ComponentTypeId],
-  f : (QueryRow) -> Unit,
-) -> Unit {
-  if component_array_has_duplicates(dirty_gpu_components) {
-    abort("Query::for_each_marking_gpu_dirty: duplicate dirty component")
-  }
-  for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-    match world.registry.get(dirty_gpu_components[i]) {
-      None =>
-        abort(
-          "Query::for_each_marking_gpu_dirty: unknown dirty component type id",
-        )
-      Some(rc) =>
-        match rc.kind {
-          CpuOnly =>
-            abort(
-              "Query::for_each_marking_gpu_dirty: dirty component must be GpuVisible",
-            )
-          GpuVisible => ()
-        }
-    }
-  }
-  world.assert_system_components_read(
-    self.required,
-    "Query::for_each_marking_gpu_dirty",
-  )
-  world.for_each_query_row_payloads(self.required, (e, _sig, views) => {
-    f({ world, entity: e, components: self.required, payloads: views })
-    for i = 0; i < dirty_gpu_components.length(); i = i + 1 {
-      let _ = world.mark_gpu_component_dirty(e, dirty_gpu_components[i])
-    }
-  })
-}
-
-///|
 /// Returns the entity for this query row.
 pub fn QueryRow::entity(self : QueryRow) -> EntityId {
   self.entity
@@ -99,7 +62,12 @@ fn QueryRow::component_payload_index(
 ) -> Int {
   let index = component_array_index_of(self.components, component)
   if index < 0 {
-    abort(operation + ": component is not part of this query")
+    abort(
+      operation +
+      ": " +
+      component_id_text(component) +
+      " is not part of this QueryRow. Hint: include this component in Query::new([...]) required components before calling read_view or write_view for it.",
+    )
   }
   index
 }
@@ -122,31 +90,27 @@ pub fn QueryRow::read_view(
 /// Returns a zero-copy mutable payload view for `component`.
 ///
 /// Schedule execution requires `component` to be declared in the active System's `writes` set.
+/// Requesting a mutable view for a GpuVisible component marks that entity row dirty immediately.
 pub fn QueryRow::write_view(
   self : QueryRow,
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
   self.world.assert_system_component_write(component, "QueryRow::write_view")
   let index = self.component_payload_index(component, "QueryRow::write_view")
-  self.payloads[index]
-}
-
-///|
-/// Marks a GpuVisible component row dirty after mutating it through [`QueryRow::write_view`].
-pub fn QueryRow::mark_dirty(
-  self : QueryRow,
-  component : ComponentTypeId,
-) -> Bool {
-  if !self.has(component) {
-    abort("QueryRow::mark_dirty: component is not part of this query")
-  }
   match self.world.registry.get(component) {
-    None => abort("QueryRow::mark_dirty: unknown component type id")
+    None =>
+      abort(
+        "QueryRow::write_view: unknown " +
+        component_id_text(component) +
+        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
+      )
     Some(rc) =>
       match rc.kind {
-        CpuOnly => abort("QueryRow::mark_dirty: component must be GpuVisible")
-        GpuVisible =>
-          self.world.mark_gpu_component_dirty(self.entity, component)
+        CpuOnly => ()
+        GpuVisible => {
+          let _ = self.world.mark_gpu_component_dirty(self.entity, component)
+        }
       }
   }
+  self.payloads[index]
 }

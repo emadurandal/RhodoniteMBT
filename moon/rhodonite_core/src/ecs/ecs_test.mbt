@@ -121,6 +121,9 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
   let e1 = world.create_entity()
   let _ = world.create_entity()
   let e3 = world.create_entity()
+  assert_true(world.add_component(e0, gpu))
+  assert_true(world.add_component(e1, gpu))
+  assert_true(world.add_component(e3, gpu))
   let _ = world.drain_resize_events()
   assert_true(world.set_gpu_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
   assert_true(world.set_gpu_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
@@ -145,6 +148,7 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
     @comp.GpuLayout::empty(16),
   )
   let entity = world.create_entity()
+  assert_true(world.add_component(entity, gpu))
   let _ = world.drain_resize_events()
   assert_true(
     world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)),
@@ -157,6 +161,97 @@ test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes"
   assert_eq(writes[0].byte_offset, entity.index * 16)
   assert_eq(writes[0].bytes.length(), 16)
   assert_eq(writes[0].bytes[0], (2U & 0xFFU).to_byte())
+}
+
+///|
+test "GPU visible public APIs require entity component ownership" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuOwnership",
+    @comp.GpuLayout::empty(16),
+  )
+  let entity = world.create_entity()
+  assert_true(
+    !world.set_gpu_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)),
+  )
+  assert_true(!world.clear_gpu_component(entity, gpu))
+  assert_true(world.gpu_component_bytes(entity, gpu) is None)
+  assert_eq(world.drain_gpu_writes(gpu).length(), 0)
+}
+
+///|
+test "add_component and add_component_bytes support CPU and GPU visible components" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("AddComponentCpu", 4)
+  let gpu = world.register_gpu_component(
+    "AddComponentGpu",
+    @comp.GpuLayout::empty(16),
+  )
+  let cpu_entity = world.create_entity()
+  let gpu_entity = world.create_entity()
+  assert_true(world.add_component(cpu_entity, cpu))
+  match world.component_bytes(cpu_entity, cpu) {
+    Some(bytes) => assert_eq(bytes, bytes4(0, 0, 0, 0))
+    None => abort("expected AddComponentCpu bytes")
+  }
+  assert_true(
+    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(44U)),
+  )
+  match world.gpu_component_bytes(gpu_entity, gpu) {
+    Some(bytes) => assert_eq(bytes[0], (44U & 0xFFU).to_byte())
+    None => abort("expected AddComponentGpu bytes")
+  }
+  assert_true(!world.add_component(cpu_entity, cpu))
+  assert_true(!world.set_component_bytes(gpu_entity, gpu, bytes4(1, 2, 3, 4)))
+}
+
+///|
+test "add_component_bytes rejects invalid byte lengths before mutating ownership" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("AddComponentBytesCpuStride", 4)
+  let cpu_entity = world.create_entity()
+  assert_true(
+    !world.add_component_bytes(cpu_entity, cpu, ([1, 2, 3] : FixedArray[Byte])),
+  )
+  assert_true(!world.has_component(cpu_entity, cpu))
+  assert_true(world.add_component_bytes(cpu_entity, cpu, bytes4(1, 2, 3, 4)))
+  match world.component_bytes(cpu_entity, cpu) {
+    Some(bytes) => assert_eq(bytes, bytes4(1, 2, 3, 4))
+    None => abort("expected AddComponentBytesCpuStride bytes")
+  }
+  let gpu_entity = world.create_entity()
+  let _ = world.drain_resize_events()
+  let gpu = world.register_gpu_component(
+    "AddComponentBytesGpuStride",
+    @comp.GpuLayout::empty(16),
+  )
+  assert_true(!world.add_component_bytes(gpu_entity, gpu, bytes4(5, 6, 7, 8)))
+  assert_true(!world.has_component(gpu_entity, gpu))
+  assert_eq(world.drain_resize_events().length(), 0)
+  assert_true(
+    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(55U)),
+  )
+  match world.gpu_component_bytes(gpu_entity, gpu) {
+    Some(bytes) => assert_eq(bytes[0], (55U & 0xFFU).to_byte())
+    None => abort("expected AddComponentBytesGpuStride bytes")
+  }
+}
+
+///|
+test "add_component emits resize events through centralized GPU capacity path" {
+  let world = World::new()
+  let entity = world.create_entity()
+  let _ = world.drain_resize_events()
+  let gpu = world.register_gpu_component(
+    "GpuResizeAfterEntity",
+    @comp.GpuLayout::empty(16),
+  )
+  assert_true(world.add_component(entity, gpu))
+  let events = world.drain_resize_events()
+  assert_eq(events.length(), 1)
+  assert_true(events[0].component == gpu)
+  assert_eq(events[0].required_capacity, entity.index + 1)
+  assert_true(events[0].needs_full_upload)
 }
 
 ///|
@@ -376,7 +471,7 @@ test "Query for_each gives full GpuComponentStore row for GpuVisible" {
 }
 
 ///|
-test "Query for_each_marking_gpu_dirty queues written gpu rows from direct query" {
+test "Query write_view queues dirty gpu row from direct query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -388,7 +483,8 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows from direct query
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  Query::new([qa, gpu16]).for_each_marking_gpu_dirty(world, [gpu16], row => {
+  let _ = world.drain_gpu_writes(gpu16)
+  Query::new([qa, gpu16]).for_each(world, row => {
     row.write_view(gpu16)[0] = (99 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
@@ -424,7 +520,7 @@ test "Query for_each wraps required row iteration" {
 }
 
 ///|
-test "Query helper for_each_marking_gpu_dirty queues written gpu rows" {
+test "Query write_view queues dirty gpu row from helper query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -437,9 +533,8 @@ test "Query helper for_each_marking_gpu_dirty queues written gpu rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.write_view(gpu16)[0] = (77 : Byte)
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => row.write_view(gpu16)[0] = (77 : Byte))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -481,7 +576,7 @@ test "QueryRow view accesses payloads by component id" {
 }
 
 ///|
-test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
+test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -494,12 +589,8 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each(world, row => {
-    row.write_view(gpu16)[0] = (88 : Byte)
-    if !row.mark_dirty(gpu16) {
-      abort("expected QueryRow dirty mark")
-    }
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => row.write_view(gpu16)[0] = (88 : Byte))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -507,7 +598,7 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
 }
 
 ///|
-test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
+test "Query write_view marks gpu row dirty even if bytes are unchanged" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -520,13 +611,12 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
   let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
-  query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.write_view(gpu16)[0] = (66 : Byte)
-  })
+  let _ = world.drain_gpu_writes(gpu16)
+  query.for_each(world, row => ignore(row.write_view(gpu16)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (66 : Byte))
+  assert_eq(writes[0].bytes[0], (0 : Byte))
 }
 
 ///|
@@ -585,6 +675,8 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
     @comp.GpuLayout::empty(16),
   )
   let e = world.create_entity()
+  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
+  assert_true(world.add_component_bytes(e, gpu16, empty))
   let missing = EntityId::new(e.index + 100, 0)
   let commands = CommandBuffer::new()
   commands.set_gpu_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))

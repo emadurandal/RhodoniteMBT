@@ -68,11 +68,17 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `QueryRow::write_view` | `writes` |
 | `set_component_bytes` | `writes` |
 | `set_gpu_component_bytes` / `clear_gpu_component` | `writes` |
-| `mark_gpu_component_dirty` / `drain_gpu_writes` | `writes` |
-| `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
+| `drain_gpu_writes` | `writes` |
+| `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
 | `create_entity` / `destroy_entity` | `structural_write` |
 
-`set_component_bytes` は既存 component の payload 更新だけを行い、archetype 構造を変えません。`add_component_bytes` は追加専用で、既に component を持つ entity に対しては `false` を返します。`remove_component` と `add_component_bytes` は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
+`set_component_bytes` は既存 CPU component の payload 更新だけを行い、archetype 構造を変えません。GPU-visible component の payload は `set_gpu_component_bytes` で更新します。
+
+component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。
+
+`set_gpu_component_bytes` / `clear_gpu_component` / `gpu_component_bytes` は、entity が対象の GPU-visible component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。
+
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_gpu_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
 
 `destroy_entity` は GPU slot の clear などを伴いますが、entity lifetime の構造操作として扱います。並列化では `structural_write` を持つ System が同 phase の他 System と衝突扱いになるため、個別 GPU component の `writes` までは要求しません。
 
@@ -99,6 +105,7 @@ System から遅延適用したい変更は `CommandBuffer` に積みます。
 ```moonbit
 pub(all) enum WorldCommand {
   DestroyEntity(EntityId)
+  AddComponent(EntityId, ComponentTypeId)
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
@@ -107,7 +114,7 @@ pub(all) enum WorldCommand {
 }
 ```
 
-`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。
+`CommandBuffer::apply` は insertion order で commands を適用し、失敗した command があれば `false` を返します。失敗後も後続 command は実行され、最後に buffer は空になります。component 追加は `CommandBuffer::add_component` または `CommandBuffer::add_component_bytes` を使えます。
 
 `CreateEntity` command はまだありません。System 内で entity を作る場合は、query callback の外で `World::create_entity` を直接呼びます。この場合は `structural_write` が必要です。query callback 内で entity 作成を予約したい場合は、将来的に予約 ID 付き create command を設計する必要があります。
 
@@ -128,24 +135,21 @@ query.for_each(world, fn(row) {
 
 `QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。
 
-`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。
+`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
 ## GPU-visible component の dirty 管理
 
-System が `GpuVisible` payload を直接変更する場合、`World::mark_gpu_component_dirty` または `QueryRow::mark_dirty` を呼ぶ必要があります。
+System が `QueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `read_view` を使うことで余分な dirty を避けられます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
   // row.write_view(gt) は GlobalTransform の flat GPU row。
-  // 書き換えた場合は dirty にする。
+  // GpuVisible の mutable view を取得した時点で dirty になる。
   let gt_row = row.write_view(gt)
   ignore(gt_row)
-  let _ = row.mark_dirty(gt)
 })
 ```
-
-`Query::for_each_marking_gpu_dirty` は callback が呼ばれた entity について、指定した GPU-visible component を callback 後に dirty 化します。全行を必ず書く System では便利ですが、一部 entity だけ変更する場合は `row.mark_dirty` で明示する方が余分な GPU upload を避けられます。
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 
