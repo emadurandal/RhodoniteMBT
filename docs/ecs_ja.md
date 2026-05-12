@@ -191,6 +191,30 @@ command は query 終了後に、積まれた順で適用されます。`Command
 
 ---
 
+## System と Schedule
+
+`World` は system を所有しません。最初の system 層は、`World` の外側に置く `Schedule` と、関数型の `System` です。
+
+```moonbit
+let schedule = Schedule::new()
+schedule.add_system(System::new("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
+  let query = Query::new([lifetime])
+  query.for_each(world, fn(entity, payloads) {
+    let remaining = @comp.get_gpu_f32_mut_view(payloads[0], 0)
+    if remaining <= ctx.delta_seconds {
+      commands.destroy_entity(entity)
+    }
+  })
+}))
+let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
+```
+
+`Schedule::run` は単一スレッドで動きます。phase は `PreUpdate`、`Update`、`PostUpdate`、`PreRender`、`RenderExtract` の順に実行されます。同じ phase の system は登録順です。各 system には新しい `CommandBuffer` が渡され、system が返った直後に schedule が適用します。そのため、後続 system は前の system の構造変更を観測できます。
+
+`System::reads` と `System::writes` は次の scheduling 改善に向けたメタデータです。構築時に重複を検査し、配列をコピーしますが、現時点の schedule はまだ conflict 検査や並列実行には使いません。
+
+---
+
 ## GPU アップロードとリサイズ
 
 - **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージして `GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。

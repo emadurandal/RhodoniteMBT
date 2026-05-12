@@ -492,6 +492,66 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
 }
 
 ///|
+test "Schedule runs systems by phase and applies commands after each system" {
+  let world = World::new()
+  let qa = world.register_cpu_component("ScheduleA", 4)
+  let qb = world.register_cpu_component("ScheduleB", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let order : Array[Int] = []
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new("post", PostUpdate, [], [], (_world, _ctx, _commands) => {
+      order.push(3)
+    }),
+  )
+  schedule.add_system(
+    System::new("add-b", Update, [qa], [qb], (system_world, ctx, commands) => {
+      order.push(ctx.frame_index)
+      let query = Query::new([qa])
+      query.for_each(system_world, (ent, _payloads) => {
+        commands.add_component_bytes(ent, qb, bytes4(5, 6, 7, 8))
+      })
+    }),
+  )
+  schedule.add_system(
+    System::new("see-b", Update, [qb], [], (system_world, _ctx, _commands) => {
+      if system_world.has_component(e, qb) {
+        order.push(2)
+      } else {
+        order.push(20)
+      }
+    }),
+  )
+  let ctx = SystemContext::new((0.016 : Float), 1)
+  assert_eq(schedule.len(), 3)
+  assert_true(schedule.run(world, ctx))
+  assert_eq(order.length(), 3)
+  assert_eq(order[0], 1)
+  assert_eq(order[1], 2)
+  assert_eq(order[2], 3)
+  assert_true(world.has_component(e, qb))
+}
+
+///|
+test "System access arrays are copied" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemAccessA", 4)
+  let qb = world.register_cpu_component("SystemAccessB", 4)
+  let reads : Array[ComponentTypeId] = [qa]
+  let writes : Array[ComponentTypeId] = [qb]
+  let system = System::new("copy-access", Update, reads, writes, (_w, _c, _b) => {
+    ()
+  })
+  reads[0] = qb
+  writes[0] = qa
+  assert_eq(system.name(), "copy-access")
+  assert_true(system.phase() == Update)
+  assert_true(system.reads()[0] == qa)
+  assert_true(system.writes()[0] == qb)
+}
+
+///|
 test "update_global_transforms_from_transforms writes hierarchy to GlobalTransform" {
   let world = World::new()
   let parent = world.create_entity()

@@ -124,6 +124,39 @@ pub struct CommandBuffer {
 }
 
 ///|
+/// Per-run data passed to systems by [`Schedule`].
+pub(all) struct SystemContext {
+  delta_seconds : Float
+  frame_index : Int
+}
+
+///|
+/// Coarse single-thread execution phase. Schedules run phases in declaration order.
+pub(all) enum SystemPhase {
+  PreUpdate
+  Update
+  PostUpdate
+  PreRender
+  RenderExtract
+} derive(Eq)
+
+///|
+/// Function-backed ECS system metadata plus declared component access.
+pub struct System {
+  name : String
+  phase : SystemPhase
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  run : (World, SystemContext, CommandBuffer) -> Unit
+}
+
+///|
+/// External system list. `World` stays focused on ECS storage and mutation.
+pub struct Schedule {
+  systems : Array[System]
+}
+
+///|
 /// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
 pub struct World {
   registry : ComponentRegistry

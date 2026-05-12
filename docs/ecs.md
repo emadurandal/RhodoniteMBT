@@ -191,6 +191,24 @@ Commands are applied in insertion order after the query has finished. `CommandBu
 
 ---
 
+## System and Schedule
+
+`World` does not own systems. The first system layer is an external `Schedule` containing function-backed `System` values.
+
+```moonbit
+let schedule = Schedule::new()
+schedule.add_system(System::new("Move", Update, [transform], [transform], fn(world, ctx, commands) {
+  // query world, optionally enqueue structural changes into commands
+}))
+let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
+```
+
+`Schedule::run` is single-threaded. It runs phases in this order: `PreUpdate`, `Update`, `PostUpdate`, `PreRender`, `RenderExtract`. Systems in the same phase keep registration order. Each system receives a fresh `CommandBuffer`, and the schedule applies it immediately after that system returns, so later systems can observe earlier structural changes.
+
+`System::reads` and `System::writes` are metadata for the next scheduling step. They are validated for duplicates and copied on construction, but the current schedule does not yet use them for conflict detection or parallel execution.
+
+---
+
 ## GPU upload and resize
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
