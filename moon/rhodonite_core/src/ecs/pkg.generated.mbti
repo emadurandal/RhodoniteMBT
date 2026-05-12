@@ -90,7 +90,8 @@ pub struct QueryRow {
 pub fn QueryRow::entity(Self) -> EntityId
 pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
 pub fn QueryRow::mark_dirty(Self, ComponentTypeId) -> Bool
-pub fn QueryRow::view(Self, ComponentTypeId) -> MutArrayView[Byte]
+pub fn QueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn QueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId

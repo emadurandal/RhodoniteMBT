@@ -68,23 +68,48 @@ pub fn QueryRow::has(self : QueryRow, component : ComponentTypeId) -> Bool {
 }
 
 ///|
-/// Returns the zero-copy payload view for `component`.
+/// Returns the query payload index for `component`.
+fn QueryRow::component_payload_index(
+  self : QueryRow,
+  component : ComponentTypeId,
+  operation : String,
+) -> Int {
+  let index = component_array_index_of(self.components, component)
+  if index < 0 {
+    abort(operation + ": component is not part of this query")
+  }
+  index
+}
+
+///|
+/// Returns a zero-copy read-only payload view for `component`.
 ///
 /// CpuOnly components return their archetype SoA row; GpuVisible components return the flat GPU
 /// store row for this entity. The component must be part of the query's required set.
-pub fn QueryRow::view(
+pub fn QueryRow::read_view(
+  self : QueryRow,
+  component : ComponentTypeId,
+) -> ArrayView[Byte] {
+  self.world.assert_system_component_read(component, "QueryRow::read_view")
+  let index = self.component_payload_index(component, "QueryRow::read_view")
+  self.payloads[index].view()
+}
+
+///|
+/// Returns a zero-copy mutable payload view for `component`.
+///
+/// Schedule execution requires `component` to be declared in the active System's `writes` set.
+pub fn QueryRow::write_view(
   self : QueryRow,
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
-  let index = component_array_index_of(self.components, component)
-  if index < 0 {
-    abort("QueryRow::view: component is not part of this query")
-  }
+  self.world.assert_system_component_write(component, "QueryRow::write_view")
+  let index = self.component_payload_index(component, "QueryRow::write_view")
   self.payloads[index]
 }
 
 ///|
-/// Marks a GpuVisible component row dirty after mutating it through [`QueryRow::view`].
+/// Marks a GpuVisible component row dirty after mutating it through [`QueryRow::write_view`].
 pub fn QueryRow::mark_dirty(
   self : QueryRow,
   component : ComponentTypeId,

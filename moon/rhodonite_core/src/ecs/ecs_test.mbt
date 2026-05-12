@@ -417,8 +417,8 @@ test "Query for_each wraps required row iteration" {
   let mut second_first_byte = (0 : Byte)
   query.for_each(world, row => {
     hits.push(row.entity())
-    first_len = row.view(qa).length()
-    second_first_byte = row.view(qb)[0]
+    first_len = row.read_view(qa).length()
+    second_first_byte = row.read_view(qb)[0]
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -441,7 +441,7 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.view(gpu16)[0] = (77 : Byte)
+    row.write_view(gpu16)[0] = (77 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
@@ -469,9 +469,9 @@ test "QueryRow view accesses payloads by component id" {
     if !row.has(qb) {
       abort("expected QueryRowB")
     }
-    a_first = row.view(qa)[0]
-    b_first = row.view(qb)[0]
-    row.view(qb)[0] = (42 : Byte)
+    a_first = row.read_view(qa)[0]
+    b_first = row.read_view(qb)[0]
+    row.write_view(qb)[0] = (42 : Byte)
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -498,7 +498,7 @@ test "QueryRow view and mark_dirty update gpu rows without payload indexes" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   query.for_each(world, row => {
-    row.view(gpu16)[0] = (88 : Byte)
+    row.write_view(gpu16)[0] = (88 : Byte)
     if !row.mark_dirty(gpu16) {
       abort("expected QueryRow dirty mark")
     }
@@ -524,7 +524,7 @@ test "Query for_each_marking_gpu_dirty queues written gpu rows with rows" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   query.for_each_marking_gpu_dirty(world, [gpu16], row => {
-    row.view(gpu16)[0] = (66 : Byte)
+    row.write_view(gpu16)[0] = (66 : Byte)
   })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)

@@ -166,16 +166,17 @@ For system-style code that does not need the full archetype signature, use `Quer
 - `Query::new` rejects duplicate component ids up front.
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
 - The callback omits `full_signature`, keeping common system code shorter.
-- `QueryRow::view(component)` returns the zero-copy `MutArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
-- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::view`.
+- `QueryRow::read_view(component)` returns a zero-copy `ArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
+- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution.
+- `QueryRow::mark_dirty(component)` marks a GPU-visible row dirty after mutating it through `QueryRow::write_view`.
 - `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` pairs `QueryRow` access with automatic dirty marking for callbacks that always write selected GPU-visible rows.
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let local_tf = @comp.Transform3D::from_component_mut_view(row.view(tf))
-  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.view(gt))
-  ignore(local_tf)
+  let tf_bytes = row.read_view(tf)
+  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
+  ignore(tf_bytes)
   ignore(global_tf)
   let _ = row.mark_dirty(gt)
 })
@@ -210,7 +211,7 @@ Commands are applied in insertion order after the query has finished. `CommandBu
 
 ```moonbit
 let schedule = Schedule::new()
-schedule.add_system(System::new("Move", Update, [transform], [transform], fn(world, ctx, commands) {
+schedule.add_system(System::new("Move", Update, [], [transform], fn(world, ctx, commands) {
   // query world, optionally enqueue structural changes into commands
 }))
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))

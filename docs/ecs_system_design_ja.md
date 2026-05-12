@@ -120,13 +120,15 @@ System からは薄い `Query` helper を使えます。
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let tf_row = row.view(tf)
-  let gt_row = row.view(gt)
+  let tf_row = row.read_view(tf)
+  let gt_row = row.write_view(gt)
   // ...
 })
 ```
 
-`QueryRow::view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を返します。現時点では `MutArrayView[Byte]` を返すため、read-only / mutable の型上の分離はまだありません。System 実行中は query required component が active system の `reads ∪ writes` に含まれることを実行時に検査します。
+`QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。
+
+`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。
 
 ## GPU-visible component の dirty 管理
 
@@ -135,8 +137,10 @@ System が `GpuVisible` payload を直接変更する場合、`World::mark_gpu_c
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  // row.view(gt) は GlobalTransform の flat GPU row。
+  // row.write_view(gt) は GlobalTransform の flat GPU row。
   // 書き換えた場合は dirty にする。
+  let gt_row = row.write_view(gt)
+  ignore(gt_row)
   let _ = row.mark_dirty(gt)
 })
 ```
@@ -188,7 +192,7 @@ pub struct App {
 
 ## まだ残る課題
 
-- read-only query view と mutable query view の型上の分離。
+- typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
 - `CreateEntity` command、または予約 `EntityId` を返す spawn API。
 - read/write/structural access に基づく実際の System batch 分割と並列実行。
 - GPU dirty tracking の thread-local 化と merge。

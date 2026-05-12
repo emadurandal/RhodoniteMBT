@@ -166,16 +166,17 @@ flowchart TD
 - `Query::new` の時点で重複 component id を拒否できます。
 - 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
 - callback から `full_signature` を省けるため、通常の System 処理を短く書けます。
-- `QueryRow::view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `MutArrayView[Byte]` を返します。
-- `QueryRow::mark_dirty(component)` は `QueryRow::view` で変更した GPU-visible row を dirty にします。
+- `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
+- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。
+- `QueryRow::mark_dirty(component)` は `QueryRow::write_view` で変更した GPU-visible row を dirty にします。
 - GPU-visible 行を必ず書く callback には `query.for_each_marking_gpu_dirty(world, dirty_gpu_components, f)` を組み合わせられます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let local_tf = @comp.Transform3D::from_component_mut_view(row.view(tf))
-  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.view(gt))
-  ignore(local_tf)
+  let tf_bytes = row.read_view(tf)
+  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
+  ignore(tf_bytes)
   ignore(global_tf)
   let _ = row.mark_dirty(gt)
 })
@@ -210,10 +211,10 @@ command は query 終了後に、積まれた順で適用されます。`Command
 
 ```moonbit
 let schedule = Schedule::new()
-schedule.add_system(System::new("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
+schedule.add_system(System::new_with_structural_write("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
   let query = Query::new([lifetime])
   query.for_each(world, fn(row) {
-    let remaining = @comp.get_gpu_f32_mut_view(row.view(lifetime), 0)
+    let remaining = @comp.get_gpu_f32_byte_view(row.read_view(lifetime), 0)
     if remaining <= ctx.delta_seconds {
       commands.destroy_entity(row.entity())
     }
