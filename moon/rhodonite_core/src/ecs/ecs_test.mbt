@@ -898,6 +898,36 @@ test "Schedule run temporarily locks component registration" {
 }
 
 ///|
+test "drain_resize_events is allowed outside schedule and structural systems" {
+  let world = World::new()
+  let e0 = world.create_entity()
+  let _ = world.drain_resize_events()
+  let gpu = world.register_gpu_component(
+    "ResizeDrainAccessGpu",
+    @comp.global_transform_gpu_layout(),
+  )
+  assert_true(world.add_component(e0, gpu))
+  let outside_events = world.drain_resize_events()
+  assert_true(outside_events.length() > 0)
+  let e1 = world.create_entity()
+  assert_true(world.add_component(e1, gpu))
+  let mut drained_in_system = 0
+  let schedule = Schedule::new()
+  schedule.add_system(
+    System::new_with_structural_write(
+      "drain-resize-events",
+      RenderExtract,
+      [],
+      [],
+      (w, _ctx, _cmds) => drained_in_system = w.drain_resize_events().length(),
+    ),
+  )
+  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(drained_in_system > 0)
+  assert_eq(world.drain_resize_events().length(), 0)
+}
+
+///|
 test "transform_propagation_system updates GlobalTransform in a schedule" {
   let world = World::new()
   let e = world.create_entity()

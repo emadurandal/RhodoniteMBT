@@ -306,8 +306,12 @@ pub fn World::drain_gpu_writes(
 }
 
 ///|
-/// Drains resize notifications after GPU backing arrays grow (caller may recreate `GPUBuffer` and full-upload).
+/// Drains resize notifications after GPU backing arrays grow.
+///
+/// Schedule execution treats this as structural access to the world's event queue; systems that
+/// drain resize events must be built with `System::new_with_structural_write`.
 pub fn World::drain_resize_events(self : World) -> Array[GpuResizeEvent] {
+  self.assert_system_structural_write("World::drain_resize_events")
   let out : Array[GpuResizeEvent] = []
   for i = 0; i < self.resize_events.length(); i = i + 1 {
     out.push(self.resize_events[i])
