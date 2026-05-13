@@ -453,6 +453,76 @@ fn World::try_update_global_transforms_no_child_fast_path(
 }
 
 ///|
+/// Fallback for hierarchy-capable transform propagation that still walks archetypes directly.
+/// It avoids per-entity `QueryRow` construction, repeated `has_component`, and per-row GPU store lookup.
+fn World::try_update_global_transforms_from_transforms_archetype_path(
+  self : World,
+  tf : ComponentTypeId,
+  gt : ComponentTypeId,
+  co : ComponentTypeId,
+) -> Bool {
+  let mut matched = false
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let comps = arch.components
+    if !component_array_contains(comps, tf) ||
+      !component_array_contains(comps, gt) {
+      continue
+    }
+    matched = true
+    let tf_col_index = arch.column_index(tf)
+    if tf_col_index < 0 {
+      return false
+    }
+    if arch.columns[tf_col_index].stride != 48 {
+      return false
+    }
+  }
+  if !matched {
+    return true
+  }
+  let gt_store = match
+    self.ensure_gpu_store_capacity(gt, self.locations.length()) {
+    Some(store) => store
+    None => return false
+  }
+  if gt_store.stride != 64 {
+    return false
+  }
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let comps = arch.components
+    if !component_array_contains(comps, tf) ||
+      !component_array_contains(comps, gt) {
+      continue
+    }
+    let has_child_of = component_array_contains(comps, co)
+    let tf_col = arch.columns[arch.column_index(tf)]
+    let tf_bytes = tf_col.bytes
+    let tf_stride = tf_col.stride
+    for row = 0; row < arch.entities.length(); row = row + 1 {
+      let e = arch.entities[row]
+      let tf_base = row * tf_stride
+      let local_m = @comp.Transform3D::local_matrix_from_component_view(
+        tf_bytes[tf_base:tf_base + tf_stride],
+      )
+      let gt_base = e.index * gt_store.stride
+      ignore(
+        self.compute_global_transform_for_tf_gt_bulk_row(
+          e,
+          has_child_of,
+          local_m,
+          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 64),
+        ),
+      )
+      gt_store.mark_dirty(e.index)
+    }
+  }
+  self.replace_gpu_store(gt_store)
+  true
+}
+
+///|
 /// Recomputes [`GlobalTransform`] GPU payloads from [`Transform3D`] (and optional [`ChildOf`] hierarchy)
 /// for every entity that currently has **both** builtin transforms.
 pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
@@ -469,6 +539,11 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
     gt, "World::update_global_transforms_from_transforms",
   )
   if self.try_update_global_transforms_no_child_fast_path(tf, gt, co) {
+    return
+  }
+  if self.try_update_global_transforms_from_transforms_archetype_path(
+      tf, gt, co,
+    ) {
     return
   }
   let required : Array[ComponentTypeId] = [tf, gt]
