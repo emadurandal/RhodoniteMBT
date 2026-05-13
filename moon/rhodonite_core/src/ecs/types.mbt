@@ -109,12 +109,20 @@ pub struct Query {
 }
 
 ///|
+priv struct QueryRowComponentAccess {
+  kind : ComponentKind
+  column_index : Int
+  stride : Int
+}
+
+///|
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views used by the lower-level world query.
 pub struct QueryRow {
   priv world : World
   priv entity : EntityId
   priv components : Array[ComponentTypeId]
+  priv accesses : Array[QueryRowComponentAccess]
   priv archetype_index : Int
   priv row : Int
 }

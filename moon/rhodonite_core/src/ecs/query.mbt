@@ -36,9 +36,63 @@ pub fn Query::for_each(
   f : (QueryRow) -> Unit,
 ) -> Unit {
   world.assert_system_components_read(self.required, "Query::for_each")
-  world.for_each_query_rows(self.required, (e, archetype_index, row) => {
-    f({ world, entity: e, components: self.required, archetype_index, row })
-  })
+  if self.required.length() == 0 {
+    return
+  }
+  for k = 0; k < self.required.length(); k = k + 1 {
+    match world.registry.get(self.required[k]) {
+      Some(_) => ()
+      None =>
+        abort(
+          "Query::for_each: unknown " +
+          component_id_text(self.required[k]) +
+          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+        )
+    }
+  }
+  world.query_depth = world.query_depth + 1
+  for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
+    let arch = world.archetypes[ai]
+    if component_array_contains_all(arch.components, self.required) {
+      let accesses : Array[QueryRowComponentAccess] = []
+      for k = 0; k < self.required.length(); k = k + 1 {
+        let component = self.required[k]
+        match world.registry.get(component) {
+          Some(rc) =>
+            match rc.kind {
+              CpuOnly => {
+                let ci = arch.column_index(component)
+                if ci < 0 {
+                  abort(
+                    "Query::for_each: matched archetype is missing CPU column",
+                  )
+                }
+                accesses.push({
+                  kind: CpuOnly,
+                  column_index: ci,
+                  stride: arch.columns[ci].stride,
+                })
+              }
+              GpuVisible =>
+                accesses.push({ kind: GpuVisible, column_index: -1, stride: 0 })
+            }
+          None => abort("Query::for_each: unknown component")
+        }
+      }
+      let ents = arch.entities
+      for row = 0; row < ents.length(); row = row + 1 {
+        f({
+          world,
+          entity: ents[row],
+          components: self.required,
+          accesses,
+          archetype_index: ai,
+          row,
+        })
+      }
+    }
+  }
+  world.query_depth = world.query_depth - 1
 }
 
 ///|
@@ -96,53 +150,34 @@ fn QueryRow::component_view(
   component : ComponentTypeId,
   operation : String,
 ) -> ArrayView[Byte] {
-  ignore(self.component_payload_index(component, operation))
-  match self.world.registry.get(component) {
-    None =>
-      abort(
-        operation +
-        ": unknown " +
-        component_id_text(component) +
-        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
-      )
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly =>
-          match
-            self.world.archetypes[self.archetype_index].component_byte_view(
-              self.row,
-              component,
-            ) {
+  let payload_index = self.component_payload_index(component, operation)
+  let access = self.accesses[payload_index]
+  match access.kind {
+    CpuOnly => {
+      let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
+      let base = self.row * access.stride
+      col.bytes[base:base + access.stride]
+    }
+    GpuVisible =>
+      match self.world.gpu_store(component) {
+        Some(store) =>
+          match store.entity_row_view(self.entity.index) {
             Some(v) => v
-            None =>
-              abort(
-                operation +
-                ": required " +
-                component_id_text(component) +
-                " is missing from the matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
-              )
-          }
-        GpuVisible =>
-          match self.world.gpu_store(component) {
-            Some(store) =>
-              match store.entity_row_view(self.entity.index) {
-                Some(v) => v
-                None =>
-                  abort(
-                    operation +
-                    ": GpuVisible " +
-                    component_id_text(component) +
-                    " row is outside the current GPU store capacity. Hint: GPU-visible ownership should be initialized through add_component/add_component_bytes before querying.",
-                  )
-              }
             None =>
               abort(
                 operation +
                 ": GpuVisible " +
                 component_id_text(component) +
-                " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+                " row is outside the current GPU store capacity. Hint: GPU-visible ownership should be initialized through add_component/add_component_bytes before querying.",
               )
           }
+        None =>
+          abort(
+            operation +
+            ": GpuVisible " +
+            component_id_text(component) +
+            " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+          )
       }
   }
 }
@@ -155,54 +190,32 @@ fn QueryRow::component_mut_view(
   operation : String,
   mark_gpu_dirty : Bool,
 ) -> MutArrayView[Byte] {
-  ignore(self.component_payload_index(component, operation))
-  match self.world.registry.get(component) {
-    None =>
-      abort(
-        operation +
-        ": unknown " +
-        component_id_text(component) +
-        ". Hint: use a ComponentTypeId returned by this World's register_*_component or builtin component accessor.",
-      )
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly =>
-          match
-            self.world.archetypes[self.archetype_index].component_byte_mut_view(
-              self.row,
-              component,
-            ) {
-            Some(v) => v
-            None =>
-              abort(
-                operation +
-                ": required " +
-                component_id_text(component) +
-                " is missing from the matched archetype. Hint: this indicates an internal ECS archetype signature/column mismatch; report the query and component ids that triggered it.",
-              )
+  let payload_index = self.component_payload_index(component, operation)
+  let access = self.accesses[payload_index]
+  match access.kind {
+    CpuOnly => {
+      let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
+      let base = self.row * access.stride
+      col.bytes.mut_view(start=base, end=base + access.stride)
+    }
+    GpuVisible =>
+      match
+        self.world.ensure_gpu_store_capacity(component, self.entity.index + 1) {
+        Some(store) => {
+          if mark_gpu_dirty {
+            store.mark_dirty(self.entity.index)
+            self.world.replace_gpu_store(store)
           }
-        GpuVisible =>
-          match
-            self.world.ensure_gpu_store_capacity(
-              component,
-              self.entity.index + 1,
-            ) {
-            Some(store) => {
-              if mark_gpu_dirty {
-                store.mark_dirty(self.entity.index)
-                self.world.replace_gpu_store(store)
-              }
-              let base = self.entity.index * store.stride
-              store.bytes.mut_view(start=base, end=base + store.stride)
-            }
-            None =>
-              abort(
-                operation +
-                ": GpuVisible " +
-                component_id_text(component) +
-                " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
-              )
-          }
+          let base = self.entity.index * store.stride
+          store.bytes.mut_view(start=base, end=base + store.stride)
+        }
+        None =>
+          abort(
+            operation +
+            ": GpuVisible " +
+            component_id_text(component) +
+            " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
+          )
       }
   }
 }

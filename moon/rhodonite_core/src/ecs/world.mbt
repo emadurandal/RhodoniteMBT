@@ -892,50 +892,6 @@ pub fn World::component_bytes(
 }
 
 ///|
-/// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
-/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access and build row views lazily
-/// at the point where the callback asks for a read-only or mutable view.
-fn World::for_each_query_rows(
-  self : World,
-  required : Array[ComponentTypeId],
-  f : (EntityId, Int, Int) -> Unit,
-) -> Unit {
-  if required.length() == 0 {
-    return
-  }
-  if component_array_has_duplicates(required) {
-    abort(
-      "Query::for_each: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
-    )
-  }
-  for k = 0; k < required.length(); k = k + 1 {
-    match self.registry.get(required[k]) {
-      Some(_) => ()
-      None =>
-        abort(
-          "Query::for_each: unknown " +
-          component_id_text(required[k]) +
-          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-        )
-    }
-  }
-  // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
-  self.query_depth = self.query_depth + 1
-  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-    let sig = self.archetypes[ai].components
-    if component_array_contains_all(sig, required) {
-      let arch = self.archetypes[ai]
-      let ents = arch.entities
-      for j = 0; j < ents.length(); j = j + 1 {
-        f(ents[j], ai, j)
-      }
-    }
-  }
-  // Restore the outer mutation state after the query finishes.
-  self.query_depth = self.query_depth - 1
-}
-
-///|
 /// Internal archetype iterator used by [`Query::for_each_archetype`].
 fn World::for_each_query_archetypes(
   self : World,
