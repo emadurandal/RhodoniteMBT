@@ -9,6 +9,8 @@ fn GpuComponentStore::new(
   let dirty_indices : Array[Int] = []
   let dirty_range_first : Array[Int] = []
   let dirty_range_last : Array[Int] = []
+  let full_dirty_first = -1
+  let full_dirty_last = -1
   let sort_bucket : Array[Bool] = []
   let active_flags : Array[Bool] = []
   let active_indices : Array[Int] = []
@@ -21,6 +23,8 @@ fn GpuComponentStore::new(
     dirty_indices,
     dirty_range_first,
     dirty_range_last,
+    full_dirty_first,
+    full_dirty_last,
     sort_bucket,
     active_flags,
     active_indices,
@@ -198,6 +202,21 @@ fn GpuComponentStore::mark_dirty_range(
     self.dirty_range_first.push(first)
     self.dirty_range_last.push(last)
   }
+}
+
+///|
+/// Queues one full upload span for this drain cycle. This dominates individual dirty indices and ranges.
+#cfg(not(target="js"))
+fn GpuComponentStore::mark_full_dirty_range(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> Unit {
+  if last < first {
+    return
+  }
+  self.full_dirty_first = first
+  self.full_dirty_last = last
 }
 
 ///|
@@ -438,15 +457,6 @@ extern "js" fn GpuComponentStore::drain_writes_js(
   #| (store) => {
   #|   const dirty = store.dirty_indices;
   #|   const pendingRanges = store.__rhodonite_dirty_ranges || [];
-  #|   if (dirty.length === 0 && pendingRanges.length === 0) return [];
-  #|   let sorted = true;
-  #|   for (let i = 1; i < dirty.length; i++) {
-  #|     if (dirty[i] < dirty[i - 1]) {
-  #|       sorted = false;
-  #|       break;
-  #|     }
-  #|   }
-  #|   if (!sorted) dirty.sort((a, b) => a - b);
   #|   const stride = store.stride;
   #|   const src = store.bytes;
   #|   const writes = [];
@@ -460,6 +470,23 @@ extern "js" fn GpuComponentStore::drain_writes_js(
   #|     out.set(src.slice(start, start + len));
   #|     return out;
   #|   };
+  #|   const full = store.__rhodonite_full_dirty_range;
+  #|   if (full && full.last >= full.first) {
+  #|     const first = full.first | 0;
+  #|     const last = full.last | 0;
+  #|     store.__rhodonite_full_dirty_range = null;
+  #|     writes.push({ byte_offset: first * stride, bytes: rangeBytes(first, last) });
+  #|     if (dirty.length === 0 && pendingRanges.length === 0) return writes;
+  #|   }
+  #|   if (dirty.length === 0 && pendingRanges.length === 0) return [];
+  #|   let sorted = true;
+  #|   for (let i = 1; i < dirty.length; i++) {
+  #|     if (dirty[i] < dirty[i - 1]) {
+  #|       sorted = false;
+  #|       break;
+  #|     }
+  #|   }
+  #|   if (!sorted) dirty.sort((a, b) => a - b);
   #|   const mergedRanges = [];
   #|   if (pendingRanges.length > 0) {
   #|     pendingRanges.sort((a, b) => a.first - b.first);
@@ -535,6 +562,14 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
 #cfg(not(target="js"))
 fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
   let writes : Array[GpuWrite] = []
+  if self.full_dirty_first >= 0 {
+    writes.push(self.range_bytes(self.full_dirty_first, self.full_dirty_last))
+    self.full_dirty_first = -1
+    self.full_dirty_last = -1
+    if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
+      return writes
+    }
+  }
   if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
     return writes
   }

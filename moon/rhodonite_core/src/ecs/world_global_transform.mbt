@@ -124,9 +124,15 @@ extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   #|     m[out + 14] = Math.fround((iz - half) * spacing);
   #|     m[out + 15] = 1;
   #|   }
-  #|   const ranges = store.__rhodonite_dirty_ranges ||
-  #|     (store.__rhodonite_dirty_ranges = []);
-  #|   if (count > 0) ranges.push({ first: 0, last: count - 1 });
+  #|   if (count > 0) {
+  #|     const pendingRanges = store.__rhodonite_dirty_ranges;
+  #|     if (store.dirty_indices.length === 0 && (!pendingRanges || pendingRanges.length === 0)) {
+  #|       store.__rhodonite_full_dirty_range = { first: 0, last: count - 1 };
+  #|     } else {
+  #|       const ranges = pendingRanges || (store.__rhodonite_dirty_ranges = []);
+  #|       ranges.push({ first: 0, last: count - 1 });
+  #|     }
+  #|   }
   #|   return true;
   #| }
 
@@ -368,6 +374,8 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   const capacity = Math.floor(gtBytes.length / gtStride);
   #|   const dirtyRanges = gtStore.__rhodonite_dirty_ranges ||
   #|     (gtStore.__rhodonite_dirty_ranges = []);
+  #|   const dirtyRangeBase = dirtyRanges.length;
+  #|   const hadPendingDirty = gtStore.dirty_indices.length > 0 || dirtyRangeBase > 0;
   #|   const pushDirtyRange = (first, last) => {
   #|     if (last < first) return;
   #|     const prev = dirtyRanges[dirtyRanges.length - 1];
@@ -377,6 +385,9 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       dirtyRanges.push({ first, last });
   #|     }
   #|   };
+  #|   let dirtyCount = 0;
+  #|   let dirtyMin = 2147483647;
+  #|   let dirtyMax = -1;
   #|
   #|   for (let ai = 0; ai < archetypes.length; ai++) {
   #|     const arch = archetypes[ai];
@@ -420,6 +431,9 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     for (let row = 0; row < entities.length; row++) {
   #|       const entityIndex = entities[row].index;
   #|       if (entityIndex < 0 || entityIndex >= capacity) return false;
+  #|       dirtyCount++;
+  #|       if (entityIndex < dirtyMin) dirtyMin = entityIndex;
+  #|       if (entityIndex > dirtyMax) dirtyMax = entityIndex;
   #|       const b = row * tfStrideF32;
   #|       const px = tfF32[b];
   #|       const py = tfF32[b + 1];
@@ -482,6 +496,10 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     }
   #|     pushDirtyRange(rangeFirst, rangePrev);
   #|   }
+  #|   if (!hadPendingDirty && dirtyCount > 0 && dirtyMin === 0 && dirtyMax === dirtyCount - 1) {
+  #|     dirtyRanges.length = dirtyRangeBase;
+  #|     gtStore.__rhodonite_full_dirty_range = { first: 0, last: dirtyMax };
+  #|   }
   #|   return true;
   #| }
 
@@ -541,6 +559,11 @@ fn World::try_update_global_transforms_no_child_fast_path(
     }
   }
   let capacity = gt_store.capacity()
+  let had_pending_dirty = gt_store.dirty_indices.length() > 0 ||
+    gt_store.dirty_range_first.length() > 0
+  let mut dirty_count = 0
+  let mut dirty_min = 2147483647
+  let mut dirty_max = -1
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let arch = self.archetypes[ai]
     let comps = arch.components
@@ -564,6 +587,13 @@ fn World::try_update_global_transforms_no_child_fast_path(
       let entity_index = arch.entities[row].index
       if entity_index < 0 || entity_index >= capacity {
         return false
+      }
+      dirty_count = dirty_count + 1
+      if entity_index < dirty_min {
+        dirty_min = entity_index
+      }
+      if entity_index > dirty_max {
+        dirty_max = entity_index
       }
       let b = row * tf_stride
       let px = get_f32_array_le(tf_bytes, b)
@@ -625,6 +655,18 @@ fn World::try_update_global_transforms_no_child_fast_path(
       }
     }
     gt_store.mark_dirty_range(dirty_first, dirty_prev)
+  }
+  if !had_pending_dirty &&
+    dirty_count > 0 &&
+    dirty_min == 0 &&
+    dirty_max == dirty_count - 1 {
+    while gt_store.dirty_range_first.length() > 0 {
+      let _ = gt_store.dirty_range_first.pop()
+    }
+    while gt_store.dirty_range_last.length() > 0 {
+      let _ = gt_store.dirty_range_last.pop()
+    }
+    gt_store.mark_full_dirty_range(0, dirty_max)
   }
   self.replace_gpu_store(gt_store)
   true
