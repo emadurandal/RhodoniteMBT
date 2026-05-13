@@ -118,6 +118,45 @@ pub fn World::write_global_transforms_dense_views(
 }
 
 ///|
+/// Bulk-writes dense GlobalTransform rows `[0, count)` and returns native `Bytes` upload ranges.
+#cfg(not(target="js"))
+pub fn World::write_global_transforms_dense_bytes(
+  self : World,
+  count : Int,
+  write : (Int, MutArrayView[Byte]) -> Unit,
+) -> Array[GpuWriteBytes] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_bytes",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_bytes: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
+    let bytes = range.bytes()
+    let stride = range.stride()
+    if stride != 64 {
+      abort(
+        "World::write_global_transforms_dense_bytes: GlobalTransform stride mismatch",
+      )
+    }
+    for i = 0; i < count; i = i + 1 {
+      let base = i * stride
+      write(i, bytes.mut_view(start=base, end=base + stride))
+    }
+  })
+  if !ok {
+    return []
+  }
+  self.drain_gpu_write_bytes(gt)
+}
+
+///|
 #cfg(target="js")
 extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   self : World,
@@ -266,6 +305,45 @@ pub fn World::write_global_transforms_dense_grid_wave(
   let half = (per_side - 1).to_double() * 0.5
   let scale_d = scale.to_double()
   self.write_global_transforms_dense(count, fn(i, row) {
+    let ix = i % per_side
+    let iz = i / per_side
+    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(
+      row,
+      52,
+      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+    )
+    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
+  })
+}
+
+///|
+/// Bulk-writes dense scaled GlobalTransform matrices and returns native `Bytes` upload ranges.
+#cfg(not(target="js"))
+pub fn World::write_global_transforms_dense_grid_wave_bytes(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Array[GpuWriteBytes] {
+  let half = (per_side - 1).to_double() * 0.5
+  let scale_d = scale.to_double()
+  self.write_global_transforms_dense_bytes(count, fn(i, row) {
     let ix = i % per_side
     let iz = i / per_side
     @comp.put_gpu_f32_mut_view(row, 0, scale_d)
@@ -639,6 +717,16 @@ fn put_f32_array_le(bytes : Array[Byte], off : Int, v : Float) -> Unit {
 
 ///|
 #cfg(not(target="js"))
+fn put_f32_fixed_le(bytes : FixedArray[Byte], off : Int, v : Float) -> Unit {
+  let u = v.reinterpret_as_uint()
+  bytes[off] = (u & 0xFFU).to_byte()
+  bytes[off + 1] = ((u >> 8) & 0xFFU).to_byte()
+  bytes[off + 2] = ((u >> 16) & 0xFFU).to_byte()
+  bytes[off + 3] = ((u >> 24) & 0xFFU).to_byte()
+}
+
+///|
+#cfg(not(target="js"))
 fn World::try_update_global_transforms_no_child_fast_path(
   self : World,
   tf : ComponentTypeId,
@@ -717,22 +805,22 @@ fn World::try_update_global_transforms_no_child_fast_path(
       let r22 = (1.0 : Float) - (2.0 : Float) * (xx + yy)
 
       let out = entity_index * gt_store.stride
-      put_f32_array_le(gt_store.bytes, out, r00 * sx)
-      put_f32_array_le(gt_store.bytes, out + 4, r10 * sx)
-      put_f32_array_le(gt_store.bytes, out + 8, r20 * sx)
-      put_f32_array_le(gt_store.bytes, out + 12, (0.0 : Float))
-      put_f32_array_le(gt_store.bytes, out + 16, r01 * sy)
-      put_f32_array_le(gt_store.bytes, out + 20, r11 * sy)
-      put_f32_array_le(gt_store.bytes, out + 24, r21 * sy)
-      put_f32_array_le(gt_store.bytes, out + 28, (0.0 : Float))
-      put_f32_array_le(gt_store.bytes, out + 32, r02 * sz)
-      put_f32_array_le(gt_store.bytes, out + 36, r12 * sz)
-      put_f32_array_le(gt_store.bytes, out + 40, r22 * sz)
-      put_f32_array_le(gt_store.bytes, out + 44, (0.0 : Float))
-      put_f32_array_le(gt_store.bytes, out + 48, px)
-      put_f32_array_le(gt_store.bytes, out + 52, py)
-      put_f32_array_le(gt_store.bytes, out + 56, pz)
-      put_f32_array_le(gt_store.bytes, out + 60, (1.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out, r00 * sx)
+      put_f32_fixed_le(gt_store.bytes, out + 4, r10 * sx)
+      put_f32_fixed_le(gt_store.bytes, out + 8, r20 * sx)
+      put_f32_fixed_le(gt_store.bytes, out + 12, (0.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out + 16, r01 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 20, r11 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 24, r21 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 28, (0.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out + 32, r02 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 36, r12 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 40, r22 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 44, (0.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out + 48, px)
+      put_f32_fixed_le(gt_store.bytes, out + 52, py)
+      put_f32_fixed_le(gt_store.bytes, out + 56, pz)
+      put_f32_fixed_le(gt_store.bytes, out + 60, (1.0 : Float))
       if dirty_first < 0 {
         dirty_first = entity_index
         dirty_prev = entity_index

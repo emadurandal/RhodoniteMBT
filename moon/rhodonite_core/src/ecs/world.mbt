@@ -893,7 +893,7 @@ pub fn World::component_bytes(
                 return None
               }
               Some(
-                copy_array_range_to_fixed(
+                copy_fixed_range_to_fixed(
                   store.bytes,
                   entity.index * store.stride,
                   store.stride,

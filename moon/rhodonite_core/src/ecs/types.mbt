@@ -85,7 +85,7 @@ struct Archetype {
 struct GpuComponentStore {
   component : ComponentTypeId
   stride : Int
-  bytes : Array[Byte]
+  mut bytes : FixedArray[Byte]
   dirty_flags : Array[Bool]
   dirty_indices : Array[Int]
   dirty_range_first : Array[Int]
@@ -108,6 +108,13 @@ pub(all) struct GpuWrite {
 pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]
+}
+
+///|
+/// GPU upload slice represented as `Bytes`. Native full-store writes can alias the store backing.
+pub(all) struct GpuWriteBytes {
+  byte_offset : Int
+  bytes : Bytes
 }
 
 ///|

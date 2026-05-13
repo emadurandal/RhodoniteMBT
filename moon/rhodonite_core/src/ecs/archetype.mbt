@@ -23,6 +23,19 @@ fn copy_array_range_to_fixed(
 }
 
 ///|
+fn copy_fixed_range_to_fixed(
+  src : FixedArray[Byte],
+  offset : Int,
+  len : Int,
+) -> FixedArray[Byte] {
+  let out = FixedArray::make(len, (0 : Byte))
+  for i = 0; i < len; i = i + 1 {
+    out[i] = src[offset + i]
+  }
+  out
+}
+
+///|
 fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
   for i = 0; i < count; i = i + 1 {
     ignore(i)

@@ -821,6 +821,29 @@ test "World drain_gpu_write_views returns borrowed contiguous upload" {
 }
 
 ///|
+#cfg(not(target="js"))
+test "World drain_gpu_write_bytes returns native bytes upload" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuBulkBytes16",
+    @comp.GpuLayout::empty(16),
+  )
+  let ok = world.with_gpu_component_write_range(gpu16, 0, 2, range => {
+    let bytes = range.bytes()
+    bytes[0] = (66 : Byte)
+    bytes[16] = (77 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_write_bytes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 32)
+  assert_eq(writes[0].bytes[0], (66 : Byte))
+  assert_eq(writes[0].bytes[16], (77 : Byte))
+  assert_eq(world.drain_gpu_write_bytes(gpu16).length(), 0)
+}
+
+///|
 test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)

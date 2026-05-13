@@ -4,7 +4,7 @@ fn GpuComponentStore::new(
   component : ComponentTypeId,
   stride : Int,
 ) -> GpuComponentStore {
-  let bytes : Array[Byte] = []
+  let bytes = FixedArray::make(0, (0 : Byte))
   let dirty_flags : Array[Bool] = []
   let dirty_indices : Array[Int] = []
   let dirty_range_first : Array[Int] = []
@@ -88,12 +88,13 @@ fn GpuComponentStore::ensure_capacity(
   while next_capacity < capacity {
     next_capacity = next_capacity * 2
   }
+  let next_bytes = FixedArray::make(next_capacity * self.stride, (0 : Byte))
+  for i = 0; i < self.bytes.length(); i = i + 1 {
+    next_bytes[i] = self.bytes[i]
+  }
+  self.bytes = next_bytes
   for entity_i = old; entity_i < next_capacity; entity_i = entity_i + 1 {
     ignore(entity_i)
-    for byte_i = 0; byte_i < self.stride; byte_i = byte_i + 1 {
-      ignore(byte_i)
-      self.bytes.push((0 : Byte))
-    }
     self.dirty_flags.push(false)
     self.active_flags.push(false)
     self.active_positions.push(-1)
@@ -485,6 +486,25 @@ fn GpuComponentStore::range_view(
 }
 
 ///|
+/// Borrows bytes for entity indices `[first..=last]` when the span covers the full backing store.
+/// Partial spans fall back to an owned compact payload.
+#cfg(not(target="js"))
+fn GpuComponentStore::range_borrowed_bytes(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> GpuWriteBytes {
+  let start = first * self.stride
+  let end = (last + 1) * self.stride
+  let bytes = if start == 0 && end == self.bytes.length() {
+    FixedArray::unsafe_reinterpret_as_bytes(self.bytes)
+  } else {
+    FixedArray::unsafe_reinterpret_as_bytes(self.range_bytes(first, last).bytes)
+  }
+  { byte_offset: start, bytes }
+}
+
+///|
 /// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
 #cfg(target="js")
 extern "js" fn GpuComponentStore::drain_writes_js(
@@ -822,6 +842,81 @@ fn GpuComponentStore::drain_write_views(
 }
 
 ///|
+/// Sorts dirty indices, merges consecutive runs into `Bytes` upload spans, then clears dirty state.
+///
+/// On native, full-backing spans alias the GPU store backing via `Bytes`; partial spans fall back to
+/// compact owned bytes because `Bytes` cannot carry an offset into a mutable array backing.
+#cfg(not(target="js"))
+fn GpuComponentStore::drain_write_bytes(
+  self : GpuComponentStore,
+) -> Array[GpuWriteBytes] {
+  let writes : Array[GpuWriteBytes] = []
+  if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
+    return writes
+  }
+  for ri = 0; ri < self.dirty_range_first.length(); ri = ri + 1 {
+    writes.push(
+      self.range_borrowed_bytes(
+        self.dirty_range_first[ri],
+        self.dirty_range_last[ri],
+      ),
+    )
+  }
+  if self.dirty_indices.length() > 0 {
+    self.sort_dirty_indices_for_drain()
+    let sorted = self.dirty_indices
+    let mut first = sorted[0]
+    let mut prev = sorted[0]
+    let mut range_cursor = 0
+    let push_run = fn(first : Int, last : Int) {
+      let mut cur = first
+      while cur <= last {
+        while range_cursor < self.dirty_range_first.length() &&
+              self.dirty_range_last[range_cursor] < cur {
+          range_cursor = range_cursor + 1
+        }
+        if range_cursor >= self.dirty_range_first.length() ||
+          self.dirty_range_first[range_cursor] > last {
+          writes.push(self.range_borrowed_bytes(cur, last))
+          return
+        }
+        let rf = self.dirty_range_first[range_cursor]
+        let rl = self.dirty_range_last[range_cursor]
+        if rf > cur {
+          let emit_last = if rf - 1 < last { rf - 1 } else { last }
+          writes.push(self.range_borrowed_bytes(cur, emit_last))
+        }
+        cur = if rl + 1 > cur { rl + 1 } else { cur + 1 }
+      }
+    }
+    for i = 1; i < sorted.length(); i = i + 1 {
+      let idx = sorted[i]
+      if idx == prev + 1 {
+        prev = idx
+      } else {
+        push_run(first, prev)
+        first = idx
+        prev = idx
+      }
+    }
+    push_run(first, prev)
+    for i = 0; i < self.dirty_indices.length(); i = i + 1 {
+      self.dirty_flags[self.dirty_indices[i]] = false
+    }
+  }
+  while self.dirty_indices.length() > 0 {
+    let _ = self.dirty_indices.pop()
+  }
+  while self.dirty_range_first.length() > 0 {
+    let _ = self.dirty_range_first.pop()
+  }
+  while self.dirty_range_last.length() > 0 {
+    let _ = self.dirty_range_last.pop()
+  }
+  writes
+}
+
+///|
 /// Reserves a parallel `gpu_stores` slot (`None`) aligned with registry indices.
 pub fn World::register_cpu_component(
   self : World,
@@ -977,6 +1072,26 @@ pub fn World::drain_gpu_write_views(
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_write_views()
+      self.replace_gpu_store(store)
+      writes
+    }
+    None => []
+  }
+}
+
+///|
+/// Returns `Bytes` upload slices for native immediate GPU upload; consumes pending dirties.
+///
+/// Full-backing spans alias the GPU store backing. Partial spans are compact owned bytes.
+#cfg(not(target="js"))
+pub fn World::drain_gpu_write_bytes(
+  self : World,
+  component : ComponentTypeId,
+) -> Array[GpuWriteBytes] {
+  self.assert_system_component_write(component, "World::drain_gpu_write_bytes")
+  match self.gpu_store(component) {
+    Some(store) => {
+      let writes = store.drain_write_bytes()
       self.replace_gpu_store(store)
       writes
     }

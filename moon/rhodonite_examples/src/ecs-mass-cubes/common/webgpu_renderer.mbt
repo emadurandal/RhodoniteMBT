@@ -294,6 +294,7 @@ fn animate_transforms_query(
 }
 
 ///|
+#cfg(target="js")
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -313,6 +314,27 @@ fn update_global_transforms_for_mass_cubes_fast(
 }
 
 ///|
+#cfg(not(target="js"))
+fn update_global_transforms_for_mass_cubes_fast(
+  world : @ecs.World,
+  tf : @ecs.ComponentTypeId,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWriteBytes] {
+  ignore(tf)
+  ignore(gt)
+  world.write_global_transforms_dense_grid_wave_bytes(
+    entity_count,
+    per_side,
+    t * 1.8,
+    cube_scale,
+    grid_spacing,
+  )
+}
+
+///|
+#cfg(target="js")
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -329,6 +351,56 @@ fn update_and_drain_global_transforms(
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
   world.drain_gpu_write_views(gt)
+}
+
+///|
+#cfg(not(target="js"))
+fn update_and_drain_global_transforms(
+  world : @ecs.World,
+  tf : @ecs.ComponentTypeId,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWriteBytes] {
+  let writes = update_global_transforms_for_mass_cubes_fast(
+    world, tf, gt, per_side, t,
+  )
+  if writes.length() > 0 {
+    return writes
+  }
+  animate_transforms_query(world, tf, per_side, t)
+  world.update_global_transforms_from_transforms()
+  world.drain_gpu_write_bytes(gt)
+}
+
+///|
+#cfg(target="js")
+fn upload_global_transform_writes(
+  queue : @wgpu.GPUQueue,
+  transform_storage : @wgpu.GPUBuffer,
+  writes : Array[@ecs.GpuWriteView],
+) -> Unit {
+  for wi = 0; wi < writes.length(); wi = wi + 1 {
+    let w = writes[wi]
+    queue.write_buffer_from_array_view(
+      transform_storage,
+      w.byte_offset.to_uint64(),
+      w.bytes,
+    )
+  }
+}
+
+///|
+#cfg(not(target="js"))
+fn upload_global_transform_writes(
+  queue : @wgpu.GPUQueue,
+  transform_storage : @wgpu.GPUBuffer,
+  writes : Array[@ecs.GpuWriteBytes],
+) -> Unit {
+  for wi = 0; wi < writes.length(); wi = wi + 1 {
+    let w = writes[wi]
+    queue.write_buffer(transform_storage, w.byte_offset.to_uint64(), w.bytes)
+  }
 }
 
 ///|
@@ -595,14 +667,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   )
   let depth_view = depth_texture.create_view()
   let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
-  for wi = 0; wi < writes0.length(); wi = wi + 1 {
-    let w = writes0[wi]
-    queue.write_buffer_from_array_view(
-      transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  upload_global_transform_writes(queue, transform_storage, writes0)
   Some({
     context: canvas_context,
     device,
@@ -655,14 +720,11 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     renderer.per_side,
     t,
   )
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    renderer.queue.write_buffer_from_array_view(
-      renderer.transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  upload_global_transform_writes(
+    renderer.queue,
+    renderer.transform_storage,
+    writes,
+  )
   let texture = renderer.context.get_current_texture()
   let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
