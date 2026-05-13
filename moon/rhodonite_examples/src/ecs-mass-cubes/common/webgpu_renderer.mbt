@@ -21,7 +21,7 @@ fn monotonic_ms() -> Double {
 
 ///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
-let entity_count : Int = 60000
+let entity_count : Int = 200000
 
 ///|
 /// Canvas resolution (matches demo HTML).
@@ -245,19 +245,21 @@ fn animate_transforms_query(
   per_side : Int,
   t : Double,
 ) -> Unit {
-  if animate_transforms_query_fast(world, tf_id, per_side, t) {
-    return
-  }
+  // if animate_transforms_query_fast(world, tf_id, per_side, t) {
+  //   return
+  // }
   let q = @ecs.Query::new([tf_id])
   q.for_each(world, row => {
     let idx = row.entity().index
     let (gx, gz) = grid_xz_for_index(idx, per_side)
     let phase = idx.to_double() * 0.09 + t * 1.8
     let wy = @math.sin(phase) * 0.12
-    let tfv = @comp.Transform3D::from_component_mut_view(row.write_view(tf_id))
-    tfv.position.set_x(gx)
-    tfv.position.set_y(Float::from_double(wy))
-    tfv.position.set_z(gz)
+    @comp.Transform3D::write_position_to_component_mut_view(
+      row.write_view(tf_id),
+      gx,
+      Float::from_double(wy),
+      gz,
+    )
   })
 }
 

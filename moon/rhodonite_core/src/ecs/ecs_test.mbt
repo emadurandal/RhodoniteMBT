@@ -369,6 +369,27 @@ test "Transform3D identity roundtrip bytes and World set/get" {
 }
 
 ///|
+test "Transform3D writes position through zero-copy component view" {
+  let buf = transform3d_bytes_identity()
+  let n = buf.length()
+  let row = buf.mut_view(start=0, end=n)
+  @comp.Transform3D::write_position_to_component_mut_view(
+    row,
+    (2.0 : Float),
+    (3.0 : Float),
+    (4.0 : Float),
+  )
+  let t = @comp.Transform3D::from_component_mut_view(row)
+  assert_eq(t.position.x(), (2.0 : Float))
+  assert_eq(t.position.y(), (3.0 : Float))
+  assert_eq(t.position.z(), (4.0 : Float))
+  t.position.set((5.0 : Float), (6.0 : Float), (7.0 : Float))
+  assert_eq(t.position.x(), (5.0 : Float))
+  assert_eq(t.position.y(), (6.0 : Float))
+  assert_eq(t.position.z(), (7.0 : Float))
+}
+
+///|
 test "GlobalTransform identity roundtrip and GPU drain" {
   let world = World::new()
   let gt_id = world.global_transform_component()

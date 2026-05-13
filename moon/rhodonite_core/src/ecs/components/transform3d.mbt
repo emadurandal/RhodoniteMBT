@@ -104,6 +104,34 @@ pub fn Transform3D::from_component_mut_view(
 }
 
 ///|
+/// Updates the borrowed position vector in one write while preserving zero-copy storage aliasing.
+pub fn Transform3D::set_position(
+  self : Transform3D,
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  self.position.set(x, y, z)
+}
+
+///|
+/// Updates only the position field of a Transform3D component row without constructing
+/// `Transform3D` / `Vector3Ref` wrappers. `row` still aliases the original ECS storage.
+pub fn Transform3D::write_position_to_component_mut_view(
+  row : MutArrayView[Byte],
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  if row.length() != 48 {
+    abort(
+      "Transform3D::write_position_to_component_mut_view: row length mismatch",
+    )
+  }
+  @v3.Vector3Ref::write_mut_view(row.mut_view(start=0, end=12), x, y, z)
+}
+
+///|
 /// Decodes a read-only component row and returns its local model matrix.
 #cfg(target="js")
 extern "js" fn transform3d_local_matrix_data_from_component_view_js(

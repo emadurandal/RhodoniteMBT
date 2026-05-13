@@ -29,11 +29,13 @@ pub(all) struct Vector4Ref[T] {
   data : MutArrayView[T]
 }
 pub fn Vector4Ref::from_mut_view(MutArrayView[Byte]) -> Self[Byte]
+pub fn Vector4Ref::set(Self[Byte], Float, Float, Float, Float) -> Unit
 pub fn Vector4Ref::set_w(Self[Byte], Float) -> Unit
 pub fn Vector4Ref::set_x(Self[Byte], Float) -> Unit
 pub fn Vector4Ref::set_y(Self[Byte], Float) -> Unit
 pub fn Vector4Ref::set_z(Self[Byte], Float) -> Unit
 pub fn Vector4Ref::w(Self[Byte]) -> Float
+pub fn Vector4Ref::write_mut_view(MutArrayView[Byte], Float, Float, Float, Float) -> Unit
 pub fn Vector4Ref::x(Self[Byte]) -> Float
 pub fn Vector4Ref::y(Self[Byte]) -> Float
 pub fn Vector4Ref::z(Self[Byte]) -> Float
