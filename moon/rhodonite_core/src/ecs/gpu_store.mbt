@@ -142,6 +142,7 @@ fn GpuComponentStore::clear_slot(
 }
 
 ///|
+#cfg(not(target="js"))
 fn swap_int_array(arr : Array[Int], i : Int, j : Int) -> Unit {
   let t = arr[i]
   arr[i] = arr[j]
@@ -150,6 +151,7 @@ fn swap_int_array(arr : Array[Int], i : Int, j : Int) -> Unit {
 
 ///|
 /// Max-heap sink for indices `[0, heap_size)` (0-based indexing).
+#cfg(not(target="js"))
 fn sift_down_max_heap(arr : Array[Int], heap_size : Int, root : Int) -> Unit {
   let mut i = root
   while true {
@@ -173,6 +175,7 @@ fn sift_down_max_heap(arr : Array[Int], heap_size : Int, root : Int) -> Unit {
 ///|
 /// In-place ascending sort. Avoids merge-sort’s O(n log n) allocations (GC + WASM slowdown in
 /// [`GpuComponentStore::drain_writes`]).
+#cfg(not(target="js"))
 fn heap_sort_ints_asc(arr : Array[Int]) -> Unit {
   let n = arr.length()
   if n <= 1 {
@@ -195,6 +198,7 @@ fn heap_sort_ints_asc(arr : Array[Int]) -> Unit {
 /// Sorts `dirty_indices` ascending in place. Uses counting sort when the index span is dense (typical
 /// for full-GPU flushes like [`World::update_global_transforms_from_transforms`]); falls back to
 /// heap sort for sparse index sets.
+#cfg(not(target="js"))
 fn GpuComponentStore::sort_dirty_indices_for_drain(
   self : GpuComponentStore,
 ) -> Unit {
@@ -243,40 +247,6 @@ fn GpuComponentStore::sort_dirty_indices_for_drain(
 
 ///|
 /// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
-#cfg(target="js")
-extern "js" fn copy_byte_range_to_fixed_array_js(
-  src : Array[Byte],
-  start : Int,
-  len : Int,
-) -> FixedArray[Byte] =
-  #| (src, start, len) => {
-  #|   if (ArrayBuffer.isView(src) && typeof src.subarray === "function") {
-  #|     return src.subarray(start, start + len);
-  #|   }
-  #|   const out = new Uint8Array(len);
-  #|   out.set(src.slice(start, start + len));
-  #|   return out;
-  #| }
-
-///|
-/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
-#cfg(target="js")
-fn GpuComponentStore::range_bytes(
-  self : GpuComponentStore,
-  first : Int,
-  last : Int,
-) -> GpuWrite {
-  let count = last - first + 1
-  let len = count * self.stride
-  let src_base = first * self.stride
-  {
-    byte_offset: src_base,
-    bytes: copy_byte_range_to_fixed_array_js(self.bytes, src_base, len),
-  }
-}
-
-///|
-/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
 #cfg(not(target="js"))
 fn GpuComponentStore::range_bytes(
   self : GpuComponentStore,
@@ -297,6 +267,65 @@ fn GpuComponentStore::range_bytes(
 
 ///|
 /// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
+#cfg(target="js")
+extern "js" fn GpuComponentStore::drain_writes_js(
+  self : GpuComponentStore,
+) -> Array[GpuWrite] =
+  #| (store) => {
+  #|   const dirty = store.dirty_indices;
+  #|   if (dirty.length === 0) return [];
+  #|   let sorted = true;
+  #|   for (let i = 1; i < dirty.length; i++) {
+  #|     if (dirty[i] < dirty[i - 1]) {
+  #|       sorted = false;
+  #|       break;
+  #|     }
+  #|   }
+  #|   if (!sorted) dirty.sort((a, b) => a - b);
+  #|   const stride = store.stride;
+  #|   const src = store.bytes;
+  #|   const writes = [];
+  #|   const rangeBytes = (first, last) => {
+  #|     const start = first * stride;
+  #|     const len = (last - first + 1) * stride;
+  #|     if (ArrayBuffer.isView(src) && typeof src.subarray === "function") {
+  #|       return src.subarray(start, start + len);
+  #|     }
+  #|     const out = new Uint8Array(len);
+  #|     out.set(src.slice(start, start + len));
+  #|     return out;
+  #|   };
+  #|   let first = dirty[0];
+  #|   let prev = dirty[0];
+  #|   for (let i = 1; i < dirty.length; i++) {
+  #|     const idx = dirty[i];
+  #|     if (idx === prev) continue;
+  #|     if (idx === prev + 1) {
+  #|       prev = idx;
+  #|     } else {
+  #|       writes.push({ byte_offset: first * stride, bytes: rangeBytes(first, prev) });
+  #|       first = idx;
+  #|       prev = idx;
+  #|     }
+  #|   }
+  #|   writes.push({ byte_offset: first * stride, bytes: rangeBytes(first, prev) });
+  #|   for (let i = 0; i < dirty.length; i++) {
+  #|     store.dirty_flags[dirty[i]] = false;
+  #|   }
+  #|   dirty.length = 0;
+  #|   return writes;
+  #| }
+
+///|
+/// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
+#cfg(target="js")
+fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
+  self.drain_writes_js()
+}
+
+///|
+/// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
+#cfg(not(target="js"))
 fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
   let writes : Array[GpuWrite] = []
   if self.dirty_indices.length() == 0 {

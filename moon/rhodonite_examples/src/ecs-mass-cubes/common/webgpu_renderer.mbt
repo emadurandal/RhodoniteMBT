@@ -135,12 +135,99 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn animate_transforms_query_fast_js(
+  world : @ecs.World,
+  tf_id : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Bool =
+  #| (world, tfId, perSide, t) => {
+  #|   const tfIndex = tfId.index;
+  #|   const half = (perSide - 1) * 0.5;
+  #|   const spacing = 0.14;
+  #|   const time = t * 1.8;
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = { u32: new Uint32Array(1), f32: null });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   const u32 = scratch.u32;
+  #|   const f32 = scratch.f32;
+  #|   const writeF32 = (bytes, offset, value) => {
+  #|     f32[0] = Math.fround(value);
+  #|     const bits = u32[0];
+  #|     bytes[offset] = bits & 0xff;
+  #|     bytes[offset + 1] = (bits >>> 8) & 0xff;
+  #|     bytes[offset + 2] = (bits >>> 16) & 0xff;
+  #|     bytes[offset + 3] = (bits >>> 24) & 0xff;
+  #|   };
+  #|   const archetypes = world.archetypes;
+  #|   for (let ai = 0; ai < archetypes.length; ai++) {
+  #|     const arch = archetypes[ai];
+  #|     let tfColumn = null;
+  #|     for (let ci = 0; ci < arch.columns.length; ci++) {
+  #|       const col = arch.columns[ci];
+  #|       if (col.component.index === tfIndex) {
+  #|         tfColumn = col;
+  #|         break;
+  #|       }
+  #|     }
+  #|     if (!tfColumn) continue;
+  #|     if (tfColumn.stride < 40) return false;
+  #|     const bytes = tfColumn.bytes;
+  #|     const stride = tfColumn.stride;
+  #|     const entities = arch.entities;
+  #|     for (let row = 0; row < entities.length; row++) {
+  #|       const idx = entities[row].index;
+  #|       const ix = idx % perSide;
+  #|       const iz = Math.trunc(idx / perSide);
+  #|       const gx = (ix - half) * spacing;
+  #|       const gz = (iz - half) * spacing;
+  #|       const wy = Math.sin(idx * 0.09 + time) * 0.12;
+  #|       const base = row * stride;
+  #|       writeF32(bytes, base, gx);
+  #|       writeF32(bytes, base + 4, wy);
+  #|       writeF32(bytes, base + 8, gz);
+  #|     }
+  #|   }
+  #|   return true;
+  #| }
+
+///|
+#cfg(target="js")
+fn animate_transforms_query_fast(
+  world : @ecs.World,
+  tf_id : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Bool {
+  animate_transforms_query_fast_js(world, tf_id, per_side, t)
+}
+
+///|
+#cfg(not(target="js"))
+fn animate_transforms_query_fast(
+  world : @ecs.World,
+  tf_id : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Bool {
+  ignore(world)
+  ignore(tf_id)
+  ignore(per_side)
+  ignore(t)
+  false
+}
+
+///|
 fn animate_transforms_query(
   world : @ecs.World,
   tf_id : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
 ) -> Unit {
+  if animate_transforms_query_fast(world, tf_id, per_side, t) {
+    return
+  }
   let q = @ecs.Query::new([tf_id])
   q.for_each(world, row => {
     let idx = row.entity().index
