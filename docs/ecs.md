@@ -48,8 +48,8 @@ flowchart TB
 
 - **`generations` / `alive` / `free_indices`**: Slot reuse and generation tracking.
 - **`locations`**: `EntityId.index` → `EntityLocation?` (archetype index and row).
-- **`archetypes`**: One SoA table per signature (CPU component payloads).
-- **`gpu_stores`**: Parallel array to registry indices, `GpuComponentStore?` (`Some` only for GPU-visible types).
+- **`archetypes`**: One SoA table per signature (CPU component payloads). Each column tracks a `row_capacity` watermark separately from the logical row count so appends can grow backing storage without leaking spare capacity to query column views.
+- **`gpu_stores`**: Parallel array to registry indices, `GpuComponentStore?` (`Some` only for GPU-visible types). Stores keep flat payload bytes, per-row dirty flags, batched dirty ranges, and a packed active-index set for owned GPU-visible rows.
 - **`resize_events`**: Queue of notifications when flat stores grow (buffer recreation / full upload may be needed).
 
 ---
@@ -59,6 +59,7 @@ flowchart TB
 - Each archetype’s **signature** is a **sorted ascending** list of `ComponentTypeId`; entities with the same set share one table.
 - A new `World` starts with **archetype 0 = empty signature**; freshly spawned entities sit there until components are added ([`World::new` in `world.mbt`](../moon/rhodonite_core/src/ecs/world.mbt)).
 - Each CPU column stores packed `bytes` with fixed `stride`; row `row` starts at offset `row * stride`.
+- Column backing may have more capacity than live rows. Public `QueryArchetype::read_column` / `write_column` expose only `entities.length() * stride` logical bytes, not spare capacity.
 
 ```mermaid
 flowchart LR
@@ -93,6 +94,7 @@ flowchart TB
 
 - **CpuOnly**: Bytes live in the archetype SoA column. When an entity moves archetypes, its **row index** changes, but overlapping columns are copied with `copy_row_to`.
 - **GpuVisible**: The archetype row only records the **type id** in the signature (`cpu_stride == 0`). Payload bytes always sit in the **flat store** at **`entity.index * stride`**. Archetype row motion does **not** change the GPU slot index.
+- GPU-visible ownership is also mirrored in a packed active-index set (`World::gpu_component_active_indices`). `add_component*` activates the entity slot; `remove_component` and `destroy_entity` zero-clear and deactivate it.
 
 ---
 
@@ -164,6 +166,8 @@ The callback receives a `QueryRow`, so payloads are accessed by component id whi
 - `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution. For `GpuVisible` components, requesting this mutable view marks that entity row dirty immediately.
 - If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
+For hot loops over CPU-only data, prefer `Query::for_each_archetype`. It builds a small per-archetype access cache (`component`, kind, column index, stride) once per matched archetype, so `QueryArchetype::component_stride`, `read_column`, and `write_column` do not re-scan columns on every call. GPU-visible columns still cannot be read as archetype columns because their payload rows are keyed by `EntityId.index`.
+
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
@@ -171,6 +175,20 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
+})
+```
+
+```moonbit
+let query = Query::new([tf])
+query.for_each_archetype(world, fn(chunk) {
+  let stride = chunk.component_stride(tf)
+  let tf_column = chunk.write_column(tf)
+  for row = 0; row < chunk.length(); row = row + 1 {
+    let e = chunk.entity(row)
+    let base = row * stride
+    // update tf_column[base .. base + stride]
+    ignore(e)
+  }
 })
 ```
 
@@ -227,10 +245,11 @@ The built-in transform update can also be registered with `transform_propagation
 
 ## GPU upload and resize
 
-- **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
+- **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, and also consumes already batched dirty ranges recorded by bulk paths. It returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
+- **`gpu_component_active_indices(component)`**: Returns a copy of the packed active `EntityId.index` values for a GPU-visible component. This is useful for renderer-side extraction or future packed update paths without scanning every possible entity slot.
 - **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**. During `Schedule::run`, this consumes a world-owned event queue and requires `structural_write`; outside schedule execution it can be called directly.
 
-`add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path.
+`add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path. Both JS and non-JS targets grow GPU stores geometrically; JS uses `Uint8Array`, while non-JS keeps the MoonBit byte array but avoids one-row-at-a-time capacity growth.
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) calls `update_global_transforms_from_transforms`, then `drain_gpu_writes(global_transform)`, then `queue.write_buffer_from_fixed_array`.
 
@@ -258,7 +277,8 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Writing `GlobalTransform` through `QueryRow::write_view` marks the GPU row dirty.
+- **`update_transform3d_positions`**: Bulk-updates only the position field of built-in `Transform3D` without constructing a `QueryRow` per entity. JS uses the public archetype-column path; non-JS uses a direct archetype sweep with fixed-offset f32 writes.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Fast paths write `GlobalTransform` rows directly and record contiguous dirty ranges when possible; fallback `QueryRow::write_view` still marks individual GPU rows dirty.
 
 ---
 
@@ -309,7 +329,16 @@ let writes = world.drain_gpu_writes(gt)
 
 ## Tests and source map
 
-Behavior is pinned in [`ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) (archetype moves, generation reuse, merged `drain_gpu_writes` ranges, std140 padding, etc.).
+Behavior is pinned in [`ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) (archetype moves, generation reuse, logical column length after capacity growth, packed GPU active indices, merged `drain_gpu_writes` ranges, std140 padding, etc.).
+
+The ECS microbench package lives at [`moon/rhodonite_core/src/ecs_bench/`](../moon/rhodonite_core/src/ecs_bench/). From the repository root:
+
+```bash
+pnpm run bench:ecs        # JS target
+pnpm run bench:ecs:js
+pnpm run bench:ecs:native
+pnpm run bench:ecs:wasm   # wasm-gc build only
+```
 
 Core implementation files:
 

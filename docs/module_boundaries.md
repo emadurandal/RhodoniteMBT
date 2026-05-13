@@ -7,7 +7,7 @@ RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitla
 | Moon module (`moon.mod.json` `name`) | Directory | Role |
 |--------------------------------------|-----------|------|
 | `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | Thin public facade; aggregates lower modules. |
-| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), little-endian buffer writes (`src/binary/writes`), ECS ([`docs/ecs.md`](ecs.md)), and other core code. |
+| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), little-endian buffer writes (`src/binary/writes`), ECS ([`docs/ecs.md`](ecs.md)), and the ECS microbench package (`src/ecs_bench`). |
 | `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU abstraction (browser and native). |
 | `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | Runnable samples (demo module). |
 
