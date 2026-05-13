@@ -509,8 +509,8 @@ extern "js" fn GpuComponentStore::drain_writes_js(
   #|   const rangeBytes = (first, last) => {
   #|     const start = first * stride;
   #|     const len = (last - first + 1) * stride;
-  #|     if (ArrayBuffer.isView(src) && typeof src.subarray === "function") {
-  #|       return src.subarray(start, start + len);
+  #|     if (ArrayBuffer.isView(src) && typeof src.slice === "function") {
+  #|       return src.slice(start, start + len);
   #|     }
   #|     const out = new Uint8Array(len);
   #|     out.set(src.slice(start, start + len));
