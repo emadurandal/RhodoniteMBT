@@ -129,4 +129,16 @@ describe("ECS TypeScript wrapper", () => {
 		expect(writes.length).toBeGreaterThan(0);
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);
 	});
+
+	it("keeps transform archetype columns appendable after JS global-transform fast path", () => {
+		const world = World.new();
+		const first = world.spawnTransformGlobalBatchIdentity(1);
+		expect(first).toHaveLength(1);
+
+		world.updateGlobalTransformsFromTransforms();
+
+		const second = world.spawnTransformGlobalBatchIdentity(1);
+		expect(second).toHaveLength(1);
+		expect(world.isAlive(second[0])).toBe(true);
+	});
 });
