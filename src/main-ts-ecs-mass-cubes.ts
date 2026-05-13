@@ -1,7 +1,7 @@
 import "./style.css";
 import { Query, World, type ComponentTypeId } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
-const ENTITY_COUNT = 400_000;
+const ENTITY_COUNT = 600_000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
