@@ -73,3 +73,34 @@ pub fn World::get_transform(
     None => None
   }
 }
+
+///|
+/// Native hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`
+/// or `Vector3Ref` wrappers per entity.
+#cfg(not(target="js"))
+pub fn World::update_transform3d_positions(
+  self : World,
+  f : (EntityId) -> (Float, Float, Float),
+) -> Unit {
+  let tf = self.transform_component_id
+  self.assert_system_component_write(tf, "World::update_transform3d_positions")
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let tf_col_index = arch.column_index(tf)
+    if tf_col_index < 0 {
+      continue
+    }
+    let col = arch.columns[tf_col_index]
+    if col.stride < 12 {
+      abort("World::update_transform3d_positions: Transform3D stride mismatch")
+    }
+    for row = 0; row < arch.entities.length(); row = row + 1 {
+      let entity = arch.entities[row]
+      let (x, y, z) = f(entity)
+      let base = row * col.stride
+      put_f32_array_le(col.bytes, base, x)
+      put_f32_array_le(col.bytes, base + 4, y)
+      put_f32_array_le(col.bytes, base + 8, z)
+    }
+  }
+}

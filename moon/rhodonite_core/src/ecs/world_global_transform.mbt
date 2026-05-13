@@ -190,29 +190,14 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     gtStore.bytes = converted;
   #|   }
   #|   const gtBytes = gtStore.bytes;
-  #|   const gtView = new DataView(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength);
+  #|   if ((gtBytes.byteOffset & 3) !== 0 || (gtBytes.byteLength & 3) !== 0) return false;
+  #|   const gtF32 = new Float32Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 2);
   #|   const gtStride = gtStore.stride;
+  #|   if ((gtStride & 3) !== 0) return false;
+  #|   const gtStrideF32 = gtStride >> 2;
   #|   const capacity = Math.floor(gtBytes.length / gtStride);
   #|   const dirtyFlags = gtStore.dirty_flags;
   #|   const dirtyIndices = gtStore.dirty_indices;
-  #|
-  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
-  #|     (globalThis.__rhodonite_f32_scratch = { u32: new Uint32Array(1), f32: null });
-  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
-  #|   const u32 = scratch.u32;
-  #|   const f32buf = scratch.f32;
-  #|   const readF32 = (bytes, i) => {
-  #|     u32[0] = (
-  #|       (bytes[i] & 0xff) |
-  #|       ((bytes[i + 1] & 0xff) << 8) |
-  #|       ((bytes[i + 2] & 0xff) << 16) |
-  #|       ((bytes[i + 3] & 0xff) << 24)
-  #|     ) >>> 0;
-  #|     return f32buf[0];
-  #|   };
-  #|   const writeF32 = (offset, value) => {
-  #|     gtView.setFloat32(offset, Math.fround(value), true);
-  #|   };
   #|
   #|   for (let ai = 0; ai < archetypes.length; ai++) {
   #|     const arch = archetypes[ai];
@@ -236,23 +221,31 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     }
   #|     if (!hasGt) continue;
   #|
+  #|     if (!ArrayBuffer.isView(tfColumn.bytes)) {
+  #|       const converted = new Uint8Array(tfColumn.bytes.length);
+  #|       converted.set(tfColumn.bytes);
+  #|       tfColumn.bytes = converted;
+  #|     }
   #|     const tfBytes = tfColumn.bytes;
   #|     const tfStride = tfColumn.stride;
+  #|     if ((tfBytes.byteOffset & 3) !== 0 || (tfBytes.byteLength & 3) !== 0 || (tfStride & 3) !== 0) return false;
+  #|     const tfF32 = new Float32Array(tfBytes.buffer, tfBytes.byteOffset, tfBytes.byteLength >> 2);
+  #|     const tfStrideF32 = tfStride >> 2;
   #|     const entities = arch.entities;
   #|     for (let row = 0; row < entities.length; row++) {
   #|       const entityIndex = entities[row].index;
   #|       if (entityIndex < 0 || entityIndex >= capacity) return false;
-  #|       const b = row * tfStride;
-  #|       const px = readF32(tfBytes, b);
-  #|       const py = readF32(tfBytes, b + 4);
-  #|       const pz = readF32(tfBytes, b + 8);
-  #|       const qx = readF32(tfBytes, b + 12);
-  #|       const qy = readF32(tfBytes, b + 16);
-  #|       const qz = readF32(tfBytes, b + 20);
-  #|       const qw = readF32(tfBytes, b + 24);
-  #|       const sx = readF32(tfBytes, b + 28);
-  #|       const sy = readF32(tfBytes, b + 32);
-  #|       const sz = readF32(tfBytes, b + 36);
+  #|       const b = row * tfStrideF32;
+  #|       const px = tfF32[b];
+  #|       const py = tfF32[b + 1];
+  #|       const pz = tfF32[b + 2];
+  #|       const qx = tfF32[b + 3];
+  #|       const qy = tfF32[b + 4];
+  #|       const qz = tfF32[b + 5];
+  #|       const qw = tfF32[b + 6];
+  #|       const sx = tfF32[b + 7];
+  #|       const sy = tfF32[b + 8];
+  #|       const sz = tfF32[b + 9];
   #|
   #|       const xx = Math.fround(qx * qx);
   #|       const yy = Math.fround(qy * qy);
@@ -273,23 +266,23 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       const r21 = Math.fround(2 * Math.fround(yz + wx));
   #|       const r22 = Math.fround(1 - Math.fround(2 * Math.fround(xx + yy)));
   #|
-  #|       const out = entityIndex * gtStride;
-  #|       writeF32(out, Math.fround(r00 * sx));
-  #|       writeF32(out + 4, Math.fround(r10 * sx));
-  #|       writeF32(out + 8, Math.fround(r20 * sx));
-  #|       writeF32(out + 12, 0);
-  #|       writeF32(out + 16, Math.fround(r01 * sy));
-  #|       writeF32(out + 20, Math.fround(r11 * sy));
-  #|       writeF32(out + 24, Math.fround(r21 * sy));
-  #|       writeF32(out + 28, 0);
-  #|       writeF32(out + 32, Math.fround(r02 * sz));
-  #|       writeF32(out + 36, Math.fround(r12 * sz));
-  #|       writeF32(out + 40, Math.fround(r22 * sz));
-  #|       writeF32(out + 44, 0);
-  #|       writeF32(out + 48, px);
-  #|       writeF32(out + 52, py);
-  #|       writeF32(out + 56, pz);
-  #|       writeF32(out + 60, 1);
+  #|       const out = entityIndex * gtStrideF32;
+  #|       gtF32[out] = Math.fround(r00 * sx);
+  #|       gtF32[out + 1] = Math.fround(r10 * sx);
+  #|       gtF32[out + 2] = Math.fround(r20 * sx);
+  #|       gtF32[out + 3] = 0;
+  #|       gtF32[out + 4] = Math.fround(r01 * sy);
+  #|       gtF32[out + 5] = Math.fround(r11 * sy);
+  #|       gtF32[out + 6] = Math.fround(r21 * sy);
+  #|       gtF32[out + 7] = 0;
+  #|       gtF32[out + 8] = Math.fround(r02 * sz);
+  #|       gtF32[out + 9] = Math.fround(r12 * sz);
+  #|       gtF32[out + 10] = Math.fround(r22 * sz);
+  #|       gtF32[out + 11] = 0;
+  #|       gtF32[out + 12] = px;
+  #|       gtF32[out + 13] = py;
+  #|       gtF32[out + 14] = pz;
+  #|       gtF32[out + 15] = 1;
   #|
   #|       if (!dirtyFlags[entityIndex]) {
   #|         dirtyFlags[entityIndex] = true;
@@ -313,17 +306,124 @@ fn World::try_update_global_transforms_no_child_fast_path(
 
 ///|
 #cfg(not(target="js"))
+fn get_f32_array_le(bytes : Array[Byte], off : Int) -> Float {
+  Float::reinterpret_from_uint(
+    bytes[off].to_uint() |
+    (bytes[off + 1].to_uint() << 8) |
+    (bytes[off + 2].to_uint() << 16) |
+    (bytes[off + 3].to_uint() << 24),
+  )
+}
+
+///|
+#cfg(not(target="js"))
+fn put_f32_array_le(bytes : Array[Byte], off : Int, v : Float) -> Unit {
+  let u = v.reinterpret_as_uint()
+  bytes[off] = (u & 0xFFU).to_byte()
+  bytes[off + 1] = ((u >> 8) & 0xFFU).to_byte()
+  bytes[off + 2] = ((u >> 16) & 0xFFU).to_byte()
+  bytes[off + 3] = ((u >> 24) & 0xFFU).to_byte()
+}
+
+///|
+#cfg(not(target="js"))
 fn World::try_update_global_transforms_no_child_fast_path(
   self : World,
   tf : ComponentTypeId,
   gt : ComponentTypeId,
   co : ComponentTypeId,
 ) -> Bool {
-  ignore(self)
-  ignore(tf)
-  ignore(gt)
-  ignore(co)
-  false
+  let gt_store = match self.gpu_store(gt) {
+    Some(store) => store
+    None => return false
+  }
+  if gt_store.stride < 64 {
+    return false
+  }
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let comps = self.archetypes[ai].components
+    let has_tf = component_array_contains(comps, tf)
+    let has_gt = component_array_contains(comps, gt)
+    if has_tf && has_gt && component_array_contains(comps, co) {
+      return false
+    }
+  }
+  let capacity = gt_store.capacity()
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let comps = arch.components
+    if !component_array_contains(comps, tf) ||
+      !component_array_contains(comps, gt) {
+      continue
+    }
+    let tf_col_index = arch.column_index(tf)
+    if tf_col_index < 0 {
+      return false
+    }
+    let tf_col = arch.columns[tf_col_index]
+    let tf_bytes = tf_col.bytes
+    let tf_stride = tf_col.stride
+    if tf_stride < 40 {
+      return false
+    }
+    for row = 0; row < arch.entities.length(); row = row + 1 {
+      let entity_index = arch.entities[row].index
+      if entity_index < 0 || entity_index >= capacity {
+        return false
+      }
+      let b = row * tf_stride
+      let px = get_f32_array_le(tf_bytes, b)
+      let py = get_f32_array_le(tf_bytes, b + 4)
+      let pz = get_f32_array_le(tf_bytes, b + 8)
+      let qx = get_f32_array_le(tf_bytes, b + 12)
+      let qy = get_f32_array_le(tf_bytes, b + 16)
+      let qz = get_f32_array_le(tf_bytes, b + 20)
+      let qw = get_f32_array_le(tf_bytes, b + 24)
+      let sx = get_f32_array_le(tf_bytes, b + 28)
+      let sy = get_f32_array_le(tf_bytes, b + 32)
+      let sz = get_f32_array_le(tf_bytes, b + 36)
+
+      let xx = qx * qx
+      let yy = qy * qy
+      let zz = qz * qz
+      let xy = qx * qy
+      let xz = qx * qz
+      let yz = qy * qz
+      let wx = qw * qx
+      let wy = qw * qy
+      let wz = qw * qz
+      let r00 = (1.0 : Float) - (2.0 : Float) * (yy + zz)
+      let r01 = (2.0 : Float) * (xy - wz)
+      let r02 = (2.0 : Float) * (xz + wy)
+      let r10 = (2.0 : Float) * (xy + wz)
+      let r11 = (1.0 : Float) - (2.0 : Float) * (xx + zz)
+      let r12 = (2.0 : Float) * (yz - wx)
+      let r20 = (2.0 : Float) * (xz - wy)
+      let r21 = (2.0 : Float) * (yz + wx)
+      let r22 = (1.0 : Float) - (2.0 : Float) * (xx + yy)
+
+      let out = entity_index * gt_store.stride
+      put_f32_array_le(gt_store.bytes, out, r00 * sx)
+      put_f32_array_le(gt_store.bytes, out + 4, r10 * sx)
+      put_f32_array_le(gt_store.bytes, out + 8, r20 * sx)
+      put_f32_array_le(gt_store.bytes, out + 12, (0.0 : Float))
+      put_f32_array_le(gt_store.bytes, out + 16, r01 * sy)
+      put_f32_array_le(gt_store.bytes, out + 20, r11 * sy)
+      put_f32_array_le(gt_store.bytes, out + 24, r21 * sy)
+      put_f32_array_le(gt_store.bytes, out + 28, (0.0 : Float))
+      put_f32_array_le(gt_store.bytes, out + 32, r02 * sz)
+      put_f32_array_le(gt_store.bytes, out + 36, r12 * sz)
+      put_f32_array_le(gt_store.bytes, out + 40, r22 * sz)
+      put_f32_array_le(gt_store.bytes, out + 44, (0.0 : Float))
+      put_f32_array_le(gt_store.bytes, out + 48, px)
+      put_f32_array_le(gt_store.bytes, out + 52, py)
+      put_f32_array_le(gt_store.bytes, out + 56, pz)
+      put_f32_array_le(gt_store.bytes, out + 60, (1.0 : Float))
+      gt_store.mark_dirty(entity_index)
+    }
+  }
+  self.replace_gpu_store(gt_store)
+  true
 }
 
 ///|

@@ -155,6 +155,7 @@ pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
+pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)
