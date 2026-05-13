@@ -90,8 +90,6 @@ struct GpuComponentStore {
   dirty_indices : Array[Int]
   dirty_range_first : Array[Int]
   dirty_range_last : Array[Int]
-  mut full_dirty_first : Int
-  mut full_dirty_last : Int
   sort_bucket : Array[Bool]
   active_flags : Array[Bool]
   active_indices : Array[Int]
