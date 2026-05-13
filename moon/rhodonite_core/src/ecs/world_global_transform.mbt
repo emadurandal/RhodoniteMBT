@@ -519,12 +519,12 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     }
   #|     if (!hasGt) continue;
   #|
-  #|     if (!ArrayBuffer.isView(tfColumn.bytes)) {
-  #|       const converted = new Uint8Array(tfColumn.bytes.length);
-  #|       converted.set(tfColumn.bytes);
-  #|       tfColumn.bytes = converted;
+  #|     let tfBytes = tfColumn.bytes;
+  #|     if (!ArrayBuffer.isView(tfBytes)) {
+  #|       const converted = new Uint8Array(tfBytes.length);
+  #|       converted.set(tfBytes);
+  #|       tfBytes = converted;
   #|     }
-  #|     const tfBytes = tfColumn.bytes;
   #|     const tfStride = tfColumn.stride;
   #|     if ((tfBytes.byteOffset & 3) !== 0 || (tfBytes.byteLength & 3) !== 0 || (tfStride & 3) !== 0) return false;
   #|     let tfF32 = tfBytes.__rhodonite_f32_view;

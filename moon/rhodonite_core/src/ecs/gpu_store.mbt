@@ -410,6 +410,48 @@ fn GpuComponentStore::sort_dirty_indices_for_drain(
 }
 
 ///|
+/// Sorts and merges dirty ranges so drain cursors can skip overlaps in one forward pass.
+#cfg(not(target="js"))
+fn GpuComponentStore::sort_dirty_ranges_for_drain(
+  self : GpuComponentStore,
+) -> Unit {
+  let n = self.dirty_range_first.length()
+  if n <= 1 {
+    return
+  }
+  for i = 1; i < n; i = i + 1 {
+    let first = self.dirty_range_first[i]
+    let last = self.dirty_range_last[i]
+    let mut j = i - 1
+    while j >= 0 && self.dirty_range_first[j] > first {
+      self.dirty_range_first[j + 1] = self.dirty_range_first[j]
+      self.dirty_range_last[j + 1] = self.dirty_range_last[j]
+      j = j - 1
+    }
+    self.dirty_range_first[j + 1] = first
+    self.dirty_range_last[j + 1] = last
+  }
+  let mut write = 0
+  for i = 1; i < n; i = i + 1 {
+    let first = self.dirty_range_first[i]
+    let last = self.dirty_range_last[i]
+    if first <= self.dirty_range_last[write] + 1 {
+      if last > self.dirty_range_last[write] {
+        self.dirty_range_last[write] = last
+      }
+    } else {
+      write = write + 1
+      self.dirty_range_first[write] = first
+      self.dirty_range_last[write] = last
+    }
+  }
+  while self.dirty_range_first.length() > write + 1 {
+    let _ = self.dirty_range_first.pop()
+    let _ = self.dirty_range_last.pop()
+  }
+}
+
+///|
 /// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
 #cfg(not(target="js"))
 fn GpuComponentStore::range_bytes(
@@ -551,6 +593,7 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
   if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
     return writes
   }
+  self.sort_dirty_ranges_for_drain()
   for ri = 0; ri < self.dirty_range_first.length(); ri = ri + 1 {
     writes.push(
       self.range_bytes(self.dirty_range_first[ri], self.dirty_range_last[ri]),
@@ -718,6 +761,7 @@ fn GpuComponentStore::drain_write_views(
   if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
     return writes
   }
+  self.sort_dirty_ranges_for_drain()
   for ri = 0; ri < self.dirty_range_first.length(); ri = ri + 1 {
     writes.push(
       self.range_view(self.dirty_range_first[ri], self.dirty_range_last[ri]),
