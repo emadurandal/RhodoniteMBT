@@ -156,7 +156,7 @@ extern "js" fn GpuComponentStore::mark_dirty_range_js(
   last : Int,
 ) -> Unit =
   #| (store, first, last) => {
-  #|   if (last < first) return;
+  #|   if (first < 0 || last < first) return;
   #|   const ranges = store.__rhodonite_dirty_ranges ||
   #|     (store.__rhodonite_dirty_ranges = []);
   #|   const prev = ranges[ranges.length - 1];
@@ -186,7 +186,7 @@ fn GpuComponentStore::mark_dirty_range(
   first : Int,
   last : Int,
 ) -> Unit {
-  if last < first {
+  if first < 0 || last < first {
     return
   }
   let n = self.dirty_range_first.length()
