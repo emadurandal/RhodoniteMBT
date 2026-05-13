@@ -252,9 +252,9 @@ fn animate_transforms_query(
   per_side : Int,
   t : Double,
 ) -> Unit {
-  if animate_transforms_query_fast(world, tf_id, per_side, t) {
-    return
-  }
+  // if animate_transforms_query_fast(world, tf_id, per_side, t) {
+  //   return
+  // }
   let q = @ecs.Query::new([tf_id])
   q.for_each(world, row => {
     let idx = row.entity().index
@@ -332,6 +332,7 @@ fn update_global_transforms_for_mass_cubes_fast(
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
+  ignore(tf)
   update_global_transforms_for_mass_cubes_fast_js(
     world, gt, per_side, t, entity_count, cube_scale,
   )
@@ -361,12 +362,12 @@ fn update_and_drain_global_transforms(
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
-  let writes = update_global_transforms_for_mass_cubes_fast(
-    world, tf, gt, per_side, t,
-  )
-  if writes.length() > 0 {
-    return writes
-  }
+  // let writes = update_global_transforms_for_mass_cubes_fast(
+  //   world, tf, gt, per_side, t,
+  // )
+  // if writes.length() > 0 {
+  //   return writes
+  // }
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
   world.drain_gpu_writes(gt)

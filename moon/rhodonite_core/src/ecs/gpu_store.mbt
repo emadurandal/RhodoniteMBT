@@ -273,7 +273,8 @@ extern "js" fn GpuComponentStore::drain_writes_js(
 ) -> Array[GpuWrite] =
   #| (store) => {
   #|   const dirty = store.dirty_indices;
-  #|   if (dirty.length === 0) return [];
+  #|   const pendingRanges = store.__rhodonite_dirty_ranges || [];
+  #|   if (dirty.length === 0 && pendingRanges.length === 0) return [];
   #|   let sorted = true;
   #|   for (let i = 1; i < dirty.length; i++) {
   #|     if (dirty[i] < dirty[i - 1]) {
@@ -295,22 +296,64 @@ extern "js" fn GpuComponentStore::drain_writes_js(
   #|     out.set(src.slice(start, start + len));
   #|     return out;
   #|   };
-  #|   let first = dirty[0];
-  #|   let prev = dirty[0];
-  #|   for (let i = 1; i < dirty.length; i++) {
-  #|     const idx = dirty[i];
-  #|     if (idx === prev) continue;
-  #|     if (idx === prev + 1) {
-  #|       prev = idx;
-  #|     } else {
-  #|       writes.push({ byte_offset: first * stride, bytes: rangeBytes(first, prev) });
-  #|       first = idx;
-  #|       prev = idx;
+  #|   const mergedRanges = [];
+  #|   if (pendingRanges.length > 0) {
+  #|     pendingRanges.sort((a, b) => a.first - b.first);
+  #|     for (let i = 0; i < pendingRanges.length; i++) {
+  #|       const r = pendingRanges[i];
+  #|       const first = r.first | 0;
+  #|       const last = r.last | 0;
+  #|       if (last < first) continue;
+  #|       const prev = mergedRanges[mergedRanges.length - 1];
+  #|       if (prev && first <= prev.last + 1) {
+  #|         if (last > prev.last) prev.last = last;
+  #|       } else {
+  #|         mergedRanges.push({ first, last });
+  #|       }
   #|     }
+  #|     pendingRanges.length = 0;
   #|   }
-  #|   writes.push({ byte_offset: first * stride, bytes: rangeBytes(first, prev) });
-  #|   for (let i = 0; i < dirty.length; i++) {
-  #|     store.dirty_flags[dirty[i]] = false;
+  #|   for (let i = 0; i < mergedRanges.length; i++) {
+  #|     const r = mergedRanges[i];
+  #|     writes.push({ byte_offset: r.first * stride, bytes: rangeBytes(r.first, r.last) });
+  #|   }
+  #|   let rangeCursor = 0;
+  #|   const pushDirtyRunOutsidePendingRanges = (first, last) => {
+  #|     let cur = first;
+  #|     while (cur <= last) {
+  #|       while (rangeCursor < mergedRanges.length && mergedRanges[rangeCursor].last < cur) {
+  #|         rangeCursor++;
+  #|       }
+  #|       if (rangeCursor >= mergedRanges.length || mergedRanges[rangeCursor].first > last) {
+  #|         writes.push({ byte_offset: cur * stride, bytes: rangeBytes(cur, last) });
+  #|         break;
+  #|       }
+  #|       const r = mergedRanges[rangeCursor];
+  #|       if (r.first > cur) {
+  #|         const emitLast = Math.min(last, r.first - 1);
+  #|         writes.push({ byte_offset: cur * stride, bytes: rangeBytes(cur, emitLast) });
+  #|       }
+  #|       cur = Math.max(cur, r.last + 1);
+  #|     }
+  #|   };
+  #|   if (dirty.length > 0) {
+  #|     let first = dirty[0];
+  #|     let prev = dirty[0];
+  #|     for (let i = 1; i < dirty.length; i++) {
+  #|       const idx = dirty[i];
+  #|       if (idx === prev) continue;
+  #|       if (idx === prev + 1) {
+  #|         prev = idx;
+  #|       } else {
+  #|         pushDirtyRunOutsidePendingRanges(first, prev);
+  #|         first = idx;
+  #|         prev = idx;
+  #|       }
+  #|     }
+  #|     pushDirtyRunOutsidePendingRanges(first, prev);
+  #|     for (let i = 0; i < dirty.length; i++) {
+  #|       store.dirty_flags[dirty[i]] = false;
+  #|     }
   #|   }
   #|   dirty.length = 0;
   #|   return writes;

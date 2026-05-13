@@ -191,13 +191,26 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   }
   #|   const gtBytes = gtStore.bytes;
   #|   if ((gtBytes.byteOffset & 3) !== 0 || (gtBytes.byteLength & 3) !== 0) return false;
-  #|   const gtF32 = new Float32Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 2);
+  #|   let gtF32 = gtBytes.__rhodonite_f32_view;
+  #|   if (!gtF32 || gtF32.buffer !== gtBytes.buffer || gtF32.byteOffset !== gtBytes.byteOffset || gtF32.length !== (gtBytes.byteLength >> 2)) {
+  #|     gtF32 = new Float32Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 2);
+  #|     gtBytes.__rhodonite_f32_view = gtF32;
+  #|   }
   #|   const gtStride = gtStore.stride;
   #|   if ((gtStride & 3) !== 0) return false;
   #|   const gtStrideF32 = gtStride >> 2;
   #|   const capacity = Math.floor(gtBytes.length / gtStride);
-  #|   const dirtyFlags = gtStore.dirty_flags;
-  #|   const dirtyIndices = gtStore.dirty_indices;
+  #|   const dirtyRanges = gtStore.__rhodonite_dirty_ranges ||
+  #|     (gtStore.__rhodonite_dirty_ranges = []);
+  #|   const pushDirtyRange = (first, last) => {
+  #|     if (last < first) return;
+  #|     const prev = dirtyRanges[dirtyRanges.length - 1];
+  #|     if (prev && first <= prev.last + 1) {
+  #|       if (last > prev.last) prev.last = last;
+  #|     } else {
+  #|       dirtyRanges.push({ first, last });
+  #|     }
+  #|   };
   #|
   #|   for (let ai = 0; ai < archetypes.length; ai++) {
   #|     const arch = archetypes[ai];
@@ -229,9 +242,15 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     const tfBytes = tfColumn.bytes;
   #|     const tfStride = tfColumn.stride;
   #|     if ((tfBytes.byteOffset & 3) !== 0 || (tfBytes.byteLength & 3) !== 0 || (tfStride & 3) !== 0) return false;
-  #|     const tfF32 = new Float32Array(tfBytes.buffer, tfBytes.byteOffset, tfBytes.byteLength >> 2);
+  #|     let tfF32 = tfBytes.__rhodonite_f32_view;
+  #|     if (!tfF32 || tfF32.buffer !== tfBytes.buffer || tfF32.byteOffset !== tfBytes.byteOffset || tfF32.length !== (tfBytes.byteLength >> 2)) {
+  #|       tfF32 = new Float32Array(tfBytes.buffer, tfBytes.byteOffset, tfBytes.byteLength >> 2);
+  #|       tfBytes.__rhodonite_f32_view = tfF32;
+  #|     }
   #|     const tfStrideF32 = tfStride >> 2;
   #|     const entities = arch.entities;
+  #|     let rangeFirst = -1;
+  #|     let rangePrev = -1;
   #|     for (let row = 0; row < entities.length; row++) {
   #|       const entityIndex = entities[row].index;
   #|       if (entityIndex < 0 || entityIndex >= capacity) return false;
@@ -284,11 +303,18 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       gtF32[out + 14] = pz;
   #|       gtF32[out + 15] = 1;
   #|
-  #|       if (!dirtyFlags[entityIndex]) {
-  #|         dirtyFlags[entityIndex] = true;
-  #|         dirtyIndices.push(entityIndex);
+  #|       if (rangeFirst < 0) {
+  #|         rangeFirst = entityIndex;
+  #|         rangePrev = entityIndex;
+  #|       } else if (entityIndex === rangePrev + 1) {
+  #|         rangePrev = entityIndex;
+  #|       } else {
+  #|         pushDirtyRange(rangeFirst, rangePrev);
+  #|         rangeFirst = entityIndex;
+  #|         rangePrev = entityIndex;
   #|       }
   #|     }
+  #|     pushDirtyRange(rangeFirst, rangePrev);
   #|   }
   #|   return true;
   #| }
