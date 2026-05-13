@@ -70,13 +70,6 @@ pub(all) struct GpuWrite {
   bytes : FixedArray[Byte]
 }
 
-pub(all) struct GpuWriteBytes {
-  byte_offset : Int
-  bytes : Bytes
-  data_offset : Int
-  byte_length : Int
-}
-
 pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]

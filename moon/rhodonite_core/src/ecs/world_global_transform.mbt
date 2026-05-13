@@ -118,45 +118,6 @@ pub fn World::write_global_transforms_dense_views(
 }
 
 ///|
-/// Bulk-writes dense GlobalTransform rows `[0, count)` and returns native `Bytes` upload ranges.
-#cfg(target="native")
-pub fn World::write_global_transforms_dense_bytes(
-  self : World,
-  count : Int,
-  write : (Int, MutArrayView[Byte]) -> Unit,
-) -> Array[GpuWriteBytes] {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_bytes",
-  )
-  if count < 0 {
-    abort(
-      "World::write_global_transforms_dense_bytes: count must be non-negative",
-    )
-  }
-  if count == 0 {
-    return []
-  }
-  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    let bytes = range.bytes()
-    let stride = range.stride()
-    if stride != 64 {
-      abort(
-        "World::write_global_transforms_dense_bytes: GlobalTransform stride mismatch",
-      )
-    }
-    for i = 0; i < count; i = i + 1 {
-      let base = i * stride
-      write(i, bytes.mut_view(start=base, end=base + stride))
-    }
-  })
-  if !ok {
-    return []
-  }
-  self.drain_gpu_write_bytes(gt)
-}
-
-///|
 #cfg(target="js")
 extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   self : World,
@@ -344,21 +305,21 @@ extern "C" fn write_global_transforms_dense_grid_wave_f32_native(
 
 ///|
 #cfg(target="native")
-pub fn World::write_global_transforms_dense_grid_wave_bytes(
+pub fn World::write_global_transforms_dense_grid_wave_views(
   self : World,
   count : Int,
   per_side : Int,
   time : Double,
   scale : Float,
   spacing : Double,
-) -> Array[GpuWriteBytes] {
+) -> Array[GpuWriteView] {
   let gt = self.global_transform_component_id
   self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_grid_wave_bytes",
+    gt, "World::write_global_transforms_dense_grid_wave_views",
   )
   if count < 0 {
     abort(
-      "World::write_global_transforms_dense_grid_wave_bytes: count must be non-negative",
+      "World::write_global_transforms_dense_grid_wave_views: count must be non-negative",
     )
   }
   if count == 0 {
@@ -368,7 +329,7 @@ pub fn World::write_global_transforms_dense_grid_wave_bytes(
     Some(store) => {
       if store.stride != 64 {
         abort(
-          "World::write_global_transforms_dense_grid_wave_bytes: GlobalTransform stride mismatch",
+          "World::write_global_transforms_dense_grid_wave_views: GlobalTransform stride mismatch",
         )
       }
       let data = FixedArray::unsafe_reinterpret_as_bytes(store.bytes)
@@ -382,7 +343,7 @@ pub fn World::write_global_transforms_dense_grid_wave_bytes(
       )
       store.mark_dirty_range(0, count - 1)
       self.replace_gpu_store(store)
-      self.drain_gpu_write_bytes(gt)
+      self.drain_gpu_write_views(gt)
     }
     None => []
   }
@@ -390,7 +351,7 @@ pub fn World::write_global_transforms_dense_grid_wave_bytes(
 
 ///|
 /// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
-#cfg(not(target="js"))
+#cfg(not(any(target="js", target="native")))
 pub fn World::write_global_transforms_dense_grid_wave_views(
   self : World,
   count : Int,

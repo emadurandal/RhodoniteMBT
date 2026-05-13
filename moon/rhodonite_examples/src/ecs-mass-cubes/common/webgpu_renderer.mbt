@@ -294,7 +294,6 @@ fn animate_transforms_query(
 }
 
 ///|
-#cfg(not(target="native"))
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -314,27 +313,6 @@ fn update_global_transforms_for_mass_cubes_fast(
 }
 
 ///|
-#cfg(target="native")
-fn update_global_transforms_for_mass_cubes_fast(
-  world : @ecs.World,
-  tf : @ecs.ComponentTypeId,
-  gt : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Array[@ecs.GpuWriteBytes] {
-  ignore(tf)
-  ignore(gt)
-  world.write_global_transforms_dense_grid_wave_bytes(
-    entity_count,
-    per_side,
-    t * 1.8,
-    cube_scale,
-    grid_spacing,
-  )
-}
-
-///|
-#cfg(not(target="native"))
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -354,27 +332,6 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-#cfg(target="native")
-fn update_and_drain_global_transforms(
-  world : @ecs.World,
-  tf : @ecs.ComponentTypeId,
-  gt : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Array[@ecs.GpuWriteBytes] {
-  let writes = update_global_transforms_for_mass_cubes_fast(
-    world, tf, gt, per_side, t,
-  )
-  if writes.length() > 0 {
-    return writes
-  }
-  animate_transforms_query(world, tf, per_side, t)
-  world.update_global_transforms_from_transforms()
-  world.drain_gpu_write_bytes(gt)
-}
-
-///|
-#cfg(not(target="native"))
 fn upload_global_transform_writes(
   queue : @wgpu.GPUQueue,
   transform_storage : @wgpu.GPUBuffer,
@@ -386,25 +343,6 @@ fn upload_global_transform_writes(
       transform_storage,
       w.byte_offset.to_uint64(),
       w.bytes,
-    )
-  }
-}
-
-///|
-#cfg(target="native")
-fn upload_global_transform_writes(
-  queue : @wgpu.GPUQueue,
-  transform_storage : @wgpu.GPUBuffer,
-  writes : Array[@ecs.GpuWriteBytes],
-) -> Unit {
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    queue.write_buffer_from_bytes_range(
-      transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-      w.data_offset.to_uint64(),
-      w.byte_length.to_uint64(),
     )
   }
 }

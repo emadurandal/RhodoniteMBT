@@ -21,7 +21,6 @@
 | `RegisteredComponent` | 名前、`kind`、`cpu_stride`、任意の `gpu_layout`。 |
 | `GpuWrite` | 所有型の GPU upload slice（`byte_offset` + `FixedArray[Byte]`）。所有 payload が必要な API 向け。 |
 | `GpuWriteView` | 借用型の GPU upload slice（`byte_offset` + `ArrayView[Byte]`）。即時 upload する zero-copy 寄りの経路向け。 |
-| `GpuWriteBytes` | native 用 upload slice（`byte_offset` + backing `Bytes` + source offset/length）。dirty span は ECS GPU store の backing を借用できます。 |
 
 ---
 
@@ -293,28 +292,24 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 - **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージします。bulk path が記録した dirty range も同時に消費し、`GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
 - **`drain_gpu_write_views(component)`**: dirty の消費ルールは同じですが、借用型の `GpuWriteView`（`byte_offset` + `ArrayView[Byte]`）を返します。同じ GPU component store を次に変更する前に即時 upload する用途向けで、ECS drain 時の `FixedArray[Byte]` payload copy を避けます。
-- **`drain_gpu_write_bytes(component)`**: native 専用の drain で、`GpuWriteBytes`（`byte_offset` + backing `Bytes` + `data_offset` + `byte_length`）を返します。フル範囲でも部分範囲でも native GPU store backing を借用し、upload helper 側が source offset/length を使うため compact payload へのコピーは不要です。
 - **`gpu_component_active_indices(component)`**: GPU-visible component を所有している `EntityId.index` の packed set をコピーして返します。renderer 側の抽出や、全スロット走査を避ける packed update path の入口として使えます。
 - **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。`Schedule::run` 中は World 所有の event queue を消費する操作として `structural_write` が必要です。Schedule 外では直接呼べます。
 
-`add_component`、`add_component_bytes`、`component_bytes`、`set_component_bytes` は CPU-only / GPU-visible component の両方を扱います。CPU-only payload は archetype SoA row、GPU-visible payload は `EntityId.index` ベースの flat GPU row に置かれます。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。JS / 非 JS とも GPU store は幾何級数的に伸び、JS では `Uint8Array`、native では連続した `FixedArray[Byte]` backing を使うことで、upload span を借用 `Bytes` + source offset/length として露出できます。
+`add_component`、`add_component_bytes`、`component_bytes`、`set_component_bytes` は CPU-only / GPU-visible component の両方を扱います。CPU-only payload は archetype SoA row、GPU-visible payload は `EntityId.index` ベースの flat GPU row に置かれます。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。JS / 非 JS とも GPU store は幾何級数的に伸び、upload span は即時 zero-copy upload 用の借用 `ArrayView[Byte]` として露出できます。
 
 WebGPU upload 側には次の API があります。
 
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
-- `GPUQueue::write_buffer_from_bytes_range`: ECS が返す native `GpuWriteBytes` payload 向け。`Bytes + data_offset + byte_length` を native queue helper に渡すため、フル範囲・部分範囲とも借用のまま upload できます。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、JS では `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` / `queue.write_buffer_from_array_view`、native では `write_global_transforms_dense_grid_wave_bytes` / `drain_gpu_write_bytes` / `queue.write_buffer_from_bytes_range` を使います。
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、JS / native とも `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` の結果を `queue.write_buffer_from_array_view` で upload します。
 
 Dense GlobalTransform helper には所有型と view 型の両方があります。
 
 - `write_global_transforms_dense(...) -> Array[GpuWrite]`
 - `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_bytes(...) -> Array[GpuWriteBytes]`（native）
 - `write_global_transforms_dense_grid_wave(...) -> Array[GpuWrite]`
 - `write_global_transforms_dense_grid_wave_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_grid_wave_bytes(...) -> Array[GpuWriteBytes]`（native）
 
 ---
 

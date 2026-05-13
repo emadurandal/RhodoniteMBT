@@ -821,63 +821,6 @@ test "World drain_gpu_write_views returns borrowed contiguous upload" {
 }
 
 ///|
-#cfg(target="native")
-test "World drain_gpu_write_bytes returns native bytes upload" {
-  let world = World::new()
-  let gpu16 = world.register_gpu_component(
-    "GpuBulkBytes16",
-    @comp.GpuLayout::empty(16),
-  )
-  let ok = world.with_gpu_component_write_range(gpu16, 0, 2, range => {
-    let bytes = range.bytes()
-    bytes[0] = (66 : Byte)
-    bytes[16] = (77 : Byte)
-  })
-  assert_true(ok)
-  let writes = world.drain_gpu_write_bytes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].data_offset, 0)
-  assert_eq(writes[0].byte_length, 32)
-  assert_eq(writes[0].bytes.length(), 32)
-  assert_eq(writes[0].bytes[0], (66 : Byte))
-  assert_eq(writes[0].bytes[16], (77 : Byte))
-  assert_eq(world.drain_gpu_write_bytes(gpu16).length(), 0)
-}
-
-///|
-#cfg(target="native")
-test "World drain_gpu_write_bytes borrows partial native range" {
-  let world = World::new()
-  let gpu16 = world.register_gpu_component(
-    "GpuPartialBytes16",
-    @comp.GpuLayout::empty(16),
-  )
-  let _ = world.with_gpu_component_write_range(gpu16, 0, 4, range => {
-    let bytes = range.bytes()
-    bytes[0] = (1 : Byte)
-    bytes[16] = (2 : Byte)
-    bytes[32] = (3 : Byte)
-    bytes[48] = (4 : Byte)
-  })
-  let _ = world.drain_gpu_write_bytes(gpu16)
-  let ok = world.with_gpu_component_write_range(gpu16, 1, 2, range => {
-    let bytes = range.bytes()
-    bytes[0] = (88 : Byte)
-    bytes[16] = (99 : Byte)
-  })
-  assert_true(ok)
-  let writes = world.drain_gpu_write_bytes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 16)
-  assert_eq(writes[0].data_offset, 16)
-  assert_eq(writes[0].byte_length, 32)
-  assert_eq(writes[0].bytes.length(), 64)
-  assert_eq(writes[0].bytes[writes[0].data_offset], (88 : Byte))
-  assert_eq(writes[0].bytes[writes[0].data_offset + 16], (99 : Byte))
-}
-
-///|
 test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
@@ -1589,13 +1532,9 @@ test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices"
 
 ///|
 #cfg(target="native")
-test "write_global_transforms_dense_grid_wave_bytes writes dense scaled grid matrices" {
-  fn get_f32(buf : BytesView, offset : Int) -> Float {
-    Float::reinterpret_from_uint(buf.unsafe_read_uint32_le(offset))
-  }
-
+test "native write_global_transforms_dense_grid_wave_views writes dense scaled grid matrices" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense_grid_wave_bytes(
+  let writes = world.write_global_transforms_dense_grid_wave_views(
     2,
     2,
     0.0,
@@ -1604,13 +1543,12 @@ test "write_global_transforms_dense_grid_wave_bytes writes dense scaled grid mat
   )
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].data_offset, 0)
-  assert_eq(writes[0].byte_length, 2 * 64)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
   let row0 = writes[0].bytes[0:64]
   let row1 = writes[0].bytes[64:128]
-  assert_eq(get_f32(row0, 0), (0.5 : Float))
-  assert_eq(get_f32(row0, 48), (-1.0 : Float))
-  assert_eq(get_f32(row0, 56), (-1.0 : Float))
-  assert_eq(get_f32(row1, 48), (1.0 : Float))
-  assert_eq(get_f32(row1, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
 }

@@ -111,15 +111,6 @@ pub(all) struct GpuWriteView {
 }
 
 ///|
-/// GPU upload slice represented as `Bytes`. Native full-store writes can alias the store backing.
-pub(all) struct GpuWriteBytes {
-  byte_offset : Int
-  bytes : Bytes
-  data_offset : Int
-  byte_length : Int
-}
-
-///|
 /// Emitted when the flat GPU backing store grows; callers may need to recreate GPU buffers and optionally full-upload.
 pub(all) struct GpuResizeEvent {
   component : ComponentTypeId
