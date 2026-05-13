@@ -898,15 +898,11 @@ fn World::for_each_query_archetypes(
   required : Array[ComponentTypeId],
   f : (Int) -> Unit,
 ) -> Unit {
-  if required.length() == 0 {
+  let required_len = required.length()
+  if required_len == 0 {
     return
   }
-  if component_array_has_duplicates(required) {
-    abort(
-      "Query::for_each_archetype: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
-    )
-  }
-  for k = 0; k < required.length(); k = k + 1 {
+  for k = 0; k < required_len; k = k + 1 {
     match self.registry.get(required[k]) {
       Some(_) => ()
       None =>
@@ -918,10 +914,28 @@ fn World::for_each_query_archetypes(
     }
   }
   self.query_depth = self.query_depth + 1
-  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-    let sig = self.archetypes[ai].components
-    if component_array_contains_all(sig, required) {
-      f(ai)
+  if required_len == 1 {
+    let c0 = required[0]
+    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+      if component_array_contains(self.archetypes[ai].components, c0) {
+        f(ai)
+      }
+    }
+  } else if required_len == 2 {
+    let c0 = required[0]
+    let c1 = required[1]
+    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+      let sig = self.archetypes[ai].components
+      if component_array_contains(sig, c0) && component_array_contains(sig, c1) {
+        f(ai)
+      }
+    }
+  } else {
+    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+      let sig = self.archetypes[ai].components
+      if component_array_contains_all(sig, required) {
+        f(ai)
+      }
     }
   }
   self.query_depth = self.query_depth - 1
