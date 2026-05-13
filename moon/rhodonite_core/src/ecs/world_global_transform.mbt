@@ -524,6 +524,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       const converted = new Uint8Array(tfBytes.length);
   #|       converted.set(tfBytes);
   #|       tfBytes = converted;
+  #|       tfColumn.bytes = converted;
   #|     }
   #|     const tfStride = tfColumn.stride;
   #|     if ((tfBytes.byteOffset & 3) !== 0 || (tfBytes.byteLength & 3) !== 0 || (tfStride & 3) !== 0) return false;
