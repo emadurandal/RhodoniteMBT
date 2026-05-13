@@ -724,6 +724,7 @@ pub fn World::add_component(
               if !self.add_component_signature(entity, component, empty) {
                 false
               } else {
+                store.activate_slot(entity.index)
                 store.clear_slot(entity.index)
                 self.replace_gpu_store(store)
                 true
@@ -767,6 +768,7 @@ pub fn World::add_component_bytes(
               if !self.add_component_signature(entity, component, empty) {
                 false
               } else {
+                store.activate_slot(entity.index)
                 if bytes.length() == 0 {
                   store.clear_slot(entity.index)
                 } else {
@@ -831,6 +833,7 @@ pub fn World::remove_component(
   match gpu_store_to_clear {
     Some(store) => {
       store.clear_slot(entity.index)
+      store.deactivate_slot(entity.index)
       self.replace_gpu_store(store)
     }
     None => ()

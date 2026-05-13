@@ -75,7 +75,37 @@ pub fn World::get_transform(
 }
 
 ///|
-/// Native hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`
+/// JS hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`.
+/// It uses the archetype column API so browser builds have the same official bulk path as native.
+#cfg(target="js")
+pub fn World::update_transform3d_positions(
+  self : World,
+  f : (EntityId) -> (Float, Float, Float),
+) -> Unit {
+  let tf = self.transform_component_id
+  self.assert_system_component_write(tf, "World::update_transform3d_positions")
+  Query::new([tf]).for_each_archetype(self, arch => {
+    let stride = arch.component_stride(tf)
+    if stride != 48 {
+      abort("World::update_transform3d_positions: Transform3D stride mismatch")
+    }
+    let col = arch.write_column(tf)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let entity = arch.entity(row)
+      let (x, y, z) = f(entity)
+      let base = row * stride
+      @comp.Transform3D::write_position_to_component_mut_view(
+        col.mut_view(start=base, end=base + 48),
+        x,
+        y,
+        z,
+      )
+    }
+  })
+}
+
+///|
+/// Native/Wasm hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`
 /// or `Vector3Ref` wrappers per entity.
 #cfg(not(target="js"))
 pub fn World::update_transform3d_positions(

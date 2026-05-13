@@ -392,6 +392,8 @@ fn World::try_update_global_transforms_no_child_fast_path(
     if tf_stride < 40 {
       return false
     }
+    let mut dirty_first = -1
+    let mut dirty_prev = -1
     for row = 0; row < arch.entities.length(); row = row + 1 {
       let entity_index = arch.entities[row].index
       if entity_index < 0 || entity_index >= capacity {
@@ -445,8 +447,18 @@ fn World::try_update_global_transforms_no_child_fast_path(
       put_f32_array_le(gt_store.bytes, out + 52, py)
       put_f32_array_le(gt_store.bytes, out + 56, pz)
       put_f32_array_le(gt_store.bytes, out + 60, (1.0 : Float))
-      gt_store.mark_dirty(entity_index)
+      if dirty_first < 0 {
+        dirty_first = entity_index
+        dirty_prev = entity_index
+      } else if entity_index == dirty_prev + 1 {
+        dirty_prev = entity_index
+      } else {
+        gt_store.mark_dirty_range(dirty_first, dirty_prev)
+        dirty_first = entity_index
+        dirty_prev = entity_index
+      }
     }
+    gt_store.mark_dirty_range(dirty_first, dirty_prev)
   }
   self.replace_gpu_store(gt_store)
   true
@@ -500,6 +512,8 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     let tf_col = arch.columns[arch.column_index(tf)]
     let tf_bytes = tf_col.bytes
     let tf_stride = tf_col.stride
+    let mut dirty_first = -1
+    let mut dirty_prev = -1
     for row = 0; row < arch.entities.length(); row = row + 1 {
       let e = arch.entities[row]
       let tf_base = row * tf_stride
@@ -515,8 +529,18 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
           gt_store.bytes.mut_view(start=gt_base, end=gt_base + 64),
         ),
       )
-      gt_store.mark_dirty(e.index)
+      if dirty_first < 0 {
+        dirty_first = e.index
+        dirty_prev = e.index
+      } else if e.index == dirty_prev + 1 {
+        dirty_prev = e.index
+      } else {
+        gt_store.mark_dirty_range(dirty_first, dirty_prev)
+        dirty_first = e.index
+        dirty_prev = e.index
+      }
     }
+    gt_store.mark_dirty_range(dirty_first, dirty_prev)
   }
   self.replace_gpu_store(gt_store)
   true

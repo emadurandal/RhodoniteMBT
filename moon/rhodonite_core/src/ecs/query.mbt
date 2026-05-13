@@ -108,7 +108,49 @@ pub fn Query::for_each_archetype(
     "Query::for_each_archetype",
   )
   world.for_each_query_archetypes(self.required, archetype_index => {
-    f({ world, components: self.required, archetype_index })
+    let arch = world.archetypes[archetype_index]
+    let accesses : Array[QueryArchetypeComponentAccess] = []
+    for k = 0; k < self.required.length(); k = k + 1 {
+      let component = self.required[k]
+      match world.registry.get(component) {
+        Some(rc) =>
+          match rc.kind {
+            CpuOnly => {
+              let ci = arch.column_index(component)
+              if ci < 0 {
+                abort(
+                  "Query::for_each_archetype: matched archetype is missing CPU column",
+                )
+              }
+              accesses.push({
+                component,
+                kind: CpuOnly,
+                column_index: ci,
+                stride: arch.columns[ci].stride,
+              })
+            }
+            GpuVisible => {
+              let stride = match world.gpu_store(component) {
+                Some(store) => store.stride
+                None =>
+                  abort(
+                    "Query::for_each_archetype: GpuVisible " +
+                    component_id_text(component) +
+                    " has no GPU store.",
+                  )
+              }
+              accesses.push({
+                component,
+                kind: GpuVisible,
+                column_index: -1,
+                stride,
+              })
+            }
+          }
+        None => abort("Query::for_each_archetype: unknown component")
+      }
+    }
+    f({ world, accesses, archetype_index })
   })
 }
 
@@ -261,7 +303,7 @@ pub fn QueryArchetype::has(
   self : QueryArchetype,
   component : ComponentTypeId,
 ) -> Bool {
-  component_array_index_of(self.components, component) >= 0
+  self.component_access_index(component) >= 0
 }
 
 ///|
@@ -269,30 +311,23 @@ pub fn QueryArchetype::component_stride(
   self : QueryArchetype,
   component : ComponentTypeId,
 ) -> Int {
-  ignore(
-    self.component_payload_index(component, "QueryArchetype::component_stride"),
+  let index = self.component_payload_index(
+    component, "QueryArchetype::component_stride",
   )
-  match self.world.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => self.world.registry.stride(component)
-        GpuVisible =>
-          match self.world.gpu_store(component) {
-            Some(store) => store.stride
-            None =>
-              abort(
-                "QueryArchetype::component_stride: GpuVisible " +
-                component_id_text(component) +
-                " has no GPU store.",
-              )
-          }
-      }
-    None =>
-      abort(
-        "QueryArchetype::component_stride: unknown " +
-        component_id_text(component),
-      )
+  self.accesses[index].stride
+}
+
+///|
+fn QueryArchetype::component_access_index(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+) -> Int {
+  for i = 0; i < self.accesses.length(); i = i + 1 {
+    if self.accesses[i].component == component {
+      return i
+    }
   }
+  -1
 }
 
 ///|
@@ -301,7 +336,7 @@ fn QueryArchetype::component_payload_index(
   component : ComponentTypeId,
   operation : String,
 ) -> Int {
-  let index = component_array_index_of(self.components, component)
+  let index = self.component_access_index(component)
   if index < 0 {
     abort(
       operation +
@@ -323,27 +358,20 @@ pub fn QueryArchetype::read_column(
   self.world.assert_system_component_read(
     component, "QueryArchetype::read_column",
   )
-  ignore(self.component_payload_index(component, "QueryArchetype::read_column"))
-  match self.world.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => {
-          let arch = self.world.archetypes[self.archetype_index]
-          let ci = arch.column_index(component)
-          if ci < 0 {
-            abort("QueryArchetype::read_column: missing CPU column")
-          }
-          let col = arch.columns[ci]
-          col.bytes[:]
-        }
-        GpuVisible =>
-          abort(
-            "QueryArchetype::read_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
-          )
-      }
-    None =>
+  let access_index = self.component_payload_index(
+    component, "QueryArchetype::read_column",
+  )
+  let access = self.accesses[access_index]
+  match access.kind {
+    CpuOnly => {
+      let arch = self.world.archetypes[self.archetype_index]
+      let col = arch.columns[access.column_index]
+      let logical_end = arch.entities.length() * col.stride
+      col.bytes[0:logical_end]
+    }
+    GpuVisible =>
       abort(
-        "QueryArchetype::read_column: unknown " + component_id_text(component),
+        "QueryArchetype::read_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
       )
   }
 }
@@ -357,29 +385,20 @@ pub fn QueryArchetype::write_column(
   self.world.assert_system_component_write(
     component, "QueryArchetype::write_column",
   )
-  ignore(
-    self.component_payload_index(component, "QueryArchetype::write_column"),
+  let access_index = self.component_payload_index(
+    component, "QueryArchetype::write_column",
   )
-  match self.world.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => {
-          let arch = self.world.archetypes[self.archetype_index]
-          let ci = arch.column_index(component)
-          if ci < 0 {
-            abort("QueryArchetype::write_column: missing CPU column")
-          }
-          let col = arch.columns[ci]
-          col.bytes.mut_view(start=0, end=col.bytes.length())
-        }
-        GpuVisible =>
-          abort(
-            "QueryArchetype::write_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
-          )
-      }
-    None =>
+  let access = self.accesses[access_index]
+  match access.kind {
+    CpuOnly => {
+      let arch = self.world.archetypes[self.archetype_index]
+      let col = arch.columns[access.column_index]
+      let logical_end = arch.entities.length() * col.stride
+      col.bytes.mut_view(start=0, end=logical_end)
+    }
+    GpuVisible =>
       abort(
-        "QueryArchetype::write_column: unknown " + component_id_text(component),
+        "QueryArchetype::write_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
       )
   }
 }

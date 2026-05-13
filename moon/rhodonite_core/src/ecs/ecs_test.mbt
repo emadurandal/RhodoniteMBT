@@ -178,6 +178,31 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
 }
 
 ///|
+test "GPU visible active indices stay packed across removal and destroy" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuActivePacked",
+    @comp.GpuLayout::empty(16),
+  )
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component(e0, gpu))
+  assert_true(world.add_component(e1, gpu))
+  assert_true(world.add_component(e2, gpu))
+  assert_eq(world.gpu_component_active_indices(gpu).length(), 3)
+  assert_true(world.remove_component(e1, gpu))
+  let after_remove = world.gpu_component_active_indices(gpu)
+  assert_eq(after_remove.length(), 2)
+  assert_true(after_remove[0] == e0.index || after_remove[1] == e0.index)
+  assert_true(after_remove[0] == e2.index || after_remove[1] == e2.index)
+  assert_true(world.destroy_entity(e0))
+  let after_destroy = world.gpu_component_active_indices(gpu)
+  assert_eq(after_destroy.length(), 1)
+  assert_eq(after_destroy[0], e2.index)
+}
+
+///|
 test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes" {
   let world = World::new()
   let gpu = world.register_gpu_component(
@@ -693,6 +718,32 @@ test "Query for_each_archetype exposes contiguous CPU columns" {
     Some(bytes) => assert_eq(bytes[0], (5 : Byte))
     None => abort("expected QueryArchB bytes")
   }
+}
+
+///|
+test "QueryArchetype column views expose logical rows after column capacity growth" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryArchCapacityA", 4)
+  let qb = world.register_cpu_component("QueryArchCapacityB", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(10, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qa, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(20, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qb, bytes4(30, 0, 0, 0)))
+  assert_true(world.destroy_entity(e1))
+  let query = Query::new([qa, qb])
+  let mut row_count = -1
+  let mut column_len = -1
+  query.for_each_archetype(world, chunk => {
+    row_count = chunk.length()
+    column_len = chunk.read_column(qa).length()
+  })
+  assert_eq(row_count, 2)
+  assert_eq(column_len, 8)
 }
 
 ///|

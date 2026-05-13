@@ -31,6 +31,30 @@ fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
 }
 
 ///|
+fn ComponentColumn::ensure_row_capacity(
+  self : ComponentColumn,
+  required_rows : Int,
+) -> Unit {
+  if required_rows <= self.row_capacity {
+    return
+  }
+  let mut next = if self.row_capacity > 0 { self.row_capacity * 2 } else { 1 }
+  while next < required_rows {
+    next = next * 2
+  }
+  append_zero_bytes(self.bytes, (next - self.row_capacity) * self.stride)
+  self.row_capacity = next
+}
+
+///|
+fn ComponentColumn::clear_row(self : ComponentColumn, row : Int) -> Unit {
+  let base = row * self.stride
+  for b = 0; b < self.stride; b = b + 1 {
+    self.bytes[base + b] = (0 : Byte)
+  }
+}
+
+///|
 /// Builds an archetype table for one sorted component signature (empty archetype uses this with zero components).
 fn Archetype::new(
   components : Array[ComponentTypeId],
@@ -43,6 +67,7 @@ fn Archetype::new(
       component: components[i],
       stride: registry.stride(components[i]),
       bytes,
+      row_capacity: 0,
     })
   }
   let entities : Array[EntityId] = []
@@ -68,7 +93,8 @@ fn Archetype::push_empty_row(self : Archetype, entity : EntityId) -> Int {
   let row = self.entities.length()
   self.entities.push(entity)
   for i = 0; i < self.columns.length(); i = i + 1 {
-    append_zero_bytes(self.columns[i].bytes, self.columns[i].stride)
+    self.columns[i].ensure_row_capacity(row + 1)
+    self.columns[i].clear_row(row)
   }
   row
 }
@@ -143,12 +169,5 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
     }
   }
   let _ = self.entities.pop()
-  for ci = 0; ci < self.columns.length(); ci = ci + 1 {
-    let col = self.columns[ci]
-    for b = 0; b < col.stride; b = b + 1 {
-      ignore(b)
-      let _ = col.bytes.pop()
-    }
-  }
   moved
 }

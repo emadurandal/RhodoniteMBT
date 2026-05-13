@@ -62,10 +62,14 @@ pub(all) struct EntityLocation {
 
 ///|
 /// One SoA column: packed `stride`-byte rows for a single component type inside an archetype.
+///
+/// `row_capacity` is the backing-capacity watermark used by append helpers. It keeps column growth
+/// policy explicit without exposing storage details to query hot paths.
 priv struct ComponentColumn {
   component : ComponentTypeId
   stride : Int
   bytes : Array[Byte]
+  mut row_capacity : Int
 }
 
 ///|
@@ -84,7 +88,12 @@ struct GpuComponentStore {
   bytes : Array[Byte]
   dirty_flags : Array[Bool]
   dirty_indices : Array[Int]
+  dirty_range_first : Array[Int]
+  dirty_range_last : Array[Int]
   sort_bucket : Array[Bool]
+  active_flags : Array[Bool]
+  active_indices : Array[Int]
+  active_positions : Array[Int]
 }
 
 ///|
@@ -116,6 +125,16 @@ priv struct QueryRowComponentAccess {
 }
 
 ///|
+/// Cached component lookup for one matched archetype chunk. This avoids repeated linear
+/// `column_index` scans inside `QueryArchetype::read_column` / `write_column` hot loops.
+priv struct QueryArchetypeComponentAccess {
+  component : ComponentTypeId
+  kind : ComponentKind
+  column_index : Int
+  stride : Int
+}
+
+///|
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views used by the lower-level world query.
 pub struct QueryRow {
@@ -132,7 +151,7 @@ pub struct QueryRow {
 /// strides for hot loops that should avoid constructing one [`QueryRow`] per entity.
 pub struct QueryArchetype {
   priv world : World
-  priv components : Array[ComponentTypeId]
+  priv accesses : Array[QueryArchetypeComponentAccess]
   priv archetype_index : Int
 }
 

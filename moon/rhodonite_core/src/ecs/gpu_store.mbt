@@ -7,8 +7,25 @@ fn GpuComponentStore::new(
   let bytes : Array[Byte] = []
   let dirty_flags : Array[Bool] = []
   let dirty_indices : Array[Int] = []
+  let dirty_range_first : Array[Int] = []
+  let dirty_range_last : Array[Int] = []
   let sort_bucket : Array[Bool] = []
-  { component, stride, bytes, dirty_flags, dirty_indices, sort_bucket }
+  let active_flags : Array[Bool] = []
+  let active_indices : Array[Int] = []
+  let active_positions : Array[Int] = []
+  {
+    component,
+    stride,
+    bytes,
+    dirty_flags,
+    dirty_indices,
+    dirty_range_first,
+    dirty_range_last,
+    sort_bucket,
+    active_flags,
+    active_indices,
+    active_positions,
+  }
 }
 
 ///|
@@ -39,6 +56,10 @@ extern "js" fn ensure_gpu_store_capacity_js(
   #|   while (store.dirty_flags.length < nextCapacity) {
   #|     store.dirty_flags.push(false);
   #|   }
+  #|   while (store.active_flags.length < nextCapacity) {
+  #|     store.active_flags.push(false);
+  #|     store.active_positions.push(-1);
+  #|   }
   #|   return true;
   #| }
 
@@ -63,13 +84,19 @@ fn GpuComponentStore::ensure_capacity(
   if capacity <= old {
     return false
   }
-  for entity_i = old; entity_i < capacity; entity_i = entity_i + 1 {
+  let mut next_capacity = if old > 0 { old * 2 } else { capacity }
+  while next_capacity < capacity {
+    next_capacity = next_capacity * 2
+  }
+  for entity_i = old; entity_i < next_capacity; entity_i = entity_i + 1 {
     ignore(entity_i)
     for byte_i = 0; byte_i < self.stride; byte_i = byte_i + 1 {
       ignore(byte_i)
       self.bytes.push((0 : Byte))
     }
     self.dirty_flags.push(false)
+    self.active_flags.push(false)
+    self.active_positions.push(-1)
   }
   true
 }
@@ -80,6 +107,96 @@ fn GpuComponentStore::mark_dirty(self : GpuComponentStore, index : Int) -> Unit 
   if !self.dirty_flags[index] {
     self.dirty_flags[index] = true
     self.dirty_indices.push(index)
+  }
+}
+
+///|
+/// Adds one entity index to this GPU-visible component's packed active set.
+fn GpuComponentStore::activate_slot(
+  self : GpuComponentStore,
+  index : Int,
+) -> Unit {
+  let _ = self.ensure_capacity(index + 1)
+  if !self.active_flags[index] {
+    self.active_flags[index] = true
+    self.active_positions[index] = self.active_indices.length()
+    self.active_indices.push(index)
+  }
+}
+
+///|
+/// Removes one entity index from this GPU-visible component's packed active set.
+fn GpuComponentStore::deactivate_slot(
+  self : GpuComponentStore,
+  index : Int,
+) -> Unit {
+  if index < 0 ||
+    index >= self.active_flags.length() ||
+    !self.active_flags[index] {
+    return
+  }
+  let pos = self.active_positions[index]
+  let last_pos = self.active_indices.length() - 1
+  let last_index = self.active_indices[last_pos]
+  if pos != last_pos {
+    self.active_indices[pos] = last_index
+    self.active_positions[last_index] = pos
+  }
+  let _ = self.active_indices.pop()
+  self.active_flags[index] = false
+  self.active_positions[index] = -1
+}
+
+///|
+/// Queues a contiguous dirty range without expanding it into one index per entity.
+#cfg(target="js")
+extern "js" fn GpuComponentStore::mark_dirty_range_js(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> Unit =
+  #| (store, first, last) => {
+  #|   if (last < first) return;
+  #|   const ranges = store.__rhodonite_dirty_ranges ||
+  #|     (store.__rhodonite_dirty_ranges = []);
+  #|   const prev = ranges[ranges.length - 1];
+  #|   if (prev && first <= prev.last + 1) {
+  #|     if (last > prev.last) prev.last = last;
+  #|   } else {
+  #|     ranges.push({ first, last });
+  #|   }
+  #| }
+
+///|
+/// Queues a contiguous dirty range without expanding it into one index per entity.
+#cfg(target="js")
+fn GpuComponentStore::mark_dirty_range(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> Unit {
+  self.mark_dirty_range_js(first, last)
+}
+
+///|
+/// Queues a contiguous dirty range without expanding it into one index per entity.
+#cfg(not(target="js"))
+fn GpuComponentStore::mark_dirty_range(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> Unit {
+  if last < first {
+    return
+  }
+  let n = self.dirty_range_first.length()
+  if n > 0 && first <= self.dirty_range_last[n - 1] + 1 {
+    if last > self.dirty_range_last[n - 1] {
+      self.dirty_range_last[n - 1] = last
+    }
+  } else {
+    self.dirty_range_first.push(first)
+    self.dirty_range_last.push(last)
   }
 }
 
@@ -371,29 +488,64 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
 #cfg(not(target="js"))
 fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] {
   let writes : Array[GpuWrite] = []
-  if self.dirty_indices.length() == 0 {
+  if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
     return writes
   }
-  self.sort_dirty_indices_for_drain()
-  let sorted = self.dirty_indices
-  let mut first = sorted[0]
-  let mut prev = sorted[0]
-  for i = 1; i < sorted.length(); i = i + 1 {
-    let idx = sorted[i]
-    if idx == prev + 1 {
-      prev = idx
-    } else {
-      writes.push(self.range_bytes(first, prev))
-      first = idx
-      prev = idx
-    }
+  for ri = 0; ri < self.dirty_range_first.length(); ri = ri + 1 {
+    writes.push(
+      self.range_bytes(self.dirty_range_first[ri], self.dirty_range_last[ri]),
+    )
   }
-  writes.push(self.range_bytes(first, prev))
-  for i = 0; i < self.dirty_indices.length(); i = i + 1 {
-    self.dirty_flags[self.dirty_indices[i]] = false
+  if self.dirty_indices.length() > 0 {
+    self.sort_dirty_indices_for_drain()
+    let sorted = self.dirty_indices
+    let mut first = sorted[0]
+    let mut prev = sorted[0]
+    let mut range_cursor = 0
+    let push_run = fn(first : Int, last : Int) {
+      let mut cur = first
+      while cur <= last {
+        while range_cursor < self.dirty_range_first.length() &&
+              self.dirty_range_last[range_cursor] < cur {
+          range_cursor = range_cursor + 1
+        }
+        if range_cursor >= self.dirty_range_first.length() ||
+          self.dirty_range_first[range_cursor] > last {
+          writes.push(self.range_bytes(cur, last))
+          return
+        }
+        let rf = self.dirty_range_first[range_cursor]
+        let rl = self.dirty_range_last[range_cursor]
+        if rf > cur {
+          let emit_last = if rf - 1 < last { rf - 1 } else { last }
+          writes.push(self.range_bytes(cur, emit_last))
+        }
+        cur = if rl + 1 > cur { rl + 1 } else { cur + 1 }
+      }
+    }
+    for i = 1; i < sorted.length(); i = i + 1 {
+      let idx = sorted[i]
+      if idx == prev + 1 {
+        prev = idx
+      } else {
+        push_run(first, prev)
+        first = idx
+        prev = idx
+      }
+    }
+    push_run(first, prev)
+    for i = 0; i < self.dirty_indices.length(); i = i + 1 {
+      self.dirty_flags[self.dirty_indices[i]] = false
+    }
   }
   while self.dirty_indices.length() > 0 {
     let _ = self.dirty_indices.pop()
+  }
+  while self.dirty_range_first.length() > 0 {
+    let _ = self.dirty_range_first.pop()
+  }
+  while self.dirty_range_last.length() > 0 {
+    let _ = self.dirty_range_last.pop()
   }
   writes
 }
@@ -494,6 +646,7 @@ fn World::clear_gpu_slots(self : World, entity_index : Int) -> Unit {
           None => store
         }
         store.clear_slot(entity_index)
+        store.deactivate_slot(entity_index)
         self.replace_gpu_store(store)
       }
       None => ()
@@ -538,6 +691,29 @@ pub fn World::drain_gpu_writes(
       let writes = store.drain_writes()
       self.replace_gpu_store(store)
       writes
+    }
+    None => []
+  }
+}
+
+///|
+/// Returns the packed active entity indices for a GPU-visible component.
+///
+/// The returned array is a copy; callers can sort or retain it without affecting storage.
+pub fn World::gpu_component_active_indices(
+  self : World,
+  component : ComponentTypeId,
+) -> Array[Int] {
+  self.assert_system_component_read(
+    component, "World::gpu_component_active_indices",
+  )
+  match self.gpu_store(component) {
+    Some(store) => {
+      let out : Array[Int] = []
+      for i = 0; i < store.active_indices.length(); i = i + 1 {
+        out.push(store.active_indices[i])
+      }
+      out
     }
     None => []
   }
