@@ -55,6 +55,16 @@ fn ComponentColumn::clear_row(self : ComponentColumn, row : Int) -> Unit {
 }
 
 ///|
+fn Archetype::ensure_row_capacity(
+  self : Archetype,
+  required_rows : Int,
+) -> Unit {
+  for i = 0; i < self.columns.length(); i = i + 1 {
+    self.columns[i].ensure_row_capacity(required_rows)
+  }
+}
+
+///|
 /// Builds an archetype table for one sorted component signature (empty archetype uses this with zero components).
 fn Archetype::new(
   components : Array[ComponentTypeId],

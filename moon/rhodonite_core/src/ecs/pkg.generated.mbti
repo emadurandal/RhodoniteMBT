@@ -70,6 +70,11 @@ pub(all) struct GpuWrite {
   bytes : FixedArray[Byte]
 }
 
+pub(all) struct GpuWriteView {
+  byte_offset : Int
+  bytes : ArrayView[Byte]
+}
+
 pub struct PreparedQuery {
   // private fields
 }
@@ -160,6 +165,7 @@ pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
+pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
@@ -179,12 +185,15 @@ pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
+pub fn World::spawn_transform_global_batch(Self, Int, (Int, EntityId, MutArrayView[Byte], MutArrayView[Byte]) -> Unit) -> Array[EntityId]
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
 pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
 pub fn World::write_global_transforms_dense_grid_wave(Self, Int, Int, Double, Float, Double) -> Array[GpuWrite]
+pub fn World::write_global_transforms_dense_grid_wave_views(Self, Int, Int, Double, Float, Double) -> Array[GpuWriteView]
+pub fn World::write_global_transforms_dense_views(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)

@@ -28,6 +28,16 @@ pub fn webgpu_queue_write_buffer(
 }
 
 ///|
+pub fn webgpu_queue_write_buffer_array_view(
+  queue : WebGPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  data : ArrayView[Byte],
+) -> Unit {
+  queue.queue.raw.write_buffer(buffer.raw, offset, Bytes::from_array(data))
+}
+
+///|
 pub fn webgpu_queue_release(queue : WebGPUQueue) -> Unit {
   queue.queue.raw.release()
 }

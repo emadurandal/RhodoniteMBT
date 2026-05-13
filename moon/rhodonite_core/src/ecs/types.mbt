@@ -104,6 +104,13 @@ pub(all) struct GpuWrite {
 }
 
 ///|
+/// Borrowed contiguous GPU upload slice. Callers should upload these views before mutating the same GPU component store again.
+pub(all) struct GpuWriteView {
+  byte_offset : Int
+  bytes : ArrayView[Byte]
+}
+
+///|
 /// Emitted when the flat GPU backing store grows; callers may need to recreate GPU buffers and optionally full-upload.
 pub(all) struct GpuResizeEvent {
   component : ComponentTypeId

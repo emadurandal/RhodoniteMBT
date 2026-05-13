@@ -300,10 +300,10 @@ fn update_global_transforms_for_mass_cubes_fast(
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
-) -> Array[@ecs.GpuWrite] {
+) -> Array[@ecs.GpuWriteView] {
   ignore(tf)
   ignore(gt)
-  world.write_global_transforms_dense_grid_wave(
+  world.write_global_transforms_dense_grid_wave_views(
     entity_count,
     per_side,
     t * 1.8,
@@ -319,7 +319,7 @@ fn update_and_drain_global_transforms(
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
-) -> Array[@ecs.GpuWrite] {
+) -> Array[@ecs.GpuWriteView] {
   let writes = update_global_transforms_for_mass_cubes_fast(
     world, tf, gt, per_side, t,
   )
@@ -328,7 +328,7 @@ fn update_and_drain_global_transforms(
   }
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
-  world.drain_gpu_writes(gt)
+  world.drain_gpu_write_views(gt)
 }
 
 ///|
@@ -501,33 +501,34 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let gt = world.global_transform_component()
   let tf = world.transform_component()
   let per_side = grid_side_len(entity_count)
-  let id_m = @m44.Matrix44F::identity()
   let inst_bytes_len = entity_count * instance_stride
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
   let mut max_index_slot = 0
-  for i = 0; i < entity_count; i = i + 1 {
-    let e = world.create_entity()
+  let _ = world.spawn_transform_global_batch(entity_count, fn(
+    i,
+    e,
+    tf_row,
+    gt_row,
+  ) {
     let idx = e.index
     if idx + 1 > max_index_slot {
       max_index_slot = idx + 1
     }
     let (gx, gz) = grid_xz_for_index(i, per_side)
-    ignore(
-      world.set_transform_trs(
-        e,
-        gx,
-        (0.0 : Float),
-        gz,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        cube_scale,
-        cube_scale,
-        cube_scale,
-      ),
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row,
+      gx,
+      (0.0 : Float),
+      gz,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      cube_scale,
+      cube_scale,
+      cube_scale,
     )
-    ignore(world.set_global_transform(e, id_m))
+    @comp.global_transform_write_identity_row(gt_row)
     let base = i * instance_stride
     let idx_f = idx.to_double()
     let (cr, cg, cb) = instance_color_rgb(idx)
@@ -535,7 +536,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @writes.put_f32_le(instance_bytes, base + 4, cr)
     @writes.put_f32_le(instance_bytes, base + 8, cg)
     @writes.put_f32_le(instance_bytes, base + 12, cb)
-  }
+  })
   let stride = @comp.global_transform_gpu_layout().stride
   let mut cap_entities = max_index_slot
   let ev_cap = max_gt_capacity_from_resize(world, gt)
@@ -596,7 +597,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
   for wi = 0; wi < writes0.length(); wi = wi + 1 {
     let w = writes0[wi]
-    queue.write_buffer_from_fixed_array(
+    queue.write_buffer_from_array_view(
       transform_storage,
       w.byte_offset.to_uint64(),
       w.bytes,
@@ -656,7 +657,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   )
   for wi = 0; wi < writes.length(); wi = wi + 1 {
     let w = writes[wi]
-    renderer.queue.write_buffer_from_fixed_array(
+    renderer.queue.write_buffer_from_array_view(
       renderer.transform_storage,
       w.byte_offset.to_uint64(),
       w.bytes,

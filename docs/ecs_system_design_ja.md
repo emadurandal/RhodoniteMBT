@@ -68,6 +68,7 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `QueryRow::write_view` | `writes` |
 | `set_component_bytes` / `clear_gpu_component` | `writes` |
 | `drain_gpu_writes` | `writes` |
+| `drain_gpu_write_views` | `writes` |
 | `gpu_component_active_indices` | `reads` または `writes` |
 | `drain_resize_events` | `structural_write` |
 | `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
@@ -162,7 +163,9 @@ query.for_each(world, fn(row) {
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 
-builtin transform propagation のように連続 entity index をまとめて更新できる bulk path は、個別 dirty index ではなく dirty range を積めます。`drain_gpu_writes` は dirty range と個別 dirty index を統合し、重複 upload を避けながら `GpuWrite` を返します。
+builtin transform propagation のように連続 entity index をまとめて更新できる bulk path は、個別 dirty index ではなく dirty range を積めます。`drain_gpu_writes` は dirty range と個別 dirty index を統合し、重複 upload を避けながら owned bytes の `GpuWrite` を返します。
+
+即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` の subarray をそのまま渡せるため、ECS drain 時の payload copy を避けられます。借用 view は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
 
 ## Builtin Transform System
 
@@ -177,6 +180,10 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 この System は `Transform3D` と `ChildOf` を読み、`GlobalTransform` を書きます。`GlobalTransform` は GPU-visible component なので、内部で dirty 記録も行います。
 
 `World::update_transform3d_positions` は `Transform3D.position` 専用の bulk API です。JS では `Query::for_each_archetype` による公開 column path、非 JS では direct archetype sweep を使い、entity ごとの `QueryRow` 構築を避けます。
+
+大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
+
+`GlobalTransform` の dense 更新 helper には owned drain 向けと borrowed view 向けの両方があります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせることを想定しています。
 
 ## Conflict 検査
 
@@ -213,6 +220,7 @@ pub struct App {
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
 - query plan cache、archetype index cache。`Query::for_each_archetype` の per-archetype column cache は導入済み。
+- native backend の `write_buffer_from_array_view` は現状 `Bytes` 経由の fallback copy なので、真の borrowed upload には lower-level queue binding が必要。
 - `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 
 ## 避ける方針

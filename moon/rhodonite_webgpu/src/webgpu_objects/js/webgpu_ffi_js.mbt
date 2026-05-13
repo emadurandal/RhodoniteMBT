@@ -388,6 +388,16 @@ extern "js" fn queue_writeBuffer(
   #|   queue.writeBuffer(buffer, offset, data)
 
 ///|
+extern "js" fn queue_writeBuffer_array_view(
+  queue : GPUQueue,
+  buffer : GPUBuffer,
+  offset : Double,
+  data : ArrayView[Byte],
+) -> Unit =
+  #| (queue, buffer, offset, data) =>
+  #|   queue.writeBuffer(buffer, offset, data.buf.subarray(data.start, data.end))
+
+///|
 extern "js" fn queue_submit(
   queue : GPUQueue,
   commandBuffer : GPUCommandBuffer,

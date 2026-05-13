@@ -19,6 +19,8 @@ For a machine-readable API listing, see [`pkg.generated.mbti`](../moon/rhodonite
 | `EntityLocation` | Which archetype table and row a live entity occupies. |
 | `ComponentKind` | `CpuOnly` (payload in SoA column) / `GpuVisible` (signature in archetype only; payload in flat `GpuComponentStore`). |
 | `RegisteredComponent` | Name, `kind`, `cpu_stride`, optional `gpu_layout`. |
+| `GpuWrite` | Owned GPU upload slice (`byte_offset` + `FixedArray[Byte]`), kept for APIs that need ownership. |
+| `GpuWriteView` | Borrowed GPU upload slice (`byte_offset` + `ArrayView[Byte]`) for immediate zero-copy-style upload paths. |
 
 ---
 
@@ -119,6 +121,41 @@ sequenceDiagram
   W->>GPU: clear_gpu_slots index
   W->>W: bump generation push free_indices
 ```
+
+### Bulk spawning built-in transforms
+
+For large static batches that need the built-in `Transform3D` + `GlobalTransform` pair, use `World::spawn_transform_global_batch(count, write)`.
+
+This API creates entities directly in the `[Transform3D, GlobalTransform]` archetype, avoiding the normal sequence of:
+
+1. spawn into the empty archetype,
+2. migrate when `Transform3D` is added,
+3. migrate again when `GlobalTransform` ownership is added.
+
+The callback receives direct row views:
+
+```moonbit
+let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, gt_row) {
+  @comp.Transform3D::write_trs_to_component_mut_view(
+    tf_row,
+    px,
+    py,
+    pz,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    sx,
+    sy,
+    sz,
+  )
+  @comp.global_transform_write_identity_row(gt_row)
+  ignore(i)
+  ignore(entity)
+})
+```
+
+The callback must fully initialize both rows. `Transform3D::write_trs_to_component_mut_view` and `global_transform_write_identity_row` exist for this purpose and avoid intermediate `FixedArray[Byte]` allocations.
 
 ---
 
@@ -246,12 +283,25 @@ The built-in transform update can also be registered with `transform_propagation
 ## GPU upload and resize
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, and also consumes already batched dirty ranges recorded by bulk paths. It returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
+- **`drain_gpu_write_views(component)`**: Same dirty consumption semantics, but returns borrowed `GpuWriteView` slices (`byte_offset` + `ArrayView[Byte]`). Use this when the caller can upload immediately before mutating the same GPU component store again. This avoids the extra `FixedArray[Byte]` payload copy in ECS drain paths.
 - **`gpu_component_active_indices(component)`**: Returns a copy of the packed active `EntityId.index` values for a GPU-visible component. This is useful for renderer-side extraction or future packed update paths without scanning every possible entity slot.
 - **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**. During `Schedule::run`, this consumes a world-owned event queue and requires `structural_write`; outside schedule execution it can be called directly.
 
 `add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path. Both JS and non-JS targets grow GPU stores geometrically; JS uses `Uint8Array`, while non-JS keeps the MoonBit byte array but avoids one-row-at-a-time capacity growth.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) calls `update_global_transforms_from_transforms`, then `drain_gpu_writes(global_transform)`, then `queue.write_buffer_from_fixed_array`.
+For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
+
+- `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
+- `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native currently falls back through `Bytes::from_array` because the native queue binding accepts `Bytes`.
+
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, `write_global_transforms_dense_grid_wave_views`, `drain_gpu_write_views`, and `queue.write_buffer_from_array_view` for its high-volume path.
+
+Dense GlobalTransform helper variants:
+
+- `write_global_transforms_dense(...) -> Array[GpuWrite]`
+- `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
+- `write_global_transforms_dense_grid_wave(...) -> Array[GpuWrite]`
+- `write_global_transforms_dense_grid_wave_views(...) -> Array[GpuWriteView]`
 
 ---
 
@@ -323,13 +373,17 @@ query.for_each(world, fn(row) {
 let gt = world.global_transform_component()
 let writes = world.drain_gpu_writes(gt)
 // queue.write_buffer_from_fixed_array(buffer, w.byte_offset, w.bytes)
+
+// Immediate borrowed upload path
+let views = world.drain_gpu_write_views(gt)
+// queue.write_buffer_from_array_view(buffer, v.byte_offset, v.bytes)
 ```
 
 ---
 
 ## Tests and source map
 
-Behavior is pinned in [`ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) (archetype moves, generation reuse, logical column length after capacity growth, packed GPU active indices, merged `drain_gpu_writes` ranges, std140 padding, etc.).
+Behavior is pinned in [`ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) (archetype moves, generation reuse, logical column length after capacity growth, packed GPU active indices, merged `drain_gpu_writes` / `drain_gpu_write_views` ranges, bulk transform spawn, std140 padding, etc.).
 
 The ECS microbench package lives at [`moon/rhodonite_core/src/ecs_bench/`](../moon/rhodonite_core/src/ecs_bench/). From the repository root:
 

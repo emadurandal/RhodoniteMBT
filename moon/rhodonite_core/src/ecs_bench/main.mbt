@@ -74,6 +74,36 @@ fn make_world(
 }
 
 ///|
+fn make_world_batch(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+  let world = @ecs.World::new()
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  let per_side = grid_side_len(count)
+  let _ = world.spawn_transform_global_batch(count, fn(i, _e, tf_row, gt_row) {
+    let (x, z) = grid_xz_for_index(i, per_side)
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row,
+      x,
+      (0.0 : Float),
+      z,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    )
+    @comp.global_transform_write_identity_row(gt_row)
+  })
+  let _ = world.drain_resize_events()
+  let _ = world.drain_gpu_write_views(gt)
+  (world, tf, gt, per_side)
+}
+
+///|
 fn report(name : String, count : Int, started : Double, checksum : Int) -> Unit {
   let elapsed = monotonic_ms() - started
   println(
@@ -161,11 +191,33 @@ fn bench_global_and_drain(count : Int) -> Unit {
 }
 
 ///|
+fn bench_global_and_drain_views(count : Int) -> Unit {
+  let (world, _, gt, _) = make_world_batch(count)
+  let started = monotonic_ms()
+  world.update_global_transforms_from_transforms()
+  let writes = world.drain_gpu_write_views(gt)
+  let mut uploaded = 0
+  for i = 0; i < writes.length(); i = i + 1 {
+    uploaded = uploaded + writes[i].bytes.length()
+  }
+  report("global_transform_drain_views", count, started, uploaded)
+}
+
+///|
+fn bench_make_world_batch(count : Int) -> Unit {
+  let started = monotonic_ms()
+  let (_, _, _, _) = make_world_batch(count)
+  report("make_world_batch", count, started, count)
+}
+
+///|
 fn run_suite(count : Int) -> Unit {
   bench_query_row(count)
   bench_query_archetype(count)
   bench_builtin_positions(count)
   bench_global_and_drain(count)
+  bench_global_and_drain_views(count)
+  bench_make_world_batch(count)
 }
 
 ///|

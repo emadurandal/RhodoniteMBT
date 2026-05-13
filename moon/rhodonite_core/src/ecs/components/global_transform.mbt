@@ -110,6 +110,30 @@ pub fn matrix44f_write_std140_mat4_to_gpu_row(
 }
 
 ///|
+/// Writes an identity matrix into one std140 GlobalTransform row.
+pub fn global_transform_write_identity_row(buf : MutArrayView[Byte]) -> Unit {
+  if buf.length() != 64 {
+    abort("global_transform_write_identity_row: length mismatch")
+  }
+  put_gpu_f32_mut_view(buf, 0, 1.0)
+  put_gpu_f32_mut_view(buf, 4, 0.0)
+  put_gpu_f32_mut_view(buf, 8, 0.0)
+  put_gpu_f32_mut_view(buf, 12, 0.0)
+  put_gpu_f32_mut_view(buf, 16, 0.0)
+  put_gpu_f32_mut_view(buf, 20, 1.0)
+  put_gpu_f32_mut_view(buf, 24, 0.0)
+  put_gpu_f32_mut_view(buf, 28, 0.0)
+  put_gpu_f32_mut_view(buf, 32, 0.0)
+  put_gpu_f32_mut_view(buf, 36, 0.0)
+  put_gpu_f32_mut_view(buf, 40, 1.0)
+  put_gpu_f32_mut_view(buf, 44, 0.0)
+  put_gpu_f32_mut_view(buf, 48, 0.0)
+  put_gpu_f32_mut_view(buf, 52, 0.0)
+  put_gpu_f32_mut_view(buf, 56, 0.0)
+  put_gpu_f32_mut_view(buf, 60, 1.0)
+}
+
+///|
 /// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
 #cfg(not(target="js"))
 pub fn matrix44f_write_std140_mat4_to_gpu_row(

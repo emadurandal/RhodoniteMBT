@@ -799,6 +799,28 @@ test "World with_gpu_component_write_range marks one contiguous upload" {
 }
 
 ///|
+test "World drain_gpu_write_views returns borrowed contiguous upload" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuBulkView16",
+    @comp.GpuLayout::empty(16),
+  )
+  let ok = world.with_gpu_component_write_range(gpu16, 1, 2, range => {
+    let bytes = range.bytes()
+    bytes[0] = (44 : Byte)
+    bytes[16] = (55 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_write_views(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 16)
+  assert_eq(writes[0].bytes.length(), 32)
+  assert_eq(writes[0].bytes[0], (44 : Byte))
+  assert_eq(writes[0].bytes[16], (55 : Byte))
+  assert_eq(world.drain_gpu_write_views(gpu16).length(), 0)
+}
+
+///|
 test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
@@ -1432,6 +1454,57 @@ test "write_global_transforms_dense writes one contiguous upload range" {
   assert_eq(
     world.drain_gpu_writes(world.global_transform_component()).length(),
     0,
+  )
+}
+
+///|
+test "spawn_transform_global_batch creates builtin transform rows directly" {
+  let world = World::new()
+  let entities = world.spawn_transform_global_batch(2, fn(
+    i,
+    _e,
+    tf_row,
+    gt_row,
+  ) {
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row,
+      Float::from_double((i + 1).to_double()),
+      Float::from_double((i + 2).to_double()),
+      Float::from_double((i + 3).to_double()),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    )
+    @comp.global_transform_write_identity_row(gt_row)
+  })
+  assert_eq(entities.length(), 2)
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  assert_true(world.has_component(entities[0], tf))
+  assert_true(world.has_component(entities[0], gt))
+  match world.get_transform(entities[1]) {
+    Some(t) => {
+      assert_eq(t.position.x(), (2.0 : Float))
+      assert_eq(t.position.y(), (3.0 : Float))
+      assert_eq(t.position.z(), (4.0 : Float))
+    }
+    None => abort("expected Transform3D")
+  }
+  let writes = world.drain_gpu_write_views(gt)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[0:64], 0),
+    (1.0 : Float),
+  )
+  assert_eq(
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[64:128], 60),
+    (1.0 : Float),
   )
 }
 

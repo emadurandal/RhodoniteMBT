@@ -80,6 +80,44 @@ pub fn World::write_global_transforms_dense(
 }
 
 ///|
+/// Bulk-writes dense GlobalTransform rows `[0, count)` and returns borrowed upload ranges.
+pub fn World::write_global_transforms_dense_views(
+  self : World,
+  count : Int,
+  write : (Int, MutArrayView[Byte]) -> Unit,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_views",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_views: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
+    let bytes = range.bytes()
+    let stride = range.stride()
+    if stride != 64 {
+      abort(
+        "World::write_global_transforms_dense_views: GlobalTransform stride mismatch",
+      )
+    }
+    for i = 0; i < count; i = i + 1 {
+      let base = i * stride
+      write(i, bytes.mut_view(start=base, end=base + stride))
+    }
+  })
+  if !ok {
+    return []
+  }
+  self.drain_gpu_write_views(gt)
+}
+
+///|
 #cfg(target="js")
 extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   self : World,
@@ -173,6 +211,48 @@ pub fn World::write_global_transforms_dense_grid_wave(
 }
 
 ///|
+/// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
+#cfg(target="js")
+pub fn World::write_global_transforms_dense_grid_wave_views(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_grid_wave_views",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_grid_wave_views: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_grid_wave_views: GlobalTransform stride mismatch",
+        )
+      }
+      self.replace_gpu_store(store)
+    }
+    None => return []
+  }
+  if !self.write_global_transforms_dense_grid_wave_js(
+      gt, count, per_side, time, scale, spacing,
+    ) {
+    return []
+  }
+  self.drain_gpu_write_views(gt)
+}
+
+///|
 /// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
 #cfg(not(target="js"))
 pub fn World::write_global_transforms_dense_grid_wave(
@@ -186,6 +266,45 @@ pub fn World::write_global_transforms_dense_grid_wave(
   let half = (per_side - 1).to_double() * 0.5
   let scale_d = scale.to_double()
   self.write_global_transforms_dense(count, fn(i, row) {
+    let ix = i % per_side
+    let iz = i / per_side
+    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(
+      row,
+      52,
+      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+    )
+    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
+  })
+}
+
+///|
+/// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
+#cfg(not(target="js"))
+pub fn World::write_global_transforms_dense_grid_wave_views(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Array[GpuWriteView] {
+  let half = (per_side - 1).to_double() * 0.5
+  let scale_d = scale.to_double()
+  self.write_global_transforms_dense_views(count, fn(i, row) {
     let ix = i % per_side
     let iz = i / per_side
     @comp.put_gpu_f32_mut_view(row, 0, scale_d)

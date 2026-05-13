@@ -27,3 +27,18 @@ pub fn webgpu_queue_write_buffer(
 ) -> Unit {
   queue_writeBuffer(queue.queue, buffer, js_u64_to_double(offset), data)
 }
+
+///|
+pub fn webgpu_queue_write_buffer_array_view(
+  queue : WebGPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  data : ArrayView[Byte],
+) -> Unit {
+  queue_writeBuffer_array_view(
+    queue.queue,
+    buffer,
+    js_u64_to_double(offset),
+    data,
+  )
+}

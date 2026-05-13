@@ -430,6 +430,19 @@ fn GpuComponentStore::range_bytes(
 }
 
 ///|
+/// Borrows bytes for entity indices `[first..=last]`; `byte_offset` is `first * stride`.
+#cfg(not(target="js"))
+fn GpuComponentStore::range_view(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> GpuWriteView {
+  let start = first * self.stride
+  let end = (last + 1) * self.stride
+  { byte_offset: start, bytes: self.bytes[start:end] }
+}
+
+///|
 /// Sorts dirty indices, merges consecutive runs into minimal `GpuWrite` spans, then clears dirty state.
 #cfg(target="js")
 extern "js" fn GpuComponentStore::drain_writes_js(
@@ -566,6 +579,173 @@ fn GpuComponentStore::drain_writes(self : GpuComponentStore) -> Array[GpuWrite] 
         if rf > cur {
           let emit_last = if rf - 1 < last { rf - 1 } else { last }
           writes.push(self.range_bytes(cur, emit_last))
+        }
+        cur = if rl + 1 > cur { rl + 1 } else { cur + 1 }
+      }
+    }
+    for i = 1; i < sorted.length(); i = i + 1 {
+      let idx = sorted[i]
+      if idx == prev + 1 {
+        prev = idx
+      } else {
+        push_run(first, prev)
+        first = idx
+        prev = idx
+      }
+    }
+    push_run(first, prev)
+    for i = 0; i < self.dirty_indices.length(); i = i + 1 {
+      self.dirty_flags[self.dirty_indices[i]] = false
+    }
+  }
+  while self.dirty_indices.length() > 0 {
+    let _ = self.dirty_indices.pop()
+  }
+  while self.dirty_range_first.length() > 0 {
+    let _ = self.dirty_range_first.pop()
+  }
+  while self.dirty_range_last.length() > 0 {
+    let _ = self.dirty_range_last.pop()
+  }
+  writes
+}
+
+///|
+/// Sorts dirty indices, merges consecutive runs into borrowed `GpuWriteView` spans, then clears dirty state.
+#cfg(target="js")
+extern "js" fn GpuComponentStore::drain_write_views_js(
+  self : GpuComponentStore,
+) -> Array[GpuWriteView] =
+  #| (store) => {
+  #|   const dirty = store.dirty_indices;
+  #|   const pendingRanges = store.__rhodonite_dirty_ranges || [];
+  #|   if (dirty.length === 0 && pendingRanges.length === 0) return [];
+  #|   let sorted = true;
+  #|   for (let i = 1; i < dirty.length; i++) {
+  #|     if (dirty[i] < dirty[i - 1]) {
+  #|       sorted = false;
+  #|       break;
+  #|     }
+  #|   }
+  #|   if (!sorted) dirty.sort((a, b) => a - b);
+  #|   const stride = store.stride;
+  #|   const src = store.bytes;
+  #|   const writes = [];
+  #|   const rangeView = (first, last) => {
+  #|     const start = first * stride;
+  #|     const end = (last + 1) * stride;
+  #|     return { buf: src, start, end };
+  #|   };
+  #|   const mergedRanges = [];
+  #|   if (pendingRanges.length > 0) {
+  #|     pendingRanges.sort((a, b) => a.first - b.first);
+  #|     for (let i = 0; i < pendingRanges.length; i++) {
+  #|       const r = pendingRanges[i];
+  #|       const first = r.first | 0;
+  #|       const last = r.last | 0;
+  #|       if (last < first) continue;
+  #|       const prev = mergedRanges[mergedRanges.length - 1];
+  #|       if (prev && first <= prev.last + 1) {
+  #|         if (last > prev.last) prev.last = last;
+  #|       } else {
+  #|         mergedRanges.push({ first, last });
+  #|       }
+  #|     }
+  #|     pendingRanges.length = 0;
+  #|   }
+  #|   for (let i = 0; i < mergedRanges.length; i++) {
+  #|     const r = mergedRanges[i];
+  #|     writes.push({ byte_offset: r.first * stride, bytes: rangeView(r.first, r.last) });
+  #|   }
+  #|   let rangeCursor = 0;
+  #|   const pushDirtyRunOutsidePendingRanges = (first, last) => {
+  #|     let cur = first;
+  #|     while (cur <= last) {
+  #|       while (rangeCursor < mergedRanges.length && mergedRanges[rangeCursor].last < cur) {
+  #|         rangeCursor++;
+  #|       }
+  #|       if (rangeCursor >= mergedRanges.length || mergedRanges[rangeCursor].first > last) {
+  #|         writes.push({ byte_offset: cur * stride, bytes: rangeView(cur, last) });
+  #|         break;
+  #|       }
+  #|       const r = mergedRanges[rangeCursor];
+  #|       if (r.first > cur) {
+  #|         const emitLast = Math.min(last, r.first - 1);
+  #|         writes.push({ byte_offset: cur * stride, bytes: rangeView(cur, emitLast) });
+  #|       }
+  #|       cur = Math.max(cur, r.last + 1);
+  #|     }
+  #|   };
+  #|   if (dirty.length > 0) {
+  #|     let first = dirty[0];
+  #|     let prev = dirty[0];
+  #|     for (let i = 1; i < dirty.length; i++) {
+  #|       const idx = dirty[i];
+  #|       if (idx === prev) continue;
+  #|       if (idx === prev + 1) {
+  #|         prev = idx;
+  #|       } else {
+  #|         pushDirtyRunOutsidePendingRanges(first, prev);
+  #|         first = idx;
+  #|         prev = idx;
+  #|       }
+  #|     }
+  #|     pushDirtyRunOutsidePendingRanges(first, prev);
+  #|     for (let i = 0; i < dirty.length; i++) {
+  #|       store.dirty_flags[dirty[i]] = false;
+  #|     }
+  #|   }
+  #|   dirty.length = 0;
+  #|   return writes;
+  #| }
+
+///|
+/// Sorts dirty indices, merges consecutive runs into borrowed `GpuWriteView` spans, then clears dirty state.
+#cfg(target="js")
+fn GpuComponentStore::drain_write_views(
+  self : GpuComponentStore,
+) -> Array[GpuWriteView] {
+  self.drain_write_views_js()
+}
+
+///|
+/// Sorts dirty indices, merges consecutive runs into borrowed `GpuWriteView` spans, then clears dirty state.
+#cfg(not(target="js"))
+fn GpuComponentStore::drain_write_views(
+  self : GpuComponentStore,
+) -> Array[GpuWriteView] {
+  let writes : Array[GpuWriteView] = []
+  if self.dirty_indices.length() == 0 && self.dirty_range_first.length() == 0 {
+    return writes
+  }
+  for ri = 0; ri < self.dirty_range_first.length(); ri = ri + 1 {
+    writes.push(
+      self.range_view(self.dirty_range_first[ri], self.dirty_range_last[ri]),
+    )
+  }
+  if self.dirty_indices.length() > 0 {
+    self.sort_dirty_indices_for_drain()
+    let sorted = self.dirty_indices
+    let mut first = sorted[0]
+    let mut prev = sorted[0]
+    let mut range_cursor = 0
+    let push_run = fn(first : Int, last : Int) {
+      let mut cur = first
+      while cur <= last {
+        while range_cursor < self.dirty_range_first.length() &&
+              self.dirty_range_last[range_cursor] < cur {
+          range_cursor = range_cursor + 1
+        }
+        if range_cursor >= self.dirty_range_first.length() ||
+          self.dirty_range_first[range_cursor] > last {
+          writes.push(self.range_view(cur, last))
+          return
+        }
+        let rf = self.dirty_range_first[range_cursor]
+        let rl = self.dirty_range_last[range_cursor]
+        if rf > cur {
+          let emit_last = if rf - 1 < last { rf - 1 } else { last }
+          writes.push(self.range_view(cur, emit_last))
         }
         cur = if rl + 1 > cur { rl + 1 } else { cur + 1 }
       }
@@ -736,6 +916,23 @@ pub fn World::drain_gpu_writes(
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_writes()
+      self.replace_gpu_store(store)
+      writes
+    }
+    None => []
+  }
+}
+
+///|
+/// Returns borrowed batched byte slices suitable for immediate GPU upload; consumes pending dirties for this component.
+pub fn World::drain_gpu_write_views(
+  self : World,
+  component : ComponentTypeId,
+) -> Array[GpuWriteView] {
+  self.assert_system_component_write(component, "World::drain_gpu_write_views")
+  match self.gpu_store(component) {
+    Some(store) => {
+      let writes = store.drain_write_views()
       self.replace_gpu_store(store)
       writes
     }

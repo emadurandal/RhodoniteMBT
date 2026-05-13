@@ -171,6 +171,20 @@ pub fn GPUQueue::write_buffer_from_fixed_array(
 }
 
 ///|
+/// Writes a borrowed byte view to a GPU buffer.
+///
+/// JS forwards the view as a `Uint8Array.subarray` without copying. Native falls back through
+/// `Bytes::from_array` because the current native queue binding accepts `Bytes`.
+pub fn GPUQueue::write_buffer_from_array_view(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  view : ArrayView[Byte],
+) -> Unit {
+  @raw.webgpu_queue_write_buffer_array_view(self.raw, buffer.raw, offset, view)
+}
+
+///|
 pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
   buffer_release(self)
 }

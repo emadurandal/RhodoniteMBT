@@ -132,6 +132,38 @@ pub fn Transform3D::write_position_to_component_mut_view(
 }
 
 ///|
+/// Writes a complete Transform3D row directly without allocating an intermediate FixedArray.
+pub fn Transform3D::write_trs_to_component_mut_view(
+  row : MutArrayView[Byte],
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> Unit {
+  if row.length() != 48 {
+    abort("Transform3D::write_trs_to_component_mut_view: row length mismatch")
+  }
+  put_gpu_f32_mut_view(row, 0, px.to_double())
+  put_gpu_f32_mut_view(row, 4, py.to_double())
+  put_gpu_f32_mut_view(row, 8, pz.to_double())
+  put_gpu_f32_mut_view(row, 12, qx)
+  put_gpu_f32_mut_view(row, 16, qy)
+  put_gpu_f32_mut_view(row, 20, qz)
+  put_gpu_f32_mut_view(row, 24, qw)
+  put_gpu_f32_mut_view(row, 28, sx.to_double())
+  put_gpu_f32_mut_view(row, 32, sy.to_double())
+  put_gpu_f32_mut_view(row, 36, sz.to_double())
+  put_gpu_f32_mut_view(row, 40, 0.0)
+  put_gpu_f32_mut_view(row, 44, 0.0)
+}
+
+///|
 /// Decodes a read-only component row and returns its local model matrix.
 #cfg(target="js")
 extern "js" fn transform3d_local_matrix_data_from_component_view_js(
