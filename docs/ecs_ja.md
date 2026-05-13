@@ -303,6 +303,7 @@ WebGPU upload 側には次の API があります。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、JS / native とも `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` の結果を `queue.write_buffer_from_array_view` で upload します。
+ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo は同じデータ path を TypeScript ECS wrapper から使い、borrowed write view をブラウザの WebGPU API で直接 submit します。
 
 Dense GlobalTransform helper には所有型と view 型の両方があります。
 
