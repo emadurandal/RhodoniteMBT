@@ -327,6 +327,7 @@ extern "js" fn update_global_transforms_for_mass_cubes_fast_js(
 #cfg(target="js")
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
+  tf : @ecs.ComponentTypeId,
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
@@ -340,12 +341,14 @@ fn update_global_transforms_for_mass_cubes_fast(
 #cfg(not(target="js"))
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
+  tf : @ecs.ComponentTypeId,
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
   ignore(per_side)
   ignore(t)
+  animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
   world.drain_gpu_writes(gt)
 }
@@ -359,7 +362,7 @@ fn update_and_drain_global_transforms(
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
   let writes = update_global_transforms_for_mass_cubes_fast(
-    world, gt, per_side, t,
+    world, tf, gt, per_side, t,
   )
   if writes.length() > 0 {
     return writes
