@@ -22,6 +22,39 @@ fn GpuComponentStore::capacity(self : GpuComponentStore) -> Int {
 
 ///|
 /// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
+#cfg(target="js")
+extern "js" fn ensure_gpu_store_capacity_js(
+  store : GpuComponentStore,
+  capacity : Int,
+) -> Bool =
+  #| (store, capacity) => {
+  #|   const stride = store.stride;
+  #|   const old = stride === 0 ? 0 : Math.floor(store.bytes.length / stride);
+  #|   if (capacity <= old) return false;
+  #|   let nextCapacity = old > 0 ? old * 2 : capacity;
+  #|   while (nextCapacity < capacity) nextCapacity *= 2;
+  #|   const next = new Uint8Array(nextCapacity * stride);
+  #|   next.set(store.bytes);
+  #|   store.bytes = next;
+  #|   while (store.dirty_flags.length < nextCapacity) {
+  #|     store.dirty_flags.push(false);
+  #|   }
+  #|   return true;
+  #| }
+
+///|
+/// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
+#cfg(target="js")
+fn GpuComponentStore::ensure_capacity(
+  self : GpuComponentStore,
+  capacity : Int,
+) -> Bool {
+  ensure_gpu_store_capacity_js(self, capacity)
+}
+
+///|
+/// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
+#cfg(not(target="js"))
 fn GpuComponentStore::ensure_capacity(
   self : GpuComponentStore,
   capacity : Int,
@@ -217,10 +250,11 @@ extern "js" fn copy_byte_range_to_fixed_array_js(
   len : Int,
 ) -> FixedArray[Byte] =
   #| (src, start, len) => {
-  #|   const out = new Uint8Array(len);
-  #|   for (let i = 0; i < len; i++) {
-  #|     out[i] = src[start + i] & 0xff;
+  #|   if (ArrayBuffer.isView(src) && typeof src.subarray === "function") {
+  #|     return src.subarray(start, start + len);
   #|   }
+  #|   const out = new Uint8Array(len);
+  #|   out.set(src.slice(start, start + len));
   #|   return out;
   #| }
 
@@ -353,7 +387,7 @@ fn World::ensure_gpu_store_capacity(
       if store.ensure_capacity(capacity) {
         self.resize_events.push({
           component: store.component,
-          required_capacity: capacity,
+          required_capacity: store.capacity(),
           needs_full_upload: true,
         })
         self.replace_gpu_store(store)
