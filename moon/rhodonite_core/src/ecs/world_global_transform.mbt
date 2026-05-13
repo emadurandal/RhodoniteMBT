@@ -331,7 +331,18 @@ pub fn World::write_global_transforms_dense_grid_wave(
 }
 
 ///|
-/// Bulk-writes dense scaled GlobalTransform matrices and returns native `Bytes` upload ranges.
+#cfg(target="native")
+#borrow(data)
+extern "C" fn write_global_transforms_dense_grid_wave_f32_native(
+  data : Bytes,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Double,
+  spacing : Double,
+) -> Unit = "rhodonite_ecs_write_global_transforms_dense_grid_wave_f32"
+
+///|
 #cfg(target="native")
 pub fn World::write_global_transforms_dense_grid_wave_bytes(
   self : World,
@@ -341,32 +352,40 @@ pub fn World::write_global_transforms_dense_grid_wave_bytes(
   scale : Float,
   spacing : Double,
 ) -> Array[GpuWriteBytes] {
-  let half = (per_side - 1).to_double() * 0.5
-  let scale_d = scale.to_double()
-  self.write_global_transforms_dense_bytes(count, fn(i, row) {
-    let ix = i % per_side
-    let iz = i / per_side
-    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(
-      row,
-      52,
-      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_grid_wave_bytes",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_grid_wave_bytes: count must be non-negative",
     )
-    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
-  })
+  }
+  if count == 0 {
+    return []
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_grid_wave_bytes: GlobalTransform stride mismatch",
+        )
+      }
+      let data = FixedArray::unsafe_reinterpret_as_bytes(store.bytes)
+      write_global_transforms_dense_grid_wave_f32_native(
+        data,
+        count,
+        per_side,
+        time,
+        scale.to_double(),
+        spacing,
+      )
+      store.mark_dirty_range(0, count - 1)
+      self.replace_gpu_store(store)
+      self.drain_gpu_write_bytes(gt)
+    }
+    None => []
+  }
 }
 
 ///|
