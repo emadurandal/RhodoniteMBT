@@ -69,6 +69,10 @@ With a root `moon.work`, running `moon test` only inside `moon/rhodonite_core` c
 - Block-oriented style; blocks are separated by `///|` and order does not matter; refactor block-by-block when useful.
 - Prefer moving deprecated code into `deprecated.mbt` per directory.
 
+## JS bridge and TypeScript wrappers
+
+When MoonBit code has a corresponding **`js_bridge`** and/or **TypeScript wrapper** (facades, `src/main-*.ts`, Vitest glue, etc.), keep **their contracts in sync** with the MoonBit side (exports, calling conventions, data layout, and error paths). Land coordinated updates in the same change when possible. Before finishing, **confirm the workspace still builds and tests cleanly** for the affected targets—for example `moon check --target all` plus the relevant `pnpm` scripts (JS demos, `pnpm run test:core:js`, etc.).
+
 ## Tooling
 
 - `moon fmt` — formatting.
