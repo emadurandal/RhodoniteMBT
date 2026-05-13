@@ -488,7 +488,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   const dirtyRanges = gtStore.__rhodonite_dirty_ranges ||
   #|     (gtStore.__rhodonite_dirty_ranges = []);
   #|   const pushDirtyRange = (first, last) => {
-  #|     if (last < first) return;
+  #|     if (first < 0 || last < first) return;
   #|     const prev = dirtyRanges[dirtyRanges.length - 1];
   #|     if (prev && first <= prev.last + 1) {
   #|       if (last > prev.last) prev.last = last;
