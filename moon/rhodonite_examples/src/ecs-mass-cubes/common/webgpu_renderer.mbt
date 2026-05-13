@@ -294,7 +294,7 @@ fn animate_transforms_query(
 }
 
 ///|
-#cfg(target="js")
+#cfg(not(target="native"))
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -314,7 +314,7 @@ fn update_global_transforms_for_mass_cubes_fast(
 }
 
 ///|
-#cfg(not(target="js"))
+#cfg(target="native")
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -334,7 +334,7 @@ fn update_global_transforms_for_mass_cubes_fast(
 }
 
 ///|
-#cfg(target="js")
+#cfg(not(target="native"))
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -354,7 +354,7 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-#cfg(not(target="js"))
+#cfg(target="native")
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -374,7 +374,7 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-#cfg(target="js")
+#cfg(not(target="native"))
 fn upload_global_transform_writes(
   queue : @wgpu.GPUQueue,
   transform_storage : @wgpu.GPUBuffer,
@@ -391,7 +391,7 @@ fn upload_global_transform_writes(
 }
 
 ///|
-#cfg(not(target="js"))
+#cfg(target="native")
 fn upload_global_transform_writes(
   queue : @wgpu.GPUQueue,
   transform_storage : @wgpu.GPUBuffer,
@@ -399,7 +399,13 @@ fn upload_global_transform_writes(
 ) -> Unit {
   for wi = 0; wi < writes.length(); wi = wi + 1 {
     let w = writes[wi]
-    queue.write_buffer(transform_storage, w.byte_offset.to_uint64(), w.bytes)
+    queue.write_buffer_from_bytes_range(
+      transform_storage,
+      w.byte_offset.to_uint64(),
+      w.bytes,
+      w.data_offset.to_uint64(),
+      w.byte_length.to_uint64(),
+    )
   }
 }
 

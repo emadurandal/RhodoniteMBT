@@ -821,7 +821,7 @@ test "World drain_gpu_write_views returns borrowed contiguous upload" {
 }
 
 ///|
-#cfg(not(target="js"))
+#cfg(target="native")
 test "World drain_gpu_write_bytes returns native bytes upload" {
   let world = World::new()
   let gpu16 = world.register_gpu_component(
@@ -837,10 +837,44 @@ test "World drain_gpu_write_bytes returns native bytes upload" {
   let writes = world.drain_gpu_write_bytes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].data_offset, 0)
+  assert_eq(writes[0].byte_length, 32)
   assert_eq(writes[0].bytes.length(), 32)
   assert_eq(writes[0].bytes[0], (66 : Byte))
   assert_eq(writes[0].bytes[16], (77 : Byte))
   assert_eq(world.drain_gpu_write_bytes(gpu16).length(), 0)
+}
+
+///|
+#cfg(target="native")
+test "World drain_gpu_write_bytes borrows partial native range" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuPartialBytes16",
+    @comp.GpuLayout::empty(16),
+  )
+  let _ = world.with_gpu_component_write_range(gpu16, 0, 4, range => {
+    let bytes = range.bytes()
+    bytes[0] = (1 : Byte)
+    bytes[16] = (2 : Byte)
+    bytes[32] = (3 : Byte)
+    bytes[48] = (4 : Byte)
+  })
+  let _ = world.drain_gpu_write_bytes(gpu16)
+  let ok = world.with_gpu_component_write_range(gpu16, 1, 2, range => {
+    let bytes = range.bytes()
+    bytes[0] = (88 : Byte)
+    bytes[16] = (99 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_write_bytes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 16)
+  assert_eq(writes[0].data_offset, 16)
+  assert_eq(writes[0].byte_length, 32)
+  assert_eq(writes[0].bytes.length(), 64)
+  assert_eq(writes[0].bytes[writes[0].data_offset], (88 : Byte))
+  assert_eq(writes[0].bytes[writes[0].data_offset + 16], (99 : Byte))
 }
 
 ///|

@@ -9,4 +9,5 @@ supported_targets = "native"
 
 options(
   implement: "emadurandal/rhodonite_webgpu/webgpu_objects",
+  "native-stub": [ "rhodonite_wgpu_queue.c" ],
 )

@@ -21,7 +21,7 @@ For a machine-readable API listing, see [`pkg.generated.mbti`](../moon/rhodonite
 | `RegisteredComponent` | Name, `kind`, `cpu_stride`, optional `gpu_layout`. |
 | `GpuWrite` | Owned GPU upload slice (`byte_offset` + `FixedArray[Byte]`), kept for APIs that need ownership. |
 | `GpuWriteView` | Borrowed GPU upload slice (`byte_offset` + `ArrayView[Byte]`) for immediate zero-copy-style upload paths. |
-| `GpuWriteBytes` | Native upload slice (`byte_offset` + `Bytes`). Full-store spans can alias the ECS GPU store backing. |
+| `GpuWriteBytes` | Native upload slice (`byte_offset` + backing `Bytes` + source offset/length). Dirty spans alias the ECS GPU store backing. |
 
 ---
 
@@ -285,19 +285,19 @@ The built-in transform update can also be registered with `transform_propagation
 
 - **`drain_gpu_writes(component)`**: Sorts dirty entity indices, merges contiguous runs, and also consumes already batched dirty ranges recorded by bulk paths. It returns `GpuWrite` slices (`byte_offset` + `bytes`) suitable for `write_buffer_from_fixed_array` (or similar).
 - **`drain_gpu_write_views(component)`**: Same dirty consumption semantics, but returns borrowed `GpuWriteView` slices (`byte_offset` + `ArrayView[Byte]`). Use this when the caller can upload immediately before mutating the same GPU component store again. This avoids the extra `FixedArray[Byte]` payload copy in ECS drain paths.
-- **`drain_gpu_write_bytes(component)`**: Native-only equivalent that returns `GpuWriteBytes` (`byte_offset` + `Bytes`). When a dirty span covers the whole native GPU store backing, the returned `Bytes` aliases that backing; partial spans still fall back to a compact owned payload.
+- **`drain_gpu_write_bytes(component)`**: Native-only equivalent that returns `GpuWriteBytes` (`byte_offset` + backing `Bytes` + `data_offset` + `byte_length`). Full and partial dirty spans alias the native GPU store backing; the upload helper uses the source offset/length instead of compacting the payload.
 - **`gpu_component_active_indices(component)`**: Returns a copy of the packed active `EntityId.index` values for a GPU-visible component. This is useful for renderer-side extraction or future packed update paths without scanning every possible entity slot.
 - **`drain_resize_events`**: Drains notifications when backing arrays grow; callers may need to **recreate GPU buffers** and optionally **full-upload**. During `Schedule::run`, this consumes a world-owned event queue and requires `structural_write`; outside schedule execution it can be called directly.
 
-`add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path. Both JS and non-JS targets grow GPU stores geometrically; JS uses `Uint8Array`, while non-JS keeps a contiguous `FixedArray[Byte]` backing so full-store upload spans can be exposed as borrowed `Bytes`.
+`add_component`, `add_component_bytes`, `component_bytes`, and `set_component_bytes` handle both CPU-only and GPU-visible components. CPU-only payloads live in archetype SoA rows; GPU-visible payloads live in flat GPU rows keyed by `EntityId.index`. GPU store capacity growth and `GpuResizeEvent` creation go through one internal `World` path. Both JS and non-JS targets grow GPU stores geometrically; JS uses `Uint8Array`, while native keeps a contiguous `FixedArray[Byte]` backing so upload spans can be exposed as borrowed `Bytes` plus source offset/length.
 
 For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native still falls back through `Bytes::from_array` because this generic queue helper accepts `ArrayView[Byte]`.
-- `GPUQueue::write_buffer` for native `GpuWriteBytes` payloads returned by ECS. This avoids the generic `ArrayView -> Bytes::from_array` fallback on full-store ECS upload paths.
+- `GPUQueue::write_buffer_from_bytes_range` for native `GpuWriteBytes` payloads returned by ECS. This forwards `Bytes + data_offset + byte_length` to a native queue helper, avoiding the generic `ArrayView -> Bytes::from_array` fallback for both full and partial ECS upload spans.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`; JS uses `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` / `queue.write_buffer_from_array_view`, while native uses `write_global_transforms_dense_grid_wave_bytes` / `drain_gpu_write_bytes` / `queue.write_buffer`.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`; JS uses `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` / `queue.write_buffer_from_array_view`, while native uses `write_global_transforms_dense_grid_wave_bytes` / `drain_gpu_write_bytes` / `queue.write_buffer_from_bytes_range`.
 
 Dense GlobalTransform helper variants:
 

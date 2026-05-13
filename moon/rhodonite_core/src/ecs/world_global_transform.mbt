@@ -119,7 +119,7 @@ pub fn World::write_global_transforms_dense_views(
 
 ///|
 /// Bulk-writes dense GlobalTransform rows `[0, count)` and returns native `Bytes` upload ranges.
-#cfg(not(target="js"))
+#cfg(target="native")
 pub fn World::write_global_transforms_dense_bytes(
   self : World,
   count : Int,
@@ -332,7 +332,7 @@ pub fn World::write_global_transforms_dense_grid_wave(
 
 ///|
 /// Bulk-writes dense scaled GlobalTransform matrices and returns native `Bytes` upload ranges.
-#cfg(not(target="js"))
+#cfg(target="native")
 pub fn World::write_global_transforms_dense_grid_wave_bytes(
   self : World,
   count : Int,

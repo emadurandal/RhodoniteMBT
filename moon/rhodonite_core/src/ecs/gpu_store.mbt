@@ -486,9 +486,8 @@ fn GpuComponentStore::range_view(
 }
 
 ///|
-/// Borrows bytes for entity indices `[first..=last]` when the span covers the full backing store.
-/// Partial spans fall back to an owned compact payload.
-#cfg(not(target="js"))
+/// Borrows bytes for entity indices `[first..=last]` from the native backing store.
+#cfg(target="native")
 fn GpuComponentStore::range_borrowed_bytes(
   self : GpuComponentStore,
   first : Int,
@@ -496,12 +495,12 @@ fn GpuComponentStore::range_borrowed_bytes(
 ) -> GpuWriteBytes {
   let start = first * self.stride
   let end = (last + 1) * self.stride
-  let bytes = if start == 0 && end == self.bytes.length() {
-    FixedArray::unsafe_reinterpret_as_bytes(self.bytes)
-  } else {
-    FixedArray::unsafe_reinterpret_as_bytes(self.range_bytes(first, last).bytes)
+  {
+    byte_offset: start,
+    bytes: FixedArray::unsafe_reinterpret_as_bytes(self.bytes),
+    data_offset: start,
+    byte_length: end - start,
   }
-  { byte_offset: start, bytes }
 }
 
 ///|
@@ -844,9 +843,8 @@ fn GpuComponentStore::drain_write_views(
 ///|
 /// Sorts dirty indices, merges consecutive runs into `Bytes` upload spans, then clears dirty state.
 ///
-/// On native, full-backing spans alias the GPU store backing via `Bytes`; partial spans fall back to
-/// compact owned bytes because `Bytes` cannot carry an offset into a mutable array backing.
-#cfg(not(target="js"))
+/// On native, spans alias the GPU store backing via `Bytes` plus source offset/length.
+#cfg(target="native")
 fn GpuComponentStore::drain_write_bytes(
   self : GpuComponentStore,
 ) -> Array[GpuWriteBytes] {
@@ -1082,8 +1080,8 @@ pub fn World::drain_gpu_write_views(
 ///|
 /// Returns `Bytes` upload slices for native immediate GPU upload; consumes pending dirties.
 ///
-/// Full-backing spans alias the GPU store backing. Partial spans are compact owned bytes.
-#cfg(not(target="js"))
+/// Upload spans alias the GPU store backing and carry source offset/length.
+#cfg(target="native")
 pub fn World::drain_gpu_write_bytes(
   self : World,
   component : ComponentTypeId,

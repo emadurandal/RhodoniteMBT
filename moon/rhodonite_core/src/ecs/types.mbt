@@ -115,6 +115,8 @@ pub(all) struct GpuWriteView {
 pub(all) struct GpuWriteBytes {
   byte_offset : Int
   bytes : Bytes
+  data_offset : Int
+  byte_length : Int
 }
 
 ///|

@@ -185,6 +185,27 @@ pub fn GPUQueue::write_buffer_from_array_view(
 }
 
 ///|
+/// Writes a borrowed subrange of `Bytes` to a GPU buffer without compacting the payload.
+#cfg(target="native")
+pub fn GPUQueue::write_buffer_from_bytes_range(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  offset : UInt64,
+  data : Bytes,
+  data_offset : UInt64,
+  byte_length : UInt64,
+) -> Unit {
+  @raw.webgpu_queue_write_buffer_bytes_range(
+    self.raw,
+    buffer.raw,
+    offset,
+    data,
+    data_offset,
+    byte_length,
+  )
+}
+
+///|
 pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
   buffer_release(self)
 }
