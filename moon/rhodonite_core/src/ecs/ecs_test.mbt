@@ -767,6 +767,40 @@ test "PreparedQuery rebuilds after structural changes create matching archetype"
 }
 
 ///|
+test "World archetype version only changes when new archetypes are created" {
+  let world = World::new()
+  let initial_version = world.archetype_version
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_eq(world.archetype_version, initial_version)
+  assert_true(world.destroy_entity(e0))
+  assert_eq(world.archetype_version, initial_version)
+  let reserved = world.reserve_entity_for_command()
+  assert_eq(world.archetype_version, initial_version)
+  assert_true(world.finalize_reserved_entity(reserved))
+  assert_eq(world.archetype_version, initial_version)
+  let qa = world.register_cpu_component("ArchetypeVersionA", 4)
+  let qb = world.register_cpu_component("ArchetypeVersionB", 4)
+  assert_true(world.add_component_bytes(e1, qa, bytes4(1, 2, 3, 4)))
+  assert_eq(world.archetype_version, initial_version + 1)
+  assert_true(world.add_component_bytes(e1, qb, bytes4(5, 6, 7, 8)))
+  let version_after_new_archetypes = world.archetype_version
+  assert_eq(version_after_new_archetypes, initial_version + 2)
+  let e2 = world.create_entity()
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+  assert_true(world.add_component_bytes(e2, qa, bytes4(9, 10, 11, 12)))
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+  assert_true(world.add_component_bytes(e2, qb, bytes4(13, 14, 15, 16)))
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+  assert_true(world.remove_component(e2, qb))
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+  assert_true(world.remove_component(e2, qa))
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+  assert_true(world.destroy_entity(e2))
+  assert_eq(world.archetype_version, version_after_new_archetypes)
+}
+
+///|
 test "World with_gpu_component_write_range marks one contiguous upload" {
   let world = World::new()
   let gpu16 = world.register_gpu_component(

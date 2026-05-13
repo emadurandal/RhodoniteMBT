@@ -149,7 +149,6 @@ pub fn World::spawn_transform_global_batch(
     }
   }
   self.replace_gpu_store(gt_store)
-  self.bump_archetype_version()
   entities
 }
 

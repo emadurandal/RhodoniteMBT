@@ -508,7 +508,6 @@ fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
   self.ensure_gpu_capacity(entity.index + 1)
-  self.bump_archetype_version()
   true
 }
 
@@ -535,7 +534,6 @@ pub fn World::create_entity(self : World) -> EntityId {
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
   self.ensure_gpu_capacity(entity.index + 1)
-  self.bump_archetype_version()
   entity
 }
 
@@ -559,7 +557,6 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.generations[entity.index] = self.generations[entity.index] + 1
   self.locations[entity.index] = None
   self.free_indices.push(entity.index)
-  self.bump_archetype_version()
   true
 }
 
@@ -686,7 +683,6 @@ fn World::add_component_signature(
   })
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
-  self.bump_archetype_version()
   true
 }
 
@@ -850,7 +846,6 @@ pub fn World::remove_component(
     }
     None => ()
   }
-  self.bump_archetype_version()
   true
 }
 
