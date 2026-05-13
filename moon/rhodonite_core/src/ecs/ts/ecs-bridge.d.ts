@@ -149,6 +149,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		scale: number,
 		spacing: number,
 	): MoonGpuWriteView[];
+	export function world_write_global_transforms_dense_grid_wave_y_views(
+		world: MoonWorld,
+		count: number,
+		perSide: number,
+		time: number,
+	): MoonGpuWriteView[];
 	export function world_write_global_transforms_dense_grid_wave_copy(
 		world: MoonWorld,
 		count: number,

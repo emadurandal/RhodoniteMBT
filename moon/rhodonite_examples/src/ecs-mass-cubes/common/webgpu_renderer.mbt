@@ -303,6 +303,19 @@ fn update_global_transforms_for_mass_cubes_fast(
 ) -> Array[@ecs.GpuWriteView] {
   ignore(tf)
   ignore(gt)
+  world.write_global_transforms_dense_grid_wave_y_views(
+    entity_count,
+    per_side,
+    t * 1.8,
+  )
+}
+
+///|
+fn initialize_global_transforms_for_mass_cubes(
+  world : @ecs.World,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWriteView] {
   world.write_global_transforms_dense_grid_wave_views(
     entity_count,
     per_side,
@@ -325,6 +338,12 @@ fn update_and_drain_global_transforms(
   )
   if writes.length() > 0 {
     return writes
+  }
+  let full_writes = initialize_global_transforms_for_mass_cubes(
+    world, per_side, t,
+  )
+  if full_writes.length() > 0 {
+    return full_writes
   }
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
@@ -610,7 +629,9 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
   )
   let depth_view = depth_texture.create_view()
-  let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
+  let writes0 = initialize_global_transforms_for_mass_cubes(
+    world, per_side, 0.0,
+  )
   upload_global_transform_writes(queue, transform_storage, writes0)
   Some({
     context: canvas_context,

@@ -185,7 +185,7 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。JS helper は `Float32Array`、native helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。これらの helper は行単位で sin/cos を初期化し、entity ごとは recurrence と x/z カウンタで進めるため、大量 entity 更新時の `sin` と除算/剰余を削減します。
 
-ブラウザ専用の `ts-ecs-mass-cubes` renderer も同じ方針です。TypeScript の user-side fast path が `World` の GPU store backing を `Float32Array` として直接更新し、native helper と同じ行単位 recurrence で grid-wave transform を埋めた後、dirty range を `drainGpuWriteViews` で upload します。
+初期化後に scale / X / Z が変わらない dense grid-wave では、`write_global_transforms_dense_grid_wave_y_views` を使えます。この helper は CPU 側の Y translation lane だけを更新し、初期化済みの他の mat4 lane を保持します。GPU buffer layout は mat4 row のままなので upload range は full dense row span ですが、CPU-side write volume は 16 floats/entity から 1 float/entity に減ります。`ecs-mass-cubes` と `ts-ecs-mass-cubes` は初回だけ full helper を使い、その後はこの library-side y-only helper を使います。
 
 ## Conflict 検査
 

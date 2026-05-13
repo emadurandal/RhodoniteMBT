@@ -271,6 +271,16 @@ pub fn world_write_global_transforms_dense_grid_wave_views(
 }
 
 ///|
+pub fn world_write_global_transforms_dense_grid_wave_y_views(
+  world : @ecs.World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Array[@ecs.GpuWriteView] {
+  world.write_global_transforms_dense_grid_wave_y_views(count, per_side, time)
+}
+
+///|
 pub fn world_write_global_transforms_dense_grid_wave_copy(
   world : @ecs.World,
   count : Int,

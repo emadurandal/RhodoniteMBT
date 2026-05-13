@@ -39,6 +39,7 @@ import {
 	world_update_global_transforms_from_transforms,
 	world_write_global_transforms_dense_grid_wave_copy,
 	world_write_global_transforms_dense_grid_wave_views,
+	world_write_global_transforms_dense_grid_wave_y_views,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -281,6 +282,19 @@ export class World {
 			time,
 			scale,
 			spacing,
+		).map((write) => new GpuWriteView(write));
+	}
+
+	writeGlobalTransformsDenseGridWaveYViews(
+		count: number,
+		perSide: number,
+		time: number,
+	): GpuWriteView[] {
+		return world_write_global_transforms_dense_grid_wave_y_views(
+			this.inner,
+			count,
+			perSide,
+			time,
 		).map((write) => new GpuWriteView(write));
 	}
 

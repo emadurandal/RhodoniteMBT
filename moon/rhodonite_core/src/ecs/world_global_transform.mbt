@@ -188,6 +188,50 @@ extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   #| }
 
 ///|
+#cfg(target="js")
+extern "js" fn World::write_global_transforms_dense_grid_wave_y_js(
+  self : World,
+  gt : ComponentTypeId,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Bool =
+  #| (world, gt, count, perSide, time) => {
+  #|   const store = world.gpu_stores[gt.index];
+  #|   if (!store || store.stride !== 64) return false;
+  #|   if (!ArrayBuffer.isView(store.bytes)) {
+  #|     const converted = new Uint8Array(store.bytes.length);
+  #|     converted.set(store.bytes);
+  #|     store.bytes = converted;
+  #|   }
+  #|   const bytes = store.bytes;
+  #|   const byteLength = count * 64;
+  #|   if (bytes.length < byteLength || (bytes.byteOffset & 3) !== 0) return false;
+  #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   let i = 0;
+  #|   let out = 0;
+  #|   while (i < count) {
+  #|     const rowCount = Math.min(perSide, count - i);
+  #|     let waveSin = Math.sin(i * 0.09 + time);
+  #|     let waveCos = Math.cos(i * 0.09 + time);
+  #|     for (let ix = 0; ix < rowCount; ix++) {
+  #|       m[out + 13] = waveSin * 0.12;
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|       i++;
+  #|       out += 16;
+  #|     }
+  #|   }
+  #|   const ranges = store.__rhodonite_dirty_ranges ||
+  #|     (store.__rhodonite_dirty_ranges = []);
+  #|   if (count > 0) ranges.push({ first: 0, last: count - 1 });
+  #|   return true;
+  #| }
+
+///|
 /// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
 #cfg(target="js")
 pub fn World::write_global_transforms_dense_grid_wave(
@@ -272,6 +316,50 @@ pub fn World::write_global_transforms_dense_grid_wave_views(
 }
 
 ///|
+/// Updates only the Y translation lane of dense grid-wave GlobalTransform rows and returns borrowed upload ranges.
+///
+/// Call this after an initial full `write_global_transforms_dense_grid_wave_views` upload when scale/X/Z
+/// are unchanged. The returned ranges still cover the full mat4 rows because the GPU buffer layout is
+/// strided; this reduces CPU writes but not upload byte size.
+#cfg(target="js")
+pub fn World::write_global_transforms_dense_grid_wave_y_views(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_grid_wave_y_views",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_grid_wave_y_views: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_grid_wave_y_views: GlobalTransform stride mismatch",
+        )
+      }
+      self.replace_gpu_store(store)
+    }
+    None => return []
+  }
+  if !self.write_global_transforms_dense_grid_wave_y_js(
+      gt, count, per_side, time,
+    ) {
+    return []
+  }
+  self.drain_gpu_write_views(gt)
+}
+
+///|
 /// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
 #cfg(not(target="js"))
 pub fn World::write_global_transforms_dense_grid_wave(
@@ -324,6 +412,16 @@ extern "C" fn write_global_transforms_dense_grid_wave_f32_native(
 
 ///|
 #cfg(target="native")
+#borrow(data)
+extern "C" fn write_global_transforms_dense_grid_wave_y_f32_native(
+  data : Bytes,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Unit = "rhodonite_ecs_write_global_transforms_dense_grid_wave_y_f32"
+
+///|
+#cfg(target="native")
 pub fn World::write_global_transforms_dense_grid_wave_views(
   self : World,
   count : Int,
@@ -369,6 +467,50 @@ pub fn World::write_global_transforms_dense_grid_wave_views(
 }
 
 ///|
+/// Updates only the Y translation lane of dense grid-wave GlobalTransform rows and returns borrowed upload ranges.
+///
+/// Call this after an initial full `write_global_transforms_dense_grid_wave_views` upload when scale/X/Z
+/// are unchanged. The returned ranges still cover the full mat4 rows because the GPU buffer layout is
+/// strided; this reduces CPU writes but not upload byte size.
+#cfg(target="native")
+pub fn World::write_global_transforms_dense_grid_wave_y_views(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_grid_wave_y_views",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_grid_wave_y_views: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_grid_wave_y_views: GlobalTransform stride mismatch",
+        )
+      }
+      let data = FixedArray::unsafe_reinterpret_as_bytes(store.bytes)
+      write_global_transforms_dense_grid_wave_y_f32_native(
+        data, count, per_side, time,
+      )
+      store.mark_dirty_range(0, count - 1)
+      self.replace_gpu_store(store)
+      self.drain_gpu_write_views(gt)
+    }
+    None => []
+  }
+}
+
+///|
 /// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
 #cfg(not(any(target="js", target="native")))
 pub fn World::write_global_transforms_dense_grid_wave_views(
@@ -404,6 +546,29 @@ pub fn World::write_global_transforms_dense_grid_wave_views(
     )
     @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
     @comp.put_gpu_f32_mut_view(row, 60, 1.0)
+  })
+}
+
+///|
+/// Updates only the Y translation lane of dense grid-wave GlobalTransform rows and returns borrowed upload ranges.
+///
+/// Call this after an initial full `write_global_transforms_dense_grid_wave_views` upload when scale/X/Z
+/// are unchanged. The returned ranges still cover the full mat4 rows because the GPU buffer layout is
+/// strided; this reduces CPU writes but not upload byte size.
+#cfg(not(any(target="js", target="native")))
+pub fn World::write_global_transforms_dense_grid_wave_y_views(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+) -> Array[GpuWriteView] {
+  self.write_global_transforms_dense_views(count, fn(i, row) {
+    @comp.put_gpu_f32_mut_view(
+      row,
+      52,
+      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+    )
+    ignore(per_side)
   })
 }
 

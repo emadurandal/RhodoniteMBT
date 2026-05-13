@@ -46,6 +46,7 @@ options(
         "world_set_transform_trs",
         "world_update_global_transforms_from_transforms",
         "world_write_global_transforms_dense_grid_wave_views",
+        "world_write_global_transforms_dense_grid_wave_y_views",
         "world_write_global_transforms_dense_grid_wave_copy",
         "world_spawn_transform_global_batch_identity",
         "query_new",

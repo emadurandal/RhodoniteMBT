@@ -14,18 +14,6 @@ const CUBE_SCALE = 0.055;
 
 type Mat4 = Float32Array;
 
-type DirtyRange = { first: number; last: number };
-
-type FastGpuStore = {
-	stride: number;
-	bytes: Uint8Array | number[];
-	__rhodonite_dirty_ranges?: DirtyRange[];
-};
-
-type FastWorldInternals = {
-	gpu_stores?: Array<FastGpuStore | null | undefined>;
-};
-
 type Renderer = {
 	readonly canvas: HTMLCanvasElement;
 	readonly context: GPUCanvasContext;
@@ -308,71 +296,6 @@ function animateTransformsQuery(
 	});
 }
 
-function writeGlobalTransformsDenseGridWaveFast(renderer: Renderer, time: number): boolean {
-	const world = renderer.world.inner as FastWorldInternals;
-	const store = world.gpu_stores?.[renderer.globalTransformComponent.index()];
-	if (store === undefined || store === null || store.stride !== 64) {
-		return false;
-	}
-	if (!(store.bytes instanceof Uint8Array)) {
-		const converted = new Uint8Array(store.bytes.length);
-		converted.set(store.bytes);
-		store.bytes = converted;
-	}
-	const byteLength = ENTITY_COUNT * 64;
-	const bytes = store.bytes;
-	if (bytes.byteLength < byteLength || (bytes.byteOffset & 3) !== 0) {
-		return false;
-	}
-
-	const matrices = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
-	const half = (renderer.perSide - 1) * 0.5;
-	const x0 = -half * GRID_SPACING;
-	const sinStep = Math.sin(0.09);
-	const cosStep = Math.cos(0.09);
-	let entityIndex = 0;
-	let rowIndex = 0;
-	let out = 0;
-	while (entityIndex < ENTITY_COUNT) {
-		const rowCount = Math.min(renderer.perSide, ENTITY_COUNT - entityIndex);
-		let x = x0;
-		const z = (rowIndex - half) * GRID_SPACING;
-		let waveSin = Math.sin(entityIndex * 0.09 + time);
-		let waveCos = Math.cos(entityIndex * 0.09 + time);
-		for (let ix = 0; ix < rowCount; ix += 1) {
-			matrices[out] = CUBE_SCALE;
-			matrices[out + 1] = 0;
-			matrices[out + 2] = 0;
-			matrices[out + 3] = 0;
-			matrices[out + 4] = 0;
-			matrices[out + 5] = CUBE_SCALE;
-			matrices[out + 6] = 0;
-			matrices[out + 7] = 0;
-			matrices[out + 8] = 0;
-			matrices[out + 9] = 0;
-			matrices[out + 10] = CUBE_SCALE;
-			matrices[out + 11] = 0;
-			matrices[out + 12] = x;
-			matrices[out + 13] = waveSin * 0.12;
-			matrices[out + 14] = z;
-			matrices[out + 15] = 1;
-
-			const nextSin = waveSin * cosStep + waveCos * sinStep;
-			waveCos = waveCos * cosStep - waveSin * sinStep;
-			waveSin = nextSin;
-			entityIndex += 1;
-			out += 16;
-			x += GRID_SPACING;
-		}
-		rowIndex += 1;
-	}
-
-	const dirtyRanges = store.__rhodonite_dirty_ranges ?? [];
-	dirtyRanges.push({ first: 0, last: ENTITY_COUNT - 1 });
-	store.__rhodonite_dirty_ranges = dirtyRanges;
-	return true;
-}
-
 function uploadGlobalTransformWrites(
 	queue: GPUQueue,
 	buffer: GPUBuffer,
@@ -388,26 +311,41 @@ function uploadGlobalTransformWrites(
 	}
 }
 
+function uploadInitialGlobalTransforms(renderer: Renderer): void {
+	uploadGlobalTransformWrites(
+		renderer.queue,
+		renderer.transformStorage,
+		renderer.world.writeGlobalTransformsDenseGridWaveViews(
+			ENTITY_COUNT,
+			renderer.perSide,
+			0,
+			CUBE_SCALE,
+			GRID_SPACING,
+		),
+	);
+}
+
 function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
 	const waveTime = t * 1.8;
-	if (writeGlobalTransformsDenseGridWaveFast(renderer, waveTime)) {
-		uploadGlobalTransformWrites(
-			renderer.queue,
-			renderer.transformStorage,
-			renderer.world.drainGpuWriteViews(renderer.globalTransformComponent),
-		);
+	const writes = renderer.world.writeGlobalTransformsDenseGridWaveYViews(
+		ENTITY_COUNT,
+		renderer.perSide,
+		waveTime,
+	);
+	if (writes.length > 0) {
+		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, writes);
 		return;
 	}
 
-	const writes = renderer.world.writeGlobalTransformsDenseGridWaveViews(
+	const fullWrites = renderer.world.writeGlobalTransformsDenseGridWaveViews(
 		ENTITY_COUNT,
 		renderer.perSide,
 		waveTime,
 		CUBE_SCALE,
 		GRID_SPACING,
 	);
-	if (writes.length > 0) {
-		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, writes);
+	if (fullWrites.length > 0) {
+		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, fullWrites);
 		return;
 	}
 
@@ -588,7 +526,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		frame: 0,
 		lastFrameStartMs: -1,
 	};
-	updateAndDrainGlobalTransforms(renderer, 0);
+	uploadInitialGlobalTransforms(renderer);
 	return renderer;
 }
 

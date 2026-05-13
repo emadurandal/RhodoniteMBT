@@ -1531,6 +1531,27 @@ test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices"
 }
 
 ///|
+test "write_global_transforms_dense_grid_wave_y_views keeps static lanes" {
+  let world = World::new()
+  let _ = world.write_global_transforms_dense_grid_wave_views(
+    2,
+    2,
+    0.0,
+    (0.5 : Float),
+    2.0,
+  )
+  let writes = world.write_global_transforms_dense_grid_wave_y_views(2, 2, 1.0)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  let row0 = writes[0].bytes[0:64]
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_true(@comp.get_gpu_f32_byte_view(row0, 52) != (0.0 : Float))
+}
+
+///|
 #cfg(target="native")
 test "native write_global_transforms_dense_grid_wave_views writes dense scaled grid matrices" {
   let world = World::new()
