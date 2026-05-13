@@ -302,8 +302,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 WebGPU upload 側には次の API があります。
 
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
-- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native の汎用 helper は `ArrayView[Byte]` を受けるため、現在も `Bytes::from_array` 経由に fallback します。
-- `GPUQueue::write_buffer_from_bytes_range`: ECS が返す native `GpuWriteBytes` payload 向け。`Bytes + data_offset + byte_length` を native queue helper に渡すため、フル範囲・部分範囲とも generic な `ArrayView -> Bytes::from_array` fallback を通さずに upload できます。
+- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
+- `GPUQueue::write_buffer_from_bytes_range`: ECS が返す native `GpuWriteBytes` payload 向け。`Bytes + data_offset + byte_length` を native queue helper に渡すため、フル範囲・部分範囲とも借用のまま upload できます。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、JS では `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` / `queue.write_buffer_from_array_view`、native では `write_global_transforms_dense_grid_wave_bytes` / `drain_gpu_write_bytes` / `queue.write_buffer_from_bytes_range` を使います。
 

@@ -165,7 +165,7 @@ query.for_each(world, fn(row) {
 
 builtin transform propagation のように連続 entity index をまとめて更新できる bulk path は、個別 dirty index ではなく dirty range を積めます。`drain_gpu_writes` は dirty range と個別 dirty index を統合し、重複 upload を避けながら owned bytes の `GpuWrite` を返します。native では `drain_gpu_write_bytes` も使え、フル範囲・部分範囲とも `GpuComponentStore` の `FixedArray[Byte]` backing を `Bytes` として借用し、source offset/length で upload 範囲を表します。
 
-即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` の subarray をそのまま渡せるため、ECS drain 時の payload copy を避けられます。native の高負荷 path では `drain_gpu_write_bytes` と `GPUQueue::write_buffer_from_bytes_range` を組み合わせることで、フル範囲・部分範囲とも `ArrayView -> Bytes::from_array` fallback copy を避けられます。借用 view / bytes は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
+即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` の subarray をそのまま渡せます。native でも同 helper が `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡すため、view を新しい `Bytes` に compact しません。native の高負荷 path では `drain_gpu_write_bytes` と `GPUQueue::write_buffer_from_bytes_range` を組み合わせることで、フル範囲・部分範囲とも `Bytes` 借用のまま upload できます。借用 view / bytes は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
 
 ## Builtin Transform System
 
@@ -220,7 +220,7 @@ pub struct App {
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
 - query plan cache、archetype index cache。`Query::for_each_archetype` の per-archetype column cache は導入済み。
-- native backend の汎用 `write_buffer_from_array_view` は現状 `Bytes` 経由の fallback copy です。ECS の hot path は `GpuWriteBytes` + `write_buffer_from_bytes_range` で回避済みですが、任意の `ArrayView[Byte]` upload まで borrowed にするには別途 source offset を持つ API が必要です。
+- native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を直接 lower-level queue binding に渡すため、任意の borrowed byte view upload でも `Bytes::from_array` の compact copy は発生しません。
 - `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 
 ## 避ける方針

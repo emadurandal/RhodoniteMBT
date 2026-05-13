@@ -294,8 +294,8 @@ The built-in transform update can also be registered with `transform_propagation
 For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
-- `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native still falls back through `Bytes::from_array` because this generic queue helper accepts `ArrayView[Byte]`.
-- `GPUQueue::write_buffer_from_bytes_range` for native `GpuWriteBytes` payloads returned by ECS. This forwards `Bytes + data_offset + byte_length` to a native queue helper, avoiding the generic `ArrayView -> Bytes::from_array` fallback for both full and partial ECS upload spans.
+- `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
+- `GPUQueue::write_buffer_from_bytes_range` for native `GpuWriteBytes` payloads returned by ECS. This forwards `Bytes + data_offset + byte_length` to a native queue helper, so full and partial ECS upload spans can stay borrowed.
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`; JS uses `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` / `queue.write_buffer_from_array_view`, while native uses `write_global_transforms_dense_grid_wave_bytes` / `drain_gpu_write_bytes` / `queue.write_buffer_from_bytes_range`.
 

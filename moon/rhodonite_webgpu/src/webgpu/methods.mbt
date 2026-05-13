@@ -173,8 +173,9 @@ pub fn GPUQueue::write_buffer_from_fixed_array(
 ///|
 /// Writes a borrowed byte view to a GPU buffer.
 ///
-/// JS forwards the view as a `Uint8Array.subarray` without copying. Native falls back through
-/// `Bytes::from_array` because the current native queue binding accepts `Bytes`.
+/// JS forwards the view as a `Uint8Array.subarray` without copying. Native forwards the
+/// `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without first
+/// compacting the view into a new `Bytes`.
 pub fn GPUQueue::write_buffer_from_array_view(
   self : GPUQueue,
   buffer : GPUBuffer,
@@ -208,6 +209,22 @@ pub fn GPUQueue::write_buffer_from_bytes_range(
 ///|
 pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
   buffer_release(self)
+}
+
+///|
+/// Reads a native GPU buffer range and returns a borrowed view of the staging bytes.
+///
+/// WebGPU native mapping requires aligned offset/size. This helper reads the aligned range into a
+/// staging `Bytes`, then returns the requested subrange as `BytesView` without compacting it into a
+/// second `Bytes`. Use `BytesView::to_owned` only when an owned, exact-length `Bytes` is required.
+#cfg(target="native")
+pub fn GPUBuffer::readback_view(
+  self : GPUBuffer,
+  instance : GPUInstance,
+  offset : UInt64,
+  size : UInt64,
+) -> BytesView {
+  @raw.webgpu_buffer_readback_view(self.raw, instance.raw, offset, size)
 }
 
 ///|
