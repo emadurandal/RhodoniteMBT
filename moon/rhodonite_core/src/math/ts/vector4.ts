@@ -78,7 +78,8 @@ export class Vector4F {
 	}
 
 	eq(other: Vector4F): boolean {
-		return v4f_eq(this.inner, other.inner) === 1;
+		const result = v4f_eq(this.inner, other.inner);
+		return result === true || result === 1;
 	}
 
 	toString(): string {

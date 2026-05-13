@@ -113,7 +113,8 @@ export class Matrix33F {
 	}
 
 	eq(other: Matrix33F): boolean {
-		return m3f_eq(this.inner, other.inner) === 1;
+		const result = m3f_eq(this.inner, other.inner);
+		return result === true || result === 1;
 	}
 
 	toString(): string {

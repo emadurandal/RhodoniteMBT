@@ -95,10 +95,13 @@ pub fn Matrix44::rotation_z(angle : Double) -> Matrix44D {
 }
 
 ///|
-/// Orthographic projection (column-major) mapping the frustum to NDC:
-/// **x** and **y** in `[-1, 1]`, **z** in `[0, 1]` (WebGPU depth).
-/// `near` and `far` are depths along **negative Z** (larger magnitude = farther).
-/// Requires `right != left` (unity `one` is derived as `(right - left) / (right - left)`).
+/// Orthographic projection (column-major, column vectors: `clip = ortho * vec4(x,y,z,1)`).
+/// Maps the axis-aligned box `[left, right] × [bottom, top]` in view **x**/**y**, with
+/// **near**/**far** positive distances along **−Z** (near plane at `z = -near`, far at `z = -far`),
+/// to WebGPU NDC: **x** and **y** in `[-1, 1]`, **z** in `[0, 1]`.
+///
+/// XY offsets live in the fourth **column** so `clip.w` stays `1` (homogeneous divide does not
+/// distort **x**/**y**). Requires `right != left`.
 pub fn[T : Add + Sub + Div] Matrix44::ortho(
   left : T,
   right : T,
@@ -113,6 +116,9 @@ pub fn[T : Add + Sub + Div] Matrix44::ortho(
   let zero = right - right
   let one = dx / dx
   let two = one + one
+  let tx = (right + left) / (left - right)
+  let ty = (top + bottom) / (bottom - top)
+  let tz = near / dz
   Matrix44::new_col_major(
     two / dx,
     zero,
@@ -126,9 +132,9 @@ pub fn[T : Add + Sub + Div] Matrix44::ortho(
     zero,
     one / dz,
     zero,
-    (right + left) / (left - right),
-    (top + bottom) / (bottom - top),
-    near / dz,
+    tx,
+    ty,
+    tz,
     one,
   )
 }

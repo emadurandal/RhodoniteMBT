@@ -15,6 +15,10 @@ Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 
 See [`docs/module_boundaries.md`](docs/module_boundaries.md) for dependency boundaries and publish order.
 
+## Documentation (`docs/`)
+
+Keep **source code and everything under [`docs/`](docs/) in sync at all times**. When behavior, APIs, module layout, build or publish steps, or project conventions change in the repo, update the relevant `docs/*.md` in the same change; when documentation is revised to reflect the current system, ensure the code and scripts match. Do not leave `docs/` describing outdated paths, commands, or architecture.
+
 ## Publish (mooncakes)
 
 After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) so the facade’s publish-time `moon check` can resolve freshly published deps. If core/webgpu are already on the registry and only the facade step must be retried, use `PUBLISH_MOON_FACADE_ONLY=1 pnpm run publish:moon`.
@@ -64,6 +68,10 @@ With a root `moon.work`, running `moon test` only inside `moon/rhodonite_core` c
 
 - Block-oriented style; blocks are separated by `///|` and order does not matter; refactor block-by-block when useful.
 - Prefer moving deprecated code into `deprecated.mbt` per directory.
+
+## JS bridge and TypeScript wrappers
+
+When MoonBit code has a corresponding **`js_bridge`** and/or **TypeScript wrapper** (facades, `src/main-*.ts`, Vitest glue, etc.), keep **their contracts in sync** with the MoonBit side (exports, calling conventions, data layout, and error paths). Land coordinated updates in the same change when possible. Before finishing, **confirm the workspace still builds and tests cleanly** for the affected targets—for example `moon check --target all` plus the relevant `pnpm` scripts (JS demos, `pnpm run test:core:js`, etc.).
 
 ## Tooling
 

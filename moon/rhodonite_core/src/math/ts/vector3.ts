@@ -73,7 +73,8 @@ export class Vector3F {
 	}
 
 	eq(other: Vector3F): boolean {
-		return v3f_eq(this.inner, other.inner) === 1;
+		const result = v3f_eq(this.inner, other.inner);
+		return result === true || result === 1;
 	}
 
 	toString(): string {

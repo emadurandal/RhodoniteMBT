@@ -121,13 +121,99 @@ pub fn get_gpu_f32(buf : FixedArray[Byte], offset : Int) -> Float {
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn get_f32_from_byte_view_js(
+  buf : ArrayView[Byte],
+  offset : Int,
+) -> Float =
+  #| (buf, offset) => {
+  #|   const bytes = buf.buf;
+  #|   const byteIndex = buf.start + offset;
+  #|   if (ArrayBuffer.isView(bytes) && bytes.buffer instanceof ArrayBuffer) {
+  #|     if (((bytes.byteOffset | bytes.byteLength | byteIndex) & 3) === 0) {
+  #|       let f32 = bytes.__rhodonite_f32_view;
+  #|       if (!f32 || f32.buffer !== bytes.buffer || f32.byteOffset !== bytes.byteOffset) {
+  #|         f32 = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+  #|         bytes.__rhodonite_f32_view = f32;
+  #|       }
+  #|       return f32[byteIndex >> 2];
+  #|     }
+  #|     return new DataView(bytes.buffer, bytes.byteOffset + byteIndex, 4).getFloat32(0, true);
+  #|   }
+  #|   const bits =
+  #|     (bytes[byteIndex] & 0xff) |
+  #|     ((bytes[byteIndex + 1] & 0xff) << 8) |
+  #|     ((bytes[byteIndex + 2] & 0xff) << 16) |
+  #|     ((bytes[byteIndex + 3] & 0xff) << 24);
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = {
+  #|       u32: new Uint32Array(1),
+  #|       f32: null,
+  #|     });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   scratch.u32[0] = bits >>> 0;
+  #|   return scratch.f32[0];
+  #| }
+
+///|
+#cfg(target="js")
+extern "js" fn get_f32_from_mut_view_js(
+  buf : MutArrayView[Byte],
+  offset : Int,
+) -> Float =
+  #| (buf, offset) => {
+  #|   const bytes = buf.buf;
+  #|   const byteIndex = buf.start + offset;
+  #|   if (ArrayBuffer.isView(bytes) && bytes.buffer instanceof ArrayBuffer) {
+  #|     if (((bytes.byteOffset | bytes.byteLength | byteIndex) & 3) === 0) {
+  #|       let f32 = bytes.__rhodonite_f32_view;
+  #|       if (!f32 || f32.buffer !== bytes.buffer || f32.byteOffset !== bytes.byteOffset) {
+  #|         f32 = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+  #|         bytes.__rhodonite_f32_view = f32;
+  #|       }
+  #|       return f32[byteIndex >> 2];
+  #|     }
+  #|     return new DataView(bytes.buffer, bytes.byteOffset + byteIndex, 4).getFloat32(0, true);
+  #|   }
+  #|   const bits =
+  #|     (bytes[byteIndex] & 0xff) |
+  #|     ((bytes[byteIndex + 1] & 0xff) << 8) |
+  #|     ((bytes[byteIndex + 2] & 0xff) << 16) |
+  #|     ((bytes[byteIndex + 3] & 0xff) << 24);
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = {
+  #|       u32: new Uint32Array(1),
+  #|       f32: null,
+  #|     });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   scratch.u32[0] = bits >>> 0;
+  #|   return scratch.f32[0];
+  #| }
+
+///|
 /// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
+#cfg(target="js")
+pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
+  get_f32_from_byte_view_js(buf, offset)
+}
+
+///|
+/// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
+#cfg(not(target="js"))
 pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_byte_view(buf, offset))
 }
 
 ///|
 /// Same as [`get_gpu_f32`] but reads through a [`MutArrayView`] (e.g. SoA row slice).
+#cfg(target="js")
+pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
+  get_f32_from_mut_view_js(buf, offset)
+}
+
+///|
+/// Same as [`get_gpu_f32`] but reads through a [`MutArrayView`] (e.g. SoA row slice).
+#cfg(not(target="js"))
 pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(buf, offset))
 }

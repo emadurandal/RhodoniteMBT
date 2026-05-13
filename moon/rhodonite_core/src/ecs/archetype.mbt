@@ -23,10 +23,57 @@ fn copy_array_range_to_fixed(
 }
 
 ///|
+fn copy_fixed_range_to_fixed(
+  src : FixedArray[Byte],
+  offset : Int,
+  len : Int,
+) -> FixedArray[Byte] {
+  let out = FixedArray::make(len, (0 : Byte))
+  for i = 0; i < len; i = i + 1 {
+    out[i] = src[offset + i]
+  }
+  out
+}
+
+///|
 fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
   for i = 0; i < count; i = i + 1 {
     ignore(i)
     dst.push((0 : Byte))
+  }
+}
+
+///|
+fn ComponentColumn::ensure_row_capacity(
+  self : ComponentColumn,
+  required_rows : Int,
+) -> Unit {
+  if required_rows <= self.row_capacity {
+    return
+  }
+  let mut next = if self.row_capacity > 0 { self.row_capacity * 2 } else { 1 }
+  while next < required_rows {
+    next = next * 2
+  }
+  append_zero_bytes(self.bytes, (next - self.row_capacity) * self.stride)
+  self.row_capacity = next
+}
+
+///|
+fn ComponentColumn::clear_row(self : ComponentColumn, row : Int) -> Unit {
+  let base = row * self.stride
+  for b = 0; b < self.stride; b = b + 1 {
+    self.bytes[base + b] = (0 : Byte)
+  }
+}
+
+///|
+fn Archetype::ensure_row_capacity(
+  self : Archetype,
+  required_rows : Int,
+) -> Unit {
+  for i = 0; i < self.columns.length(); i = i + 1 {
+    self.columns[i].ensure_row_capacity(required_rows)
   }
 }
 
@@ -43,6 +90,7 @@ fn Archetype::new(
       component: components[i],
       stride: registry.stride(components[i]),
       bytes,
+      row_capacity: 0,
     })
   }
   let entities : Array[EntityId] = []
@@ -68,7 +116,8 @@ fn Archetype::push_empty_row(self : Archetype, entity : EntityId) -> Int {
   let row = self.entities.length()
   self.entities.push(entity)
   for i = 0; i < self.columns.length(); i = i + 1 {
-    append_zero_bytes(self.columns[i].bytes, self.columns[i].stride)
+    self.columns[i].ensure_row_capacity(row + 1)
+    self.columns[i].clear_row(row)
   }
   row
 }
@@ -124,42 +173,6 @@ fn Archetype::component_bytes(
 }
 
 ///|
-/// Zero-copy read-only view of one component row ([`ArrayView`] over [`ComponentColumn::bytes`]).
-fn Archetype::component_byte_view(
-  self : Archetype,
-  row : Int,
-  component : ComponentTypeId,
-) -> ArrayView[Byte]? {
-  let col_index = self.column_index(component)
-  if col_index < 0 {
-    None
-  } else {
-    let col = self.columns[col_index]
-    let base = row * col.stride
-    let end = base + col.stride
-    Some(col.bytes[base:end])
-  }
-}
-
-///|
-/// Zero-copy **mutable** view of one component row ([`MutArrayView`] over [`ComponentColumn::bytes`]).
-fn Archetype::component_byte_mut_view(
-  self : Archetype,
-  row : Int,
-  component : ComponentTypeId,
-) -> MutArrayView[Byte]? {
-  let col_index = self.column_index(component)
-  if col_index < 0 {
-    None
-  } else {
-    let col = self.columns[col_index]
-    let base = row * col.stride
-    let end = base + col.stride
-    Some(col.bytes.mut_view(start=base, end~))
-  }
-}
-
-///|
 /// Dense archetype table helpers (swap-remove keeps rows packed).
 fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
   let last = self.entities.length() - 1
@@ -179,12 +192,5 @@ fn Archetype::swap_remove_row(self : Archetype, row : Int) -> EntityId? {
     }
   }
   let _ = self.entities.pop()
-  for ci = 0; ci < self.columns.length(); ci = ci + 1 {
-    let col = self.columns[ci]
-    for b = 0; b < col.stride; b = b + 1 {
-      ignore(b)
-      let _ = col.bytes.pop()
-    }
-  }
   moved
 }

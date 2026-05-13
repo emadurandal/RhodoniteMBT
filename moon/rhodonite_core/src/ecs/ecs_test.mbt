@@ -178,6 +178,31 @@ test "GPU visible components stay flat by EntityId index and drain only dirty ra
 }
 
 ///|
+test "GPU visible active indices stay packed across removal and destroy" {
+  let world = World::new()
+  let gpu = world.register_gpu_component(
+    "GpuActivePacked",
+    @comp.GpuLayout::empty(16),
+  )
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component(e0, gpu))
+  assert_true(world.add_component(e1, gpu))
+  assert_true(world.add_component(e2, gpu))
+  assert_eq(world.gpu_component_active_indices(gpu).length(), 3)
+  assert_true(world.remove_component(e1, gpu))
+  let after_remove = world.gpu_component_active_indices(gpu)
+  assert_eq(after_remove.length(), 2)
+  assert_true(after_remove[0] == e0.index || after_remove[1] == e0.index)
+  assert_true(after_remove[0] == e2.index || after_remove[1] == e2.index)
+  assert_true(world.destroy_entity(e0))
+  let after_destroy = world.gpu_component_active_indices(gpu)
+  assert_eq(after_destroy.length(), 1)
+  assert_eq(after_destroy[0], e2.index)
+}
+
+///|
 test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes" {
   let world = World::new()
   let gpu = world.register_gpu_component(
@@ -366,6 +391,27 @@ test "Transform3D identity roundtrip bytes and World set/get" {
     world.drain_gpu_writes(world.global_transform_component()).length(),
     0,
   )
+}
+
+///|
+test "Transform3D writes position through zero-copy component view" {
+  let buf = transform3d_bytes_identity()
+  let n = buf.length()
+  let row = buf.mut_view(start=0, end=n)
+  @comp.Transform3D::write_position_to_component_mut_view(
+    row,
+    (2.0 : Float),
+    (3.0 : Float),
+    (4.0 : Float),
+  )
+  let t = @comp.Transform3D::from_component_mut_view(row)
+  assert_eq(t.position.x(), (2.0 : Float))
+  assert_eq(t.position.y(), (3.0 : Float))
+  assert_eq(t.position.z(), (4.0 : Float))
+  t.position.set((5.0 : Float), (6.0 : Float), (7.0 : Float))
+  assert_eq(t.position.x(), (5.0 : Float))
+  assert_eq(t.position.y(), (6.0 : Float))
+  assert_eq(t.position.z(), (7.0 : Float))
 }
 
 ///|
@@ -627,6 +673,151 @@ test "QueryRow view accesses payloads by component id" {
     Some(bytes) => assert_eq(bytes[0], (42 : Byte))
     None => abort("expected QueryRowB bytes")
   }
+}
+
+///|
+test "Query for_each_archetype exposes contiguous CPU columns" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryArchA", 4)
+  let qb = world.register_cpu_component("QueryArchB", 4)
+  let query = Query::new([qa, qb])
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(10, 11, 12, 13)))
+  assert_true(world.add_component_bytes(e1, qa, bytes4(5, 6, 7, 8)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(20, 21, 22, 23)))
+  let mut archetype_count = 0
+  let mut row_count = 0
+  let mut saw_qa = false
+  let mut saw_qb = false
+  let mut stride_qa = -1
+  query.for_each_archetype(world, chunk => {
+    archetype_count = archetype_count + 1
+    saw_qa = chunk.has(qa)
+    saw_qb = chunk.has(qb)
+    stride_qa = chunk.component_stride(qa)
+    let a = chunk.read_column(qa)
+    let b = chunk.write_column(qb)
+    for row = 0; row < chunk.length(); row = row + 1 {
+      let base = row * 4
+      b[base] = a[base]
+      row_count = row_count + 1
+    }
+  })
+  assert_eq(archetype_count, 1)
+  assert_eq(row_count, 2)
+  assert_true(saw_qa)
+  assert_true(saw_qb)
+  assert_eq(stride_qa, 4)
+  match world.component_bytes(e0, qb) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected QueryArchB bytes")
+  }
+  match world.component_bytes(e1, qb) {
+    Some(bytes) => assert_eq(bytes[0], (5 : Byte))
+    None => abort("expected QueryArchB bytes")
+  }
+}
+
+///|
+test "QueryArchetype column views expose logical rows after column capacity growth" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryArchCapacityA", 4)
+  let qb = world.register_cpu_component("QueryArchCapacityB", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(10, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qa, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(20, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qb, bytes4(30, 0, 0, 0)))
+  assert_true(world.destroy_entity(e1))
+  let query = Query::new([qa, qb])
+  let mut row_count = -1
+  let mut column_len = -1
+  query.for_each_archetype(world, chunk => {
+    row_count = chunk.length()
+    column_len = chunk.read_column(qa).length()
+  })
+  assert_eq(row_count, 2)
+  assert_eq(column_len, 8)
+}
+
+///|
+test "PreparedQuery rebuilds after structural changes create matching archetype" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryA", 4)
+  let qb = world.register_cpu_component("PreparedQueryB", 4)
+  let query = Query::new([qa, qb])
+  let prepared = query.prepare(world)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let mut row_count = 0
+  let mut first_a = (0 : Byte)
+  prepared.for_each_archetype(world, chunk => {
+    row_count = row_count + chunk.length()
+    first_a = chunk.read_column(qa)[0]
+  })
+  assert_eq(row_count, 1)
+  assert_eq(first_a, (1 : Byte))
+}
+
+///|
+test "World with_gpu_component_write_range marks one contiguous upload" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuBulkRange16",
+    @comp.GpuLayout::empty(16),
+  )
+  let ok = world.with_gpu_component_write_range(gpu16, 2, 3, range => {
+    if range.first_entity_index() != 2 {
+      abort("expected first entity index 2")
+    }
+    if range.count() != 3 {
+      abort("expected range count 3")
+    }
+    if range.stride() != 16 {
+      abort("expected stride 16")
+    }
+    let bytes = range.bytes()
+    bytes[0] = (11 : Byte)
+    bytes[16] = (22 : Byte)
+    bytes[32] = (33 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 2 * 16)
+  assert_eq(writes[0].bytes.length(), 3 * 16)
+  assert_eq(writes[0].bytes[0], (11 : Byte))
+  assert_eq(writes[0].bytes[16], (22 : Byte))
+  assert_eq(writes[0].bytes[32], (33 : Byte))
+}
+
+///|
+test "World drain_gpu_write_views returns borrowed contiguous upload" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuBulkView16",
+    @comp.GpuLayout::empty(16),
+  )
+  let ok = world.with_gpu_component_write_range(gpu16, 1, 2, range => {
+    let bytes = range.bytes()
+    bytes[0] = (44 : Byte)
+    bytes[16] = (55 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_write_views(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 16)
+  assert_eq(writes[0].bytes.length(), 32)
+  assert_eq(writes[0].bytes[0], (44 : Byte))
+  assert_eq(writes[0].bytes[16], (55 : Byte))
+  assert_eq(world.drain_gpu_write_views(gpu16).length(), 0)
 }
 
 ///|
@@ -1244,4 +1435,120 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
     Some(m) => assert_eq(m.at(0, 3), (7.0 : Float))
     None => abort("expected Matrix44F")
   }
+}
+
+///|
+test "write_global_transforms_dense writes one contiguous upload range" {
+  let world = World::new()
+  let writes = world.write_global_transforms_dense(2, fn(i, row) {
+    row[0] = ((10 + i) & 0xFF).to_byte()
+    row[63] = ((20 + i) & 0xFF).to_byte()
+  })
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(writes[0].bytes[0], (10 : Byte))
+  assert_eq(writes[0].bytes[63], (20 : Byte))
+  assert_eq(writes[0].bytes[64], (11 : Byte))
+  assert_eq(writes[0].bytes[127], (21 : Byte))
+  assert_eq(
+    world.drain_gpu_writes(world.global_transform_component()).length(),
+    0,
+  )
+}
+
+///|
+test "spawn_transform_global_batch creates builtin transform rows directly" {
+  let world = World::new()
+  let entities = world.spawn_transform_global_batch(2, fn(
+    i,
+    _e,
+    tf_row,
+    gt_row,
+  ) {
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row,
+      Float::from_double((i + 1).to_double()),
+      Float::from_double((i + 2).to_double()),
+      Float::from_double((i + 3).to_double()),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    )
+    @comp.global_transform_write_identity_row(gt_row)
+  })
+  assert_eq(entities.length(), 2)
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  assert_true(world.has_component(entities[0], tf))
+  assert_true(world.has_component(entities[0], gt))
+  match world.get_transform(entities[1]) {
+    Some(t) => {
+      assert_eq(t.position.x(), (2.0 : Float))
+      assert_eq(t.position.y(), (3.0 : Float))
+      assert_eq(t.position.z(), (4.0 : Float))
+    }
+    None => abort("expected Transform3D")
+  }
+  let writes = world.drain_gpu_write_views(gt)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[0:64], 0),
+    (1.0 : Float),
+  )
+  assert_eq(
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[64:128], 60),
+    (1.0 : Float),
+  )
+}
+
+///|
+test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices" {
+  let world = World::new()
+  let writes = world.write_global_transforms_dense_grid_wave(
+    2,
+    2,
+    0.0,
+    (0.5 : Float),
+    2.0,
+  )
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  let row0 = writes[0].bytes[0:64]
+  let row1 = writes[0].bytes[64:128]
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
+}
+
+///|
+#cfg(target="native")
+test "native write_global_transforms_dense_grid_wave_views writes dense scaled grid matrices" {
+  let world = World::new()
+  let writes = world.write_global_transforms_dense_grid_wave_views(
+    2,
+    2,
+    0.0,
+    (0.5 : Float),
+    2.0,
+  )
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  let row0 = writes[0].bytes[0:64]
+  let row1 = writes[0].bytes[64:128]
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
 }

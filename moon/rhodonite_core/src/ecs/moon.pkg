@@ -1,5 +1,9 @@
 import {
   "emadurandal/rhodonite_core/ecs/components" @comp,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
-  "emadurandal/rhodonite_core/math/matrix44ref" @m44ref,
+  "moonbitlang/core/math" @math,
 }
+
+options(
+  "native-stub": [ "rhodonite_ecs_native.c" ],
+)

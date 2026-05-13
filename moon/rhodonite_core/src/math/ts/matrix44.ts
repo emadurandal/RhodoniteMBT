@@ -178,7 +178,8 @@ export class Matrix44F {
 	}
 
 	eq(other: Matrix44F): boolean {
-		return m4f_eq(this.inner, other.inner) === 1;
+		const result = m4f_eq(this.inner, other.inner);
+		return result === true || result === 1;
 	}
 
 	toString(): string {

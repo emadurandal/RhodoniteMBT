@@ -51,6 +51,14 @@ pub(all) struct EntityLocation {
 
 type GpuComponentStore
 
+pub struct GpuComponentWriteRange {
+  // private fields
+}
+pub fn GpuComponentWriteRange::bytes(Self) -> MutArrayView[Byte]
+pub fn GpuComponentWriteRange::count(Self) -> Int
+pub fn GpuComponentWriteRange::first_entity_index(Self) -> Int
+pub fn GpuComponentWriteRange::stride(Self) -> Int
+
 pub(all) struct GpuResizeEvent {
   component : ComponentTypeId
   required_capacity : Int
@@ -62,12 +70,34 @@ pub(all) struct GpuWrite {
   bytes : FixedArray[Byte]
 }
 
+pub(all) struct GpuWriteView {
+  byte_offset : Int
+  bytes : ArrayView[Byte]
+}
+
+pub struct PreparedQuery {
+  // private fields
+}
+pub fn PreparedQuery::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
+
 pub struct Query {
   // private fields
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
+pub fn Query::prepare(Self, World) -> PreparedQuery
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
+
+pub struct QueryArchetype {
+  // private fields
+}
+pub fn QueryArchetype::component_stride(Self, ComponentTypeId) -> Int
+pub fn QueryArchetype::entity(Self, Int) -> EntityId
+pub fn QueryArchetype::has(Self, ComponentTypeId) -> Bool
+pub fn QueryArchetype::length(Self) -> Int
+pub fn QueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn QueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub struct QueryRow {
   // private fields
@@ -135,12 +165,14 @@ pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
+pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
 pub fn World::global_transform_component(Self) -> ComponentTypeId
+pub fn World::gpu_component_active_indices(Self, ComponentTypeId) -> Array[Int]
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
@@ -153,8 +185,15 @@ pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
+pub fn World::spawn_transform_global_batch(Self, Int, (Int, EntityId, MutArrayView[Byte], MutArrayView[Byte]) -> Unit) -> Array[EntityId]
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
+pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
+pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
+pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
+pub fn World::write_global_transforms_dense_grid_wave(Self, Int, Int, Double, Float, Double) -> Array[GpuWrite]
+pub fn World::write_global_transforms_dense_grid_wave_views(Self, Int, Int, Double, Float, Double) -> Array[GpuWriteView]
+pub fn World::write_global_transforms_dense_views(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)

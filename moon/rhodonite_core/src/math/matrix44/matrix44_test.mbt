@@ -322,4 +322,32 @@ test "Matrix44F ortho scales xy" {
   )
   assert_eq(m.at(0, 0), (1.0 : Float))
   assert_eq(m.at(1, 1), (1.0 : Float))
+  assert_eq(m.at(2, 2), (1.0 : Float) / ((0.1 : Float) - (10.0 : Float)))
+  assert_eq(m.at(0, 3), (0.0 : Float))
+  assert_eq(m.at(1, 3), (0.0 : Float))
+  assert_eq(m.at(2, 3), (0.1 : Float) / ((0.1 : Float) - (10.0 : Float)))
+  assert_eq(m.at(3, 0), (0.0 : Float))
+  assert_eq(m.at(3, 1), (0.0 : Float))
+  assert_eq(m.at(3, 2), (0.0 : Float))
+  assert_eq(m.at(3, 3), (1.0 : Float))
+}
+
+///|
+test "Matrix44F ortho asymmetric frustum keeps clip_w at 1 for xy" {
+  let m = Matrix44::ortho(
+    (-2.0 : Float),
+    (4.0 : Float),
+    (-1.0 : Float),
+    (5.0 : Float),
+    (0.1 : Float),
+    (10.0 : Float),
+  )
+  let v = @v4.Vector4::new(
+    (1.0 : Float),
+    (2.0 : Float),
+    (-0.1 : Float),
+    (1.0 : Float),
+  )
+  let c = m.mul_vec4(v)
+  assert_eq(c.w(), (1.0 : Float))
 }

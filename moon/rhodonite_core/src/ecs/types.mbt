@@ -62,10 +62,14 @@ pub(all) struct EntityLocation {
 
 ///|
 /// One SoA column: packed `stride`-byte rows for a single component type inside an archetype.
+///
+/// `row_capacity` is the backing-capacity watermark used by append helpers. It keeps column growth
+/// policy explicit without exposing storage details to query hot paths.
 priv struct ComponentColumn {
   component : ComponentTypeId
   stride : Int
   bytes : Array[Byte]
+  mut row_capacity : Int
 }
 
 ///|
@@ -81,9 +85,15 @@ struct Archetype {
 struct GpuComponentStore {
   component : ComponentTypeId
   stride : Int
-  bytes : Array[Byte]
+  mut bytes : FixedArray[Byte]
   dirty_flags : Array[Bool]
   dirty_indices : Array[Int]
+  dirty_range_first : Array[Int]
+  dirty_range_last : Array[Int]
+  sort_bucket : Array[Bool]
+  active_flags : Array[Bool]
+  active_indices : Array[Int]
+  active_positions : Array[Int]
 }
 
 ///|
@@ -91,6 +101,13 @@ struct GpuComponentStore {
 pub(all) struct GpuWrite {
   byte_offset : Int
   bytes : FixedArray[Byte]
+}
+
+///|
+/// Borrowed contiguous GPU upload slice. Callers should upload these views before mutating the same GPU component store again.
+pub(all) struct GpuWriteView {
+  byte_offset : Int
+  bytes : ArrayView[Byte]
 }
 
 ///|
@@ -108,14 +125,64 @@ pub struct Query {
 }
 
 ///|
+/// Cached archetype-column plan for repeated chunk iteration over the same query.
+pub struct PreparedQuery {
+  priv required : Array[ComponentTypeId]
+  priv archetype_version : Int
+  priv archetypes : Array[PreparedQueryArchetype]
+}
+
+///|
+priv struct QueryRowComponentAccess {
+  kind : ComponentKind
+  column_index : Int
+  stride : Int
+}
+
+///|
+/// Cached component lookup for one matched archetype chunk. This avoids repeated linear
+/// `column_index` scans inside `QueryArchetype::read_column` / `write_column` hot loops.
+priv struct QueryArchetypeComponentAccess {
+  component : ComponentTypeId
+  kind : ComponentKind
+  column_index : Int
+  stride : Int
+}
+
+///|
+priv struct PreparedQueryArchetype {
+  archetype_index : Int
+  accesses : Array[QueryArchetypeComponentAccess]
+}
+
+///|
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views used by the lower-level world query.
 pub struct QueryRow {
   priv world : World
   priv entity : EntityId
   priv components : Array[ComponentTypeId]
+  priv accesses : Array[QueryRowComponentAccess]
   priv archetype_index : Int
   priv row : Int
+}
+
+///|
+/// One archetype chunk yielded by [`Query::for_each_archetype`]. Use column views plus row
+/// strides for hot loops that should avoid constructing one [`QueryRow`] per entity.
+pub struct QueryArchetype {
+  priv world : World
+  priv accesses : Array[QueryArchetypeComponentAccess]
+  priv archetype_index : Int
+}
+
+///|
+/// Mutable contiguous GPU-visible component range borrowed through [`World`].
+pub struct GpuComponentWriteRange {
+  priv bytes : MutArrayView[Byte]
+  priv stride : Int
+  priv first_entity_index : Int
+  priv count : Int
 }
 
 ///|
@@ -184,6 +251,7 @@ pub struct World {
   priv free_indices : Array[Int]
   priv locations : Array[EntityLocation?]
   priv archetypes : Array[Archetype]
+  priv mut archetype_version : Int
   priv gpu_stores : Array[GpuComponentStore?]
   priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.

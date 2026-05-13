@@ -71,6 +71,11 @@ fn World::restore_system_access(
 }
 
 ///|
+fn World::bump_archetype_version(self : World) -> Unit {
+  self.archetype_version = self.archetype_version + 1
+}
+
+///|
 fn component_id_text(component : ComponentTypeId) -> String {
   "component id " + component.index.to_string()
 }
@@ -298,6 +303,7 @@ pub fn World::new() -> World {
   let archetypes : Array[Archetype] = [
     Archetype::new(empty_components, registry),
   ]
+  let archetype_version = 0
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
@@ -314,6 +320,7 @@ pub fn World::new() -> World {
     free_indices,
     locations,
     archetypes,
+    archetype_version,
     gpu_stores,
     resize_events,
     query_depth,
@@ -432,6 +439,7 @@ fn World::ensure_archetype(
   } else {
     let idx = self.archetypes.length()
     self.archetypes.push(Archetype::new(components, self.registry))
+    self.bump_archetype_version()
     idx
   }
 }
@@ -724,6 +732,7 @@ pub fn World::add_component(
               if !self.add_component_signature(entity, component, empty) {
                 false
               } else {
+                store.activate_slot(entity.index)
                 store.clear_slot(entity.index)
                 self.replace_gpu_store(store)
                 true
@@ -767,6 +776,7 @@ pub fn World::add_component_bytes(
               if !self.add_component_signature(entity, component, empty) {
                 false
               } else {
+                store.activate_slot(entity.index)
                 if bytes.length() == 0 {
                   store.clear_slot(entity.index)
                 } else {
@@ -831,6 +841,7 @@ pub fn World::remove_component(
   match gpu_store_to_clear {
     Some(store) => {
       store.clear_slot(entity.index)
+      store.deactivate_slot(entity.index)
       self.replace_gpu_store(store)
     }
     None => ()
@@ -877,7 +888,7 @@ pub fn World::component_bytes(
                 return None
               }
               Some(
-                copy_array_range_to_fixed(
+                copy_fixed_range_to_fixed(
                   store.bytes,
                   entity.index * store.stride,
                   store.stride,
@@ -889,50 +900,6 @@ pub fn World::component_bytes(
       }
     None => None
   }
-}
-
-///|
-/// Internal row iterator used by [`Query`]. This intentionally performs no system access check;
-/// [`QueryRow::read_view`] and [`QueryRow::write_view`] enforce access and build row views lazily
-/// at the point where the callback asks for a read-only or mutable view.
-fn World::for_each_query_rows(
-  self : World,
-  required : Array[ComponentTypeId],
-  f : (EntityId, Int, Int) -> Unit,
-) -> Unit {
-  if required.length() == 0 {
-    return
-  }
-  if component_array_has_duplicates(required) {
-    abort(
-      "Query::for_each: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
-    )
-  }
-  for k = 0; k < required.length(); k = k + 1 {
-    match self.registry.get(required[k]) {
-      Some(_) => ()
-      None =>
-        abort(
-          "Query::for_each: unknown " +
-          component_id_text(required[k]) +
-          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-        )
-    }
-  }
-  // Nested query depth lets structural APIs detect and reject invalid mutation during iteration.
-  self.query_depth = self.query_depth + 1
-  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-    let sig = self.archetypes[ai].components
-    if component_array_contains_all(sig, required) {
-      let arch = self.archetypes[ai]
-      let ents = arch.entities
-      for j = 0; j < ents.length(); j = j + 1 {
-        f(ents[j], ai, j)
-      }
-    }
-  }
-  // Restore the outer mutation state after the query finishes.
-  self.query_depth = self.query_depth - 1
 }
 
 ///|

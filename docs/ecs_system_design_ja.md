@@ -12,7 +12,7 @@
 - `Schedule` が phase 順、同一 phase 内は登録順で System を実行する。
 - System は `reads` / `writes` / `structural_write` を宣言する。
 - System 内の query callback 中に直接構造変更せず、必要な変更は `CommandBuffer` に積む。
-- GPU-visible component を直接書いた場合は、明示的に dirty を記録する。
+- GPU-visible component を直接書いた場合は、`QueryRow::write_view` / `set_component_bytes` / builtin bulk path が dirty を記録する。bulk path では連続 dirty range を直接記録できる。
 
 ## 主要な型
 
@@ -68,6 +68,8 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `QueryRow::write_view` | `writes` |
 | `set_component_bytes` / `clear_gpu_component` | `writes` |
 | `drain_gpu_writes` | `writes` |
+| `drain_gpu_write_views` | `writes` |
+| `gpu_component_active_indices` | `reads` または `writes` |
 | `drain_resize_events` | `structural_write` |
 | `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
 | `create_entity` / `destroy_entity` | `structural_write` |
@@ -76,9 +78,9 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 
 component 所有の追加は `add_component` または `add_component_bytes` を使います。どちらも registry kind に応じて CPU-only / GPU-visible の両方を扱います。`add_component` は CPU component なら zero bytes で SoA row を初期化し、GPU-visible component なら ownership marker を追加して GPU slot を zero clear します。`add_component_bytes` は CPU component なら SoA row、GPU-visible component なら flat GPU row を指定 bytes で初期化します。`remove_component` と各 add API は archetype 移動を起こすため、component `writes` だけでなく `structural_write` も要求します。`GpuVisible` component を `remove_component` で外す場合は、所有解除と同時に対象 entity の flat GPU slot を zero clear し、その row を dirty にします。
 
-GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。`remove_component` 後は ownership が消えるため `component_bytes` は `None` になり、GPU 側には zero clear された dirty row が残ります。
+GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。`add_component*` は同時に packed active index set へ entity index を追加し、`remove_component` / `destroy_entity` は zero clear 後に active set から外します。`World::gpu_component_active_indices` はこの packed set のコピーを返す read API です。`remove_component` 後は ownership が消えるため `component_bytes` は `None` になり、GPU 側には zero clear された dirty row が残ります。
 
-GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。JS / 非 JS とも capacity は幾何級数的に伸び、JS は `Uint8Array`、非 JS は MoonBit の byte array を使います。
 
 `drain_resize_events` は World が所有する resize event queue を消費します。Schedule 実行中に呼ぶ場合は、event queue に対する構造的 access として `structural_write` が必要です。Schedule 外では従来通り呼べます。
 
@@ -143,6 +145,8 @@ query.for_each(world, fn(row) {
 
 `QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
+CPU-only の bulk loop では `Query::for_each_archetype` を使えます。マッチした archetype ごとに required component の column index / stride を cache するため、`QueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
+
 ## GPU-visible component の dirty 管理
 
 System が `QueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `read_view` を使うことで余分な dirty を避けられます。
@@ -159,6 +163,10 @@ query.for_each(world, fn(row) {
 
 `Schedule` が `writes` を見て自動 dirty 化する設計は採っていません。`writes` は「書く可能性がある」宣言であり、実際にどの entity が変わったかまでは表さないためです。
 
+builtin transform propagation のように連続 entity index をまとめて更新できる bulk path は、個別 dirty index ではなく dirty range を積めます。`drain_gpu_writes` は dirty range と個別 dirty index を統合し、重複 upload を避けながら owned bytes の `GpuWrite` を返します。即時 upload では `drain_gpu_write_views` が同じ dirty queue を消費し、JS / native とも `GpuComponentStore` の backing を `ArrayView[Byte]` として借用します。
+
+即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` の subarray をそのまま渡せます。native でも同 helper が `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡すため、view を新しい `Bytes` に compact しません。借用 view は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
+
 ## Builtin Transform System
 
 `World::update_global_transforms_from_transforms` は低レベル API として残っています。System として使う場合は `transform_propagation_system(world)` factory を使います。
@@ -170,6 +178,12 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 ```
 
 この System は `Transform3D` と `ChildOf` を読み、`GlobalTransform` を書きます。`GlobalTransform` は GPU-visible component なので、内部で dirty 記録も行います。
+
+`World::update_transform3d_positions` は `Transform3D.position` 専用の bulk API です。JS では `Query::for_each_archetype` による公開 column path、非 JS では direct archetype sweep を使い、entity ごとの `QueryRow` 構築を避けます。
+
+大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
+
+`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。native の grid wave helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。
 
 ## Conflict 検査
 
@@ -203,9 +217,11 @@ pub struct App {
 ## まだ残る課題
 
 - typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
-- read/write/structural access に基づく実際の System batch 分割と並列実行。
+- 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
-- query plan cache、archetype index cache、required component column index cache。
+- query plan cache、archetype index cache。`Query::for_each_archetype` の per-archetype column cache は導入済み。
+- native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を直接 lower-level queue binding に渡すため、任意の borrowed byte view upload でも `Bytes::from_array` の compact copy は発生しません。
+- `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 
 ## 避ける方針
 

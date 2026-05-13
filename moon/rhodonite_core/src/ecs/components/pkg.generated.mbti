@@ -19,6 +19,8 @@ pub fn get_gpu_f32_mut_view(MutArrayView[Byte], Int) -> Float
 
 pub fn global_transform_gpu_layout() -> GpuLayout
 
+pub fn global_transform_write_identity_row(MutArrayView[Byte]) -> Unit
+
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
 pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
@@ -87,8 +89,11 @@ pub(all) struct Transform3D {
 }
 pub fn Transform3D::from_component_mut_view(MutArrayView[Byte]) -> Self
 pub fn Transform3D::local_matrix_from_component_view(ArrayView[Byte]) -> @matrix44.Matrix44[Float]
+pub fn Transform3D::set_position(Self, Float, Float, Float) -> Unit
 pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
 pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix44[Float]
+pub fn Transform3D::write_position_to_component_mut_view(MutArrayView[Byte], Float, Float, Float) -> Unit
+pub fn Transform3D::write_trs_to_component_mut_view(MutArrayView[Byte], Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Unit
 
 // Type aliases
 

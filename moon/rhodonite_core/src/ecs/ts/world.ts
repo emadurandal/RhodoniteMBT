@@ -1,0 +1,321 @@
+import type {
+	MoonGpuWriteCopy,
+	MoonGpuWriteView,
+	MoonWorld,
+} from "@moon/rhodonite_core/ecs/js_bridge";
+import {
+	bytes_get_f32,
+	bytes_put_f32,
+	gpu_write_copy_byte_offset,
+	gpu_write_copy_bytes,
+	gpu_write_view_byte_offset,
+	gpu_write_view_bytes,
+	world_add_component,
+	world_add_component_bytes,
+	world_child_of_component,
+	world_clear_gpu_component,
+	world_component_bytes_copy,
+	world_component_cpu_stride,
+	world_component_gpu_layout,
+	world_component_info,
+	world_create_entity,
+	world_destroy_entity,
+	world_drain_gpu_write_views,
+	world_drain_gpu_writes_copy,
+	world_drain_resize_events,
+	world_global_transform_component,
+	world_gpu_component_active_indices,
+	world_has_component,
+	world_is_alive,
+	world_location,
+	world_new,
+	world_register_cpu_component,
+	world_register_gpu_component,
+	world_remove_component,
+	world_set_component_bytes,
+	world_set_transform_trs,
+	world_spawn_transform_global_batch_identity,
+	world_transform_component,
+	world_update_global_transforms_from_transforms,
+	world_write_global_transforms_dense_grid_wave_copy,
+	world_write_global_transforms_dense_grid_wave_views,
+} from "@moon/rhodonite_core/ecs/js_bridge";
+import {
+	ComponentTypeId,
+	EntityId,
+	type EntityLocation,
+	GpuLayout,
+	GpuResizeEvent,
+	RegisteredComponent,
+} from "./types.ts";
+import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
+
+export class GpuWriteView {
+	readonly inner: MoonGpuWriteView;
+
+	constructor(inner: MoonGpuWriteView) {
+		this.inner = inner;
+	}
+
+	byteOffset(): number {
+		return gpu_write_view_byte_offset(this.inner);
+	}
+
+	bytes(): ByteView {
+		return byteView(gpu_write_view_bytes(this.inner));
+	}
+}
+
+export class GpuWriteCopy {
+	readonly inner: MoonGpuWriteCopy;
+
+	constructor(inner: MoonGpuWriteCopy) {
+		this.inner = inner;
+	}
+
+	byteOffset(): number {
+		return gpu_write_copy_byte_offset(this.inner);
+	}
+
+	bytes(): Uint8Array {
+		const bytes = gpu_write_copy_bytes(this.inner);
+		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
+	}
+}
+
+export class World {
+	readonly inner: MoonWorld;
+
+	constructor(inner: MoonWorld) {
+		this.inner = inner;
+	}
+
+	static new(): World {
+		return new World(world_new());
+	}
+
+	createEntity(): EntityId {
+		return new EntityId(world_create_entity(this.inner));
+	}
+
+	destroyEntity(entity: EntityId): boolean {
+		return moonBool(world_destroy_entity(this.inner, entity.inner));
+	}
+
+	isAlive(entity: EntityId): boolean {
+		return moonBool(world_is_alive(this.inner, entity.inner));
+	}
+
+	transformComponent(): ComponentTypeId {
+		return new ComponentTypeId(world_transform_component(this.inner));
+	}
+
+	globalTransformComponent(): ComponentTypeId {
+		return new ComponentTypeId(world_global_transform_component(this.inner));
+	}
+
+	childOfComponent(): ComponentTypeId {
+		return new ComponentTypeId(world_child_of_component(this.inner));
+	}
+
+	location(entity: EntityId): EntityLocation | null {
+		const location = world_location(this.inner, entity.inner);
+		return location === undefined || location === null
+			? null
+			: { archetypeIndex: location.archetype_index, row: location.row };
+	}
+
+	registerCpuComponent(name: string, cpuStride: number): ComponentTypeId {
+		return new ComponentTypeId(
+			world_register_cpu_component(this.inner, name, cpuStride),
+		);
+	}
+
+	registerGpuComponent(name: string, gpuLayout: GpuLayout): ComponentTypeId {
+		return new ComponentTypeId(
+			world_register_gpu_component(this.inner, name, gpuLayout.inner),
+		);
+	}
+
+	componentCpuStride(component: ComponentTypeId): number | null {
+		return world_component_cpu_stride(this.inner, component.inner) ?? null;
+	}
+
+	componentGpuLayout(component: ComponentTypeId): GpuLayout | null {
+		const layout = world_component_gpu_layout(this.inner, component.inner);
+		return layout === undefined || layout === null ? null : new GpuLayout(layout);
+	}
+
+	componentInfo(component: ComponentTypeId): RegisteredComponent | null {
+		const info = world_component_info(this.inner, component.inner);
+		return info === undefined || info === null ? null : new RegisteredComponent(info);
+	}
+
+	hasComponent(entity: EntityId, component: ComponentTypeId): boolean {
+		return moonBool(world_has_component(this.inner, entity.inner, component.inner));
+	}
+
+	addComponent(entity: EntityId, component: ComponentTypeId): boolean {
+		return moonBool(world_add_component(this.inner, entity.inner, component.inner));
+	}
+
+	addComponentBytes(
+		entity: EntityId,
+		component: ComponentTypeId,
+		bytes: Uint8Array | ArrayLike<number>,
+	): boolean {
+		return moonBool(
+			world_add_component_bytes(
+				this.inner,
+				entity.inner,
+				component.inner,
+				bytesInput(bytes),
+			),
+		);
+	}
+
+	setComponentBytes(
+		entity: EntityId,
+		component: ComponentTypeId,
+		bytes: Uint8Array | ArrayLike<number>,
+	): boolean {
+		return moonBool(
+			world_set_component_bytes(
+				this.inner,
+				entity.inner,
+				component.inner,
+				bytesInput(bytes),
+			),
+		);
+	}
+
+	removeComponent(entity: EntityId, component: ComponentTypeId): boolean {
+		return moonBool(world_remove_component(this.inner, entity.inner, component.inner));
+	}
+
+	clearGpuComponent(entity: EntityId, component: ComponentTypeId): boolean {
+		return moonBool(
+			world_clear_gpu_component(this.inner, entity.inner, component.inner),
+		);
+	}
+
+	componentBytesCopy(
+		entity: EntityId,
+		component: ComponentTypeId,
+	): Uint8Array | null {
+		const bytes = world_component_bytes_copy(this.inner, entity.inner, component.inner);
+		if (bytes === undefined || bytes === null) {
+			return null;
+		}
+		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
+	}
+
+	drainGpuWriteViews(component: ComponentTypeId): GpuWriteView[] {
+		return world_drain_gpu_write_views(this.inner, component.inner).map(
+			(write) => new GpuWriteView(write),
+		);
+	}
+
+	drainGpuWritesCopy(component: ComponentTypeId): GpuWriteCopy[] {
+		return world_drain_gpu_writes_copy(this.inner, component.inner).map(
+			(write) => new GpuWriteCopy(write),
+		);
+	}
+
+	drainResizeEvents(): GpuResizeEvent[] {
+		return world_drain_resize_events(this.inner).map(
+			(event) => new GpuResizeEvent(event),
+		);
+	}
+
+	gpuComponentActiveIndices(component: ComponentTypeId): number[] {
+		return world_gpu_component_active_indices(this.inner, component.inner);
+	}
+
+	setTransformTrs(
+		entity: EntityId,
+		px: number,
+		py: number,
+		pz: number,
+		qx: number,
+		qy: number,
+		qz: number,
+		qw: number,
+		sx: number,
+		sy: number,
+		sz: number,
+	): boolean {
+		return moonBool(
+			world_set_transform_trs(
+				this.inner,
+				entity.inner,
+				px,
+				py,
+				pz,
+				qx,
+				qy,
+				qz,
+				qw,
+				sx,
+				sy,
+				sz,
+			),
+		);
+	}
+
+	updateGlobalTransformsFromTransforms(): void {
+		world_update_global_transforms_from_transforms(this.inner);
+	}
+
+	writeGlobalTransformsDenseGridWaveViews(
+		count: number,
+		perSide: number,
+		time: number,
+		scale: number,
+		spacing: number,
+	): GpuWriteView[] {
+		return world_write_global_transforms_dense_grid_wave_views(
+			this.inner,
+			count,
+			perSide,
+			time,
+			scale,
+			spacing,
+		).map((write) => new GpuWriteView(write));
+	}
+
+	writeGlobalTransformsDenseGridWaveCopy(
+		count: number,
+		perSide: number,
+		time: number,
+		scale: number,
+		spacing: number,
+	): GpuWriteCopy[] {
+		return world_write_global_transforms_dense_grid_wave_copy(
+			this.inner,
+			count,
+			perSide,
+			time,
+			scale,
+			spacing,
+		).map((write) => new GpuWriteCopy(write));
+	}
+
+	spawnTransformGlobalBatchIdentity(count: number): EntityId[] {
+		return world_spawn_transform_global_batch_identity(this.inner, count).map(
+			(entity) => new EntityId(entity),
+		);
+	}
+}
+
+export function getF32(bytes: Uint8Array | number[], offset: number): number {
+	return bytes_get_f32(bytes, offset);
+}
+
+export function putF32(
+	bytes: Uint8Array | number[],
+	offset: number,
+	value: number,
+): void {
+	bytes_put_f32(bytes, offset, value);
+}

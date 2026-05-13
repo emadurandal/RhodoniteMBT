@@ -19,6 +19,8 @@
 | `EntityLocation` | 生存エンティティが「どのアーキタイプの何行目」にいるか。 |
 | `ComponentKind` | `CpuOnly`（SoA 列に実データ） / `GpuVisible`（シグネチャのみ SoA、実体はフラット `GpuComponentStore`）。 |
 | `RegisteredComponent` | 名前、`kind`、`cpu_stride`、任意の `gpu_layout`。 |
+| `GpuWrite` | 所有型の GPU upload slice（`byte_offset` + `FixedArray[Byte]`）。所有 payload が必要な API 向け。 |
+| `GpuWriteView` | 借用型の GPU upload slice（`byte_offset` + `ArrayView[Byte]`）。即時 upload する zero-copy 寄りの経路向け。 |
 
 ---
 
@@ -48,8 +50,8 @@ flowchart TB
 
 - **`generations` / `alive` / `free_indices`**: スロットの再利用と世代管理。
 - **`locations`**: `EntityId.index` → `EntityLocation?`（アーキタイプ索引と行）。
-- **`archetypes`**: シグネチャごとの SoA テーブル（CPU コンポーネントの実体）。
-- **`gpu_stores`**: `ComponentTypeId.index` に並ぶ `GpuComponentStore?`（GPU 可視のみ `Some`）。
+- **`archetypes`**: シグネチャごとの SoA テーブル（CPU コンポーネントの実体）。各列は論理行数とは別に `row_capacity` を持ち、append 時に backing を余裕を持って伸ばしても query の列 view には未使用領域を見せません。
+- **`gpu_stores`**: `ComponentTypeId.index` に並ぶ `GpuComponentStore?`（GPU 可視のみ `Some`）。flat payload bytes、行単位 dirty flag、bulk path 用 dirty range、所有中 row の packed active index set を持ちます。
 - **`resize_events`**: フラットストア拡張時にバッファ再作成が必要な通知のキュー。
 
 ---
@@ -59,6 +61,7 @@ flowchart TB
 - 各アーキタイプは **昇順ソートされた `ComponentTypeId` のリスト**をシグネチャとして持ち、同一シグネチャのエンティティが同じテーブルに並びます。
 - 新規 `World` では **アーキタイプ 0 が空シグネチャ**で、生成直後のエンティティはそこに入ります（[`world.mbt` の `World::new`](../moon/rhodonite_core/src/ecs/world.mbt)）。
 - 各 CPU コンポーネント列は `stride` バイト幅の `bytes` 配列で、行 `row` のオフセットは `row * stride` です。
+- 列の backing capacity は生存行数より大きい場合があります。公開 API の `QueryArchetype::read_column` / `write_column` は `entities.length() * stride` 分の論理バイトだけを返します。
 
 ```mermaid
 flowchart LR
@@ -93,6 +96,7 @@ flowchart TB
 
 - **CpuOnly**: アーキタイプの SoA 列にバイト列が載る。エンティティがアーキタイプ間を移動すると行インデックスは変わるが、列内のデータは `copy_row_to` で引き継がれる。
 - **GpuVisible**: アーキタイプには **型 ID がシグネチャに含まれるだけ**（`cpu_stride == 0`）。実データは常に **`entity.index * stride` 起点のフラット配列**。アーキタイプ行が動いても **GPU スロットは `index` で固定**される。
+- GPU-visible の ownership は packed active index set にも反映されます（`World::gpu_component_active_indices`）。`add_component*` で active 化し、`remove_component` / `destroy_entity` では zero clear して dirty にしたうえで active set から外します。
 
 ---
 
@@ -117,6 +121,43 @@ sequenceDiagram
   W->>GPU: clear_gpu_slots index
   W->>W: bump generation push free_indices
 ```
+
+### ビルトイン Transform の bulk spawn
+
+`Transform3D` + `GlobalTransform` のビルトイン組を大量生成する場合は `World::spawn_transform_global_batch(count, write)` を使えます。
+
+この API は、通常の
+
+1. 空アーキタイプに spawn、
+2. `Transform3D` 追加で migration、
+3. `GlobalTransform` ownership 追加でもう一度 migration、
+
+という流れを避け、最初から `[Transform3D, GlobalTransform]` アーキタイプへ直接行を追加します。
+
+callback には direct row view が渡されます。
+
+```moonbit
+let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, gt_row) {
+  @comp.Transform3D::write_trs_to_component_mut_view(
+    tf_row,
+    px,
+    py,
+    pz,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    sx,
+    sy,
+    sz,
+  )
+  @comp.global_transform_write_identity_row(gt_row)
+  ignore(i)
+  ignore(entity)
+})
+```
+
+callback は両方の row を完全に初期化する必要があります。そのために `Transform3D::write_trs_to_component_mut_view` と `global_transform_write_identity_row` があり、中間の `FixedArray[Byte]` 確保を避けます。
 
 ---
 
@@ -164,6 +205,8 @@ callback には `QueryRow` が渡り、payload 配列の添字ではなく compo
 - `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 - イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
+CPU-only のホットループでは `Query::for_each_archetype` を優先してください。マッチしたアーキタイプごとに、要求 component の kind、列 index、stride を小さな access cache として一度だけ作るため、`QueryArchetype::component_stride`、`read_column`、`write_column` は毎回 `column_index` を線形探索しません。GPU-visible component は `EntityId.index` ベースの flat storage にあるため、archetype column としては読めません。
+
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
@@ -171,6 +214,20 @@ query.for_each(world, fn(row) {
   let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
+})
+```
+
+```moonbit
+let query = Query::new([tf])
+query.for_each_archetype(world, fn(chunk) {
+  let stride = chunk.component_stride(tf)
+  let tf_column = chunk.write_column(tf)
+  for row = 0; row < chunk.length(); row = row + 1 {
+    let e = chunk.entity(row)
+    let base = row * stride
+    // tf_column[base .. base + stride] を更新
+    ignore(e)
+  }
 })
 ```
 
@@ -233,12 +290,61 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 ## GPU アップロードとリサイズ
 
-- **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージして `GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
+- **`drain_gpu_writes(component)`**: 当該コンポーネントのストアで dirty になった **エンティティインデックス**をソートし、連続区間をマージします。bulk path が記録した dirty range も同時に消費し、`GpuWrite`（`byte_offset` + `bytes`）の配列にします。WebGPU 側では `write_buffer_from_fixed_array` 等にそのまま渡せます。
+- **`drain_gpu_write_views(component)`**: dirty の消費ルールは同じですが、借用型の `GpuWriteView`（`byte_offset` + `ArrayView[Byte]`）を返します。同じ GPU component store を次に変更する前に即時 upload する用途向けで、ECS drain 時の `FixedArray[Byte]` payload copy を避けます。
+- **`gpu_component_active_indices(component)`**: GPU-visible component を所有している `EntityId.index` の packed set をコピーして返します。renderer 側の抽出や、全スロット走査を避ける packed update path の入口として使えます。
 - **`drain_resize_events`**: バッキング配列が伸びた際の通知。呼び出し側で **GPU バッファを再作成**し、必要なら **フルアップロード**する想定です。`Schedule::run` 中は World 所有の event queue を消費する操作として `structural_write` が必要です。Schedule 外では直接呼べます。
 
-`add_component`、`add_component_bytes`、`component_bytes`、`set_component_bytes` は CPU-only / GPU-visible component の両方を扱います。CPU-only payload は archetype SoA row、GPU-visible payload は `EntityId.index` ベースの flat GPU row に置かれます。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。
+`add_component`、`add_component_bytes`、`component_bytes`、`set_component_bytes` は CPU-only / GPU-visible component の両方を扱います。CPU-only payload は archetype SoA row、GPU-visible payload は `EntityId.index` ベースの flat GPU row に置かれます。GPU store の capacity 拡張と `GpuResizeEvent` 生成は `World` 内部の共通経路を通ります。JS / 非 JS とも GPU store は幾何級数的に伸び、upload span は即時 zero-copy upload 用の借用 `ArrayView[Byte]` として露出できます。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) で `update_global_transforms_from_transforms` の後に `drain_gpu_writes(global_transform)` し、`queue.write_buffer_from_fixed_array` しています。
+WebGPU upload 側には次の API があります。
+
+- `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
+- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
+
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、JS / native とも `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` の結果を `queue.write_buffer_from_array_view` で upload します。
+ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo は同じデータ path を TypeScript ECS wrapper から使い、borrowed write view をブラウザの WebGPU API で直接 submit します。
+
+Dense GlobalTransform helper には所有型と view 型の両方があります。
+
+- `write_global_transforms_dense(...) -> Array[GpuWrite]`
+- `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
+- `write_global_transforms_dense_grid_wave(...) -> Array[GpuWrite]`
+- `write_global_transforms_dense_grid_wave_views(...) -> Array[GpuWriteView]`
+
+---
+
+## TypeScript ラッパー
+
+JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` の surface を対象にし、entity lifecycle、component 登録、builtin component id、row/chunk query view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
+
+wrapper では ECS の zero-copy 方針を明示しています。
+
+- `QueryRow::read_view` / `write_view`、`QueryArchetype::read_column` / `write_column`、`GpuWriteView.bytes` は `ByteView` として公開します。
+- `ByteView` は MoonBit の `{ buf, start, end }` view を保持し、元の backing storage に直接 read/write します。
+- `ByteView.asUint8Array()` は backing storage が typed array の場合だけ `Uint8Array.subarray(...)` を返します。GPU store upload path は通常この経路です。
+- CPU SoA column は JS number array が backing になる場合があります。この場合も `ByteView.get`、`set`、`getF32`、`setF32` は zero-copy ですが、`Uint8Array` 化には明示名の `toUint8ArrayCopy()` が必要です。
+- コピーを伴う API は `componentBytesCopy`、`drainGpuWritesCopy` のように名前で示します。即時 WebGPU upload には `drainGpuWriteViews` を優先してください。
+
+```ts
+import { GpuLayout, Query, World } from "./moon/rhodonite_core/src/ecs/ts/index.ts";
+
+const world = World.new();
+const material = world.registerGpuComponent("Material", GpuLayout.empty(16));
+const entity = world.createEntity();
+world.addComponent(entity, material);
+
+Query.new([material]).forEach(world, (row) => {
+  const bytes = row.writeView(material);
+  bytes.setF32(0, 1.0);
+});
+
+for (const write of world.drainGpuWriteViews(material)) {
+  const bytes = write.bytes().asUint8Array();
+  if (bytes === null) throw new Error("GPU write view must be typed");
+  // queue.writeBuffer(buffer, write.byteOffset(), bytes);
+}
+```
 
 ---
 
@@ -264,7 +370,8 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`QueryRow::write_view` 経由で `GlobalTransform` に書くため、GPU 行は dirty になります。
+- **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では公開 archetype column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。fast path は `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。fallback の `QueryRow::write_view` 経由では従来通り個別 row が dirty になります。
 
 ---
 
@@ -309,13 +416,26 @@ query.for_each(world, fn(row) {
 let gt = world.global_transform_component()
 let writes = world.drain_gpu_writes(gt)
 // queue.write_buffer_from_fixed_array(buffer, w.byte_offset, w.bytes)
+
+// 即時 upload 用の借用 view path
+let views = world.drain_gpu_write_views(gt)
+// queue.write_buffer_from_array_view(buffer, v.byte_offset, v.bytes)
 ```
 
 ---
 
 ## テストと実装へのリンク
 
-挙動の固定には [`moon/rhodonite_core/src/ecs/ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) が参照になります（アーキタイプ移行、世代再利用、`drain_gpu_writes` の連続マージ、std140 パディングなど）。
+挙動の固定には [`moon/rhodonite_core/src/ecs/ecs_test.mbt`](../moon/rhodonite_core/src/ecs/ecs_test.mbt) が参照になります（アーキタイプ移行、世代再利用、capacity growth 後の論理 column 長、GPU active index の packed set、`drain_gpu_writes` / `drain_gpu_write_views` の連続マージ、bulk transform spawn、std140 パディングなど）。
+
+ECS microbench は [`moon/rhodonite_core/src/ecs_bench/`](../moon/rhodonite_core/src/ecs_bench/) にあります。リポジトリ root から次を実行できます。
+
+```bash
+pnpm run bench:ecs        # JS target
+pnpm run bench:ecs:js
+pnpm run bench:ecs:native
+pnpm run bench:ecs:wasm   # wasm-gc は build のみ
+```
 
 コア実装ファイル:
 

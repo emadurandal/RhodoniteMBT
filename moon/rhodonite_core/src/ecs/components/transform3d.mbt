@@ -25,17 +25,14 @@ pub fn transform3d_gpu_layout() -> GpuLayout {
 
 ///|
 fn transform3d_from_row_mut(row : MutArrayView[Byte]) -> Transform3D {
-  let layout = transform3d_gpu_layout()
-  if row.length() != layout.stride {
+  // Hot path: fixed offsets (must match transform3d_gpu_layout).
+  let stride = 48
+  if row.length() != stride {
     abort("Transform3D: row length mismatch")
   }
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
-  }
-  let pos = row.mut_view(start=f[0].offset, end=f[0].offset + f[0].size)
-  let rot = row.mut_view(start=f[1].offset, end=f[1].offset + f[1].size)
-  let scl = row.mut_view(start=f[2].offset, end=f[2].offset + f[2].size)
+  let pos = row.mut_view(start=0, end=12)
+  let rot = row.mut_view(start=12, end=28)
+  let scl = row.mut_view(start=28, end=40)
   {
     position: @v3.Vector3Ref::from_mut_view(pos),
     rotation: @v4.Vector4Ref::from_mut_view(rot),
@@ -107,28 +104,153 @@ pub fn Transform3D::from_component_mut_view(
 }
 
 ///|
+/// Updates the borrowed position vector in one write while preserving zero-copy storage aliasing.
+pub fn Transform3D::set_position(
+  self : Transform3D,
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  self.position.set(x, y, z)
+}
+
+///|
+/// Updates only the position field of a Transform3D component row without constructing
+/// `Transform3D` / `Vector3Ref` wrappers. `row` still aliases the original ECS storage.
+pub fn Transform3D::write_position_to_component_mut_view(
+  row : MutArrayView[Byte],
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  if row.length() != 48 {
+    abort(
+      "Transform3D::write_position_to_component_mut_view: row length mismatch",
+    )
+  }
+  @v3.Vector3Ref::write_mut_view(row.mut_view(start=0, end=12), x, y, z)
+}
+
+///|
+/// Writes a complete Transform3D row directly without allocating an intermediate FixedArray.
+pub fn Transform3D::write_trs_to_component_mut_view(
+  row : MutArrayView[Byte],
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> Unit {
+  if row.length() != 48 {
+    abort("Transform3D::write_trs_to_component_mut_view: row length mismatch")
+  }
+  put_gpu_f32_mut_view(row, 0, px.to_double())
+  put_gpu_f32_mut_view(row, 4, py.to_double())
+  put_gpu_f32_mut_view(row, 8, pz.to_double())
+  put_gpu_f32_mut_view(row, 12, qx)
+  put_gpu_f32_mut_view(row, 16, qy)
+  put_gpu_f32_mut_view(row, 20, qz)
+  put_gpu_f32_mut_view(row, 24, qw)
+  put_gpu_f32_mut_view(row, 28, sx.to_double())
+  put_gpu_f32_mut_view(row, 32, sy.to_double())
+  put_gpu_f32_mut_view(row, 36, sz.to_double())
+  put_gpu_f32_mut_view(row, 40, 0.0)
+  put_gpu_f32_mut_view(row, 44, 0.0)
+}
+
+///|
 /// Decodes a read-only component row and returns its local model matrix.
+#cfg(target="js")
+extern "js" fn transform3d_local_matrix_data_from_component_view_js(
+  row : ArrayView[Byte],
+) -> FixedArray[Float] =
+  #| (row) => {
+  #|   const bytes = row.buf;
+  #|   const base = row.start;
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = {
+  #|       u32: new Uint32Array(1),
+  #|       f32: null,
+  #|     });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   const f32 = (off) => {
+  #|     const i = base + off;
+  #|     const bits =
+  #|       (bytes[i] & 0xff) |
+  #|       ((bytes[i + 1] & 0xff) << 8) |
+  #|       ((bytes[i + 2] & 0xff) << 16) |
+  #|       ((bytes[i + 3] & 0xff) << 24);
+  #|     scratch.u32[0] = bits >>> 0;
+  #|     return scratch.f32[0];
+  #|   };
+  #|   const px = f32(0), py = f32(4), pz = f32(8);
+  #|   const qx = f32(12), qy = f32(16), qz = f32(20), qw = f32(24);
+  #|   const sx = f32(28), sy = f32(32), sz = f32(36);
+  #|   const xx = Math.fround(qx * qx);
+  #|   const yy = Math.fround(qy * qy);
+  #|   const zz = Math.fround(qz * qz);
+  #|   const xy = Math.fround(qx * qy);
+  #|   const xz = Math.fround(qx * qz);
+  #|   const yz = Math.fround(qy * qz);
+  #|   const wx = Math.fround(qw * qx);
+  #|   const wy = Math.fround(qw * qy);
+  #|   const wz = Math.fround(qw * qz);
+  #|   const r00 = Math.fround(1 - Math.fround(2 * Math.fround(yy + zz)));
+  #|   const r01 = Math.fround(2 * Math.fround(xy - wz));
+  #|   const r02 = Math.fround(2 * Math.fround(xz + wy));
+  #|   const r10 = Math.fround(2 * Math.fround(xy + wz));
+  #|   const r11 = Math.fround(1 - Math.fround(2 * Math.fround(xx + zz)));
+  #|   const r12 = Math.fround(2 * Math.fround(yz - wx));
+  #|   const r20 = Math.fround(2 * Math.fround(xz - wy));
+  #|   const r21 = Math.fround(2 * Math.fround(yz + wx));
+  #|   const r22 = Math.fround(1 - Math.fround(2 * Math.fround(xx + yy)));
+  #|   return [
+  #|     Math.fround(r00 * sx), Math.fround(r10 * sx), Math.fround(r20 * sx), 0,
+  #|     Math.fround(r01 * sy), Math.fround(r11 * sy), Math.fround(r21 * sy), 0,
+  #|     Math.fround(r02 * sz), Math.fround(r12 * sz), Math.fround(r22 * sz), 0,
+  #|     px, py, pz, 1,
+  #|   ];
+  #| }
+
+///|
+/// Decodes a read-only component row and returns its local model matrix.
+#cfg(target="js")
 pub fn Transform3D::local_matrix_from_component_view(
   row : ArrayView[Byte],
 ) -> @m44.Matrix44F {
-  let layout = transform3d_gpu_layout()
-  if row.length() != layout.stride {
+  if row.length() != 48 {
     abort("Transform3D::local_matrix_from_component_view: row length mismatch")
   }
-  let f = layout.fields
-  if f.length() != 3 {
-    abort("transform3d_gpu_layout: expected 3 fields")
+  @m44.Matrix44F::{
+    data: transform3d_local_matrix_data_from_component_view_js(row),
   }
-  let px = get_gpu_f32_byte_view(row, f[0].offset + 0)
-  let py = get_gpu_f32_byte_view(row, f[0].offset + 4)
-  let pz = get_gpu_f32_byte_view(row, f[0].offset + 8)
-  let qx = get_gpu_f32_byte_view(row, f[1].offset + 0)
-  let qy = get_gpu_f32_byte_view(row, f[1].offset + 4)
-  let qz = get_gpu_f32_byte_view(row, f[1].offset + 8)
-  let qw = get_gpu_f32_byte_view(row, f[1].offset + 12)
-  let sx = get_gpu_f32_byte_view(row, f[2].offset + 0)
-  let sy = get_gpu_f32_byte_view(row, f[2].offset + 4)
-  let sz = get_gpu_f32_byte_view(row, f[2].offset + 8)
+}
+
+///|
+/// Decodes a read-only component row and returns its local model matrix.
+#cfg(not(target="js"))
+pub fn Transform3D::local_matrix_from_component_view(
+  row : ArrayView[Byte],
+) -> @m44.Matrix44F {
+  // Hot path: fixed offsets (must match transform3d_gpu_layout).
+  if row.length() != 48 {
+    abort("Transform3D::local_matrix_from_component_view: row length mismatch")
+  }
+  let px = get_gpu_f32_byte_view(row, 0)
+  let py = get_gpu_f32_byte_view(row, 4)
+  let pz = get_gpu_f32_byte_view(row, 8)
+  let qx = get_gpu_f32_byte_view(row, 12)
+  let qy = get_gpu_f32_byte_view(row, 16)
+  let qz = get_gpu_f32_byte_view(row, 20)
+  let qw = get_gpu_f32_byte_view(row, 24)
+  let sx = get_gpu_f32_byte_view(row, 28)
+  let sy = get_gpu_f32_byte_view(row, 32)
+  let sz = get_gpu_f32_byte_view(row, 36)
   transform3d_local_matrix_from_trs(px, py, pz, qx, qy, qz, qw, sx, sy, sz)
 }
 
