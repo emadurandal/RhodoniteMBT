@@ -19,6 +19,10 @@
     "build:core:js": "cd moon/rhodonite_core && moon build --target js --release",
     "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/src/math/ts",
     "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh",
+    "bench:ecs": "bash scripts/run-ecs-bench.sh",
+    "bench:ecs:js": "bash scripts/run-ecs-bench.sh js",
+    "bench:ecs:native": "bash scripts/run-ecs-bench.sh native",
+    "bench:ecs:wasm": "bash scripts/run-ecs-bench.sh wasm-gc",
     "publish:moon": "bash scripts/publish-rhodonite-mooncakes.sh"
   },
   "devDependencies": {
