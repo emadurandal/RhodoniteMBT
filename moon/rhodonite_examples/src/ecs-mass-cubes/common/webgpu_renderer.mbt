@@ -245,9 +245,9 @@ fn animate_transforms_query(
   per_side : Int,
   t : Double,
 ) -> Unit {
-  // if animate_transforms_query_fast(world, tf_id, per_side, t) {
-  //   return
-  // }
+  if animate_transforms_query_fast(world, tf_id, per_side, t) {
+    return
+  }
   let q = @ecs.Query::new([tf_id])
   q.for_each(world, row => {
     let idx = row.entity().index
