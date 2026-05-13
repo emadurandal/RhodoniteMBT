@@ -21,7 +21,7 @@ fn monotonic_ms() -> Double {
 
 ///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
-let entity_count : Int = 200000
+let entity_count : Int = 400000
 
 ///|
 /// Canvas resolution (matches demo HTML).
@@ -55,11 +55,135 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
+/// Smallest `s` with `s * s >= n` for a roughly square XZ grid.
+fn grid_side_len(n : Int) -> Int {
+  let mut s = 1
+  while s * s < n {
+    s = s + 1
+  }
+  s
+}
+
+///|
+/// View-space **z** extrema of the grid AABB corners after `view_rot` (before extra Z pull).
+fn view_space_z_range_corners(
+  view_rot : @m44.Matrix44D,
+  extent_xz : Double,
+  wave_y : Double,
+) -> (Double, Double) {
+  let sx_arr = [-1.0, 1.0]
+  let sz_arr = [-1.0, 1.0]
+  let wy_arr = [-1.0, 1.0]
+  let mut i = 0
+  let mut z_min = (0.0 : Double)
+  let mut z_max = (0.0 : Double)
+  for sx = 0; sx < 2; sx = sx + 1 {
+    for sy = 0; sy < 2; sy = sy + 1 {
+      for sz = 0; sz < 2; sz = sz + 1 {
+        let wx = sx_arr[sx] * extent_xz
+        let wy = wy_arr[sy] * wave_y
+        let wz = sz_arr[sz] * extent_xz
+        let v = view_rot.mul_vec4(@v4.Vector4::new(wx, wy, wz, (1.0 : Double)))
+        let z = v.z()
+        if i == 0 {
+          z_min = z
+          z_max = z
+        } else {
+          if z < z_min {
+            z_min = z
+          }
+          if z > z_max {
+            z_max = z
+          }
+        }
+        i = i + 1
+      }
+    }
+  }
+  (z_min, z_max)
+}
+
+///|
+/// View-space **y** extrema of the same world AABB corners (for ortho `bottom`/`top`).
+fn view_space_y_range_corners(
+  view_rot : @m44.Matrix44D,
+  extent_xz : Double,
+  wave_y : Double,
+) -> (Double, Double) {
+  let sx_arr = [-1.0, 1.0]
+  let sz_arr = [-1.0, 1.0]
+  let wy_arr = [-1.0, 1.0]
+  let mut i = 0
+  let mut y_min = (0.0 : Double)
+  let mut y_max = (0.0 : Double)
+  for sx = 0; sx < 2; sx = sx + 1 {
+    for sy = 0; sy < 2; sy = sy + 1 {
+      for sz = 0; sz < 2; sz = sz + 1 {
+        let wx = sx_arr[sx] * extent_xz
+        let wy = wy_arr[sy] * wave_y
+        let wz = sz_arr[sz] * extent_xz
+        let v = view_rot.mul_vec4(@v4.Vector4::new(wx, wy, wz, (1.0 : Double)))
+        let y = v.y()
+        if i == 0 {
+          y_min = y
+          y_max = y
+        } else {
+          if y < y_min {
+            y_min = y
+          }
+          if y > y_max {
+            y_max = y
+          }
+        }
+        i = i + 1
+      }
+    }
+  }
+  (y_min, y_max)
+}
+
+///|
+/// Ortho frustum that fits the tilted XZ grid in view space and matches canvas aspect.
+///
+/// WebGPU clips to `0 ≤ clip.z ≤ clip.w`. [`Matrix44::ortho`] maps view **z** in
+/// `[-far, -near]` to NDC depth `[0, 1]`. This grid can reach **positive** view **z**,
+/// so we pull along **−Z** and extend **far** so the whole slab stays inside the clip volume.
 fn camera_uniform_bytes() -> FixedArray[Byte] {
-  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
+  let view_rot = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
   )
-  let proj = @m44.Matrix44::ortho(-10.0, 10.0, -10.0, 10.0, 0.1, 80.0)
+  let per_side = grid_side_len(entity_count)
+  let half = (per_side - 1).to_double() * 0.5
+  let extent_xz = half * grid_spacing
+  let wave = 0.12
+  let margin = cube_scale.to_double() * 2.5
+  /// World **y** bound: wave motion + scaled unit cube local **y** (±1 in mesh space).
+  let wave_y = wave + cube_scale.to_double() * 1.1
+  let (y_lo, y_hi) = view_space_y_range_corners(view_rot, extent_xz, wave_y)
+  let cy = (y_lo + y_hi) * 0.5
+  let hy = (y_hi - y_lo) * 0.5 + margin
+  let hx = extent_xz + margin
+  let aspect = canvas_width.to_double() / canvas_height.to_double()
+  let mut half_w = hx
+  let mut half_h = hy
+  if half_w / half_h < aspect {
+    half_w = half_h * aspect
+  } else {
+    half_h = half_w / aspect
+  }
+  let left = -half_w
+  let right = half_w
+  let bottom = cy - half_h
+  let top = cy + half_h
+  let (z_lo, z_hi) = view_space_z_range_corners(view_rot, extent_xz, wave_y)
+  let pull_z = if z_hi > -0.15 { -z_hi - 1.0 } else { 0.0 }
+  let view = @m44.Matrix44::translation(0.0, 0.0, pull_z, 1.0, 0.0).mat_mul(
+    view_rot,
+  )
+  let z_min_pulled = z_lo + pull_z
+  let far_need = -z_min_pulled + 8.0
+  let far_clip = if far_need > 80.0 { far_need } else { 80.0 }
+  let proj = @m44.Matrix44::ortho(left, right, bottom, top, 0.1, far_clip)
   let vp = proj.mat_mul(view)
   let bytes = FixedArray::make(256, (0 : Byte))
   put_mat4_col_major_f64_to_bytes(bytes, vp)
@@ -131,16 +255,6 @@ fn max_gt_capacity_from_resize(
     }
   }
   cap
-}
-
-///|
-/// Smallest `s` with `s * s >= n` for a roughly square XZ grid.
-fn grid_side_len(n : Int) -> Int {
-  let mut s = 1
-  while s * s < n {
-    s = s + 1
-  }
-  s
 }
 
 ///|
