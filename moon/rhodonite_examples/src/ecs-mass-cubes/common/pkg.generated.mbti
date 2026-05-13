@@ -39,6 +39,7 @@ pub(all) struct WebGPURenderer {
   tf : @ecs.ComponentTypeId
   per_side : Int
   frame : @ref.Ref[Int]
+  perf_last_frame_start_ms : @ref.Ref[Double]
 }
 pub fn WebGPURenderer::release(Self) -> Unit
 

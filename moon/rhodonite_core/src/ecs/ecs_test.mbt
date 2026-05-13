@@ -630,6 +630,51 @@ test "QueryRow view accesses payloads by component id" {
 }
 
 ///|
+test "Query for_each_archetype exposes contiguous CPU columns" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryArchA", 4)
+  let qb = world.register_cpu_component("QueryArchB", 4)
+  let query = Query::new([qa, qb])
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(10, 11, 12, 13)))
+  assert_true(world.add_component_bytes(e1, qa, bytes4(5, 6, 7, 8)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(20, 21, 22, 23)))
+  let mut archetype_count = 0
+  let mut row_count = 0
+  let mut saw_qa = false
+  let mut saw_qb = false
+  let mut stride_qa = -1
+  query.for_each_archetype(world, chunk => {
+    archetype_count = archetype_count + 1
+    saw_qa = chunk.has(qa)
+    saw_qb = chunk.has(qb)
+    stride_qa = chunk.component_stride(qa)
+    let a = chunk.read_column(qa)
+    let b = chunk.write_column(qb)
+    for row = 0; row < chunk.length(); row = row + 1 {
+      let base = row * 4
+      b[base] = a[base]
+      row_count = row_count + 1
+    }
+  })
+  assert_eq(archetype_count, 1)
+  assert_eq(row_count, 2)
+  assert_true(saw_qa)
+  assert_true(saw_qb)
+  assert_eq(stride_qa, 4)
+  match world.component_bytes(e0, qb) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected QueryArchB bytes")
+  }
+  match world.component_bytes(e1, qb) {
+    Some(bytes) => assert_eq(bytes[0], (5 : Byte))
+    None => abort("expected QueryArchB bytes")
+  }
+}
+
+///|
 test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)

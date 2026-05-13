@@ -1,4 +1,25 @@
 ///|
+#cfg(target="js")
+extern "js" fn monotonic_ms() -> Double =
+  #| () => performance.now()
+
+///|
+#cfg(target="native")
+extern "C" fn sdl_get_ticks() -> UInt64 = "SDL_GetTicks"
+
+///|
+#cfg(target="native")
+fn monotonic_ms() -> Double {
+  sdl_get_ticks().to_double()
+}
+
+///|
+#cfg(not(any(target="js", target="native")))
+fn monotonic_ms() -> Double {
+  0.0
+}
+
+///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
 let entity_count : Int = 60000
 
@@ -262,6 +283,7 @@ pub(all) struct WebGPURenderer {
   tf : @ecs.ComponentTypeId
   per_side : Int
   frame : @ref.Ref[Int]
+  perf_last_frame_start_ms : @ref.Ref[Double]
 }
 
 ///|
@@ -301,6 +323,69 @@ fn ecs_mass_shader_wgsl() -> String {
     #|}
     #|
   code
+}
+
+///|
+#cfg(target="js")
+extern "js" fn ecs_mass_cubes_perf_overlay_js(
+  fps : Double,
+  cpu_ms : Double,
+) -> Unit =
+  #| (fps, cpuMs) => {
+  #|   const el = document.getElementById("ecs-mass-cubes-perf");
+  #|   if (!el) return;
+  #|   el.textContent =
+  #|     "FPS " +
+  #|     fps.toFixed(1) +
+  #|     "  ·  CPU " +
+  #|     cpuMs.toFixed(2) +
+  #|     " ms / frame (submit まで)";
+  #| }
+
+///|
+#cfg(target="js")
+fn ecs_mass_cubes_perf_overlay(fps : Double, cpu_ms : Double) -> Unit {
+  ecs_mass_cubes_perf_overlay_js(fps, cpu_ms)
+}
+
+///|
+#cfg(not(target="js"))
+fn ecs_mass_cubes_perf_overlay(_fps : Double, _cpu_ms : Double) -> Unit {
+  ignore(_fps)
+  ignore(_cpu_ms)
+  ()
+}
+
+///|
+#cfg(target="native")
+fn ecs_mass_cubes_perf_console_log(
+  fps : Double,
+  cpu_ms : Double,
+  frame_idx : Int,
+) -> Unit {
+  if frame_idx < 2 || frame_idx % 30 != 0 {
+    return
+  }
+  println(
+    "ecs-mass-cubes: FPS=" +
+    fps.to_string() +
+    "  CPU=" +
+    cpu_ms.to_string() +
+    " ms/frame (until submit)",
+  )
+}
+
+///|
+#cfg(not(target="native"))
+fn ecs_mass_cubes_perf_console_log(
+  _fps : Double,
+  _cpu_ms : Double,
+  _frame_idx : Int,
+) -> Unit {
+  ignore(_fps)
+  ignore(_cpu_ms)
+  ignore(_frame_idx)
+  ()
 }
 
 ///|
@@ -464,11 +549,25 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     tf,
     per_side,
     frame: @ref.new(0),
+    perf_last_frame_start_ms: @ref.new(-1.0),
   })
 }
 
 ///|
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
+  let t_frame_start = monotonic_ms()
+  let last_start = renderer.perf_last_frame_start_ms.val
+  let fps = if last_start >= 0.0 {
+    let wall_dt = t_frame_start - last_start
+    if wall_dt > 1.0e-9 {
+      1000.0 / wall_dt
+    } else {
+      0.0
+    }
+  } else {
+    0.0
+  }
+  renderer.perf_last_frame_start_ms.val = t_frame_start
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.018
   let gt = renderer.gt
@@ -542,6 +641,9 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
+  let cpu_ms = monotonic_ms() - t_frame_start
+  ecs_mass_cubes_perf_overlay(fps, cpu_ms)
+  ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
   @wgpu.textureView_release(color_view)
   renderer.context.present()
 }

@@ -66,8 +66,19 @@ pub struct Query {
   // private fields
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
+
+pub struct QueryArchetype {
+  // private fields
+}
+pub fn QueryArchetype::component_stride(Self, ComponentTypeId) -> Int
+pub fn QueryArchetype::entity(Self, Int) -> EntityId
+pub fn QueryArchetype::has(Self, ComponentTypeId) -> Bool
+pub fn QueryArchetype::length(Self) -> Int
+pub fn QueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn QueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub struct QueryRow {
   // private fields

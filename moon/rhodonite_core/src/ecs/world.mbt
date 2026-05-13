@@ -936,6 +936,42 @@ fn World::for_each_query_rows(
 }
 
 ///|
+/// Internal archetype iterator used by [`Query::for_each_archetype`].
+fn World::for_each_query_archetypes(
+  self : World,
+  required : Array[ComponentTypeId],
+  f : (Int) -> Unit,
+) -> Unit {
+  if required.length() == 0 {
+    return
+  }
+  if component_array_has_duplicates(required) {
+    abort(
+      "Query::for_each_archetype: duplicate required component. Hint: construct queries through Query::new and pass each ComponentTypeId at most once.",
+    )
+  }
+  for k = 0; k < required.length(); k = k + 1 {
+    match self.registry.get(required[k]) {
+      Some(_) => ()
+      None =>
+        abort(
+          "Query::for_each_archetype: unknown " +
+          component_id_text(required[k]) +
+          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+        )
+    }
+  }
+  self.query_depth = self.query_depth + 1
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let sig = self.archetypes[ai].components
+    if component_array_contains_all(sig, required) {
+      f(ai)
+    }
+  }
+  self.query_depth = self.query_depth - 1
+}
+
+///|
 pub fn World::transform_component(self : World) -> ComponentTypeId {
   self.transform_component_id
 }

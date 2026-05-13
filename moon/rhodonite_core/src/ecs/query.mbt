@@ -42,6 +42,23 @@ pub fn Query::for_each(
 }
 
 ///|
+/// Runs this query archetype-by-archetype. This avoids constructing one [`QueryRow`] per entity
+/// and lets hot systems loop over contiguous CPU component columns directly.
+pub fn Query::for_each_archetype(
+  self : Query,
+  world : World,
+  f : (QueryArchetype) -> Unit,
+) -> Unit {
+  world.assert_system_components_read(
+    self.required,
+    "Query::for_each_archetype",
+  )
+  world.for_each_query_archetypes(self.required, archetype_index => {
+    f({ world, components: self.required, archetype_index })
+  })
+}
+
+///|
 /// Returns the entity for this query row.
 pub fn QueryRow::entity(self : QueryRow) -> EntityId {
   self.entity
@@ -214,4 +231,142 @@ pub fn QueryRow::write_view(
 ) -> MutArrayView[Byte] {
   self.world.assert_system_component_write(component, "QueryRow::write_view")
   self.component_mut_view(component, "QueryRow::write_view", true)
+}
+
+///|
+pub fn QueryArchetype::length(self : QueryArchetype) -> Int {
+  self.world.archetypes[self.archetype_index].entities.length()
+}
+
+///|
+pub fn QueryArchetype::entity(self : QueryArchetype, row : Int) -> EntityId {
+  self.world.archetypes[self.archetype_index].entities[row]
+}
+
+///|
+pub fn QueryArchetype::has(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+) -> Bool {
+  component_array_index_of(self.components, component) >= 0
+}
+
+///|
+pub fn QueryArchetype::component_stride(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+) -> Int {
+  ignore(
+    self.component_payload_index(component, "QueryArchetype::component_stride"),
+  )
+  match self.world.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => self.world.registry.stride(component)
+        GpuVisible =>
+          match self.world.gpu_store(component) {
+            Some(store) => store.stride
+            None =>
+              abort(
+                "QueryArchetype::component_stride: GpuVisible " +
+                component_id_text(component) +
+                " has no GPU store.",
+              )
+          }
+      }
+    None =>
+      abort(
+        "QueryArchetype::component_stride: unknown " +
+        component_id_text(component),
+      )
+  }
+}
+
+///|
+fn QueryArchetype::component_payload_index(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+  operation : String,
+) -> Int {
+  let index = component_array_index_of(self.components, component)
+  if index < 0 {
+    abort(
+      operation +
+      ": " +
+      component_id_text(component) +
+      " is not part of this QueryArchetype.",
+    )
+  }
+  index
+}
+
+///|
+/// Returns the contiguous CPU SoA column for `component`. GPU-visible components are flat by
+/// `EntityId.index` instead of archetype row, so use row views or component-specific APIs for them.
+pub fn QueryArchetype::read_column(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+) -> ArrayView[Byte] {
+  self.world.assert_system_component_read(
+    component, "QueryArchetype::read_column",
+  )
+  ignore(self.component_payload_index(component, "QueryArchetype::read_column"))
+  match self.world.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => {
+          let arch = self.world.archetypes[self.archetype_index]
+          let ci = arch.column_index(component)
+          if ci < 0 {
+            abort("QueryArchetype::read_column: missing CPU column")
+          }
+          let col = arch.columns[ci]
+          col.bytes[:]
+        }
+        GpuVisible =>
+          abort(
+            "QueryArchetype::read_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
+          )
+      }
+    None =>
+      abort(
+        "QueryArchetype::read_column: unknown " + component_id_text(component),
+      )
+  }
+}
+
+///|
+/// Returns the contiguous mutable CPU SoA column for `component`.
+pub fn QueryArchetype::write_column(
+  self : QueryArchetype,
+  component : ComponentTypeId,
+) -> MutArrayView[Byte] {
+  self.world.assert_system_component_write(
+    component, "QueryArchetype::write_column",
+  )
+  ignore(
+    self.component_payload_index(component, "QueryArchetype::write_column"),
+  )
+  match self.world.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => {
+          let arch = self.world.archetypes[self.archetype_index]
+          let ci = arch.column_index(component)
+          if ci < 0 {
+            abort("QueryArchetype::write_column: missing CPU column")
+          }
+          let col = arch.columns[ci]
+          col.bytes.mut_view(start=0, end=col.bytes.length())
+        }
+        GpuVisible =>
+          abort(
+            "QueryArchetype::write_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
+          )
+      }
+    None =>
+      abort(
+        "QueryArchetype::write_column: unknown " + component_id_text(component),
+      )
+  }
 }

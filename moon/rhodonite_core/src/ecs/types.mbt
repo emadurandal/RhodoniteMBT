@@ -120,6 +120,15 @@ pub struct QueryRow {
 }
 
 ///|
+/// One archetype chunk yielded by [`Query::for_each_archetype`]. Use column views plus row
+/// strides for hot loops that should avoid constructing one [`QueryRow`] per entity.
+pub struct QueryArchetype {
+  priv world : World
+  priv components : Array[ComponentTypeId]
+  priv archetype_index : Int
+}
+
+///|
 /// Deferred structural or payload mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)
