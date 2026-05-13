@@ -55,6 +55,18 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
+fn camera_uniform_bytes() -> FixedArray[Byte] {
+  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
+    @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
+  )
+  let proj = @m44.Matrix44::ortho(-10.0, 10.0, -10.0, 10.0, 0.1, 80.0)
+  let vp = proj.mat_mul(view)
+  let bytes = FixedArray::make(256, (0 : Byte))
+  put_mat4_col_major_f64_to_bytes(bytes, vp)
+  bytes
+}
+
+///|
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -102,11 +114,6 @@ fn put_mat4_col_major_f64_to_bytes(
   for i = 0; i < 16; i = i + 1 {
     @writes.put_f32_le(out, i * 4, d[i])
   }
-}
-
-///|
-fn empty_offsets() -> Array[UInt] {
-  []
 }
 
 ///|
@@ -264,6 +271,105 @@ fn animate_transforms_query(
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn update_global_transforms_for_mass_cubes_fast_js(
+  world : @ecs.World,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+  count : Int,
+  scale : Float,
+) -> Array[@ecs.GpuWrite] =
+  #| (world, gt, perSide, t, count, scale) => {
+  #|   const store = world.gpu_stores[gt.index];
+  #|   if (!store || store.stride !== 64) return [];
+  #|   if (!ArrayBuffer.isView(store.bytes)) {
+  #|     const converted = new Uint8Array(store.bytes.length);
+  #|     converted.set(store.bytes);
+  #|     store.bytes = converted;
+  #|   }
+  #|   const bytes = store.bytes;
+  #|   const byteLength = count * 64;
+  #|   if (bytes.length < byteLength || (bytes.byteOffset & 3) !== 0) return [];
+  #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
+  #|   const half = (perSide - 1) * 0.5;
+  #|   const spacing = 0.14;
+  #|   const time = t * 1.8;
+  #|   const s = Math.fround(scale);
+  #|   for (let i = 0, out = 0; i < count; i++, out += 16) {
+  #|     const ix = i % perSide;
+  #|     const iz = Math.trunc(i / perSide);
+  #|     m[out] = s;
+  #|     m[out + 1] = 0;
+  #|     m[out + 2] = 0;
+  #|     m[out + 3] = 0;
+  #|     m[out + 4] = 0;
+  #|     m[out + 5] = s;
+  #|     m[out + 6] = 0;
+  #|     m[out + 7] = 0;
+  #|     m[out + 8] = 0;
+  #|     m[out + 9] = 0;
+  #|     m[out + 10] = s;
+  #|     m[out + 11] = 0;
+  #|     m[out + 12] = Math.fround((ix - half) * spacing);
+  #|     m[out + 13] = Math.fround(Math.sin(i * 0.09 + time) * 0.12);
+  #|     m[out + 14] = Math.fround((iz - half) * spacing);
+  #|     m[out + 15] = 1;
+  #|   }
+  #|   const dirty = store.dirty_indices;
+  #|   const flags = store.dirty_flags;
+  #|   for (let i = 0; i < dirty.length; i++) flags[dirty[i]] = false;
+  #|   dirty.length = 0;
+  #|   return [{ byte_offset: 0, bytes: bytes.subarray(0, byteLength) }];
+  #| }
+
+///|
+#cfg(target="js")
+fn update_global_transforms_for_mass_cubes_fast(
+  world : @ecs.World,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWrite] {
+  update_global_transforms_for_mass_cubes_fast_js(
+    world, gt, per_side, t, entity_count, cube_scale,
+  )
+}
+
+///|
+#cfg(not(target="js"))
+fn update_global_transforms_for_mass_cubes_fast(
+  world : @ecs.World,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWrite] {
+  ignore(per_side)
+  ignore(t)
+  world.update_global_transforms_from_transforms()
+  world.drain_gpu_writes(gt)
+}
+
+///|
+fn update_and_drain_global_transforms(
+  world : @ecs.World,
+  tf : @ecs.ComponentTypeId,
+  gt : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Array[@ecs.GpuWrite] {
+  let writes = update_global_transforms_for_mass_cubes_fast(
+    world, gt, per_side, t,
+  )
+  if writes.length() > 0 {
+    return writes
+  }
+  animate_transforms_query(world, tf, per_side, t)
+  world.update_global_transforms_from_transforms()
+  world.drain_gpu_writes(gt)
+}
+
+///|
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext
   device : @wgpu.GPUDevice
@@ -284,6 +390,7 @@ pub(all) struct WebGPURenderer {
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
+  bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
 }
@@ -479,6 +586,11 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
     @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let camera_uniform = device.create_buffer(256UL, cam_usage)
+  queue.write_buffer_from_fixed_array(
+    camera_uniform,
+    0UL,
+    camera_uniform_bytes(),
+  )
   let bind_transforms = device.create_bind_group({
     layout: layout_transforms,
     entries: [
@@ -519,9 +631,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
   )
   let depth_view = depth_texture.create_view()
-  animate_transforms_query(world, tf, per_side, 0.0)
-  world.update_global_transforms_from_transforms()
-  let writes0 = world.drain_gpu_writes(gt)
+  let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
   for wi = 0; wi < writes0.length(); wi = wi + 1 {
     let w = writes0[wi]
     queue.write_buffer_from_fixed_array(
@@ -550,6 +660,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     gt,
     tf,
     per_side,
+    bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
   })
@@ -574,9 +685,13 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let t = renderer.frame.val.to_double() * 0.018
   let gt = renderer.gt
   let tf = renderer.tf
-  animate_transforms_query(renderer.world, tf, renderer.per_side, t)
-  renderer.world.update_global_transforms_from_transforms()
-  let writes = renderer.world.drain_gpu_writes(gt)
+  let writes = update_and_drain_global_transforms(
+    renderer.world,
+    tf,
+    gt,
+    renderer.per_side,
+    t,
+  )
   for wi = 0; wi < writes.length(); wi = wi + 1 {
     let w = writes[wi]
     renderer.queue.write_buffer_from_fixed_array(
@@ -585,18 +700,6 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       w.bytes,
     )
   }
-  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
-    @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
-  )
-  let proj = @m44.Matrix44::ortho(-10.0, 10.0, -10.0, 10.0, 0.1, 80.0)
-  let vp = proj.mat_mul(view)
-  let cam_bytes = FixedArray::make(256, (0 : Byte))
-  put_mat4_col_major_f64_to_bytes(cam_bytes, vp)
-  renderer.queue.write_buffer_from_fixed_array(
-    renderer.camera_uniform,
-    0UL,
-    cam_bytes,
-  )
   let texture = renderer.context.get_current_texture()
   let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
@@ -617,8 +720,16 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     }),
   })
   render_pass.set_pipeline(renderer.pipeline)
-  render_pass.set_bind_group(0U, renderer.bind_transforms, empty_offsets())
-  render_pass.set_bind_group(1U, renderer.bind_camera, empty_offsets())
+  render_pass.set_bind_group(
+    0U,
+    renderer.bind_transforms,
+    renderer.bind_group_offsets,
+  )
+  render_pass.set_bind_group(
+    1U,
+    renderer.bind_camera,
+    renderer.bind_group_offsets,
+  )
   render_pass.set_index_buffer(
     renderer.index_buffer,
     @wgpu.GPUIndexFormat::Uint16,
