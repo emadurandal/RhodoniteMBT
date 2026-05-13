@@ -294,16 +294,16 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, uploads one full `write_global_transforms_dense_grid_wave_views` result at initialization, then uses `write_global_transforms_dense_grid_wave_y_views` each frame. The JS/native grid-wave helpers advance the per-entity wave with row-local sin/cos recurrence, avoiding one `sin` plus one divide/remainder pair per entity. The y-only helper updates only the CPU-side Y translation lane; because the GPU buffer still stores mat4 rows, the borrowed upload range remains the full dense row span.
-The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper for the same library-side y-only path and submits borrowed write views with the native browser WebGPU API.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, then calls `write_global_transforms_dense_range_views` with sample-owned callbacks that bulk-write the dense `GlobalTransform` range. The initialization callback writes the full mat4 rows; the per-frame callback updates only the CPU-side Y translation lane. Because the GPU buffer still stores mat4 rows, the borrowed upload range remains the full dense row span. The library only provides the dense range and dirty tracking; grid-wave math stays in the sample.
+The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper for the same dense-range callback path and submits borrowed write views with the native browser WebGPU API.
 
 Dense GlobalTransform helper variants:
 
 - `write_global_transforms_dense(...) -> Array[GpuWrite]`
 - `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_grid_wave(...) -> Array[GpuWrite]`
-- `write_global_transforms_dense_grid_wave_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_grid_wave_y_views(...) -> Array[GpuWriteView]`
+- `write_global_transforms_dense_range_views(count, write) -> Array[GpuWriteView]`
+
+`write_global_transforms_dense_range_views` is the high-throughput variant for user-defined logic. It calls `write` once with a `GpuComponentWriteRange` (`bytes`, `stride`, `first_entity_index`, `count`), allowing caller code to run a tight loop over contiguous rows without a callback per entity.
 
 ---
 

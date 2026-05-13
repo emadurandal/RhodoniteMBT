@@ -302,16 +302,16 @@ WebGPU upload 側には次の API があります。
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、初期化時だけ `write_global_transforms_dense_grid_wave_views` を full upload し、以後の frame では `write_global_transforms_dense_grid_wave_y_views` を使います。JS / native の grid-wave helper は entity ごとの wave を行単位の sin/cos recurrence で進めるため、entity ごとの `sin` と除算/剰余を避けます。y-only helper は CPU 側の Y translation lane だけを更新しますが、GPU buffer は mat4 row のままなので、borrowed upload range は full dense row span です。
-ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo は TypeScript ECS wrapper から同じ library-side y-only path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、`write_global_transforms_dense_range_views` にサンプル側 callback を渡して dense な `GlobalTransform` 範囲を一括更新します。初期化 callback は mat4 row 全体を書き、frame ごとの callback は CPU 側の Y translation lane だけを更新します。GPU buffer は mat4 row のままなので、borrowed upload range は full dense row span です。ライブラリは dense range と dirty 記録だけを担当し、grid-wave の計算はサンプル側にあります。
+ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。
 
 Dense GlobalTransform helper には所有型と view 型の両方があります。
 
 - `write_global_transforms_dense(...) -> Array[GpuWrite]`
 - `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_grid_wave(...) -> Array[GpuWrite]`
-- `write_global_transforms_dense_grid_wave_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_grid_wave_y_views(...) -> Array[GpuWriteView]`
+- `write_global_transforms_dense_range_views(count, write) -> Array[GpuWriteView]`
+
+`write_global_transforms_dense_range_views` はユーザー定義ロジック向けの高スループット版です。`write` を 1 回だけ呼び、`GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を渡します。呼び出し側は entity ごとの callback なしに、連続 row 上で tight loop を実行できます。
 
 ---
 

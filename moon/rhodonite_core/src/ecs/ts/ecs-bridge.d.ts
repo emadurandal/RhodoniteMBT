@@ -141,28 +141,16 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
-	export function world_write_global_transforms_dense_grid_wave_views(
+	export function world_write_global_transforms_dense_range_views(
 		world: MoonWorld,
 		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
+		f: (
+			bytes: MoonByteView,
+			stride: number,
+			firstEntityIndex: number,
+			count: number,
+		) => void,
 	): MoonGpuWriteView[];
-	export function world_write_global_transforms_dense_grid_wave_y_views(
-		world: MoonWorld,
-		count: number,
-		perSide: number,
-		time: number,
-	): MoonGpuWriteView[];
-	export function world_write_global_transforms_dense_grid_wave_copy(
-		world: MoonWorld,
-		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
-	): MoonGpuWriteCopy[];
 	export function world_spawn_transform_global_batch_identity(
 		world: MoonWorld,
 		count: number,

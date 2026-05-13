@@ -257,41 +257,14 @@ pub fn world_update_global_transforms_from_transforms(
 }
 
 ///|
-pub fn world_write_global_transforms_dense_grid_wave_views(
+pub fn world_write_global_transforms_dense_range_views(
   world : @ecs.World,
   count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
+  f : (MutArrayView[Byte], Int, Int, Int) -> Unit,
 ) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_grid_wave_views(
-    count, per_side, time, scale, spacing,
-  )
-}
-
-///|
-pub fn world_write_global_transforms_dense_grid_wave_y_views(
-  world : @ecs.World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_grid_wave_y_views(count, per_side, time)
-}
-
-///|
-pub fn world_write_global_transforms_dense_grid_wave_copy(
-  world : @ecs.World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[@ecs.GpuWrite] {
-  world.write_global_transforms_dense_grid_wave(
-    count, per_side, time, scale, spacing,
-  )
+  world.write_global_transforms_dense_range_views(count, range => {
+    f(range.bytes(), range.stride(), range.first_entity_index(), range.count())
+  })
 }
 
 ///|

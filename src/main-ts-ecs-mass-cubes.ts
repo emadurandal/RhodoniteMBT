@@ -1,5 +1,10 @@
 import "./style.css";
-import { Query, World, type ComponentTypeId } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import {
+	Query,
+	World,
+	type ByteView,
+	type ComponentTypeId,
+} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 600_000;
 const CANVAS_WIDTH = 800;
@@ -311,38 +316,173 @@ function uploadGlobalTransformWrites(
 	}
 }
 
+function rangeAsF32(bytes: ByteView): Float32Array | null {
+	const view = bytes.asUint8Array();
+	if (view === null || (view.byteOffset & 3) !== 0) {
+		return null;
+	}
+	return new Float32Array(view.buffer, view.byteOffset, view.byteLength >> 2);
+}
+
+function writeMassCubesFullRange(
+	bytes: ByteView,
+	stride: number,
+	firstEntityIndex: number,
+	count: number,
+	perSide: number,
+	waveTime: number,
+): void {
+	const matrices = rangeAsF32(bytes);
+	if (matrices === null || stride !== 64) {
+		for (let i = 0; i < count; i += 1) {
+			const index = firstEntityIndex + i;
+			const [x, z] = gridXzForIndex(index, perSide);
+			const y = Math.sin(index * 0.09 + waveTime) * 0.12;
+			const base = i * stride;
+			bytes.setF32(base, CUBE_SCALE);
+			bytes.setF32(base + 4, 0);
+			bytes.setF32(base + 8, 0);
+			bytes.setF32(base + 12, 0);
+			bytes.setF32(base + 16, 0);
+			bytes.setF32(base + 20, CUBE_SCALE);
+			bytes.setF32(base + 24, 0);
+			bytes.setF32(base + 28, 0);
+			bytes.setF32(base + 32, 0);
+			bytes.setF32(base + 36, 0);
+			bytes.setF32(base + 40, CUBE_SCALE);
+			bytes.setF32(base + 44, 0);
+			bytes.setF32(base + 48, x);
+			bytes.setF32(base + 52, y);
+			bytes.setF32(base + 56, z);
+			bytes.setF32(base + 60, 1);
+		}
+		return;
+	}
+
+	const half = (perSide - 1) * 0.5;
+	const sinStep = Math.sin(0.09);
+	const cosStep = Math.cos(0.09);
+	let localIndex = 0;
+	let row = Math.trunc(firstEntityIndex / perSide);
+	let column = firstEntityIndex % perSide;
+	let out = 0;
+	while (localIndex < count) {
+		const rowCount = Math.min(perSide - column, count - localIndex);
+		let x = (column - half) * GRID_SPACING;
+		const z = (row - half) * GRID_SPACING;
+		const globalIndex = firstEntityIndex + localIndex;
+		let waveSin = Math.sin(globalIndex * 0.09 + waveTime);
+		let waveCos = Math.cos(globalIndex * 0.09 + waveTime);
+		for (let ix = 0; ix < rowCount; ix += 1) {
+			matrices[out] = CUBE_SCALE;
+			matrices[out + 1] = 0;
+			matrices[out + 2] = 0;
+			matrices[out + 3] = 0;
+			matrices[out + 4] = 0;
+			matrices[out + 5] = CUBE_SCALE;
+			matrices[out + 6] = 0;
+			matrices[out + 7] = 0;
+			matrices[out + 8] = 0;
+			matrices[out + 9] = 0;
+			matrices[out + 10] = CUBE_SCALE;
+			matrices[out + 11] = 0;
+			matrices[out + 12] = x;
+			matrices[out + 13] = waveSin * 0.12;
+			matrices[out + 14] = z;
+			matrices[out + 15] = 1;
+
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			localIndex += 1;
+			out += 16;
+			x += GRID_SPACING;
+		}
+		row += 1;
+		column = 0;
+	}
+}
+
+function writeMassCubesYRange(
+	bytes: ByteView,
+	stride: number,
+	firstEntityIndex: number,
+	count: number,
+	waveTime: number,
+): void {
+	const matrices = rangeAsF32(bytes);
+	if (matrices === null || stride !== 64) {
+		for (let i = 0; i < count; i += 1) {
+			const index = firstEntityIndex + i;
+			bytes.setF32(i * stride + 52, Math.sin(index * 0.09 + waveTime) * 0.12);
+		}
+		return;
+	}
+
+	const sinStep = Math.sin(0.09);
+	const cosStep = Math.cos(0.09);
+	let localIndex = 0;
+	let out = 0;
+	let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
+	let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
+	while (localIndex < count) {
+		matrices[out + 13] = waveSin * 0.12;
+		const nextSin = waveSin * cosStep + waveCos * sinStep;
+		waveCos = waveCos * cosStep - waveSin * sinStep;
+		waveSin = nextSin;
+		localIndex += 1;
+		out += 16;
+	}
+}
+
 function uploadInitialGlobalTransforms(renderer: Renderer): void {
 	uploadGlobalTransformWrites(
 		renderer.queue,
 		renderer.transformStorage,
-		renderer.world.writeGlobalTransformsDenseGridWaveViews(
+		renderer.world.writeGlobalTransformsDenseRangeViews(
 			ENTITY_COUNT,
-			renderer.perSide,
-			0,
-			CUBE_SCALE,
-			GRID_SPACING,
+			(bytes, stride, firstEntityIndex, count) =>
+				writeMassCubesFullRange(
+					bytes,
+					stride,
+					firstEntityIndex,
+					count,
+					renderer.perSide,
+					0,
+				),
 		),
 	);
 }
 
 function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
 	const waveTime = t * 1.8;
-	const writes = renderer.world.writeGlobalTransformsDenseGridWaveYViews(
+	const writes = renderer.world.writeGlobalTransformsDenseRangeViews(
 		ENTITY_COUNT,
-		renderer.perSide,
-		waveTime,
+		(bytes, stride, firstEntityIndex, count) =>
+			writeMassCubesYRange(
+				bytes,
+				stride,
+				firstEntityIndex,
+				count,
+				waveTime,
+			),
 	);
 	if (writes.length > 0) {
 		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, writes);
 		return;
 	}
 
-	const fullWrites = renderer.world.writeGlobalTransformsDenseGridWaveViews(
+	const fullWrites = renderer.world.writeGlobalTransformsDenseRangeViews(
 		ENTITY_COUNT,
-		renderer.perSide,
-		waveTime,
-		CUBE_SCALE,
-		GRID_SPACING,
+		(bytes, stride, firstEntityIndex, count) =>
+			writeMassCubesFullRange(
+				bytes,
+				stride,
+				firstEntityIndex,
+				count,
+				renderer.perSide,
+				waveTime,
+			),
 	);
 	if (fullWrites.length > 0) {
 		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, fullWrites);

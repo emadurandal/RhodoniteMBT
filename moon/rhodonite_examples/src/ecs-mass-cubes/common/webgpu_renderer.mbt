@@ -294,6 +294,90 @@ fn animate_transforms_query(
 }
 
 ///|
+fn write_mass_cubes_full_range(
+  range : @ecs.GpuComponentWriteRange,
+  per_side : Int,
+  wave_time : Double,
+) -> Unit {
+  let bytes = range.bytes()
+  let stride = range.stride()
+  let first = range.first_entity_index()
+  let count = range.count()
+  let half = (per_side - 1).to_double() * 0.5
+  let scale_d = cube_scale.to_double()
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let mut local_i = 0
+  let mut row = first / per_side
+  let mut column = first % per_side
+  while local_i < count {
+    let remaining_in_row = per_side - column
+    let remaining_count = count - local_i
+    let row_count = if remaining_count > remaining_in_row {
+      remaining_in_row
+    } else {
+      remaining_count
+    }
+    let mut x = (column.to_double() - half) * grid_spacing
+    let z = (row.to_double() - half) * grid_spacing
+    let global_i = first + local_i
+    let mut wave_s = @math.sin(global_i.to_double() * 0.09 + wave_time)
+    let mut wave_c = @math.cos(global_i.to_double() * 0.09 + wave_time)
+    let mut row_i = 0
+    while row_i < row_count {
+      let base = local_i * stride
+      @writes.put_f32_le_mut_view(bytes, base + 0, scale_d)
+      @writes.put_f32_le_mut_view(bytes, base + 4, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 8, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 12, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 16, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 20, scale_d)
+      @writes.put_f32_le_mut_view(bytes, base + 24, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 28, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 32, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 36, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 40, scale_d)
+      @writes.put_f32_le_mut_view(bytes, base + 44, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 48, x)
+      @writes.put_f32_le_mut_view(bytes, base + 52, wave_s * 0.12)
+      @writes.put_f32_le_mut_view(bytes, base + 56, z)
+      @writes.put_f32_le_mut_view(bytes, base + 60, 1.0)
+      let next_s = wave_s * cos_step + wave_c * sin_step
+      wave_c = wave_c * cos_step - wave_s * sin_step
+      wave_s = next_s
+      x = x + grid_spacing
+      local_i = local_i + 1
+      row_i = row_i + 1
+    }
+    row = row + 1
+    column = 0
+  }
+}
+
+///|
+fn write_mass_cubes_y_range(
+  range : @ecs.GpuComponentWriteRange,
+  wave_time : Double,
+) -> Unit {
+  let bytes = range.bytes()
+  let stride = range.stride()
+  let first = range.first_entity_index()
+  let count = range.count()
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let mut local_i = 0
+  let mut wave_s = @math.sin(first.to_double() * 0.09 + wave_time)
+  let mut wave_c = @math.cos(first.to_double() * 0.09 + wave_time)
+  while local_i < count {
+    @writes.put_f32_le_mut_view(bytes, local_i * stride + 52, wave_s * 0.12)
+    let next_s = wave_s * cos_step + wave_c * sin_step
+    wave_c = wave_c * cos_step - wave_s * sin_step
+    wave_s = next_s
+    local_i = local_i + 1
+  }
+}
+
+///|
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -303,11 +387,11 @@ fn update_global_transforms_for_mass_cubes_fast(
 ) -> Array[@ecs.GpuWriteView] {
   ignore(tf)
   ignore(gt)
-  world.write_global_transforms_dense_grid_wave_y_views(
-    entity_count,
-    per_side,
-    t * 1.8,
-  )
+  ignore(per_side)
+  let wave_time = t * 1.8
+  world.write_global_transforms_dense_range_views(entity_count, range => {
+    write_mass_cubes_y_range(range, wave_time)
+  })
 }
 
 ///|
@@ -316,13 +400,10 @@ fn initialize_global_transforms_for_mass_cubes(
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_grid_wave_views(
-    entity_count,
-    per_side,
-    t * 1.8,
-    cube_scale,
-    grid_spacing,
-  )
+  let wave_time = t * 1.8
+  world.write_global_transforms_dense_range_views(entity_count, range => {
+    write_mass_cubes_full_range(range, per_side, wave_time)
+  })
 }
 
 ///|

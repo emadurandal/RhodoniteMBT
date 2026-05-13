@@ -1509,15 +1509,26 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
 }
 
 ///|
-test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices" {
+test "write_global_transforms_dense_range_views writes dense rows through one range callback" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense_grid_wave(
-    2,
-    2,
-    0.0,
-    (0.5 : Float),
-    2.0,
-  )
+  let writes = world.write_global_transforms_dense_range_views(2, range => {
+    if range.first_entity_index() != 0 {
+      abort("expected first range entity index to be 0")
+    }
+    if range.count() != 2 {
+      abort("expected range count to be 2")
+    }
+    if range.stride() != 64 {
+      abort("expected GlobalTransform row stride to be 64")
+    }
+    let bytes = range.bytes()
+    @comp.put_gpu_f32_mut_view(bytes, 0, (0.5 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 48, (-1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 56, (-1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 64, (0.5 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 64 + 48, (1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 64 + 56, (-1.0 : Double))
+  })
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
   assert_eq(writes[0].bytes.length(), 2 * 64)
@@ -1526,50 +1537,7 @@ test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices"
   assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
   assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
   assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
-}
-
-///|
-test "write_global_transforms_dense_grid_wave_y_views keeps static lanes" {
-  let world = World::new()
-  let _ = world.write_global_transforms_dense_grid_wave_views(
-    2,
-    2,
-    0.0,
-    (0.5 : Float),
-    2.0,
-  )
-  let writes = world.write_global_transforms_dense_grid_wave_y_views(2, 2, 1.0)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 64)
-  let row0 = writes[0].bytes[0:64]
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
-  assert_true(@comp.get_gpu_f32_byte_view(row0, 52) != (0.0 : Float))
-}
-
-///|
-#cfg(target="native")
-test "native write_global_transforms_dense_grid_wave_views writes dense scaled grid matrices" {
-  let world = World::new()
-  let writes = world.write_global_transforms_dense_grid_wave_views(
-    2,
-    2,
-    0.0,
-    (0.5 : Float),
-    2.0,
-  )
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 64)
-  let row0 = writes[0].bytes[0:64]
-  let row1 = writes[0].bytes[64:128]
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 0), (0.5 : Float))
   assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
   assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
 }

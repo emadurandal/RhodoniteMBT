@@ -183,9 +183,9 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
 
-`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。JS helper は `Float32Array`、native helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。これらの helper は行単位で sin/cos を初期化し、entity ごとは recurrence と x/z カウンタで進めるため、大量 entity 更新時の `sin` と除算/剰余を削減します。
+`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` は entity ごとの callback で `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。
 
-初期化後に scale / X / Z が変わらない dense grid-wave では、`write_global_transforms_dense_grid_wave_y_views` を使えます。この helper は CPU 側の Y translation lane だけを更新し、初期化済みの他の mat4 lane を保持します。GPU buffer layout は mat4 row のままなので upload range は full dense row span ですが、CPU-side write volume は 16 floats/entity から 1 float/entity に減ります。`ecs-mass-cubes` と `ts-ecs-mass-cubes` は初回だけ full helper を使い、その後はこの library-side y-only helper を使います。
+大量更新で callback 回数も避けたい場合は `write_global_transforms_dense_range_views` を使います。この API は `GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を 1 回だけ渡し、呼び出し側のロジックが連続 row 上で tight loop を実行できます。ライブラリ側は dense range の貸し出し、stride 検査、dirty range 記録、borrowed upload view への drain だけを担当します。`ecs-mass-cubes` と `ts-ecs-mass-cubes` の grid-wave 計算や y-only 更新はサンプル側 callback に置き、ライブラリには sample 固有の計算を持ち込みません。
 
 ## Conflict 検査
 
