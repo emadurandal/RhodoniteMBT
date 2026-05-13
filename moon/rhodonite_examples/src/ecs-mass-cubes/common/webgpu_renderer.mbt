@@ -189,33 +189,13 @@ fn update_global_transforms_for_mass_cubes_fast(
 ) -> Array[@ecs.GpuWrite] {
   ignore(tf)
   ignore(gt)
-  let half = (per_side - 1).to_double() * 0.5
-  let time = t * 1.8
-  let scale = cube_scale.to_double()
-  world.write_global_transforms_dense(entity_count, fn(i, row) {
-    let ix = i % per_side
-    let iz = i / per_side
-    @comp.put_gpu_f32_mut_view(row, 0, scale)
-    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 20, scale)
-    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 40, scale)
-    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * grid_spacing)
-    @comp.put_gpu_f32_mut_view(
-      row,
-      52,
-      @math.sin(i.to_double() * 0.09 + time) * 0.12,
-    )
-    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * grid_spacing)
-    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
-  })
+  world.write_global_transforms_dense_grid_wave(
+    entity_count,
+    per_side,
+    t * 1.8,
+    cube_scale,
+    grid_spacing,
+  )
 }
 
 ///|

@@ -184,6 +184,7 @@ pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
 pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
+pub fn World::write_global_transforms_dense_grid_wave(Self, Int, Int, Double, Float, Double) -> Array[GpuWrite]
 
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)

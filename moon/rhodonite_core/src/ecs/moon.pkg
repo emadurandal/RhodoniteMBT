@@ -1,4 +1,5 @@
 import {
   "emadurandal/rhodonite_core/ecs/components" @comp,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
+  "moonbitlang/core/math" @math,
 }

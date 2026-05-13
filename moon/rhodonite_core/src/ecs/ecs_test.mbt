@@ -1434,3 +1434,25 @@ test "write_global_transforms_dense writes one contiguous upload range" {
     0,
   )
 }
+
+///|
+test "write_global_transforms_dense_grid_wave writes dense scaled grid matrices" {
+  let world = World::new()
+  let writes = world.write_global_transforms_dense_grid_wave(
+    2,
+    2,
+    0.0,
+    (0.5 : Float),
+    2.0,
+  )
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  let row0 = writes[0].bytes[0:64]
+  let row1 = writes[0].bytes[64:128]
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
+}

@@ -80,6 +80,138 @@ pub fn World::write_global_transforms_dense(
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn World::write_global_transforms_dense_grid_wave_js(
+  self : World,
+  gt : ComponentTypeId,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Bool =
+  #| (world, gt, count, perSide, time, scale, spacing) => {
+  #|   const store = world.gpu_stores[gt.index];
+  #|   if (!store || store.stride !== 64) return false;
+  #|   if (!ArrayBuffer.isView(store.bytes)) {
+  #|     const converted = new Uint8Array(store.bytes.length);
+  #|     converted.set(store.bytes);
+  #|     store.bytes = converted;
+  #|   }
+  #|   const bytes = store.bytes;
+  #|   const byteLength = count * 64;
+  #|   if (bytes.length < byteLength || (bytes.byteOffset & 3) !== 0) return false;
+  #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
+  #|   const half = (perSide - 1) * 0.5;
+  #|   const s = Math.fround(scale);
+  #|   for (let i = 0, out = 0; i < count; i++, out += 16) {
+  #|     const ix = i % perSide;
+  #|     const iz = Math.trunc(i / perSide);
+  #|     m[out] = s;
+  #|     m[out + 1] = 0;
+  #|     m[out + 2] = 0;
+  #|     m[out + 3] = 0;
+  #|     m[out + 4] = 0;
+  #|     m[out + 5] = s;
+  #|     m[out + 6] = 0;
+  #|     m[out + 7] = 0;
+  #|     m[out + 8] = 0;
+  #|     m[out + 9] = 0;
+  #|     m[out + 10] = s;
+  #|     m[out + 11] = 0;
+  #|     m[out + 12] = Math.fround((ix - half) * spacing);
+  #|     m[out + 13] = Math.fround(Math.sin(i * 0.09 + time) * 0.12);
+  #|     m[out + 14] = Math.fround((iz - half) * spacing);
+  #|     m[out + 15] = 1;
+  #|   }
+  #|   const ranges = store.__rhodonite_dirty_ranges ||
+  #|     (store.__rhodonite_dirty_ranges = []);
+  #|   if (count > 0) ranges.push({ first: 0, last: count - 1 });
+  #|   return true;
+  #| }
+
+///|
+/// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
+#cfg(target="js")
+pub fn World::write_global_transforms_dense_grid_wave(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Array[GpuWrite] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_grid_wave",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_grid_wave: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return []
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_grid_wave: GlobalTransform stride mismatch",
+        )
+      }
+      self.replace_gpu_store(store)
+    }
+    None => return []
+  }
+  if !self.write_global_transforms_dense_grid_wave_js(
+      gt, count, per_side, time, scale, spacing,
+    ) {
+    return []
+  }
+  self.drain_gpu_writes(gt)
+}
+
+///|
+/// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
+#cfg(not(target="js"))
+pub fn World::write_global_transforms_dense_grid_wave(
+  self : World,
+  count : Int,
+  per_side : Int,
+  time : Double,
+  scale : Float,
+  spacing : Double,
+) -> Array[GpuWrite] {
+  let half = (per_side - 1).to_double() * 0.5
+  let scale_d = scale.to_double()
+  self.write_global_transforms_dense(count, fn(i, row) {
+    let ix = i % per_side
+    let iz = i / per_side
+    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
+    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(
+      row,
+      52,
+      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+    )
+    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
+    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
+  })
+}
+
+///|
 /// `leaf_local_matrix`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
 fn World::multiply_world_chain_matrix(
   self : World,
