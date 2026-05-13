@@ -246,6 +246,41 @@ fn animate_transforms_query_fast(
 }
 
 ///|
+/// Bulk-updates positions via [`@ecs.Query::for_each_archetype`] (SoA column walk) without building
+/// a [`@ecs.QueryRow`] per entity.
+fn animate_transforms_query_for_each_archetype(
+  world : @ecs.World,
+  tf_id : @ecs.ComponentTypeId,
+  per_side : Int,
+  t : Double,
+) -> Bool {
+  let q = @ecs.Query::new([tf_id])
+  let mut ok = true
+  q.for_each_archetype(world, fn(arch) {
+    let stride = arch.component_stride(tf_id)
+    if stride < 12 {
+      ok = false
+      return
+    }
+    let col = arch.write_column(tf_id)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let idx = arch.entity(row).index
+      let (gx, gz) = grid_xz_for_index(idx, per_side)
+      let phase = idx.to_double() * 0.09 + t * 1.8
+      let wy = @math.sin(phase) * 0.12
+      let base = row * stride
+      @v3.Vector3Ref::write_mut_view(
+        col.mut_view(start=base, end=base + 12),
+        gx,
+        Float::from_double(wy),
+        gz,
+      )
+    }
+  })
+  ok
+}
+
+///|
 fn animate_transforms_query(
   world : @ecs.World,
   tf_id : @ecs.ComponentTypeId,
@@ -255,6 +290,9 @@ fn animate_transforms_query(
   // if animate_transforms_query_fast(world, tf_id, per_side, t) {
   //   return
   // }
+  if animate_transforms_query_for_each_archetype(world, tf_id, per_side, t) {
+    return
+  }
   let q = @ecs.Query::new([tf_id])
   q.for_each(world, row => {
     let idx = row.entity().index
