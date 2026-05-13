@@ -163,136 +163,13 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
-#cfg(target="js")
-extern "js" fn animate_transforms_query_fast_js(
-  world : @ecs.World,
-  tf_id : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Bool =
-  #| (world, tfId, perSide, t) => {
-  #|   const tfIndex = tfId.index;
-  #|   const half = (perSide - 1) * 0.5;
-  #|   const spacing = 0.14;
-  #|   const time = t * 1.8;
-  #|   const archetypes = world.archetypes;
-  #|   for (let ai = 0; ai < archetypes.length; ai++) {
-  #|     const arch = archetypes[ai];
-  #|     let tfColumn = null;
-  #|     for (let ci = 0; ci < arch.columns.length; ci++) {
-  #|       const col = arch.columns[ci];
-  #|       if (col.component.index === tfIndex) {
-  #|         tfColumn = col;
-  #|         break;
-  #|       }
-  #|     }
-  #|     if (!tfColumn) continue;
-  #|     if (tfColumn.stride < 40) return false;
-  #|     if (!ArrayBuffer.isView(tfColumn.bytes)) {
-  #|       const converted = new Uint8Array(tfColumn.bytes.length);
-  #|       converted.set(tfColumn.bytes);
-  #|       tfColumn.bytes = converted;
-  #|     }
-  #|     const bytes = tfColumn.bytes;
-  #|     const stride = tfColumn.stride;
-  #|     if ((bytes.byteOffset & 3) !== 0 || (bytes.byteLength & 3) !== 0 || (stride & 3) !== 0) return false;
-  #|     const values = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-  #|     const strideF32 = stride >> 2;
-  #|     const entities = arch.entities;
-  #|     for (let row = 0; row < entities.length; row++) {
-  #|       const idx = entities[row].index;
-  #|       const ix = idx % perSide;
-  #|       const iz = Math.trunc(idx / perSide);
-  #|       const gx = (ix - half) * spacing;
-  #|       const gz = (iz - half) * spacing;
-  #|       const wy = Math.sin(idx * 0.09 + time) * 0.12;
-  #|       const base = row * strideF32;
-  #|       values[base] = Math.fround(gx);
-  #|       values[base + 1] = Math.fround(wy);
-  #|       values[base + 2] = Math.fround(gz);
-  #|     }
-  #|   }
-  #|   return true;
-  #| }
-
-///|
-#cfg(target="js")
-fn animate_transforms_query_fast(
-  world : @ecs.World,
-  tf_id : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Bool {
-  animate_transforms_query_fast_js(world, tf_id, per_side, t)
-}
-
-///|
-#cfg(not(target="js"))
-fn animate_transforms_query_fast(
-  world : @ecs.World,
-  tf_id : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Bool {
-  ignore(tf_id)
-  world.update_transform3d_positions(fn(e) {
-    let idx = e.index
-    let (gx, gz) = grid_xz_for_index(idx, per_side)
-    let phase = idx.to_double() * 0.09 + t * 1.8
-    let wy = @math.sin(phase) * 0.12
-    (gx, Float::from_double(wy), gz)
-  })
-  true
-}
-
-///|
-/// Bulk-updates positions via [`@ecs.Query::for_each_archetype`] (SoA column walk) without building
-/// a [`@ecs.QueryRow`] per entity.
-fn animate_transforms_query_for_each_archetype(
-  world : @ecs.World,
-  tf_id : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Bool {
-  let q = @ecs.Query::new([tf_id])
-  let mut ok = true
-  q.for_each_archetype(world, fn(arch) {
-    let stride = arch.component_stride(tf_id)
-    if stride < 12 {
-      ok = false
-      return
-    }
-    let col = arch.write_column(tf_id)
-    for row = 0; row < arch.length(); row = row + 1 {
-      let idx = arch.entity(row).index
-      let (gx, gz) = grid_xz_for_index(idx, per_side)
-      let phase = idx.to_double() * 0.09 + t * 1.8
-      let wy = @math.sin(phase) * 0.12
-      let base = row * stride
-      @v3.Vector3Ref::write_mut_view(
-        col.mut_view(start=base, end=base + 12),
-        gx,
-        Float::from_double(wy),
-        gz,
-      )
-    }
-  })
-  ok
-}
-
-///|
 fn animate_transforms_query(
   world : @ecs.World,
   tf_id : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
 ) -> Unit {
-  // if animate_transforms_query_fast(world, tf_id, per_side, t) {
-  //   return
-  // }
-  // if animate_transforms_query_for_each_archetype(world, tf_id, per_side, t) {
-  //   return
-  // }
+  ignore(tf_id)
   world.update_transform3d_positions(fn(entity) {
     let idx = entity.index
     let (gx, gz) = grid_xz_for_index(idx, per_side)
@@ -300,77 +177,9 @@ fn animate_transforms_query(
     let wy = @math.sin(phase) * 0.12
     (gx, Float::from_double(wy), gz)
   })
-
-  // let q = @ecs.Query::new([tf_id])
-  // q.for_each(world, row => {
-  //   let idx = row.entity().index
-  //   let (gx, gz) = grid_xz_for_index(idx, per_side)
-  //   let phase = idx.to_double() * 0.09 + t * 1.8
-  //   let wy = @math.sin(phase) * 0.12
-  //   @comp.Transform3D::write_position_to_component_mut_view(
-  //     row.write_view(tf_id),
-  //     gx,
-  //     Float::from_double(wy),
-  //     gz,
-  //   )
-  // })
 }
 
 ///|
-#cfg(target="js")
-extern "js" fn update_global_transforms_for_mass_cubes_fast_js(
-  world : @ecs.World,
-  gt : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-  count : Int,
-  scale : Float,
-) -> Array[@ecs.GpuWrite] =
-  #| (world, gt, perSide, t, count, scale) => {
-  #|   const store = world.gpu_stores[gt.index];
-  #|   if (!store || store.stride !== 64) return [];
-  #|   if (!ArrayBuffer.isView(store.bytes)) {
-  #|     const converted = new Uint8Array(store.bytes.length);
-  #|     converted.set(store.bytes);
-  #|     store.bytes = converted;
-  #|   }
-  #|   const bytes = store.bytes;
-  #|   const byteLength = count * 64;
-  #|   if (bytes.length < byteLength || (bytes.byteOffset & 3) !== 0) return [];
-  #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
-  #|   const half = (perSide - 1) * 0.5;
-  #|   const spacing = 0.14;
-  #|   const time = t * 1.8;
-  #|   const s = Math.fround(scale);
-  #|   for (let i = 0, out = 0; i < count; i++, out += 16) {
-  #|     const ix = i % perSide;
-  #|     const iz = Math.trunc(i / perSide);
-  #|     m[out] = s;
-  #|     m[out + 1] = 0;
-  #|     m[out + 2] = 0;
-  #|     m[out + 3] = 0;
-  #|     m[out + 4] = 0;
-  #|     m[out + 5] = s;
-  #|     m[out + 6] = 0;
-  #|     m[out + 7] = 0;
-  #|     m[out + 8] = 0;
-  #|     m[out + 9] = 0;
-  #|     m[out + 10] = s;
-  #|     m[out + 11] = 0;
-  #|     m[out + 12] = Math.fround((ix - half) * spacing);
-  #|     m[out + 13] = Math.fround(Math.sin(i * 0.09 + time) * 0.12);
-  #|     m[out + 14] = Math.fround((iz - half) * spacing);
-  #|     m[out + 15] = 1;
-  #|   }
-  #|   const dirty = store.dirty_indices;
-  #|   const flags = store.dirty_flags;
-  #|   for (let i = 0; i < dirty.length; i++) flags[dirty[i]] = false;
-  #|   dirty.length = 0;
-  #|   return [{ byte_offset: 0, bytes: bytes.subarray(0, byteLength) }];
-  #| }
-
-///|
-#cfg(target="js")
 fn update_global_transforms_for_mass_cubes_fast(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -379,25 +188,34 @@ fn update_global_transforms_for_mass_cubes_fast(
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
   ignore(tf)
-  update_global_transforms_for_mass_cubes_fast_js(
-    world, gt, per_side, t, entity_count, cube_scale,
-  )
-}
-
-///|
-#cfg(not(target="js"))
-fn update_global_transforms_for_mass_cubes_fast(
-  world : @ecs.World,
-  tf : @ecs.ComponentTypeId,
-  gt : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Array[@ecs.GpuWrite] {
-  ignore(per_side)
-  ignore(t)
-  animate_transforms_query(world, tf, per_side, t)
-  world.update_global_transforms_from_transforms()
-  world.drain_gpu_writes(gt)
+  ignore(gt)
+  let half = (per_side - 1).to_double() * 0.5
+  let time = t * 1.8
+  let scale = cube_scale.to_double()
+  world.write_global_transforms_dense(entity_count, fn(i, row) {
+    let ix = i % per_side
+    let iz = i / per_side
+    @comp.put_gpu_f32_mut_view(row, 0, scale)
+    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 20, scale)
+    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 40, scale)
+    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
+    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * grid_spacing)
+    @comp.put_gpu_f32_mut_view(
+      row,
+      52,
+      @math.sin(i.to_double() * 0.09 + time) * 0.12,
+    )
+    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * grid_spacing)
+    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
+  })
 }
 
 ///|
@@ -408,12 +226,12 @@ fn update_and_drain_global_transforms(
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWrite] {
-  // let writes = update_global_transforms_for_mass_cubes_fast(
-  //   world, tf, gt, per_side, t,
-  // )
-  // if writes.length() > 0 {
-  //   return writes
-  // }
+  let writes = update_global_transforms_for_mass_cubes_fast(
+    world, tf, gt, per_side, t,
+  )
+  if writes.length() > 0 {
+    return writes
+  }
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
   world.drain_gpu_writes(gt)

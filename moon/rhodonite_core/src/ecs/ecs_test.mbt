@@ -747,6 +747,58 @@ test "QueryArchetype column views expose logical rows after column capacity grow
 }
 
 ///|
+test "PreparedQuery rebuilds after structural changes create matching archetype" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryA", 4)
+  let qb = world.register_cpu_component("PreparedQueryB", 4)
+  let query = Query::new([qa, qb])
+  let prepared = query.prepare(world)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
+  let mut row_count = 0
+  let mut first_a = (0 : Byte)
+  prepared.for_each_archetype(world, chunk => {
+    row_count = row_count + chunk.length()
+    first_a = chunk.read_column(qa)[0]
+  })
+  assert_eq(row_count, 1)
+  assert_eq(first_a, (1 : Byte))
+}
+
+///|
+test "World with_gpu_component_write_range marks one contiguous upload" {
+  let world = World::new()
+  let gpu16 = world.register_gpu_component(
+    "GpuBulkRange16",
+    @comp.GpuLayout::empty(16),
+  )
+  let ok = world.with_gpu_component_write_range(gpu16, 2, 3, range => {
+    if range.first_entity_index() != 2 {
+      abort("expected first entity index 2")
+    }
+    if range.count() != 3 {
+      abort("expected range count 3")
+    }
+    if range.stride() != 16 {
+      abort("expected stride 16")
+    }
+    let bytes = range.bytes()
+    bytes[0] = (11 : Byte)
+    bytes[16] = (22 : Byte)
+    bytes[32] = (33 : Byte)
+  })
+  assert_true(ok)
+  let writes = world.drain_gpu_writes(gpu16)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 2 * 16)
+  assert_eq(writes[0].bytes.length(), 3 * 16)
+  assert_eq(writes[0].bytes[0], (11 : Byte))
+  assert_eq(writes[0].bytes[16], (22 : Byte))
+  assert_eq(writes[0].bytes[32], (33 : Byte))
+}
+
+///|
 test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
@@ -1361,4 +1413,24 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
     Some(m) => assert_eq(m.at(0, 3), (7.0 : Float))
     None => abort("expected Matrix44F")
   }
+}
+
+///|
+test "write_global_transforms_dense writes one contiguous upload range" {
+  let world = World::new()
+  let writes = world.write_global_transforms_dense(2, fn(i, row) {
+    row[0] = ((10 + i) & 0xFF).to_byte()
+    row[63] = ((20 + i) & 0xFF).to_byte()
+  })
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(writes[0].bytes[0], (10 : Byte))
+  assert_eq(writes[0].bytes[63], (20 : Byte))
+  assert_eq(writes[0].bytes[64], (11 : Byte))
+  assert_eq(writes[0].bytes[127], (21 : Byte))
+  assert_eq(
+    world.drain_gpu_writes(world.global_transform_component()).length(),
+    0,
+  )
 }

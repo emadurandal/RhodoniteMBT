@@ -229,6 +229,53 @@ fn GpuComponentStore::mut_entity_row(
 }
 
 ///|
+/// Borrows a contiguous mutable GPU component range and marks it dirty as one range.
+fn GpuComponentStore::mut_range(
+  self : GpuComponentStore,
+  first_entity_index : Int,
+  count : Int,
+  write : (GpuComponentWriteRange) -> Unit,
+) -> Unit {
+  if count <= 0 {
+    return
+  }
+  let _ = self.ensure_capacity(first_entity_index + count)
+  let start = first_entity_index * self.stride
+  let end = start + count * self.stride
+  write({
+    bytes: self.bytes.mut_view(start~, end~),
+    stride: self.stride,
+    first_entity_index,
+    count,
+  })
+  self.mark_dirty_range(first_entity_index, first_entity_index + count - 1)
+}
+
+///|
+pub fn GpuComponentWriteRange::bytes(
+  self : GpuComponentWriteRange,
+) -> MutArrayView[Byte] {
+  self.bytes
+}
+
+///|
+pub fn GpuComponentWriteRange::stride(self : GpuComponentWriteRange) -> Int {
+  self.stride
+}
+
+///|
+pub fn GpuComponentWriteRange::first_entity_index(
+  self : GpuComponentWriteRange,
+) -> Int {
+  self.first_entity_index
+}
+
+///|
+pub fn GpuComponentWriteRange::count(self : GpuComponentWriteRange) -> Int {
+  self.count
+}
+
+///|
 /// Writes one entity slot `[entity_index * stride, ..)` and marks it dirty for GPU upload.
 fn GpuComponentStore::set_bytes(
   self : GpuComponentStore,
@@ -693,6 +740,48 @@ pub fn World::drain_gpu_writes(
       writes
     }
     None => []
+  }
+}
+
+///|
+/// Borrows a contiguous GPU-visible component range for bulk writes and marks it dirty once.
+pub fn World::with_gpu_component_write_range(
+  self : World,
+  component : ComponentTypeId,
+  first_entity_index : Int,
+  count : Int,
+  write : (GpuComponentWriteRange) -> Unit,
+) -> Bool {
+  self.assert_system_component_write(
+    component, "World::with_gpu_component_write_range",
+  )
+  if first_entity_index < 0 || count < 0 {
+    return false
+  }
+  if count == 0 {
+    return true
+  }
+  match self.registry.get(component) {
+    Some(rc) =>
+      match rc.kind {
+        CpuOnly => false
+        GpuVisible =>
+          match
+            self.ensure_gpu_store_capacity(
+              component,
+              first_entity_index + count,
+            ) {
+            Some(store) => {
+              self.query_depth = self.query_depth + 1
+              store.mut_range(first_entity_index, count, write)
+              self.query_depth = self.query_depth - 1
+              self.replace_gpu_store(store)
+              true
+            }
+            None => false
+          }
+      }
+    None => false
   }
 }
 

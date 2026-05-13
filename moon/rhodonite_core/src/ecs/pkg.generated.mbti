@@ -51,6 +51,14 @@ pub(all) struct EntityLocation {
 
 type GpuComponentStore
 
+pub struct GpuComponentWriteRange {
+  // private fields
+}
+pub fn GpuComponentWriteRange::bytes(Self) -> MutArrayView[Byte]
+pub fn GpuComponentWriteRange::count(Self) -> Int
+pub fn GpuComponentWriteRange::first_entity_index(Self) -> Int
+pub fn GpuComponentWriteRange::stride(Self) -> Int
+
 pub(all) struct GpuResizeEvent {
   component : ComponentTypeId
   required_capacity : Int
@@ -62,12 +70,18 @@ pub(all) struct GpuWrite {
   bytes : FixedArray[Byte]
 }
 
+pub struct PreparedQuery {
+  // private fields
+}
+pub fn PreparedQuery::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
+
 pub struct Query {
   // private fields
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn Query::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
+pub fn Query::prepare(Self, World) -> PreparedQuery
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 
 pub struct QueryArchetype {
@@ -168,6 +182,8 @@ pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Dou
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
+pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
+pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
 
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)

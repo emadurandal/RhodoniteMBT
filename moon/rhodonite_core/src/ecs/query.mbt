@@ -29,6 +29,126 @@ pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
 }
 
 ///|
+fn Query::assert_registered_components(
+  self : Query,
+  world : World,
+  operation : String,
+) -> Unit {
+  for k = 0; k < self.required.length(); k = k + 1 {
+    match world.registry.get(self.required[k]) {
+      Some(_) => ()
+      None =>
+        abort(
+          operation +
+          ": unknown " +
+          component_id_text(self.required[k]) +
+          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
+        )
+    }
+  }
+}
+
+///|
+fn Query::archetype_accesses(
+  self : Query,
+  world : World,
+  archetype_index : Int,
+  operation : String,
+) -> Array[QueryArchetypeComponentAccess] {
+  let arch = world.archetypes[archetype_index]
+  let accesses : Array[QueryArchetypeComponentAccess] = []
+  for k = 0; k < self.required.length(); k = k + 1 {
+    let component = self.required[k]
+    match world.registry.get(component) {
+      Some(rc) =>
+        match rc.kind {
+          CpuOnly => {
+            let ci = arch.column_index(component)
+            if ci < 0 {
+              abort(operation + ": matched archetype is missing CPU column")
+            }
+            accesses.push({
+              component,
+              kind: CpuOnly,
+              column_index: ci,
+              stride: arch.columns[ci].stride,
+            })
+          }
+          GpuVisible => {
+            let stride = match world.gpu_store(component) {
+              Some(store) => store.stride
+              None =>
+                abort(
+                  operation +
+                  ": GpuVisible " +
+                  component_id_text(component) +
+                  " has no GPU store.",
+                )
+            }
+            accesses.push({
+              component,
+              kind: GpuVisible,
+              column_index: -1,
+              stride,
+            })
+          }
+        }
+      None => abort(operation + ": unknown component")
+    }
+  }
+  accesses
+}
+
+///|
+fn Query::matches_archetype(
+  self : Query,
+  world : World,
+  archetype_index : Int,
+) -> Bool {
+  let required_len = self.required.length()
+  if required_len == 0 {
+    false
+  } else if required_len == 1 {
+    component_array_contains(
+      world.archetypes[archetype_index].components,
+      self.required[0],
+    )
+  } else if required_len == 2 {
+    let sig = world.archetypes[archetype_index].components
+    component_array_contains(sig, self.required[0]) &&
+    component_array_contains(sig, self.required[1])
+  } else {
+    component_array_contains_all(
+      world.archetypes[archetype_index].components,
+      self.required,
+    )
+  }
+}
+
+///|
+/// Precomputes matched archetypes and component access metadata for repeated chunk iteration.
+pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
+  world.assert_system_components_read(self.required, "Query::prepare")
+  self.assert_registered_components(world, "Query::prepare")
+  let prepared_archetypes : Array[PreparedQueryArchetype] = []
+  if self.required.length() > 0 {
+    for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
+      if self.matches_archetype(world, ai) {
+        prepared_archetypes.push({
+          archetype_index: ai,
+          accesses: self.archetype_accesses(world, ai, "Query::prepare"),
+        })
+      }
+    }
+  }
+  {
+    required: copy_component_array(self.required),
+    archetype_version: world.archetype_version,
+    archetypes: prepared_archetypes,
+  }
+}
+
+///|
 /// Runs this query with component-id based row access instead of payload-index access.
 pub fn Query::for_each(
   self : Query,
@@ -39,17 +159,7 @@ pub fn Query::for_each(
   if self.required.length() == 0 {
     return
   }
-  for k = 0; k < self.required.length(); k = k + 1 {
-    match world.registry.get(self.required[k]) {
-      Some(_) => ()
-      None =>
-        abort(
-          "Query::for_each: unknown " +
-          component_id_text(self.required[k]) +
-          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-        )
-    }
-  }
+  self.assert_registered_components(world, "Query::for_each")
   world.query_depth = world.query_depth + 1
   for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
     let arch = world.archetypes[ai]
@@ -103,55 +213,39 @@ pub fn Query::for_each_archetype(
   world : World,
   f : (QueryArchetype) -> Unit,
 ) -> Unit {
+  self.prepare(world).for_each_archetype(world, f)
+}
+
+///|
+/// Runs a prepared query archetype-by-archetype. If structural changes made the plan stale,
+/// it rebuilds once before iteration.
+pub fn PreparedQuery::for_each_archetype(
+  self : PreparedQuery,
+  world : World,
+  f : (QueryArchetype) -> Unit,
+) -> Unit {
   world.assert_system_components_read(
     self.required,
-    "Query::for_each_archetype",
+    "PreparedQuery::for_each_archetype",
   )
-  world.for_each_query_archetypes(self.required, archetype_index => {
-    let arch = world.archetypes[archetype_index]
-    let accesses : Array[QueryArchetypeComponentAccess] = []
-    for k = 0; k < self.required.length(); k = k + 1 {
-      let component = self.required[k]
-      match world.registry.get(component) {
-        Some(rc) =>
-          match rc.kind {
-            CpuOnly => {
-              let ci = arch.column_index(component)
-              if ci < 0 {
-                abort(
-                  "Query::for_each_archetype: matched archetype is missing CPU column",
-                )
-              }
-              accesses.push({
-                component,
-                kind: CpuOnly,
-                column_index: ci,
-                stride: arch.columns[ci].stride,
-              })
-            }
-            GpuVisible => {
-              let stride = match world.gpu_store(component) {
-                Some(store) => store.stride
-                None =>
-                  abort(
-                    "Query::for_each_archetype: GpuVisible " +
-                    component_id_text(component) +
-                    " has no GPU store.",
-                  )
-              }
-              accesses.push({
-                component,
-                kind: GpuVisible,
-                column_index: -1,
-                stride,
-              })
-            }
-          }
-        None => abort("Query::for_each_archetype: unknown component")
-      }
-    }
-    f({ world, accesses, archetype_index })
-  })
+  let plan = if self.archetype_version == world.archetype_version {
+    self
+  } else {
+    Query::new(self.required).prepare(world)
+  }
+  if plan.required.length() == 0 {
+    return
+  }
+  world.query_depth = world.query_depth + 1
+  for i = 0; i < plan.archetypes.length(); i = i + 1 {
+    let chunk = plan.archetypes[i]
+    f({
+      world,
+      accesses: chunk.accesses,
+      archetype_index: chunk.archetype_index,
+    })
+  }
+  world.query_depth = world.query_depth - 1
 }
 
 ///|

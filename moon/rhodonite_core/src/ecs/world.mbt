@@ -71,6 +71,11 @@ fn World::restore_system_access(
 }
 
 ///|
+fn World::bump_archetype_version(self : World) -> Unit {
+  self.archetype_version = self.archetype_version + 1
+}
+
+///|
 fn component_id_text(component : ComponentTypeId) -> String {
   "component id " + component.index.to_string()
 }
@@ -298,6 +303,7 @@ pub fn World::new() -> World {
   let archetypes : Array[Archetype] = [
     Archetype::new(empty_components, registry),
   ]
+  let archetype_version = 0
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
@@ -314,6 +320,7 @@ pub fn World::new() -> World {
     free_indices,
     locations,
     archetypes,
+    archetype_version,
     gpu_stores,
     resize_events,
     query_depth,
@@ -432,6 +439,7 @@ fn World::ensure_archetype(
   } else {
     let idx = self.archetypes.length()
     self.archetypes.push(Archetype::new(components, self.registry))
+    self.bump_archetype_version()
     idx
   }
 }
@@ -500,6 +508,7 @@ fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
   self.ensure_gpu_capacity(entity.index + 1)
+  self.bump_archetype_version()
   true
 }
 
@@ -526,6 +535,7 @@ pub fn World::create_entity(self : World) -> EntityId {
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
   self.ensure_gpu_capacity(entity.index + 1)
+  self.bump_archetype_version()
   entity
 }
 
@@ -549,6 +559,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.generations[entity.index] = self.generations[entity.index] + 1
   self.locations[entity.index] = None
   self.free_indices.push(entity.index)
+  self.bump_archetype_version()
   true
 }
 
@@ -675,6 +686,7 @@ fn World::add_component_signature(
   })
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
+  self.bump_archetype_version()
   true
 }
 
@@ -838,6 +850,7 @@ pub fn World::remove_component(
     }
     None => ()
   }
+  self.bump_archetype_version()
   true
 }
 
@@ -892,56 +905,6 @@ pub fn World::component_bytes(
       }
     None => None
   }
-}
-
-///|
-/// Internal archetype iterator used by [`Query::for_each_archetype`].
-fn World::for_each_query_archetypes(
-  self : World,
-  required : Array[ComponentTypeId],
-  f : (Int) -> Unit,
-) -> Unit {
-  let required_len = required.length()
-  if required_len == 0 {
-    return
-  }
-  for k = 0; k < required_len; k = k + 1 {
-    match self.registry.get(required[k]) {
-      Some(_) => ()
-      None =>
-        abort(
-          "Query::for_each_archetype: unknown " +
-          component_id_text(required[k]) +
-          ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
-        )
-    }
-  }
-  self.query_depth = self.query_depth + 1
-  if required_len == 1 {
-    let c0 = required[0]
-    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-      if component_array_contains(self.archetypes[ai].components, c0) {
-        f(ai)
-      }
-    }
-  } else if required_len == 2 {
-    let c0 = required[0]
-    let c1 = required[1]
-    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-      let sig = self.archetypes[ai].components
-      if component_array_contains(sig, c0) && component_array_contains(sig, c1) {
-        f(ai)
-      }
-    }
-  } else {
-    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-      let sig = self.archetypes[ai].components
-      if component_array_contains_all(sig, required) {
-        f(ai)
-      }
-    }
-  }
-  self.query_depth = self.query_depth - 1
 }
 
 ///|

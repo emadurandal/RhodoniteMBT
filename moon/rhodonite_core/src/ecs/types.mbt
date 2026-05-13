@@ -118,6 +118,14 @@ pub struct Query {
 }
 
 ///|
+/// Cached archetype-column plan for repeated chunk iteration over the same query.
+pub struct PreparedQuery {
+  priv required : Array[ComponentTypeId]
+  priv archetype_version : Int
+  priv archetypes : Array[PreparedQueryArchetype]
+}
+
+///|
 priv struct QueryRowComponentAccess {
   kind : ComponentKind
   column_index : Int
@@ -132,6 +140,12 @@ priv struct QueryArchetypeComponentAccess {
   kind : ComponentKind
   column_index : Int
   stride : Int
+}
+
+///|
+priv struct PreparedQueryArchetype {
+  archetype_index : Int
+  accesses : Array[QueryArchetypeComponentAccess]
 }
 
 ///|
@@ -153,6 +167,15 @@ pub struct QueryArchetype {
   priv world : World
   priv accesses : Array[QueryArchetypeComponentAccess]
   priv archetype_index : Int
+}
+
+///|
+/// Mutable contiguous GPU-visible component range borrowed through [`World`].
+pub struct GpuComponentWriteRange {
+  priv bytes : MutArrayView[Byte]
+  priv stride : Int
+  priv first_entity_index : Int
+  priv count : Int
 }
 
 ///|
@@ -221,6 +244,7 @@ pub struct World {
   priv free_indices : Array[Int]
   priv locations : Array[EntityLocation?]
   priv archetypes : Array[Archetype]
+  priv mut archetype_version : Int
   priv gpu_stores : Array[GpuComponentStore?]
   priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.

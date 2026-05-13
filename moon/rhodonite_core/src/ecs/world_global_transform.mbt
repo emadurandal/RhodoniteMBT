@@ -46,6 +46,40 @@ pub fn World::get_global_transform(
 }
 
 ///|
+/// Bulk-writes dense GlobalTransform rows `[0, count)` and returns the upload ranges.
+pub fn World::write_global_transforms_dense(
+  self : World,
+  count : Int,
+  write : (Int, MutArrayView[Byte]) -> Unit,
+) -> Array[GpuWrite] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(gt, "World::write_global_transforms_dense")
+  if count < 0 {
+    abort("World::write_global_transforms_dense: count must be non-negative")
+  }
+  if count == 0 {
+    return []
+  }
+  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
+    let bytes = range.bytes()
+    let stride = range.stride()
+    if stride != 64 {
+      abort(
+        "World::write_global_transforms_dense: GlobalTransform stride mismatch",
+      )
+    }
+    for i = 0; i < count; i = i + 1 {
+      let base = i * stride
+      write(i, bytes.mut_view(start=base, end=base + stride))
+    }
+  })
+  if !ok {
+    return []
+  }
+  self.drain_gpu_writes(gt)
+}
+
+///|
 /// `leaf_local_matrix`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
 fn World::multiply_world_chain_matrix(
   self : World,
