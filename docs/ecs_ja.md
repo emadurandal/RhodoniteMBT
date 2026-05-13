@@ -159,6 +159,19 @@ let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, g
 
 callback は両方の row を完全に初期化する必要があります。そのために `Transform3D::write_trs_to_component_mut_view` と `global_transform_write_identity_row` があり、中間の `FixedArray[Byte]` 確保を避けます。
 
+任意の component signature を大量生成する場合は `World::spawn_batch(components, count, write)` を使えます。指定 component set のアーキタイプへ直接 append し、callback には `SpawnBatchRow` が渡ります。
+
+```moonbit
+let entities = world.spawn_batch([cpu_component, gpu_component], count, fn(i, entity, row) {
+  let cpu = row.write_view(cpu_component)
+  let gpu = row.write_view(gpu_component)
+  cpu[0] = i.to_byte()
+  gpu[0] = entity.gpu_index().to_byte()
+})
+```
+
+`GpuVisible` component は entity index slot を active 化し、連続 index の batch なら dirty range としてまとめます。callback 中は row view を借用しているため、通常の query callback と同じく構造変更 API は拒否されます。
+
 ---
 
 ## コンポーネント追加・削除とアーキタイプ移行
@@ -206,6 +219,8 @@ callback には `QueryRow` が渡り、payload 配列の添字ではなく compo
 - イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
 
 CPU-only のホットループでは `Query::for_each_archetype` を優先してください。マッチしたアーキタイプごとに、要求 component の kind、列 index、stride を小さな access cache として一度だけ作るため、`QueryArchetype::component_stride`、`read_column`、`write_column` は毎回 `column_index` を線形探索しません。GPU-visible component は `EntityId.index` ベースの flat storage にあるため、archetype column としては読めません。
+
+row callback の形を維持したい場合は、`Query::prepare` で得た `PreparedQuery::for_each(world, f)` を使えます。`world.archetype_version` が変わったときだけ plan を作り直し、通常フレームでは archetype scan と access metadata を再利用します。
 
 ```moonbit
 let query = Query::new([tf, gt])
@@ -285,6 +300,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 `System::reads` と `System::writes` は scheduling / batching 用のメタデータです。構築時に重複を検査し、配列をコピーします。`System::conflicts_with(other)` は write/write、write/read、read/write の重なりを検出し、`Schedule::has_parallel_access_conflicts()` は同じ phase の system 間に同一 batch に入れられないアクセス衝突があるかを返します。`Schedule::run` 自体は単一スレッドですが、同じ conflict ルールで batch 分割します。
 
 ビルトインの変換更新は `transform_propagation_system(world)` でも登録できます。この system は `World::update_global_transforms_from_transforms` と同じ処理を `PostUpdate` phase で実行し、`Transform3D` / `ChildOf` を read、`GlobalTransform` を write として宣言します。
+
+`update_global_transforms_from_transforms` は、`ChildOf` を持たない archetype を fast path のまま処理し、`ChildOf` を含む archetype だけを階層対応 path に回します。scene の一部だけが親子関係を持つ場合でも、flat な大量 entity は階層 path に巻き込まれません。
 
 ---
 
@@ -372,7 +389,7 @@ flowchart BT
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
 - **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では公開 archetype column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。fast path は `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。fallback の `QueryRow::write_view` 経由では従来通り個別 row が dirty になります。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は fast path で `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。
 
 ---
 

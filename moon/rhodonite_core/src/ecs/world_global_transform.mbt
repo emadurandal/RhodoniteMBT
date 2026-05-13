@@ -281,6 +281,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   if (!gtStore || gtStore.stride < 64) return false;
   #|
   #|   const archetypes = world.archetypes;
+  #|   let hasChildArchetype = false;
   #|   for (let ai = 0; ai < archetypes.length; ai++) {
   #|     const arch = archetypes[ai];
   #|     const comps = arch.components;
@@ -291,7 +292,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       else if (idx === gtIndex) hasGt = true;
   #|       else if (idx === coIndex) hasCo = true;
   #|     }
-  #|     if (hasTf && hasGt && hasCo) return false;
+  #|     if (hasTf && hasGt && hasCo) hasChildArchetype = true;
   #|   }
   #|
   #|   if (!ArrayBuffer.isView(gtStore.bytes)) {
@@ -343,6 +344,14 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       }
   #|     }
   #|     if (!hasGt) continue;
+  #|     let hasCo = false;
+  #|     for (let ci = 0; ci < comps.length; ci++) {
+  #|       if (comps[ci].index === coIndex) {
+  #|         hasCo = true;
+  #|         break;
+  #|       }
+  #|     }
+  #|     if (hasCo) continue;
   #|
   #|     let tfBytes = tfColumn.bytes;
   #|     if (!ArrayBuffer.isView(tfBytes)) {
@@ -426,7 +435,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     }
   #|     pushDirtyRange(rangeFirst, rangePrev);
   #|   }
-  #|   return true;
+  #|   return !hasChildArchetype;
   #| }
 
 ///|
@@ -486,12 +495,13 @@ fn World::try_update_global_transforms_no_child_fast_path(
   if gt_store.stride < 64 {
     return false
   }
+  let mut has_child_archetype = false
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let comps = self.archetypes[ai].components
     let has_tf = component_array_contains(comps, tf)
     let has_gt = component_array_contains(comps, gt)
     if has_tf && has_gt && component_array_contains(comps, co) {
-      return false
+      has_child_archetype = true
     }
   }
   let capacity = gt_store.capacity()
@@ -500,6 +510,9 @@ fn World::try_update_global_transforms_no_child_fast_path(
     let comps = arch.components
     if !component_array_contains(comps, tf) ||
       !component_array_contains(comps, gt) {
+      continue
+    }
+    if component_array_contains(comps, co) {
       continue
     }
     let tf_col_index = arch.column_index(tf)
@@ -581,12 +594,13 @@ fn World::try_update_global_transforms_no_child_fast_path(
     gt_store.mark_dirty_range(dirty_first, dirty_prev)
   }
   self.replace_gpu_store(gt_store)
-  true
+  !has_child_archetype
 }
 
 ///|
 /// Fallback for hierarchy-capable transform propagation that still walks archetypes directly.
-/// It avoids per-entity `QueryRow` construction, repeated `has_component`, and per-row GPU store lookup.
+/// It only handles archetypes that actually carry [`ChildOf`]; no-child archetypes are handled by
+/// the fast path above even when the world contains a mix of hierarchical and flat transforms.
 fn World::try_update_global_transforms_from_transforms_archetype_path(
   self : World,
   tf : ComponentTypeId,
@@ -599,6 +613,9 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     let comps = arch.components
     if !component_array_contains(comps, tf) ||
       !component_array_contains(comps, gt) {
+      continue
+    }
+    if !component_array_contains(comps, co) {
       continue
     }
     matched = true
@@ -626,6 +643,9 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     let comps = arch.components
     if !component_array_contains(comps, tf) ||
       !component_array_contains(comps, gt) {
+      continue
+    }
+    if !component_array_contains(comps, co) {
       continue
     }
     let has_child_of = component_array_contains(comps, co)

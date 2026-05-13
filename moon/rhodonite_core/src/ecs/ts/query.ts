@@ -7,6 +7,7 @@ import type {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	prepared_query_for_each_archetype,
+	prepared_query_for_each,
 	query_archetype_component_stride,
 	query_archetype_entity,
 	query_archetype_has,
@@ -74,6 +75,12 @@ export class PreparedQuery {
 	): void {
 		prepared_query_for_each_archetype(this.inner, world.inner, (archetype) =>
 			f(new QueryArchetype(archetype)),
+		);
+	}
+
+	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
+		prepared_query_for_each(this.inner, world.inner, (row) =>
+			f(new QueryRow(row)),
 		);
 	}
 }

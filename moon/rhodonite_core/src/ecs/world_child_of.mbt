@@ -37,6 +37,41 @@ pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
 }
 
 ///|
+fn get_u32_array_le(bytes : Array[Byte], off : Int) -> UInt {
+  bytes[off].to_uint() |
+  (bytes[off + 1].to_uint() << 8) |
+  (bytes[off + 2].to_uint() << 16) |
+  (bytes[off + 3].to_uint() << 24)
+}
+
+///|
+fn World::child_of_parent_direct(self : World, entity : EntityId) -> EntityId? {
+  if !self.is_alive(entity) {
+    return None
+  }
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return None
+  }
+  let arch = self.archetypes[loc.archetype_index]
+  let col_index = arch.column_index(self.child_of_component_id)
+  if col_index < 0 {
+    return None
+  }
+  let col = arch.columns[col_index]
+  if col.stride < 8 {
+    return None
+  }
+  let base = loc.row * col.stride
+  Some(
+    EntityId::new(
+      get_u32_array_le(col.bytes, base).reinterpret_as_int(),
+      get_u32_array_le(col.bytes, base + 4).reinterpret_as_int(),
+    ),
+  )
+}
+
+///|
 /// Walks [`ChildOf`] links upward from `start` (includes `start`). Returns [`None`] on cycle,
 /// out-of-range indices, or missing/dead parent link.
 fn World::build_child_of_ancestor_chain(
@@ -57,7 +92,7 @@ fn World::build_child_of_ancestor_chain(
     }
     visited[cur.index] = true
     chain.push(cur)
-    match self.get_child_of(cur) {
+    match self.child_of_parent_direct(cur) {
       None => walking = false
       Some(parent) =>
         if !self.is_alive(parent) {

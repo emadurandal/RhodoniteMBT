@@ -78,6 +78,7 @@ pub(all) struct GpuWriteView {
 pub struct PreparedQuery {
   // private fields
 }
+pub fn PreparedQuery::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn PreparedQuery::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 
 pub struct Query {
@@ -123,6 +124,12 @@ pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
 pub fn Schedule::len(Self) -> Int
 pub fn Schedule::new() -> Self
 pub fn Schedule::run(Self, World, SystemContext) -> Bool
+
+pub struct SpawnBatchRow {
+  // private fields
+}
+pub fn SpawnBatchRow::entity(Self) -> EntityId
+pub fn SpawnBatchRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub struct System {
   // private fields
@@ -185,6 +192,7 @@ pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
+pub fn World::spawn_batch(Self, Array[ComponentTypeId], Int, (Int, EntityId, SpawnBatchRow) -> Unit) -> Array[EntityId]
 pub fn World::spawn_transform_global_batch(Self, Int, (Int, EntityId, MutArrayView[Byte], MutArrayView[Byte]) -> Unit) -> Array[EntityId]
 pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit

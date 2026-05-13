@@ -168,6 +168,15 @@ pub struct QueryRow {
 }
 
 ///|
+/// One row yielded while batch-spawning entities directly into a target archetype.
+pub struct SpawnBatchRow {
+  priv world : World
+  priv entity : EntityId
+  priv archetype_index : Int
+  priv row : Int
+}
+
+///|
 /// One archetype chunk yielded by [`Query::for_each_archetype`]. Use column views plus row
 /// strides for hot loops that should avoid constructing one [`QueryRow`] per entity.
 pub struct QueryArchetype {

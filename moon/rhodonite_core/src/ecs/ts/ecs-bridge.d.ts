@@ -12,6 +12,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonPreparedQuery = object;
 	export type MoonQueryRow = object;
 	export type MoonQueryArchetype = object;
+	export type MoonSpawnBatchRow = object;
 	export type MoonRegisteredComponent = object;
 	export type MoonGpuLayout = { fields: MoonGpuField[]; stride: number; align: number };
 	export type MoonGpuField = {
@@ -155,6 +156,17 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		count: number,
 	): MoonEntityId[];
+	export function world_spawn_batch(
+		world: MoonWorld,
+		components: MoonComponentTypeId[],
+		count: number,
+		f: (index: number, entity: MoonEntityId, row: MoonSpawnBatchRow) => void,
+	): MoonEntityId[];
+	export function spawn_batch_row_entity(row: MoonSpawnBatchRow): MoonEntityId;
+	export function spawn_batch_row_write_view(
+		row: MoonSpawnBatchRow,
+		component: MoonComponentTypeId,
+	): MoonByteView;
 
 	export function query_new(required: MoonComponentTypeId[]): MoonQuery;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
@@ -173,6 +185,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonPreparedQuery,
 		world: MoonWorld,
 		f: (archetype: MoonQueryArchetype) => void,
+	): void;
+	export function prepared_query_for_each(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+		f: (row: MoonQueryRow) => void,
 	): void;
 	export function query_row_entity(row: MoonQueryRow): MoonEntityId;
 	export function query_row_has(

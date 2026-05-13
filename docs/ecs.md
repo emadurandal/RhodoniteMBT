@@ -157,6 +157,19 @@ let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, g
 
 The callback must fully initialize both rows. `Transform3D::write_trs_to_component_mut_view` and `global_transform_write_identity_row` exist for this purpose and avoid intermediate `FixedArray[Byte]` allocations.
 
+For arbitrary component signatures, use `World::spawn_batch(components, count, write)`. It canonicalizes the signature, appends entities directly to the matching archetype, activates any `GpuVisible` slots, and marks those GPU rows dirty as one contiguous range when entity indices are dense.
+
+```moonbit
+let entities = world.spawn_batch([cpu_component, gpu_component], count, fn(i, entity, row) {
+  let cpu = row.write_view(cpu_component)
+  let gpu = row.write_view(gpu_component)
+  cpu[0] = i.to_byte()
+  gpu[0] = entity.gpu_index().to_byte()
+})
+```
+
+The row callback runs while ECS views are borrowed, so structural mutation APIs are still rejected inside it. This keeps the direct append path from invalidating the row views it hands out.
+
 ---
 
 ## Adding/removing components and archetype migration
@@ -204,6 +217,8 @@ The callback receives a `QueryRow`, so payloads are accessed by component id whi
 - If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
 
 For hot loops over CPU-only data, prefer `Query::for_each_archetype`. It builds a small per-archetype access cache (`component`, kind, column index, stride) once per matched archetype, so `QueryArchetype::component_stride`, `read_column`, and `write_column` do not re-scan columns on every call. GPU-visible columns still cannot be read as archetype columns because their payload rows are keyed by `EntityId.index`.
+
+If a row callback is still the right shape for the system, prepare the query once and call `PreparedQuery::for_each(world, f)`. Like `PreparedQuery::for_each_archetype`, it rebuilds once when `world.archetype_version` changes, but otherwise reuses the matched archetype plan instead of scanning every archetype on each frame.
 
 ```moonbit
 let query = Query::new([tf, gt])
@@ -277,6 +292,8 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 `System::reads` and `System::writes` are metadata for scheduling and batching. They are validated for duplicates and copied on construction. `System::conflicts_with(other)` detects write/write, write/read, and read/write overlap, and `Schedule::has_parallel_access_conflicts()` reports whether systems in the same phase have access conflicts that force separate batches. `Schedule::run` remains single-threaded but uses the same conflict rules for batch splitting.
 
 The built-in transform update can also be registered with `transform_propagation_system(world)`. That system runs the same work as `World::update_global_transforms_from_transforms` in the `PostUpdate` phase, declaring `Transform3D` / `ChildOf` as reads and `GlobalTransform` as a write.
+
+`update_global_transforms_from_transforms` keeps archetypes without `ChildOf` on the direct fast path and sends only archetypes that include `ChildOf` through the hierarchy-aware path. A scene can therefore mix a large flat batch with a smaller parented set without forcing the flat batch through ancestor traversal.
 
 ---
 
@@ -364,7 +381,7 @@ flowchart BT
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
 - **`update_transform3d_positions`**: Bulk-updates only the position field of built-in `Transform3D` without constructing a `QueryRow` per entity. JS uses the public archetype-column path; non-JS uses a direct archetype sweep with fixed-offset f32 writes.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Fast paths write `GlobalTransform` rows directly and record contiguous dirty ranges when possible; fallback `QueryRow::write_view` still marks individual GPU rows dirty.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` write `GlobalTransform` rows directly and record contiguous dirty ranges when possible; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column.
 
 ---
 

@@ -217,6 +217,59 @@ pub fn Query::for_each_archetype(
 }
 
 ///|
+fn query_row_accesses_from_archetype_accesses(
+  accesses : Array[QueryArchetypeComponentAccess],
+) -> Array[QueryRowComponentAccess] {
+  let out : Array[QueryRowComponentAccess] = []
+  for i = 0; i < accesses.length(); i = i + 1 {
+    let access = accesses[i]
+    out.push({
+      kind: access.kind,
+      column_index: access.column_index,
+      stride: access.stride,
+    })
+  }
+  out
+}
+
+///|
+/// Runs a prepared query with row callbacks. If structural changes made the plan stale,
+/// it rebuilds once before iteration.
+pub fn PreparedQuery::for_each(
+  self : PreparedQuery,
+  world : World,
+  f : (QueryRow) -> Unit,
+) -> Unit {
+  world.assert_system_components_read(self.required, "PreparedQuery::for_each")
+  let plan = if self.archetype_version == world.archetype_version {
+    self
+  } else {
+    Query::new(self.required).prepare(world)
+  }
+  if plan.required.length() == 0 {
+    return
+  }
+  world.query_depth = world.query_depth + 1
+  for i = 0; i < plan.archetypes.length(); i = i + 1 {
+    let chunk = plan.archetypes[i]
+    let accesses = query_row_accesses_from_archetype_accesses(chunk.accesses)
+    let arch = world.archetypes[chunk.archetype_index]
+    let ents = arch.entities
+    for row = 0; row < ents.length(); row = row + 1 {
+      f({
+        world,
+        entity: ents[row],
+        components: plan.required,
+        accesses,
+        archetype_index: chunk.archetype_index,
+        row,
+      })
+    }
+  }
+  world.query_depth = world.query_depth - 1
+}
+
+///|
 /// Runs a prepared query archetype-by-archetype. If structural changes made the plan stale,
 /// it rebuilds once before iteration.
 pub fn PreparedQuery::for_each_archetype(

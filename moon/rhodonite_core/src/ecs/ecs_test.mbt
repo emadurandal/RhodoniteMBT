@@ -767,6 +767,23 @@ test "PreparedQuery rebuilds after structural changes create matching archetype"
 }
 
 ///|
+test "PreparedQuery for_each rebuilds stale row plan" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryRowA", 4)
+  let qb = world.register_cpu_component("PreparedQueryRowB", 4)
+  let prepared = Query::new([qa, qb]).prepare(world)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(4, 0, 0, 0)))
+  let mut sum = 0
+  prepared.for_each(world, row => {
+    sum = sum + row.read_view(qa)[0].to_int()
+    sum = sum + row.read_view(qb)[0].to_int()
+  })
+  assert_eq(sum, 7)
+}
+
+///|
 test "World with_gpu_component_write_range marks one contiguous upload" {
   let world = World::new()
   let gpu16 = world.register_gpu_component(
@@ -1438,6 +1455,58 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
 }
 
 ///|
+test "update_global_transforms_from_transforms handles mixed child and root archetypes" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  let root = world.create_entity()
+  let buf_p = transform3d_bytes_translation(
+    (10.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let np = buf_p.length()
+  let tf_p = @comp.Transform3D::from_component_mut_view(
+    buf_p.mut_view(start=0, end=np),
+  )
+  let buf_c = transform3d_bytes_translation(
+    (5.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let nc = buf_c.length()
+  let tf_c = @comp.Transform3D::from_component_mut_view(
+    buf_c.mut_view(start=0, end=nc),
+  )
+  let buf_r = transform3d_bytes_translation(
+    (7.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+  )
+  let nr = buf_r.length()
+  let tf_r = @comp.Transform3D::from_component_mut_view(
+    buf_r.mut_view(start=0, end=nr),
+  )
+  assert_true(world.set_transform(parent, tf_p))
+  assert_true(world.set_transform(child, tf_c))
+  assert_true(world.set_child_of(child, parent))
+  assert_true(world.set_transform(root, tf_r))
+  assert_true(world.set_global_transform(parent, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(child, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(root, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(child) {
+    Some(m) => assert_eq(m.at(0, 3), (15.0 : Float))
+    None => abort("expected child Matrix44F")
+  }
+  match world.get_global_transform(root) {
+    Some(m) => assert_eq(m.at(0, 3), (7.0 : Float))
+    None => abort("expected root Matrix44F")
+  }
+}
+
+///|
 test "write_global_transforms_dense writes one contiguous upload range" {
   let world = World::new()
   let writes = world.write_global_transforms_dense(2, fn(i, row) {
@@ -1506,6 +1575,40 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
     @comp.get_gpu_f32_byte_view(writes[0].bytes[64:128], 60),
     (1.0 : Float),
   )
+}
+
+///|
+test "spawn_batch creates arbitrary CPU and GPU components directly" {
+  let world = World::new()
+  let cpu = world.register_cpu_component("SpawnBatchCpu", 4)
+  let gpu = world.register_gpu_component(
+    "SpawnBatchGpu",
+    @comp.GpuLayout::empty(16),
+  )
+  let entities = world.spawn_batch([gpu, cpu], 3, fn(i, _e, row) {
+    let c = row.write_view(cpu)
+    c[0] = (10 + i).to_byte()
+    let g = row.write_view(gpu)
+    g[0] = (20 + i).to_byte()
+  })
+  assert_eq(entities.length(), 3)
+  for i = 0; i < entities.length(); i = i + 1 {
+    assert_true(world.has_component(entities[i], cpu))
+    assert_true(world.has_component(entities[i], gpu))
+    match world.component_bytes(entities[i], cpu) {
+      Some(bytes) => assert_eq(bytes[0], (10 + i).to_byte())
+      None => abort("expected cpu bytes")
+    }
+  }
+  let active = world.gpu_component_active_indices(gpu)
+  assert_eq(active.length(), 3)
+  let writes = world.drain_gpu_write_views(gpu)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 3 * 16)
+  assert_eq(writes[0].bytes[0], (20 : Byte))
+  assert_eq(writes[0].bytes[16], (21 : Byte))
+  assert_eq(writes[0].bytes[32], (22 : Byte))
 }
 
 ///|

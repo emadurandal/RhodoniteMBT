@@ -1,6 +1,7 @@
 import type {
 	MoonGpuWriteCopy,
 	MoonGpuWriteView,
+	MoonSpawnBatchRow,
 	MoonWorld,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -34,6 +35,9 @@ import {
 	world_remove_component,
 	world_set_component_bytes,
 	world_set_transform_trs,
+	spawn_batch_row_entity,
+	spawn_batch_row_write_view,
+	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
 	world_transform_component,
 	world_update_global_transforms_from_transforms,
@@ -48,6 +52,22 @@ import {
 	RegisteredComponent,
 } from "./types.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
+
+export class SpawnBatchRow {
+	readonly inner: MoonSpawnBatchRow;
+
+	constructor(inner: MoonSpawnBatchRow) {
+		this.inner = inner;
+	}
+
+	entity(): EntityId {
+		return new EntityId(spawn_batch_row_entity(this.inner));
+	}
+
+	writeView(component: ComponentTypeId): ByteView {
+		return byteView(spawn_batch_row_write_view(this.inner, component.inner));
+	}
+}
 
 export class GpuWriteView {
 	readonly inner: MoonGpuWriteView;
@@ -287,6 +307,20 @@ export class World {
 		return world_spawn_transform_global_batch_identity(this.inner, count).map(
 			(entity) => new EntityId(entity),
 		);
+	}
+
+	spawnBatch(
+		components: ComponentTypeId[],
+		count: number,
+		f: (index: number, entity: EntityId, row: SpawnBatchRow) => void,
+	): EntityId[] {
+		return world_spawn_batch(
+			this.inner,
+			components.map((component) => component.inner),
+			count,
+			(index, entity, row) =>
+				f(index, new EntityId(entity), new SpawnBatchRow(row)),
+		).map((entity) => new EntityId(entity));
 	}
 }
 

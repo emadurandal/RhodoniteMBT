@@ -281,6 +281,29 @@ pub fn world_spawn_transform_global_batch_identity(
 }
 
 ///|
+pub fn world_spawn_batch(
+  world : @ecs.World,
+  components : Array[@ecs.ComponentTypeId],
+  count : Int,
+  f : (Int, @ecs.EntityId, @ecs.SpawnBatchRow) -> Unit,
+) -> Array[@ecs.EntityId] {
+  world.spawn_batch(components, count, f)
+}
+
+///|
+pub fn spawn_batch_row_entity(row : @ecs.SpawnBatchRow) -> @ecs.EntityId {
+  row.entity()
+}
+
+///|
+pub fn spawn_batch_row_write_view(
+  row : @ecs.SpawnBatchRow,
+  component : @ecs.ComponentTypeId,
+) -> MutArrayView[Byte] {
+  row.write_view(component)
+}
+
+///|
 pub fn query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.Query {
   @ecs.Query::new(required)
 }
@@ -325,6 +348,15 @@ pub fn prepared_query_for_each_archetype(
   f : (@ecs.QueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
+}
+
+///|
+pub fn prepared_query_for_each(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+  f : (@ecs.QueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
 }
 
 ///|
