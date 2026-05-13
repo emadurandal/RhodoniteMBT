@@ -294,8 +294,8 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch` and uploads `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` results with `queue.write_buffer_from_array_view` on both JS and native.
-The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper for the same data path and submits the borrowed write views with the native browser WebGPU API.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch` and uploads `write_global_transforms_dense_grid_wave_views` / `drain_gpu_write_views` results with `queue.write_buffer_from_array_view` on both JS and native. The JS/native grid-wave helpers fill dense rows directly and advance the per-entity wave with row-local sin/cos recurrence, avoiding one `sin` plus one divide/remainder pair per entity.
+The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper and submits borrowed write views with the native browser WebGPU API. Its user-side renderer mirrors the same row-local sin/cos recurrence for the dense grid-wave path, then drains the same dirty range through `drainGpuWriteViews`.
 
 Dense GlobalTransform helper variants:
 

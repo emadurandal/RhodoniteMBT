@@ -142,25 +142,44 @@ extern "js" fn World::write_global_transforms_dense_grid_wave_js(
   #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
   #|   const half = (perSide - 1) * 0.5;
   #|   const s = Math.fround(scale);
-  #|   for (let i = 0, out = 0; i < count; i++, out += 16) {
-  #|     const ix = i % perSide;
-  #|     const iz = Math.trunc(i / perSide);
-  #|     m[out] = s;
-  #|     m[out + 1] = 0;
-  #|     m[out + 2] = 0;
-  #|     m[out + 3] = 0;
-  #|     m[out + 4] = 0;
-  #|     m[out + 5] = s;
-  #|     m[out + 6] = 0;
-  #|     m[out + 7] = 0;
-  #|     m[out + 8] = 0;
-  #|     m[out + 9] = 0;
-  #|     m[out + 10] = s;
-  #|     m[out + 11] = 0;
-  #|     m[out + 12] = Math.fround((ix - half) * spacing);
-  #|     m[out + 13] = Math.fround(Math.sin(i * 0.09 + time) * 0.12);
-  #|     m[out + 14] = Math.fround((iz - half) * spacing);
-  #|     m[out + 15] = 1;
+  #|   const x0 = -half * spacing;
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   let i = 0;
+  #|   let row = 0;
+  #|   let out = 0;
+  #|   while (i < count) {
+  #|     const rowCount = Math.min(perSide, count - i);
+  #|     let x = x0;
+  #|     const z = (row - half) * spacing;
+  #|     let waveSin = Math.sin(i * 0.09 + time);
+  #|     let waveCos = Math.cos(i * 0.09 + time);
+  #|     for (let ix = 0; ix < rowCount; ix++) {
+  #|       m[out] = s;
+  #|       m[out + 1] = 0;
+  #|       m[out + 2] = 0;
+  #|       m[out + 3] = 0;
+  #|       m[out + 4] = 0;
+  #|       m[out + 5] = s;
+  #|       m[out + 6] = 0;
+  #|       m[out + 7] = 0;
+  #|       m[out + 8] = 0;
+  #|       m[out + 9] = 0;
+  #|       m[out + 10] = s;
+  #|       m[out + 11] = 0;
+  #|       m[out + 12] = x;
+  #|       m[out + 13] = waveSin * 0.12;
+  #|       m[out + 14] = z;
+  #|       m[out + 15] = 1;
+  #|
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|       i++;
+  #|       out += 16;
+  #|       x += spacing;
+  #|     }
+  #|     row++;
   #|   }
   #|   const ranges = store.__rhodonite_dirty_ranges ||
   #|     (store.__rhodonite_dirty_ranges = []);

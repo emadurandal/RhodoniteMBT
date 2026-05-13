@@ -183,7 +183,9 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
 
-`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。native の grid wave helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。
+`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。JS helper は `Float32Array`、native helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。これらの helper は行単位で sin/cos を初期化し、entity ごとは recurrence と x/z カウンタで進めるため、大量 entity 更新時の `sin` と除算/剰余を削減します。
+
+ブラウザ専用の `ts-ecs-mass-cubes` renderer も同じ方針です。TypeScript の user-side fast path が `World` の GPU store backing を `Float32Array` として直接更新し、native helper と同じ行単位 recurrence で grid-wave transform を埋めた後、dirty range を `drainGpuWriteViews` で upload します。
 
 ## Conflict 検査
 

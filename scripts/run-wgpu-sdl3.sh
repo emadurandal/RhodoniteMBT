@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Native wgpu + SDL3 triangle demo. Requires SDL3 development headers (e.g. brew install sdl3).
+# Native wgpu + SDL3 demo. Requires SDL3 development headers (e.g. brew install sdl3).
 # First argument: sample name (default basic-triangle). Example: scripts/run-wgpu-sdl3.sh triangle-with-buffer
+# Builds release binaries by default; set MOON_NATIVE_MODE=debug to run the debug build.
 # Like Kaida-Amethyst/sdl3 env.sh: expose pkg-config or Homebrew include paths.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,7 +27,21 @@ else
   done
 fi
 
-moon build --target native
+MOON_NATIVE_MODE="${MOON_NATIVE_MODE:-release}"
+case "$MOON_NATIVE_MODE" in
+  release)
+    moon build --target native --release
+    BUILD_PROFILE_DIR="release"
+    ;;
+  debug)
+    moon build --target native
+    BUILD_PROFILE_DIR="debug"
+    ;;
+  *)
+    echo "MOON_NATIVE_MODE must be 'release' or 'debug' (got: $MOON_NATIVE_MODE)" >&2
+    exit 2
+    ;;
+esac
 
 if [ "$#" -ge 1 ]; then
   SAMPLE="$1"
@@ -36,4 +51,4 @@ else
 fi
 
 # Workspace builds emit native binaries under the repo-root `_build`, not `moon/rhodonite_examples/_build`.
-exec "$ROOT/_build/native/debug/build/emadurandal/rhodonite_examples/${SAMPLE}/wgpu/main/main.exe" "$@"
+exec "$ROOT/_build/native/${BUILD_PROFILE_DIR}/build/emadurandal/rhodonite_examples/${SAMPLE}/wgpu/main/main.exe" "$@"

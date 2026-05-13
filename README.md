@@ -54,7 +54,7 @@ pnpm install
 pnpm run dev:native:basic-triangle
 ```
 
-[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) runs the native binary; under workspace builds it lives at `_build/native/debug/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
+[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) builds release native binaries by default and runs the selected sample. Set `MOON_NATIVE_MODE=debug` to run the debug build while iterating. Under workspace builds the executable lives at `_build/native/<release|debug>/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
 
 ### Core (JS bridge / Vitest)
 
