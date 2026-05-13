@@ -305,6 +305,40 @@ Dense GlobalTransform helper variants:
 
 ---
 
+## TypeScript wrapper
+
+The JS target also exposes an ECS bridge and TypeScript wrappers under [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/). The wrapper currently covers the `World` + `Query` surface: entity lifecycle, component registration, built-in component ids, row/chunk query views, GPU write-view drains, resize events, and built-in transform upload helpers. `Schedule`, `System`, and `CommandBuffer` are intentionally not wrapped yet.
+
+The wrapper keeps the ECS zero-copy policy explicit:
+
+- `QueryRow::read_view` / `write_view`, `QueryArchetype::read_column` / `write_column`, and `GpuWriteView.bytes` are surfaced as `ByteView`.
+- `ByteView` stores the original MoonBit `{ buf, start, end }` view and reads/writes through that backing storage directly.
+- `ByteView.asUint8Array()` returns a zero-copy `Uint8Array.subarray(...)` only when the backing storage is already typed, which is the normal GPU-store upload path.
+- CPU SoA columns may be backed by a JS number array. Those are still zero-copy through `ByteView.get`, `set`, `getF32`, and `setF32`; converting them to a `Uint8Array` requires the explicitly named `toUint8ArrayCopy()`.
+- Copying APIs are named accordingly in TS, for example `componentBytesCopy` and `drainGpuWritesCopy`. Prefer `drainGpuWriteViews` for immediate WebGPU uploads.
+
+```ts
+import { GpuLayout, Query, World } from "./moon/rhodonite_core/src/ecs/ts/index.ts";
+
+const world = World.new();
+const material = world.registerGpuComponent("Material", GpuLayout.empty(16));
+const entity = world.createEntity();
+world.addComponent(entity, material);
+
+Query.new([material]).forEach(world, (row) => {
+  const bytes = row.writeView(material);
+  bytes.setF32(0, 1.0);
+});
+
+for (const write of world.drainGpuWriteViews(material)) {
+  const bytes = write.bytes().asUint8Array();
+  if (bytes === null) throw new Error("GPU write view must be typed");
+  // queue.writeBuffer(buffer, write.byteOffset(), bytes);
+}
+```
+
+---
+
 ## Built-in components (three)
 
 Registered in `World::new` in this order (`ComponentTypeId.index` 0, 1, 2):

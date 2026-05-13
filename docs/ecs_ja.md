@@ -313,6 +313,40 @@ Dense GlobalTransform helper には所有型と view 型の両方があります
 
 ---
 
+## TypeScript ラッパー
+
+JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` の surface を対象にし、entity lifecycle、component 登録、builtin component id、row/chunk query view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
+
+wrapper では ECS の zero-copy 方針を明示しています。
+
+- `QueryRow::read_view` / `write_view`、`QueryArchetype::read_column` / `write_column`、`GpuWriteView.bytes` は `ByteView` として公開します。
+- `ByteView` は MoonBit の `{ buf, start, end }` view を保持し、元の backing storage に直接 read/write します。
+- `ByteView.asUint8Array()` は backing storage が typed array の場合だけ `Uint8Array.subarray(...)` を返します。GPU store upload path は通常この経路です。
+- CPU SoA column は JS number array が backing になる場合があります。この場合も `ByteView.get`、`set`、`getF32`、`setF32` は zero-copy ですが、`Uint8Array` 化には明示名の `toUint8ArrayCopy()` が必要です。
+- コピーを伴う API は `componentBytesCopy`、`drainGpuWritesCopy` のように名前で示します。即時 WebGPU upload には `drainGpuWriteViews` を優先してください。
+
+```ts
+import { GpuLayout, Query, World } from "./moon/rhodonite_core/src/ecs/ts/index.ts";
+
+const world = World.new();
+const material = world.registerGpuComponent("Material", GpuLayout.empty(16));
+const entity = world.createEntity();
+world.addComponent(entity, material);
+
+Query.new([material]).forEach(world, (row) => {
+  const bytes = row.writeView(material);
+  bytes.setF32(0, 1.0);
+});
+
+for (const write of world.drainGpuWriteViews(material)) {
+  const bytes = write.bytes().asUint8Array();
+  if (bytes === null) throw new Error("GPU write view must be typed");
+  // queue.writeBuffer(buffer, write.byteOffset(), bytes);
+}
+```
+
+---
+
 ## ビルトインの 3 コンポーネント
 
 `World::new` 時に次の順で登録されます（`ComponentTypeId.index` は 0, 1, 2）。

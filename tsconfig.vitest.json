@@ -5,8 +5,16 @@
 		"paths": {
 			"@moon/rhodonite_core/math/js_bridge": [
 				"./_build/js/release/build/emadurandal/rhodonite_core/math/js_bridge/js_bridge.js"
+			],
+			"@moon/rhodonite_core/ecs/js_bridge": [
+				"./_build/js/release/build/emadurandal/rhodonite_core/ecs/js_bridge/js_bridge.js"
 			]
 		}
 	},
-	"include": ["moon/rhodonite_core/src/math/ts/**/*.ts", "moon/rhodonite_core/src/math/ts/math-bridge.d.ts"]
+	"include": [
+		"moon/rhodonite_core/src/math/ts/**/*.ts",
+		"moon/rhodonite_core/src/math/ts/math-bridge.d.ts",
+		"moon/rhodonite_core/src/ecs/ts/**/*.ts",
+		"moon/rhodonite_core/src/ecs/ts/ecs-bridge.d.ts"
+	]
 }

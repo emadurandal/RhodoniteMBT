@@ -17,7 +17,7 @@
     "dev:native:ecs-mass-cubes": "bash scripts/run-wgpu-sdl3.sh ecs-mass-cubes",
     "build": "pnpm run build:moon && tsc && vite build",
     "build:core:js": "cd moon/rhodonite_core && moon build --target js --release",
-    "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/src/math/ts",
+    "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/src/math/ts moon/rhodonite_core/src/ecs/ts",
     "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh",
     "bench:ecs": "bash scripts/run-ecs-bench.sh",
     "bench:ecs:js": "bash scripts/run-ecs-bench.sh js",

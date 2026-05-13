@@ -1,6 +1,7 @@
 /** Generated MoonBit js_bridge bindings (`moon build --target js --release`). */
 declare module "@moon/rhodonite_core/math/js_bridge" {
 	export type MoonVecF = { data: number[] };
+	export type MoonBool = boolean | 0 | 1;
 
 	export function v3f_new(x: number, y: number, z: number): MoonVecF;
 	export function v3f_zero(): MoonVecF;
@@ -15,8 +16,7 @@ declare module "@moon/rhodonite_core/math/js_bridge" {
 	export function v3f_mul(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v3f_scale(v: MoonVecF, s: number): MoonVecF;
 	export function v3f_div_scalar(v: MoonVecF, s: number): MoonVecF;
-	/** MoonBit `Bool` is `0 | 1` in JS. */
-	export function v3f_eq(a: MoonVecF, b: MoonVecF): 0 | 1;
+	export function v3f_eq(a: MoonVecF, b: MoonVecF): MoonBool;
 	export function v3f_to_string(v: MoonVecF): string;
 
 	export function v4f_new(
@@ -38,8 +38,7 @@ declare module "@moon/rhodonite_core/math/js_bridge" {
 	export function v4f_mul(a: MoonVecF, b: MoonVecF): MoonVecF;
 	export function v4f_scale(v: MoonVecF, s: number): MoonVecF;
 	export function v4f_div_scalar(v: MoonVecF, s: number): MoonVecF;
-	/** MoonBit `Bool` is `0 | 1` in JS. */
-	export function v4f_eq(a: MoonVecF, b: MoonVecF): 0 | 1;
+	export function v4f_eq(a: MoonVecF, b: MoonVecF): MoonBool;
 	export function v4f_to_string(v: MoonVecF): string;
 
 	export type MoonMat3F = { data: number[] };
@@ -73,7 +72,7 @@ declare module "@moon/rhodonite_core/math/js_bridge" {
 	export function m3f_sub(a: MoonMat3F, b: MoonMat3F): MoonMat3F;
 	export function m3f_neg(m: MoonMat3F): MoonMat3F;
 	export function m3f_mul(a: MoonMat3F, b: MoonMat3F): MoonMat3F;
-	export function m3f_eq(a: MoonMat3F, b: MoonMat3F): 0 | 1;
+	export function m3f_eq(a: MoonMat3F, b: MoonMat3F): MoonBool;
 	export function m3f_to_string(m: MoonMat3F): string;
 
 	export function m4f_new_col_major(
@@ -122,6 +121,6 @@ declare module "@moon/rhodonite_core/math/js_bridge" {
 	export function m4f_sub(a: MoonMat4F, b: MoonMat4F): MoonMat4F;
 	export function m4f_neg(m: MoonMat4F): MoonMat4F;
 	export function m4f_mul(a: MoonMat4F, b: MoonMat4F): MoonMat4F;
-	export function m4f_eq(a: MoonMat4F, b: MoonMat4F): 0 | 1;
+	export function m4f_eq(a: MoonMat4F, b: MoonMat4F): MoonBool;
 	export function m4f_to_string(m: MoonMat4F): string;
 }
