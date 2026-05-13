@@ -70,6 +70,48 @@ pub fn matrix44f_from_std140_gpu_bytes(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+#cfg(target="js")
+extern "js" fn write_std140_mat4_to_gpu_row_js(
+  data : FixedArray[Float],
+  buf : MutArrayView[Byte],
+) -> Unit =
+  #| (data, buf) => {
+  #|   const bytes = buf.buf;
+  #|   let o = buf.start;
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = {
+  #|       u32: new Uint32Array(1),
+  #|       f32: null,
+  #|     });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   for (let i = 0; i < 16; i++) {
+  #|     scratch.f32[0] = Math.fround(data[i]);
+  #|     const u = scratch.u32[0];
+  #|     bytes[o] = u & 0xff;
+  #|     bytes[o + 1] = (u >>> 8) & 0xff;
+  #|     bytes[o + 2] = (u >>> 16) & 0xff;
+  #|     bytes[o + 3] = (u >>> 24) & 0xff;
+  #|     o += 4;
+  #|   }
+  #| }
+
+///|
+/// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+#cfg(target="js")
+pub fn matrix44f_write_std140_mat4_to_gpu_row(
+  m : @m44.Matrix44F,
+  buf : MutArrayView[Byte],
+) -> Unit {
+  // Hot path: fixed std140 mat4 row (must match global_transform_gpu_layout).
+  if buf.length() != 64 {
+    abort("matrix44f_write_std140_mat4_to_gpu_row: length mismatch")
+  }
+  write_std140_mat4_to_gpu_row_js(m.data, buf)
+}
+
+///|
+/// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+#cfg(not(target="js"))
 pub fn matrix44f_write_std140_mat4_to_gpu_row(
   m : @m44.Matrix44F,
   buf : MutArrayView[Byte],

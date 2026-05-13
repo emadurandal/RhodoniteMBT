@@ -210,6 +210,40 @@ fn GpuComponentStore::sort_dirty_indices_for_drain(
 
 ///|
 /// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
+#cfg(target="js")
+extern "js" fn copy_byte_range_to_fixed_array_js(
+  src : Array[Byte],
+  start : Int,
+  len : Int,
+) -> FixedArray[Byte] =
+  #| (src, start, len) => {
+  #|   const out = new Uint8Array(len);
+  #|   for (let i = 0; i < len; i++) {
+  #|     out[i] = src[start + i] & 0xff;
+  #|   }
+  #|   return out;
+  #| }
+
+///|
+/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
+#cfg(target="js")
+fn GpuComponentStore::range_bytes(
+  self : GpuComponentStore,
+  first : Int,
+  last : Int,
+) -> GpuWrite {
+  let count = last - first + 1
+  let len = count * self.stride
+  let src_base = first * self.stride
+  {
+    byte_offset: src_base,
+    bytes: copy_byte_range_to_fixed_array_js(self.bytes, src_base, len),
+  }
+}
+
+///|
+/// Copies bytes for entity indices `[first..=last]` into one payload; `byte_offset` is `first * stride`.
+#cfg(not(target="js"))
 fn GpuComponentStore::range_bytes(
   self : GpuComponentStore,
   first : Int,
@@ -219,22 +253,9 @@ fn GpuComponentStore::range_bytes(
   let len = count * self.stride
   let out = FixedArray::make(len, (0 : Byte))
   let src_base = first * self.stride
-  let src_view = self.bytes[src_base:src_base + len]
   let mut i = 0
-  while i + 8 <= len {
-    let u0 = @writes.get_u32_le_byte_view(src_view, i)
-    let u1 = @writes.get_u32_le_byte_view(src_view, i + 4)
-    @writes.put_u32_le(out, i, u0)
-    @writes.put_u32_le(out, i + 4, u1)
-    i = i + 8
-  }
-  while i + 4 <= len {
-    let u = @writes.get_u32_le_byte_view(src_view, i)
-    @writes.put_u32_le(out, i, u)
-    i = i + 4
-  }
   while i < len {
-    out[i] = src_view[i]
+    out[i] = self.bytes[src_base + i]
     i = i + 1
   }
   { byte_offset: src_base, bytes: out }

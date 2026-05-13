@@ -105,6 +105,75 @@ pub fn Transform3D::from_component_mut_view(
 
 ///|
 /// Decodes a read-only component row and returns its local model matrix.
+#cfg(target="js")
+extern "js" fn transform3d_local_matrix_data_from_component_view_js(
+  row : ArrayView[Byte],
+) -> FixedArray[Float] =
+  #| (row) => {
+  #|   const bytes = row.buf;
+  #|   const base = row.start;
+  #|   const scratch = globalThis.__rhodonite_f32_scratch ||
+  #|     (globalThis.__rhodonite_f32_scratch = {
+  #|       u32: new Uint32Array(1),
+  #|       f32: null,
+  #|     });
+  #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
+  #|   const f32 = (off) => {
+  #|     const i = base + off;
+  #|     const bits =
+  #|       (bytes[i] & 0xff) |
+  #|       ((bytes[i + 1] & 0xff) << 8) |
+  #|       ((bytes[i + 2] & 0xff) << 16) |
+  #|       ((bytes[i + 3] & 0xff) << 24);
+  #|     scratch.u32[0] = bits >>> 0;
+  #|     return scratch.f32[0];
+  #|   };
+  #|   const px = f32(0), py = f32(4), pz = f32(8);
+  #|   const qx = f32(12), qy = f32(16), qz = f32(20), qw = f32(24);
+  #|   const sx = f32(28), sy = f32(32), sz = f32(36);
+  #|   const xx = Math.fround(qx * qx);
+  #|   const yy = Math.fround(qy * qy);
+  #|   const zz = Math.fround(qz * qz);
+  #|   const xy = Math.fround(qx * qy);
+  #|   const xz = Math.fround(qx * qz);
+  #|   const yz = Math.fround(qy * qz);
+  #|   const wx = Math.fround(qw * qx);
+  #|   const wy = Math.fround(qw * qy);
+  #|   const wz = Math.fround(qw * qz);
+  #|   const r00 = Math.fround(1 - Math.fround(2 * Math.fround(yy + zz)));
+  #|   const r01 = Math.fround(2 * Math.fround(xy - wz));
+  #|   const r02 = Math.fround(2 * Math.fround(xz + wy));
+  #|   const r10 = Math.fround(2 * Math.fround(xy + wz));
+  #|   const r11 = Math.fround(1 - Math.fround(2 * Math.fround(xx + zz)));
+  #|   const r12 = Math.fround(2 * Math.fround(yz - wx));
+  #|   const r20 = Math.fround(2 * Math.fround(xz - wy));
+  #|   const r21 = Math.fround(2 * Math.fround(yz + wx));
+  #|   const r22 = Math.fround(1 - Math.fround(2 * Math.fround(xx + yy)));
+  #|   return [
+  #|     Math.fround(r00 * sx), Math.fround(r10 * sx), Math.fround(r20 * sx), 0,
+  #|     Math.fround(r01 * sy), Math.fround(r11 * sy), Math.fround(r21 * sy), 0,
+  #|     Math.fround(r02 * sz), Math.fround(r12 * sz), Math.fround(r22 * sz), 0,
+  #|     px, py, pz, 1,
+  #|   ];
+  #| }
+
+///|
+/// Decodes a read-only component row and returns its local model matrix.
+#cfg(target="js")
+pub fn Transform3D::local_matrix_from_component_view(
+  row : ArrayView[Byte],
+) -> @m44.Matrix44F {
+  if row.length() != 48 {
+    abort("Transform3D::local_matrix_from_component_view: row length mismatch")
+  }
+  @m44.Matrix44F::{
+    data: transform3d_local_matrix_data_from_component_view_js(row),
+  }
+}
+
+///|
+/// Decodes a read-only component row and returns its local model matrix.
+#cfg(not(target="js"))
 pub fn Transform3D::local_matrix_from_component_view(
   row : ArrayView[Byte],
 ) -> @m44.Matrix44F {
