@@ -749,6 +749,8 @@ pub fn World::register_cpu_component(
   self.assert_component_registration_open("World::register_cpu_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   self.gpu_stores.push(None)
+  let archetypes : Array[Int] = []
+  self.component_archetypes.push(archetypes)
   id
 }
 
@@ -767,6 +769,8 @@ pub fn World::register_gpu_component(
   }
   let id = self.registry.register_gpu(name, gpu_layout)
   self.gpu_stores.push(Some(GpuComponentStore::new(id, gpu_layout.stride)))
+  let archetypes : Array[Int] = []
+  self.component_archetypes.push(archetypes)
   id
 }
 

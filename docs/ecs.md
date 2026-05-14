@@ -51,6 +51,7 @@ flowchart TB
 - **`generations` / `alive` / `free_indices`**: Slot reuse and generation tracking.
 - **`locations`**: `EntityId.index` → `EntityLocation?` (archetype index and row).
 - **`archetypes`**: One SoA table per signature (CPU component payloads). Each column tracks a `row_capacity` watermark separately from the logical row count so appends can grow backing storage without leaking spare capacity to query column views.
+- **`archetype_signature_cache` / `component_archetypes`**: Internal indexes for storage and query planning. Signature lookup avoids repeatedly scanning all archetypes for structural moves, and component-to-archetype lists let query planning start from the rarest required component instead of every archetype.
 - **`gpu_stores`**: Parallel array to registry indices, `GpuComponentStore?` (`Some` only for GPU-visible types). Stores keep flat payload bytes, per-row dirty flags, batched dirty ranges, and a packed active-index set for owned GPU-visible rows.
 - **`resize_events`**: Queue of notifications when flat stores grow (buffer recreation / full upload may be needed).
 
@@ -249,7 +250,7 @@ raw.for_each_archetype(world, fn(chunk) {
 })
 ```
 
-`Query::prepare` / `RawQuery::prepare` reuse the archetype scan and access metadata while the world's archetype version is unchanged.
+`Query::prepare` / `RawQuery::prepare` use the world's component-to-archetype index to skip unrelated archetypes, then cache matched archetypes and access metadata while the world's archetype version is unchanged. Non-prepared `for_each` also goes through the same plan builder.
 
 ---
 

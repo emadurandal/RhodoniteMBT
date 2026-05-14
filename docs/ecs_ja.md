@@ -51,6 +51,7 @@ flowchart TB
 - **`generations` / `alive` / `free_indices`**: スロットの再利用と世代管理。
 - **`locations`**: `EntityId.index` → `EntityLocation?`（アーキタイプ索引と行）。
 - **`archetypes`**: シグネチャごとの SoA テーブル（CPU コンポーネントの実体）。各列は論理行数とは別に `row_capacity` を持ち、append 時に backing を余裕を持って伸ばしても query の列 view には未使用領域を見せません。
+- **`archetype_signature_cache` / `component_archetypes`**: storage / query planning 用の内部 index。シグネチャ lookup は構造変更時の全 archetype 走査を避け、component-to-archetype list は query planning を全 archetype ではなく最も候補が少ない required component から始めます。
 - **`gpu_stores`**: `ComponentTypeId.index` に並ぶ `GpuComponentStore?`（GPU 可視のみ `Some`）。flat payload bytes、行単位 dirty flag、bulk path 用 dirty range、所有中 row の packed active index set を持ちます。
 - **`resize_events`**: フラットストア拡張時にバッファ再作成が必要な通知のキュー。
 
@@ -240,7 +241,7 @@ RawQuery::new([position, velocity]).for_each_archetype(world, fn(chunk) {
 })
 ```
 
-`Query::prepare` / `RawQuery::prepare` は構造変更がなければ archetype scan と access metadata を再利用します。
+`Query::prepare` / `RawQuery::prepare` は world の component-to-archetype index で無関係な archetype を飛ばし、構造変更がなければマッチ済み archetype と access metadata を再利用します。非 prepared の `for_each` も同じ plan builder を通ります。
 
 ```moonbit
 let raw = RawQuery::new([tf])
@@ -404,7 +405,7 @@ flowchart BT
 ```
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
-- **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では公開 archetype column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
+- **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では `RawQuery::for_each_archetype` による column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
 - **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は fast path で 48 byte affine `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。affine 3x4 layout は、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
 
 ---

@@ -170,6 +170,13 @@ priv struct PreparedQueryArchetype {
 }
 
 ///|
+priv struct ArchetypeSignatureCacheEntry {
+  hash : Int
+  components : Array[ComponentTypeId]
+  archetype_index : Int
+}
+
+///|
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
 /// views through closure-scoped high-level helpers.
 pub struct QueryRow {
@@ -286,6 +293,8 @@ pub struct World {
   priv locations : Array[EntityLocation?]
   priv archetypes : Array[Archetype]
   priv mut archetype_version : Int
+  priv archetype_signature_cache : Array[ArchetypeSignatureCacheEntry]
+  priv component_archetypes : Array[Array[Int]]
   priv gpu_stores : Array[GpuComponentStore?]
   priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.

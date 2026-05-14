@@ -149,9 +149,9 @@ query.for_each(world, fn(row) {
 
 `QueryRow::write(component, f)` は同じ payload を `MutArrayView[Byte]` として closure に渡します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
-CPU-only の bulk loop では `RawQuery::for_each_archetype` を使えます。マッチした archetype ごとに required component の column index / stride を cache するため、`RawQueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
+CPU-only の bulk loop では `RawQuery::for_each_archetype` を使えます。query plan は world の component-to-archetype index を使って無関係な archetype を飛ばし、マッチした archetype ごとに required component の column index / stride を cache します。そのため、`RawQueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
 
-row callback の形を保ちたい場合は、`Query::prepare` で得た `PreparedQuery::for_each` を使えます。raw row/chunk が必要な hot loop は `RawQuery::prepare` で得た `RawPreparedQuery` を使い、`world.archetype_version` が変わった場合だけ plan を作り直します。
+row callback の形を保ちたい場合は、`Query::prepare` で得た `PreparedQuery::for_each` を使えます。raw row/chunk が必要な hot loop は `RawQuery::prepare` で得た `RawPreparedQuery` を使い、`world.archetype_version` が変わった場合だけ plan を作り直します。非 prepared の `Query::for_each` / `RawQuery::for_each` も同じ plan builder を使います。
 
 ## GPU-visible component の dirty 管理
 
@@ -227,10 +227,10 @@ pub struct App {
 
 ## まだ残る課題
 
-- typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
+- ユーザー定義 component 向けの typed row wrapper pattern。標準 component には `Transform3DRow` / `Transform3DMutRow` / `GlobalTransformGpuMutRow` / `ChildOf` 系 wrapper があるため、残る課題は custom component でも同じ書き味を作りやすくすること。
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
-- archetype index cache。`RawQuery::for_each_archetype` と `PreparedQuery::for_each` / `RawPreparedQuery` の per-archetype access cache は導入済み。
+- component-to-archetype index と signature cache は導入済み。残る課題は、query pattern ごとの長寿命 cache や、並列 chunk 分割と一体化した plan cache。
 - native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を直接 lower-level queue binding に渡すため、任意の borrowed byte view upload でも `Bytes::from_array` の compact copy は発生しません。
 - `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 

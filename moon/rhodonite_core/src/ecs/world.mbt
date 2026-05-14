@@ -119,6 +119,94 @@ fn component_arrays_equal(
 }
 
 ///|
+fn component_signature_hash(components : Array[ComponentTypeId]) -> Int {
+  let mut h = components.length()
+  for i = 0; i < components.length(); i = i + 1 {
+    h = h + components[i].index + 1
+  }
+  h
+}
+
+///|
+fn World::remember_archetype_signature(
+  self : World,
+  components : Array[ComponentTypeId],
+  archetype_index : Int,
+) -> Unit {
+  let hash = component_signature_hash(components)
+  for i = 0; i < self.archetype_signature_cache.length(); i = i + 1 {
+    let entry = self.archetype_signature_cache[i]
+    if entry.hash == hash &&
+      component_arrays_equal(entry.components, components) {
+      self.archetype_signature_cache[i] = {
+        hash,
+        components: copy_component_array(components),
+        archetype_index,
+      }
+      return
+    }
+  }
+  self.archetype_signature_cache.push({
+    hash,
+    components: copy_component_array(components),
+    archetype_index,
+  })
+}
+
+///|
+fn World::ensure_component_archetype_slot(
+  self : World,
+  component : ComponentTypeId,
+) -> Unit {
+  while self.component_archetypes.length() <= component.index {
+    let archetypes : Array[Int] = []
+    self.component_archetypes.push(archetypes)
+  }
+}
+
+///|
+fn World::index_archetype_components(
+  self : World,
+  archetype_index : Int,
+) -> Unit {
+  let components = self.archetypes[archetype_index].components
+  for i = 0; i < components.length(); i = i + 1 {
+    let component = components[i]
+    self.ensure_component_archetype_slot(component)
+    self.component_archetypes[component.index].push(archetype_index)
+  }
+}
+
+///|
+fn World::query_candidate_archetypes(
+  self : World,
+  required : Array[ComponentTypeId],
+) -> Array[Int] {
+  let empty : Array[Int] = []
+  if required.length() == 0 {
+    return empty
+  }
+  let mut best_component_index = -1
+  let mut best_len = 0
+  for i = 0; i < required.length(); i = i + 1 {
+    let component = required[i]
+    if component.index < 0 ||
+      component.index >= self.component_archetypes.length() {
+      return empty
+    }
+    let candidate_len = self.component_archetypes[component.index].length()
+    if candidate_len == 0 {
+      return empty
+    }
+    if best_component_index < 0 || candidate_len < best_len {
+      best_component_index = component.index
+      best_len = candidate_len
+    }
+  }
+  self.component_archetypes[best_component_index]
+}
+
+///|
 /// Component-type ids are sorted ascending so archetype keys are canonical and comparable.
 fn sorted_with_added(
   components : Array[ComponentTypeId],
@@ -304,6 +392,19 @@ pub fn World::new() -> World {
     Archetype::new(empty_components, registry),
   ]
   let archetype_version = 0
+  let archetype_signature_cache : Array[ArchetypeSignatureCacheEntry] = [
+    {
+      hash: component_signature_hash(empty_components),
+      components: copy_component_array(empty_components),
+      archetype_index: 0,
+    },
+  ]
+  let transform_archetypes : Array[Int] = []
+  let global_transform_archetypes : Array[Int] = []
+  let child_of_archetypes : Array[Int] = []
+  let component_archetypes : Array[Array[Int]] = [
+    transform_archetypes, global_transform_archetypes, child_of_archetypes,
+  ]
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
@@ -321,6 +422,8 @@ pub fn World::new() -> World {
     locations,
     archetypes,
     archetype_version,
+    archetype_signature_cache,
+    component_archetypes,
     gpu_stores,
     resize_events,
     query_depth,
@@ -415,13 +518,22 @@ fn World::exit_system_access(
 }
 
 ///|
-/// Linear scan for an archetype whose sorted signature matches `components` (small archetype count expected).
+/// Returns an archetype whose sorted signature matches `components`.
 fn World::find_archetype(
   self : World,
   components : Array[ComponentTypeId],
 ) -> Int {
+  let hash = component_signature_hash(components)
+  for i = 0; i < self.archetype_signature_cache.length(); i = i + 1 {
+    let entry = self.archetype_signature_cache[i]
+    if entry.hash == hash &&
+      component_arrays_equal(entry.components, components) {
+      return entry.archetype_index
+    }
+  }
   for i = 0; i < self.archetypes.length(); i = i + 1 {
     if component_arrays_equal(self.archetypes[i].components, components) {
+      self.remember_archetype_signature(components, i)
       return i
     }
   }
@@ -439,6 +551,8 @@ fn World::ensure_archetype(
   } else {
     let idx = self.archetypes.length()
     self.archetypes.push(Archetype::new(components, self.registry))
+    self.remember_archetype_signature(components, idx)
+    self.index_archetype_components(idx)
     self.bump_archetype_version()
     idx
   }

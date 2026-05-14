@@ -50,14 +50,23 @@ fn Query::assert_registered_components(
   world : World,
   operation : String,
 ) -> Unit {
-  for k = 0; k < self.required.length(); k = k + 1 {
-    match world.registry.get(self.required[k]) {
+  assert_query_components_registered(self.required, world, operation)
+}
+
+///|
+fn assert_query_components_registered(
+  required : Array[ComponentTypeId],
+  world : World,
+  operation : String,
+) -> Unit {
+  for k = 0; k < required.length(); k = k + 1 {
+    match world.registry.get(required[k]) {
       Some(_) => ()
       None =>
         abort(
           operation +
           ": unknown " +
-          component_id_text(self.required[k]) +
+          component_id_text(required[k]) +
           ". Hint: use ComponentTypeId values registered in this World, or builtin component accessors such as world.transform_component().",
         )
     }
@@ -65,21 +74,16 @@ fn Query::assert_registered_components(
 }
 
 ///|
-fn RawQuery::as_query(self : RawQuery) -> Query {
-  Query::new(self.required)
-}
-
-///|
-fn Query::archetype_accesses(
-  self : Query,
+fn query_archetype_accesses(
+  required : Array[ComponentTypeId],
   world : World,
   archetype_index : Int,
   operation : String,
 ) -> Array[QueryArchetypeComponentAccess] {
   let arch = world.archetypes[archetype_index]
   let accesses : Array[QueryArchetypeComponentAccess] = []
-  for k = 0; k < self.required.length(); k = k + 1 {
-    let component = self.required[k]
+  for k = 0; k < required.length(); k = k + 1 {
+    let component = required[k]
     match world.registry.get(component) {
       Some(rc) =>
         match rc.kind {
@@ -121,29 +125,51 @@ fn Query::archetype_accesses(
 }
 
 ///|
-fn Query::matches_archetype(
-  self : Query,
+fn query_matches_archetype(
+  required : Array[ComponentTypeId],
   world : World,
   archetype_index : Int,
 ) -> Bool {
-  let required_len = self.required.length()
+  let required_len = required.length()
   if required_len == 0 {
     false
   } else if required_len == 1 {
     component_array_contains(
       world.archetypes[archetype_index].components,
-      self.required[0],
+      required[0],
     )
   } else if required_len == 2 {
     let sig = world.archetypes[archetype_index].components
-    component_array_contains(sig, self.required[0]) &&
-    component_array_contains(sig, self.required[1])
+    component_array_contains(sig, required[0]) &&
+    component_array_contains(sig, required[1])
   } else {
     component_array_contains_all(
       world.archetypes[archetype_index].components,
-      self.required,
+      required,
     )
   }
+}
+
+///|
+fn build_prepared_query_archetypes(
+  required : Array[ComponentTypeId],
+  world : World,
+  operation : String,
+) -> Array[PreparedQueryArchetype] {
+  let prepared_archetypes : Array[PreparedQueryArchetype] = []
+  if required.length() > 0 {
+    let candidates = world.query_candidate_archetypes(required)
+    for i = 0; i < candidates.length(); i = i + 1 {
+      let ai = candidates[i]
+      if query_matches_archetype(required, world, ai) {
+        prepared_archetypes.push({
+          archetype_index: ai,
+          accesses: query_archetype_accesses(required, world, ai, operation),
+        })
+      }
+    }
+  }
+  prepared_archetypes
 }
 
 ///|
@@ -151,33 +177,30 @@ fn Query::matches_archetype(
 pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
   world.assert_system_components_read(self.required, "Query::prepare")
   self.assert_registered_components(world, "Query::prepare")
-  let prepared_archetypes : Array[PreparedQueryArchetype] = []
-  if self.required.length() > 0 {
-    for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
-      if self.matches_archetype(world, ai) {
-        prepared_archetypes.push({
-          archetype_index: ai,
-          accesses: self.archetype_accesses(world, ai, "Query::prepare"),
-        })
-      }
-    }
-  }
   {
     required: copy_component_array(self.required),
     archetype_version: world.archetype_version,
-    archetypes: prepared_archetypes,
+    archetypes: build_prepared_query_archetypes(
+      self.required,
+      world,
+      "Query::prepare",
+    ),
   }
 }
 
 ///|
 /// Precomputes matched archetypes and component access metadata for repeated raw iteration.
 pub fn RawQuery::prepare(self : RawQuery, world : World) -> RawPreparedQuery {
-  let query = self.as_query()
-  let prepared = query.prepare(world)
+  world.assert_system_components_read(self.required, "RawQuery::prepare")
+  assert_query_components_registered(self.required, world, "RawQuery::prepare")
   {
-    required: prepared.required,
-    archetype_version: prepared.archetype_version,
-    archetypes: prepared.archetypes,
+    required: copy_component_array(self.required),
+    archetype_version: world.archetype_version,
+    archetypes: build_prepared_query_archetypes(
+      self.required,
+      world,
+      "RawQuery::prepare",
+    ),
   }
 }
 
@@ -188,54 +211,7 @@ pub fn Query::for_each(
   world : World,
   f : (QueryRow) -> Unit,
 ) -> Unit {
-  world.assert_system_components_read(self.required, "Query::for_each")
-  if self.required.length() == 0 {
-    return
-  }
-  self.assert_registered_components(world, "Query::for_each")
-  world.query_depth = world.query_depth + 1
-  for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
-    let arch = world.archetypes[ai]
-    if component_array_contains_all(arch.components, self.required) {
-      let accesses : Array[QueryRowComponentAccess] = []
-      for k = 0; k < self.required.length(); k = k + 1 {
-        let component = self.required[k]
-        match world.registry.get(component) {
-          Some(rc) =>
-            match rc.kind {
-              CpuOnly => {
-                let ci = arch.column_index(component)
-                if ci < 0 {
-                  abort(
-                    "Query::for_each: matched archetype is missing CPU column",
-                  )
-                }
-                accesses.push({
-                  kind: CpuOnly,
-                  column_index: ci,
-                  stride: arch.columns[ci].stride,
-                })
-              }
-              GpuVisible =>
-                accesses.push({ kind: GpuVisible, column_index: -1, stride: 0 })
-            }
-          None => abort("Query::for_each: unknown component")
-        }
-      }
-      let ents = arch.entities
-      for row = 0; row < ents.length(); row = row + 1 {
-        f({
-          world,
-          entity: ents[row],
-          components: self.required,
-          accesses,
-          archetype_index: ai,
-          row,
-        })
-      }
-    }
-  }
-  world.query_depth = world.query_depth - 1
+  self.prepare(world).for_each(world, f)
 }
 
 ///|
@@ -245,55 +221,7 @@ pub fn RawQuery::for_each(
   world : World,
   f : (RawQueryRow) -> Unit,
 ) -> Unit {
-  let query = self.as_query()
-  world.assert_system_components_read(query.required, "RawQuery::for_each")
-  if query.required.length() == 0 {
-    return
-  }
-  query.assert_registered_components(world, "RawQuery::for_each")
-  world.query_depth = world.query_depth + 1
-  for ai = 0; ai < world.archetypes.length(); ai = ai + 1 {
-    let arch = world.archetypes[ai]
-    if component_array_contains_all(arch.components, query.required) {
-      let accesses : Array[QueryRowComponentAccess] = []
-      for k = 0; k < query.required.length(); k = k + 1 {
-        let component = query.required[k]
-        match world.registry.get(component) {
-          Some(rc) =>
-            match rc.kind {
-              CpuOnly => {
-                let ci = arch.column_index(component)
-                if ci < 0 {
-                  abort(
-                    "RawQuery::for_each: matched archetype is missing CPU column",
-                  )
-                }
-                accesses.push({
-                  kind: CpuOnly,
-                  column_index: ci,
-                  stride: arch.columns[ci].stride,
-                })
-              }
-              GpuVisible =>
-                accesses.push({ kind: GpuVisible, column_index: -1, stride: 0 })
-            }
-          None => abort("RawQuery::for_each: unknown component")
-        }
-      }
-      let ents = arch.entities
-      for row = 0; row < ents.length(); row = row + 1 {
-        f({
-          world,
-          entity: ents[row],
-          components: query.required,
-          accesses,
-          archetype_index: ai,
-          row,
-        })
-      }
-    }
-  }
-  world.query_depth = world.query_depth - 1
+  self.prepare(world).for_each(world, f)
 }
 
 ///|
