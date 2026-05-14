@@ -74,6 +74,9 @@ The current test set covers:
 | `depth-test` browser | `depth_test_browser_sample.png` |
 | `ecs-scene-graph` browser | `ecs_scene_graph_browser_sample.png` |
 | `ecs-mass-cubes` browser | `ecs_mass_cubes_browser_sample.png` |
+| `ts-ecs-mass-cubes` browser | `ts_ecs_mass_cubes_browser_sample.png` |
+| `wasm-ecs-mass-cubes` browser | `wasm_ecs_mass_cubes_browser_sample.png` |
+| `wasm-gc-ecs-mass-cubes` browser | `wasm_gc_ecs_mass_cubes_browser_sample.png` |
 
 If a PNG is missing, a WebGPU-capable normal test run fails with a message that
 points at the update command. On machines where adapter creation fails, the
@@ -124,5 +127,8 @@ then sends comparison results or updated PNG bytes back to the Node runner.
   Chrome/Chromium page, and waits for the page to POST its result. Browser
   stdout/stderr is hidden by default; set `RHODONITE_BROWSER_VERBOSE=1` to debug
   page progress and Chrome logs.
+- Browser visual commands build the MoonBit JS, WASM, and WASM-GC artifacts
+  before launching the harness, because the MassCubes browser variants are
+  covered separately.
 - The readback texture size is currently `800x600`, matching the native/demo
   sample canvas size.

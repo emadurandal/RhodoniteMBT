@@ -40,6 +40,17 @@ type SnapshotModule = {
 	render_ecs_mass_cubes_browser_snapshot: () => Promise<unknown>;
 };
 
+type TsMassCubesModule = {
+	renderTsEcsMassCubesBrowserSnapshot: () => Promise<unknown>;
+};
+
+type WasmMassCubesModule = {
+	renderEcsMassCubesWasmSnapshot: (
+		wasmUrl: string,
+		label: string,
+	) => Promise<unknown>;
+};
+
 void main();
 
 window.addEventListener("error", (event) => {
@@ -103,6 +114,7 @@ async function main(): Promise<void> {
 	}
 
 	const samples = createSamples(snapshotModule);
+	await addMassCubesVariantSamples(samples);
 
 	const results: SampleResult[] = [];
 	const failures: SampleFailure[] = [];
@@ -214,6 +226,51 @@ function createSamples(snapshotModule: SnapshotModule): BrowserSnapshotSample[] 
 				toUint8Array(await snapshotModule.render_ecs_mass_cubes_browser_snapshot()),
 		},
 	];
+}
+
+async function addMassCubesVariantSamples(
+	samples: BrowserSnapshotSample[],
+): Promise<void> {
+	const [tsModule, wasmHost, wasmModule, wasmGcModule] = await Promise.all([
+		import("../main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
+		import("../ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
+		import(
+			"../../_build/wasm/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
+		) as Promise<{ default: string }>,
+		import(
+			"../../_build/wasm-gc/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
+		) as Promise<{ default: string }>,
+	]);
+	samples.push(
+		{
+			name: "ts-ecs-mass-cubes browser",
+			filename: "ts_ecs_mass_cubes_browser_sample.png",
+			render: async () =>
+				toUint8Array(await tsModule.renderTsEcsMassCubesBrowserSnapshot()),
+		},
+		{
+			name: "wasm-ecs-mass-cubes browser",
+			filename: "wasm_ecs_mass_cubes_browser_sample.png",
+			render: async () =>
+				toUint8Array(
+					await wasmHost.renderEcsMassCubesWasmSnapshot(
+						wasmModule.default,
+						"WASM",
+					),
+				),
+		},
+		{
+			name: "wasm-gc-ecs-mass-cubes browser",
+			filename: "wasm_gc_ecs_mass_cubes_browser_sample.png",
+			render: async () =>
+				toUint8Array(
+					await wasmHost.renderEcsMassCubesWasmSnapshot(
+						wasmGcModule.default,
+						"WASM-GC",
+					),
+				),
+		},
+	);
 }
 
 function toUint8Array(value: unknown): Uint8Array {
