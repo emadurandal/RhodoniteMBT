@@ -191,7 +191,7 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`GlobalTransform` の GPU row は 48 byte の affine 3x4（`vec4<f32>` 3 行）で、非一様 scale と親回転から生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行を送らないレイアウトです。`write_global_transforms_dense_views` は entity ごとの callback でこの flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。
 
-大量更新で callback 回数も避けたい場合は `write_global_transforms_dense_range_views` を使います。この API は `GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を 1 回だけ渡し、呼び出し側のロジックが連続 row 上で tight loop を実行できます。ライブラリ側は dense range の貸し出し、stride 検査、dirty range 記録、borrowed upload view への drain だけを担当します。`ecs-mass-cubes` と `ts-ecs-mass-cubes` の grid-wave 計算や y-only 更新はサンプル側 callback に置き、ライブラリには sample 固有の計算を持ち込みません。
+大量更新で callback 回数も避けたい場合は `write_global_transforms_dense_range_views` を使います。この API は `GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を 1 回だけ渡し、呼び出し側のロジックが連続 row 上で tight loop を実行できます。ライブラリ側は dense range の貸し出し、stride 検査、dirty range 記録、borrowed upload view への drain だけを担当します。`ecs-mass-cubes` と `ts-ecs-mass-cubes` の grid-wave 計算や y-only 更新はサンプル側 callback に置き、ライブラリには sample 固有の計算を持ち込みません。non-GC `wasm-ecs-mass-cubes` は同じ 48 byte affine row / full-span upload 条件のまま、sample 所有の `FixedArray[Float]` upload buffer を使って f32 byte packing を避けます。
 
 ## Conflict 検査
 
