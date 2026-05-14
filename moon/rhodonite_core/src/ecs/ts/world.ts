@@ -38,6 +38,7 @@ import {
 	world_register_gpu_component,
 	world_remove_component,
 	world_set_component_bytes,
+	world_set_global_transform_format,
 	world_set_transform_trs,
 	spawn_batch_row_entity,
 	spawn_batch_row_write,
@@ -319,6 +320,12 @@ export class World {
 
 	updateGlobalTransformsFromTransforms(): void {
 		world_update_global_transforms_from_transforms(this.inner);
+	}
+
+	setGlobalTransformFormat(entity: EntityId, formatCode: 0 | 1): boolean {
+		return moonBool(
+			world_set_global_transform_format(this.inner, entity.inner, formatCode),
+		);
 	}
 
 	globalTransformBlobWordCapacity(): number {

@@ -333,6 +333,8 @@ WebGPU upload 側には次の API があります。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は、`array<u32>` の storage buffer を 1 本 bind します。instance buffer には 8 byte の `GlobalTransform` ref（`format`, `word_offset`）と color を持たせ、WGSL が同じ blob から 12 個の f32 word または 6 個の packed-f16 word を読みます。精度差で draw を分けません。
 
+MassCubes sample 群は、ユーザーソース冒頭の精度モード定数で all-fp32、all-fp16、前半 fp32 / 後半 fp16、偶数 entity id fp32 / 奇数 entity id fp16 を切り替えられます。mixed mode でも instance ref と draw call は共通で、renderer は選択された ref が必要とする active packed-word span だけを upload します。
+
 `World::new()` は新規 `GlobalTransform` slot の default format を fp32 にします。`World::new_with_global_transform_format(Affine3x4F16)` は default allocation format だけを fp16 に変えます。個々の entity は `set_global_transform_format(entity, format)` で `Affine3x4F32` / `Affine3x4F16` を切り替えられます。format tag は instance ref に含まれるため、shader と draw call は共通です。
 
 Packed GlobalTransform upload API:

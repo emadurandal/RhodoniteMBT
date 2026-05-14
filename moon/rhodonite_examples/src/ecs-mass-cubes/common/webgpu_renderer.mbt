@@ -24,6 +24,17 @@ fn monotonic_ms() -> Double {
 let entity_count : Int = 800_000
 
 ///|
+enum GlobalTransformPrecisionMode {
+  AllF32
+  AllF16
+  FirstHalfF32SecondHalfF16
+  EvenIdF32OddIdF16
+} derive(Eq)
+
+///|
+let global_transform_precision_mode : GlobalTransformPrecisionMode = AllF16
+
+///|
 /// Canvas resolution (matches demo HTML).
 let canvas_width : UInt = 800U
 
@@ -58,6 +69,12 @@ let cube_scale : Float = 0.055
 struct DenseTransformLayout {
   format : @comp.GlobalTransformGpuFormat
   words_per_entity : Int
+}
+
+///|
+struct TransformUploadRange {
+  first_word : Int
+  word_count : Int
 }
 
 ///|
@@ -348,6 +365,72 @@ fn detect_dense_transform_layout(
     }
   }
   Some({ format, words_per_entity })
+}
+
+///|
+fn global_transform_default_format() -> @comp.GlobalTransformGpuFormat {
+  match global_transform_precision_mode {
+    AllF32 => Affine3x4F32
+    _ => Affine3x4F16
+  }
+}
+
+///|
+fn entity_uses_f32(entity : @ecs.EntityId, local_index : Int) -> Bool {
+  match global_transform_precision_mode {
+    AllF32 => true
+    AllF16 => false
+    FirstHalfF32SecondHalfF16 => local_index < entity_count / 2
+    EvenIdF32OddIdF16 => entity.index % 2 == 0
+  }
+}
+
+///|
+fn apply_global_transform_precision_mode(
+  world : @ecs.World,
+  entities : Array[@ecs.EntityId],
+) -> Unit {
+  match global_transform_precision_mode {
+    AllF32 | AllF16 => ()
+    _ =>
+      for i = 0; i < entities.length(); i = i + 1 {
+        let e = entities[i]
+        if entity_uses_f32(e, i) {
+          ignore(world.set_global_transform_format(e, Affine3x4F32))
+        }
+      }
+  }
+}
+
+///|
+fn compute_transform_upload_range(
+  refs : FixedArray[Byte],
+  count : Int,
+  dense_layout : DenseTransformLayout?,
+) -> TransformUploadRange {
+  match dense_layout {
+    Some(layout) =>
+      { first_word: 0, word_count: count * layout.words_per_entity }
+    None => {
+      let mut first_word = 0
+      let mut end_word = 0
+      for i = 0; i < count; i = i + 1 {
+        let base = i * 8
+        let format = @comp.global_transform_format_from_code(
+          @writes.get_u32_le(refs, base),
+        )
+        let word_offset = @writes.get_u32_le(refs, base + 4).reinterpret_as_int()
+        let word_end = word_offset + @comp.global_transform_word_count(format)
+        if i == 0 || word_offset < first_word {
+          first_word = word_offset
+        }
+        if word_end > end_word {
+          end_word = word_end
+        }
+      }
+      { first_word, word_count: end_word - first_word }
+    }
+  }
 }
 
 ///|
@@ -720,13 +803,14 @@ fn write_mass_cubes_transform_blob_dense(
 fn write_dense_global_transform_views(
   world : @ecs.World,
   layout : DenseTransformLayout,
+  upload_range : TransformUploadRange,
   per_side : Int,
   t : Double,
   full_rows : Bool,
 ) -> Array[@ecs.GpuWriteView] {
   world.write_global_transform_blob_range_views(
-    0,
-    entity_count * layout.words_per_entity,
+    upload_range.first_word,
+    upload_range.word_count,
     fn(bytes) {
       write_mass_cubes_transform_blob_dense(
         bytes, layout, per_side, t, full_rows,
@@ -736,20 +820,258 @@ fn write_dense_global_transform_views(
 }
 
 ///|
-fn animate_transforms_query(
-  world : @ecs.World,
-  tf_id : @ecs.ComponentTypeId,
+#cfg(target="js")
+extern "js" fn write_mass_cubes_transform_blob_refs(
+  bytes : MutArrayView[Byte],
+  refs : FixedArray[Byte],
+  upload_first_word : Int,
+  entity_count : Int,
   per_side : Int,
   t : Double,
+  full_rows : Bool,
+  cube_scale : Float,
+  grid_spacing : Double,
+) -> Unit =
+  #| (
+  #|   bytes,
+  #|   refs,
+  #|   uploadFirstWord,
+  #|   entityCount,
+  #|   perSide,
+  #|   t,
+  #|   fullRows,
+  #|   cubeScale,
+  #|   gridSpacing,
+  #| ) => {
+  #|   const src = bytes.buf;
+  #|   const start = bytes.start;
+  #|   const byteLength = bytes.end - bytes.start;
+  #|   if (!ArrayBuffer.isView(src) || !ArrayBuffer.isView(refs)) {
+  #|     throw new Error("MassCubes transform refs writer requires typed storage.");
+  #|   }
+  #|   const words = new Uint32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const refWords = new Uint32Array(refs.buffer, refs.byteOffset, refs.byteLength >> 2);
+  #|   const scratchF32 = new Float32Array(1);
+  #|   const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|   const f32ToF16Bits = (value) => {
+  #|     scratchF32[0] = Math.fround(value);
+  #|     const bits = scratchU32[0] >>> 0;
+  #|     const sign = (bits >>> 16) & 0x8000;
+  #|     let exp = (bits >>> 23) & 0xff;
+  #|     let mant = bits & 0x7fffff;
+  #|     if (exp === 255) return sign | (mant === 0 ? 0x7c00 : 0x7e00);
+  #|     exp = exp - 127 + 15;
+  #|     if (exp >= 31) return sign | 0x7c00;
+  #|     if (exp <= 0) {
+  #|       if (exp < -10) return sign;
+  #|       mant = (mant | 0x800000) >>> (1 - exp);
+  #|       return sign | ((mant + 0x1000) >>> 13);
+  #|     }
+  #|     return sign | (exp << 10) | ((mant + 0x1000) >>> 13);
+  #|   };
+  #|   const packF16x2 = (x, y) => f32ToF16Bits(x) | (f32ToF16Bits(y) << 16);
+  #|   const waveTime = t * 1.8;
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   if (!fullRows) {
+  #|     let waveSin = Math.sin(waveTime);
+  #|     let waveCos = Math.cos(waveTime);
+  #|     for (let i = 0; i < entityCount; i++) {
+  #|       const refBase = i * 2;
+  #|       const format = refWords[refBase] ?? 0;
+  #|       const wordOffset = (refWords[refBase + 1] ?? 0) - uploadFirstWord;
+  #|       const y = waveSin * 0.12;
+  #|       if (format === 1) words[wordOffset + 3] = packF16x2(0, y);
+  #|       else floats[wordOffset + 7] = y;
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|     }
+  #|     return;
+  #|   }
+  #|   const half = (perSide - 1) * 0.5;
+  #|   let localIndex = 0;
+  #|   let row = 0;
+  #|   while (localIndex < entityCount) {
+  #|     const rowCount = Math.min(perSide, entityCount - localIndex);
+  #|     let x = -half * gridSpacing;
+  #|     const z = (row - half) * gridSpacing;
+  #|     let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+  #|     let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+  #|     for (let ix = 0; ix < rowCount; ix++) {
+  #|       const refBase = localIndex * 2;
+  #|       const format = refWords[refBase] ?? 0;
+  #|       const wordOffset = (refWords[refBase + 1] ?? 0) - uploadFirstWord;
+  #|       const y = waveSin * 0.12;
+  #|       if (format === 1) {
+  #|         words[wordOffset + 0] = packF16x2(cubeScale, 0);
+  #|         words[wordOffset + 1] = packF16x2(0, x);
+  #|         words[wordOffset + 2] = packF16x2(0, cubeScale);
+  #|         words[wordOffset + 3] = packF16x2(0, y);
+  #|         words[wordOffset + 4] = packF16x2(0, 0);
+  #|         words[wordOffset + 5] = packF16x2(cubeScale, z);
+  #|       } else {
+  #|         floats[wordOffset + 0] = cubeScale;
+  #|         words[wordOffset + 1] = 0;
+  #|         words[wordOffset + 2] = 0;
+  #|         floats[wordOffset + 3] = x;
+  #|         words[wordOffset + 4] = 0;
+  #|         floats[wordOffset + 5] = cubeScale;
+  #|         words[wordOffset + 6] = 0;
+  #|         floats[wordOffset + 7] = y;
+  #|         words[wordOffset + 8] = 0;
+  #|         words[wordOffset + 9] = 0;
+  #|         floats[wordOffset + 10] = cubeScale;
+  #|         floats[wordOffset + 11] = z;
+  #|       }
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|       localIndex++;
+  #|       x += gridSpacing;
+  #|     }
+  #|     row++;
+  #|   }
+  #| }
+
+///|
+#cfg(target="native")
+#borrow(bytes, refs)
+extern "C" fn write_mass_cubes_transform_blob_refs(
+  bytes : MutArrayView[Byte],
+  refs : FixedArray[Byte],
+  upload_first_word : Int,
+  entity_count : Int,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+  cube_scale : Float,
+  grid_spacing : Double,
+) -> Unit = "rhodonite_mass_cubes_write_transform_blob_refs"
+
+///|
+#cfg(not(any(target="js", target="native")))
+fn write_mass_cubes_transform_blob_refs(
+  bytes : MutArrayView[Byte],
+  refs : FixedArray[Byte],
+  upload_first_word : Int,
+  entity_count : Int,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+  cube_scale : Float,
+  grid_spacing : Double,
 ) -> Unit {
-  ignore(tf_id)
-  world.update_transform3d_positions(fn(entity) {
-    let idx = entity.index
-    let (gx, gz) = grid_xz_for_index(idx, per_side)
-    let phase = idx.to_double() * 0.09 + t * 1.8
-    let wy = @math.sin(phase) * 0.12
-    (gx, Float::from_double(wy), gz)
-  })
+  let wave_time = t * 1.8
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let zero = (0.0 : Float)
+  if !full_rows {
+    let mut i = 0
+    let mut wave_sin = @math.sin(wave_time)
+    let mut wave_cos = @math.cos(wave_time)
+    while i < entity_count {
+      let base = i * 8
+      let format = @comp.global_transform_format_from_code(
+        @writes.get_u32_le(refs, base),
+      )
+      let word_offset = @writes.get_u32_le(refs, base + 4).reinterpret_as_int() -
+        upload_first_word
+      let y = Float::from_double(wave_sin * 0.12)
+      match format {
+        Affine3x4F16 =>
+          put_packed_f16x2_mut_view(bytes, (word_offset + 3) * 4, zero, y)
+        Affine3x4F32 => put_f32_word_mut_view(bytes, word_offset + 7, y)
+      }
+      let next_sin = wave_sin * cos_step + wave_cos * sin_step
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step
+      wave_sin = next_sin
+      i = i + 1
+    }
+    return
+  }
+  let half = (per_side - 1).to_double() * 0.5
+  let step = Float::from_double(grid_spacing)
+  let mut local_index = 0
+  let mut row = 0
+  while local_index < entity_count {
+    let remaining = entity_count - local_index
+    let row_count = if per_side < remaining { per_side } else { remaining }
+    let mut x = Float::from_double((0.0 - half) * grid_spacing)
+    let z = Float::from_double((row.to_double() - half) * grid_spacing)
+    let phase = local_index.to_double() * 0.09 + wave_time
+    let mut wave_sin = @math.sin(phase)
+    let mut wave_cos = @math.cos(phase)
+    for _ix = 0; _ix < row_count; _ix = _ix + 1 {
+      let ref_base = local_index * 8
+      let format = @comp.global_transform_format_from_code(
+        @writes.get_u32_le(refs, ref_base),
+      )
+      let word_offset = @writes.get_u32_le(refs, ref_base + 4).reinterpret_as_int() -
+        upload_first_word
+      let y = Float::from_double(wave_sin * 0.12)
+      match format {
+        Affine3x4F16 => {
+          let base = word_offset * 4
+          put_packed_f16x2_mut_view(bytes, base + 0, cube_scale, zero)
+          put_packed_f16x2_mut_view(bytes, base + 4, zero, x)
+          put_packed_f16x2_mut_view(bytes, base + 8, zero, cube_scale)
+          put_packed_f16x2_mut_view(bytes, base + 12, zero, y)
+          put_packed_f16x2_mut_view(bytes, base + 16, zero, zero)
+          put_packed_f16x2_mut_view(bytes, base + 20, cube_scale, z)
+        }
+        Affine3x4F32 => {
+          put_f32_word_mut_view(bytes, word_offset + 0, cube_scale)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 1) * 4, 0U)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 2) * 4, 0U)
+          put_f32_word_mut_view(bytes, word_offset + 3, x)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 4) * 4, 0U)
+          put_f32_word_mut_view(bytes, word_offset + 5, cube_scale)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 6) * 4, 0U)
+          put_f32_word_mut_view(bytes, word_offset + 7, y)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 8) * 4, 0U)
+          @writes.put_u32_le_mut_view(bytes, (word_offset + 9) * 4, 0U)
+          put_f32_word_mut_view(bytes, word_offset + 10, cube_scale)
+          put_f32_word_mut_view(bytes, word_offset + 11, z)
+        }
+      }
+      let next_sin = wave_sin * cos_step + wave_cos * sin_step
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step
+      wave_sin = next_sin
+      local_index = local_index + 1
+      x = x + step
+    }
+    row = row + 1
+  }
+}
+
+///|
+fn write_ref_global_transform_views(
+  world : @ecs.World,
+  refs : FixedArray[Byte],
+  upload_range : TransformUploadRange,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+) -> Array[@ecs.GpuWriteView] {
+  world.write_global_transform_blob_range_views(
+    upload_range.first_word,
+    upload_range.word_count,
+    fn(bytes) {
+      write_mass_cubes_transform_blob_refs(
+        bytes,
+        refs,
+        upload_range.first_word,
+        entity_count,
+        per_side,
+        t,
+        full_rows,
+        cube_scale,
+        grid_spacing,
+      )
+    },
+  )
 }
 
 ///|
@@ -759,18 +1081,22 @@ fn update_and_drain_global_transforms(
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
+  transform_refs : FixedArray[Byte],
+  upload_range : TransformUploadRange,
   dense_transform_layout : DenseTransformLayout?,
   full_rows : Bool,
 ) -> Array[@ecs.GpuWriteView] {
+  ignore(tf)
+  ignore(gt)
   match dense_transform_layout {
     Some(layout) =>
-      write_dense_global_transform_views(world, layout, per_side, t, full_rows)
-    None => {
-      ignore(gt)
-      animate_transforms_query(world, tf, per_side, t)
-      world.update_global_transforms_from_transforms()
-      world.drain_global_transform_blob_write_views()
-    }
+      write_dense_global_transform_views(
+        world, layout, upload_range, per_side, t, full_rows,
+      )
+    None =>
+      write_ref_global_transform_views(
+        world, transform_refs, upload_range, per_side, t, full_rows,
+      )
   }
 }
 
@@ -811,6 +1137,8 @@ pub(all) struct WebGPURenderer {
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
+  transform_refs : FixedArray[Byte]
+  transform_upload_range : TransformUploadRange
   dense_transform_layout : DenseTransformLayout?
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
@@ -1001,7 +1329,9 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   @wgpu.shaderModule_release(shader)
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
-  let world = @ecs.World::new_with_global_transform_format(Affine3x4F16)
+  let world = @ecs.World::new_with_global_transform_format(
+    global_transform_default_format(),
+  )
   let gt = world.global_transform_component()
   let tf = world.transform_component()
   let per_side = grid_side_len(entity_count)
@@ -1033,12 +1363,16 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @writes.put_f32_le(instance_bytes, base + 12, cg)
     @writes.put_f32_le(instance_bytes, base + 16, cb)
   })
+  apply_global_transform_precision_mode(world, entities)
   world.write_global_transform_refs_into(
     entities, instance_bytes, instance_stride, 0,
   )
   let transform_refs = world.extract_global_transform_refs(entities)
   let dense_transform_layout = detect_dense_transform_layout(
     transform_refs, entity_count,
+  )
+  let transform_upload_range = compute_transform_upload_range(
+    transform_refs, entity_count, dense_transform_layout,
   )
   let storage_bytes = (world.global_transform_blob_word_capacity() * 4).to_uint64()
   let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
@@ -1092,7 +1426,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   )
   let depth_view = depth_texture.create_view()
   let writes0 = update_and_drain_global_transforms(
-    world, tf, gt, per_side, 0.0, dense_transform_layout, true,
+    world, tf, gt, per_side, 0.0, transform_refs, transform_upload_range, dense_transform_layout,
+    true,
   )
   upload_global_transform_writes(queue, transform_storage, writes0)
   Some({
@@ -1115,6 +1450,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     gt,
     tf,
     per_side,
+    transform_refs,
+    transform_upload_range,
     dense_transform_layout,
     bind_group_offsets: [],
     frame: @ref.new(0),
@@ -1147,6 +1484,8 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     gt,
     renderer.per_side,
     t,
+    renderer.transform_refs,
+    renderer.transform_upload_range,
     renderer.dense_transform_layout,
     false,
   )

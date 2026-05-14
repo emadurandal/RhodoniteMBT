@@ -46,6 +46,7 @@ options(
         "world_gpu_component_active_indices",
         "world_set_transform_trs",
         "world_update_global_transforms_from_transforms",
+        "world_set_global_transform_format",
         "world_write_global_transforms_dense_range_views",
         "world_drain_global_transform_blob_write_views",
         "world_write_global_transform_blob_range_views",

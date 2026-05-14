@@ -54,6 +54,13 @@ static void put_u32_le(uint8_t* bytes, int32_t off, uint32_t value) {
   bytes[off + 3] = (uint8_t)((value >> 24) & 0xffu);
 }
 
+static uint32_t get_u32_le(const uint8_t* bytes, int32_t off) {
+  return (uint32_t)bytes[off] |
+         ((uint32_t)bytes[off + 1] << 8) |
+         ((uint32_t)bytes[off + 2] << 16) |
+         ((uint32_t)bytes[off + 3] << 24);
+}
+
 static uint32_t f32_bits(float value) {
   uint32_t bits;
   memcpy(&bits, &value, sizeof(bits));
@@ -167,6 +174,89 @@ void rhodonite_mass_cubes_write_transform_blob_dense(
       put_u32_le(bytes, (base + 9) * 4, 0);
       put_f32_word(bytes, base + 10, cube_scale);
       put_f32_word(bytes, base + 11, z);
+      double next_sin = wave_sin * cos_step + wave_cos * sin_step;
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step;
+      wave_sin = next_sin;
+      local_index++;
+      x = (float)((double)x + grid_spacing);
+    }
+    row++;
+  }
+}
+
+void rhodonite_mass_cubes_write_transform_blob_refs(
+  RhodoniteArrayViewU8 view,
+  moonbit_bytes_t refs,
+  int32_t upload_first_word,
+  int32_t entity_count,
+  int32_t per_side,
+  double t,
+  int32_t full_rows,
+  float cube_scale,
+  double grid_spacing
+) {
+  uint8_t* bytes = view.bytes + view.start;
+  double wave_time = t * 1.8;
+  double sin_step = sin(0.09);
+  double cos_step = cos(0.09);
+  if (!full_rows) {
+    double wave_sin = sin(wave_time);
+    double wave_cos = cos(wave_time);
+    for (int32_t i = 0; i < entity_count; i++) {
+      int32_t ref_base = i * 8;
+      uint32_t format_code = get_u32_le(refs, ref_base);
+      int32_t word_offset =
+        (int32_t)get_u32_le(refs, ref_base + 4) - upload_first_word;
+      float y = (float)(wave_sin * 0.12);
+      if (format_code == 1u) {
+        put_packed_f16x2(bytes, (word_offset + 3) * 4, 0.0f, y);
+      } else {
+        put_f32_word(bytes, word_offset + 7, y);
+      }
+      double next_sin = wave_sin * cos_step + wave_cos * sin_step;
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step;
+      wave_sin = next_sin;
+    }
+    return;
+  }
+  double half = ((double)per_side - 1.0) * 0.5;
+  int32_t local_index = 0;
+  int32_t row = 0;
+  while (local_index < entity_count) {
+    int32_t remaining = entity_count - local_index;
+    int32_t row_count = per_side < remaining ? per_side : remaining;
+    float x = (float)(-half * grid_spacing);
+    float z = (float)(((double)row - half) * grid_spacing);
+    double wave_sin = sin((double)local_index * 0.09 + wave_time);
+    double wave_cos = cos((double)local_index * 0.09 + wave_time);
+    for (int32_t ix = 0; ix < row_count; ix++) {
+      int32_t ref_base = local_index * 8;
+      uint32_t format_code = get_u32_le(refs, ref_base);
+      int32_t word_offset =
+        (int32_t)get_u32_le(refs, ref_base + 4) - upload_first_word;
+      float y = (float)(wave_sin * 0.12);
+      if (format_code == 1u) {
+        int32_t base = word_offset * 4;
+        put_packed_f16x2(bytes, base + 0, cube_scale, 0.0f);
+        put_packed_f16x2(bytes, base + 4, 0.0f, x);
+        put_packed_f16x2(bytes, base + 8, 0.0f, cube_scale);
+        put_packed_f16x2(bytes, base + 12, 0.0f, y);
+        put_packed_f16x2(bytes, base + 16, 0.0f, 0.0f);
+        put_packed_f16x2(bytes, base + 20, cube_scale, z);
+      } else {
+        put_f32_word(bytes, word_offset + 0, cube_scale);
+        put_u32_le(bytes, (word_offset + 1) * 4, 0);
+        put_u32_le(bytes, (word_offset + 2) * 4, 0);
+        put_f32_word(bytes, word_offset + 3, x);
+        put_u32_le(bytes, (word_offset + 4) * 4, 0);
+        put_f32_word(bytes, word_offset + 5, cube_scale);
+        put_u32_le(bytes, (word_offset + 6) * 4, 0);
+        put_f32_word(bytes, word_offset + 7, y);
+        put_u32_le(bytes, (word_offset + 8) * 4, 0);
+        put_u32_le(bytes, (word_offset + 9) * 4, 0);
+        put_f32_word(bytes, word_offset + 10, cube_scale);
+        put_f32_word(bytes, word_offset + 11, z);
+      }
       double next_sin = wave_sin * cos_step + wave_cos * sin_step;
       wave_cos = wave_cos * cos_step - wave_sin * sin_step;
       wave_sin = next_sin;

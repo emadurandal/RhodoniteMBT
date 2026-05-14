@@ -262,6 +262,18 @@ pub fn world_update_global_transforms_from_transforms(
 }
 
 ///|
+pub fn world_set_global_transform_format(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  format_code : UInt,
+) -> Bool {
+  world.set_global_transform_format(
+    entity,
+    @comp.global_transform_format_from_code(format_code),
+  )
+}
+
+///|
 pub fn world_write_global_transforms_dense_range_views(
   world : @ecs.World,
   count : Int,

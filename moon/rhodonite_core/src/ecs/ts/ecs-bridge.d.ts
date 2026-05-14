@@ -155,6 +155,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
+	export function world_set_global_transform_format(
+		world: MoonWorld,
+		entity: MoonEntityId,
+		formatCode: number,
+	): MoonBool;
 	export function world_global_transform_blob_word_capacity(
 		world: MoonWorld,
 	): number;

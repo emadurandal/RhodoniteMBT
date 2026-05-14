@@ -320,6 +320,8 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) and [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) now bind one storage buffer as `array<u32>`. Their instance buffers carry an 8-byte `GlobalTransform` ref (`format`, `word_offset`) plus color, and the WGSL loads either 12 f32 words or 6 packed-f16 words from the same blob in one draw.
 
+The MassCubes samples expose a source-level precision-mode constant near the top of their user source. The modes cover all-fp32, all-fp16, first-half fp32 / second-half fp16, and even-entity-id fp32 / odd-entity-id fp16. Mixed modes still use the same instance ref and one draw call; the renderer uploads only the active packed-word span needed by the selected refs.
+
 `World::new()` uses fp32 as the default allocation format. `World::new_with_global_transform_format(Affine3x4F16)` changes only the default for newly allocated `GlobalTransform` slots; individual entities can later move between `Affine3x4F32` and `Affine3x4F16` with `set_global_transform_format(entity, format)`. The shader does not need separate draw calls for the two formats because the per-instance ref includes the format tag.
 
 Packed GlobalTransform upload APIs:

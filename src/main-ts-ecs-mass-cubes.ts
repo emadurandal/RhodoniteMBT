@@ -5,7 +5,12 @@ import {
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
-const USE_FP16_GLOBAL_TRANSFORM = true;
+type GlobalTransformPrecisionMode =
+	| "all-f32"
+	| "all-f16"
+	| "first-half-f32-second-half-f16"
+	| "even-id-f32-odd-id-f16";
+const GLOBAL_TRANSFORM_PRECISION_MODE: GlobalTransformPrecisionMode = "all-f16";
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
@@ -74,6 +79,10 @@ type DenseTransformLayout = {
 	readonly format: 0 | 1;
 	readonly wordsPerEntity: 6 | 12;
 };
+type TransformUploadRange = {
+	readonly firstWord: number;
+	readonly wordCount: number;
+};
 
 type Renderer = {
 	readonly canvas: HTMLCanvasElement;
@@ -93,6 +102,7 @@ type Renderer = {
 	readonly world: World;
 	readonly transformRefs: Uint32Array;
 	readonly transformWordCapacity: number;
+	readonly transformWordUploadFirst: number;
 	readonly transformWordUploadCount: number;
 	readonly denseTransformLayout: DenseTransformLayout | null;
 	readonly perSide: number;
@@ -131,6 +141,40 @@ function packF16x2(x: number, y: number): number {
 	return f32ToF16Bits(x) | (f32ToF16Bits(y) << 16);
 }
 
+function globalTransformDefaultIsF16(): boolean {
+	return GLOBAL_TRANSFORM_PRECISION_MODE !== "all-f32";
+}
+
+function entityUsesF32(entityIndex: number, localIndex: number): boolean {
+	switch (GLOBAL_TRANSFORM_PRECISION_MODE) {
+		case "all-f32":
+			return true;
+		case "all-f16":
+			return false;
+		case "first-half-f32-second-half-f16":
+			return localIndex < Math.floor(ENTITY_COUNT / 2);
+		case "even-id-f32-odd-id-f16":
+			return (entityIndex & 1) === 0;
+	}
+}
+
+function applyGlobalTransformPrecisionMode(
+	world: World,
+	entities: ReturnType<World["spawnTransformGlobalBatchIdentity"]>,
+): void {
+	if (
+		GLOBAL_TRANSFORM_PRECISION_MODE === "all-f32" ||
+		GLOBAL_TRANSFORM_PRECISION_MODE === "all-f16"
+	) {
+		return;
+	}
+	entities.forEach((entity, localIndex) => {
+		if (entityUsesF32(entity.index(), localIndex)) {
+			world.setGlobalTransformFormat(entity, 0);
+		}
+	});
+}
+
 function detectDenseTransformLayout(refs: Uint32Array): DenseTransformLayout | null {
 	if (refs.length < ENTITY_COUNT * 2) {
 		return null;
@@ -147,6 +191,36 @@ function detectDenseTransformLayout(refs: Uint32Array): DenseTransformLayout | n
 		}
 	}
 	return { format, wordsPerEntity };
+}
+
+function globalTransformWordsForFormat(format: number): 6 | 12 {
+	return format === 1 ? 6 : 12;
+}
+
+function computeTransformUploadRange(
+	refs: Uint32Array,
+	denseLayout: DenseTransformLayout | null,
+): TransformUploadRange {
+	if (denseLayout !== null) {
+		return {
+			firstWord: 0,
+			wordCount: ENTITY_COUNT * denseLayout.wordsPerEntity,
+		};
+	}
+	let firstWord = Number.POSITIVE_INFINITY;
+	let endWord = 0;
+	for (let i = 0; i < ENTITY_COUNT; i += 1) {
+		const refBase = i * 2;
+		const format = refs[refBase] ?? 0;
+		const wordOffset = refs[refBase + 1] ?? 0;
+		const wordCount = globalTransformWordsForFormat(format);
+		firstWord = Math.min(firstWord, wordOffset);
+		endWord = Math.max(endWord, wordOffset + wordCount);
+	}
+	if (!Number.isFinite(firstWord) || endWord <= firstWord) {
+		return { firstWord: 0, wordCount: 0 };
+	}
+	return { firstWord, wordCount: endWord - firstWord };
 }
 
 function mat4Identity(): Mat4 {
@@ -361,6 +435,7 @@ function writeMassCubesTransformBlob(
 	bytes: ByteView,
 	refs: Uint32Array,
 	denseLayout: DenseTransformLayout | null,
+	uploadFirstWord: number,
 	perSide: number,
 	t: number,
 	fullRows: boolean,
@@ -542,7 +617,7 @@ function writeMassCubesTransformBlob(
 		while (i < ENTITY_COUNT) {
 			const refBase = i * 2;
 			const format = refs[refBase] ?? 0;
-			const wordOffset = refs[refBase + 1] ?? 0;
+			const wordOffset = (refs[refBase + 1] ?? 0) - uploadFirstWord;
 			const y = waveSin * 0.12;
 			if (format === 1) {
 				words[wordOffset + 3] = packF16x2(0, y);
@@ -569,7 +644,7 @@ function writeMassCubesTransformBlob(
 		for (let ix = 0; ix < rowCount; ix += 1) {
 			const refBase = localIndex * 2;
 			const format = refs[refBase] ?? 0;
-			const wordOffset = refs[refBase + 1] ?? 0;
+			const wordOffset = (refs[refBase + 1] ?? 0) - uploadFirstWord;
 			const y = waveSin * 0.12;
 			if (format === 1) {
 				words[wordOffset] = packF16x2(CUBE_SCALE, 0);
@@ -608,13 +683,14 @@ function uploadInitialGlobalTransforms(renderer: Renderer): void {
 		renderer.queue,
 		renderer.transformStorage,
 		renderer.world.writeGlobalTransformBlobRangeViews(
-			0,
+			renderer.transformWordUploadFirst,
 			renderer.transformWordUploadCount,
 			(bytes) =>
 				writeMassCubesTransformBlob(
 					bytes,
 					renderer.transformRefs,
 					renderer.denseTransformLayout,
+					renderer.transformWordUploadFirst,
 					renderer.perSide,
 					0,
 					true,
@@ -628,13 +704,14 @@ function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
 		renderer.queue,
 		renderer.transformStorage,
 		renderer.world.writeGlobalTransformBlobRangeViews(
-			0,
+			renderer.transformWordUploadFirst,
 			renderer.transformWordUploadCount,
 			(bytes) =>
 				writeMassCubesTransformBlob(
 					bytes,
 					renderer.transformRefs,
 					renderer.denseTransformLayout,
+					renderer.transformWordUploadFirst,
 					renderer.perSide,
 					t,
 					false,
@@ -770,11 +847,12 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		},
 	});
 
-	const world = USE_FP16_GLOBAL_TRANSFORM
+	const world = globalTransformDefaultIsF16()
 		? World.newWithGlobalTransformF16()
 		: World.new();
 	const perSide = gridSideLen(ENTITY_COUNT);
 	const entities = world.spawnTransformGlobalBatchIdentity(ENTITY_COUNT);
+	applyGlobalTransformPrecisionMode(world, entities);
 	const transformRefsBytes = world.extractGlobalTransformRefs(entities);
 	const transformRefs = new Uint32Array(
 		transformRefsBytes.buffer,
@@ -783,10 +861,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	);
 	const denseTransformLayout = detectDenseTransformLayout(transformRefs);
 	const transformWordCapacity = world.globalTransformBlobWordCapacity();
-	const transformWordUploadCount =
-		denseTransformLayout?.wordsPerEntity === undefined
-			? transformWordCapacity
-			: ENTITY_COUNT * denseTransformLayout.wordsPerEntity;
+	const transformUploadRange = computeTransformUploadRange(transformRefs, denseTransformLayout);
 	const transformStorage = device.createBuffer({
 		size: Math.max(transformWordCapacity * 4, 4),
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -848,7 +923,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		world,
 		transformRefs,
 		transformWordCapacity,
-		transformWordUploadCount,
+		transformWordUploadFirst: transformUploadRange.firstWord,
+		transformWordUploadCount: transformUploadRange.wordCount,
 		denseTransformLayout,
 		perSide,
 		frame: 0,
