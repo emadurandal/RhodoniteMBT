@@ -19,6 +19,22 @@ const F16_SCRATCH_F32 = new Float32Array(1);
 const F16_SCRATCH_U32 = new Uint32Array(F16_SCRATCH_F32.buffer);
 const F32_TO_F16_BASE = new Uint16Array(512);
 const F32_TO_F16_SHIFT = new Uint8Array(512);
+type Float16ArrayLike = {
+	readonly length: number;
+	[index: number]: number;
+};
+type Float16ArrayConstructorLike = {
+	new (
+		buffer: ArrayBufferLike,
+		byteOffset?: number,
+		length?: number,
+	): Float16ArrayLike;
+};
+const Float16ArrayCtor = (
+	globalThis as typeof globalThis & {
+		Float16Array?: Float16ArrayConstructorLike;
+	}
+).Float16Array;
 
 for (let i = 0; i < 256; i += 1) {
 	const e = i - 127;
@@ -54,6 +70,10 @@ for (let i = 0; i < 256; i += 1) {
 }
 
 type Mat4 = Float32Array;
+type DenseTransformLayout = {
+	readonly format: 0 | 1;
+	readonly wordsPerEntity: 6 | 12;
+};
 
 type Renderer = {
 	readonly canvas: HTMLCanvasElement;
@@ -73,6 +93,8 @@ type Renderer = {
 	readonly world: World;
 	readonly transformRefs: Uint32Array;
 	readonly transformWordCapacity: number;
+	readonly transformWordUploadCount: number;
+	readonly denseTransformLayout: DenseTransformLayout | null;
 	readonly perSide: number;
 	frame: number;
 	lastFrameStartMs: number;
@@ -107,6 +129,24 @@ function f32ToF16Bits(value: number): number {
 
 function packF16x2(x: number, y: number): number {
 	return f32ToF16Bits(x) | (f32ToF16Bits(y) << 16);
+}
+
+function detectDenseTransformLayout(refs: Uint32Array): DenseTransformLayout | null {
+	if (refs.length < ENTITY_COUNT * 2) {
+		return null;
+	}
+	const format = refs[0];
+	if (format !== 0 && format !== 1) {
+		return null;
+	}
+	const wordsPerEntity = format === 1 ? 6 : 12;
+	for (let i = 0; i < ENTITY_COUNT; i += 1) {
+		const refBase = i * 2;
+		if (refs[refBase] !== format || refs[refBase + 1] !== i * wordsPerEntity) {
+			return null;
+		}
+	}
+	return { format, wordsPerEntity };
 }
 
 function mat4Identity(): Mat4 {
@@ -320,6 +360,7 @@ function uploadGlobalTransformWrites(
 function writeMassCubesTransformBlob(
 	bytes: ByteView,
 	refs: Uint32Array,
+	denseLayout: DenseTransformLayout | null,
 	perSide: number,
 	t: number,
 	fullRows: boolean,
@@ -328,11 +369,172 @@ function writeMassCubesTransformBlob(
 	if (view === null || (view.byteOffset & 3) !== 0) {
 		throw new Error("GlobalTransform blob must be backed by aligned Uint8Array storage.");
 	}
-	const words = new Uint32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
-	const floats = new Float32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
 	const waveTime = t * 1.8;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
+	if (denseLayout !== null && !fullRows) {
+		if (denseLayout.format === 1) {
+			if (Float16ArrayCtor !== undefined) {
+				const halfFloats = new Float16ArrayCtor(
+					view.buffer,
+					view.byteOffset,
+					view.byteLength >>> 1,
+				);
+				let i = 0;
+				let waveSin = Math.sin(waveTime);
+				let waveCos = Math.cos(waveTime);
+				while (i < ENTITY_COUNT) {
+					halfFloats[i * 12 + 7] = waveSin * 0.12;
+					const nextSin = waveSin * cosStep + waveCos * sinStep;
+					waveCos = waveCos * cosStep - waveSin * sinStep;
+					waveSin = nextSin;
+					i += 1;
+				}
+				return;
+			}
+			const halfRows = new Uint16Array(view.buffer, view.byteOffset, view.byteLength >>> 1);
+			let i = 0;
+			let waveSin = Math.sin(waveTime);
+			let waveCos = Math.cos(waveTime);
+			while (i < ENTITY_COUNT) {
+				halfRows[i * 12 + 7] = f32ToF16Bits(waveSin * 0.12);
+				const nextSin = waveSin * cosStep + waveCos * sinStep;
+				waveCos = waveCos * cosStep - waveSin * sinStep;
+				waveSin = nextSin;
+				i += 1;
+			}
+			return;
+		}
+		const floats = new Float32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
+		let i = 0;
+		let waveSin = Math.sin(waveTime);
+		let waveCos = Math.cos(waveTime);
+		while (i < ENTITY_COUNT) {
+			floats[i * 12 + 7] = waveSin * 0.12;
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			i += 1;
+		}
+		return;
+	}
+	if (denseLayout !== null && fullRows) {
+		const half = (perSide - 1) * 0.5;
+		if (denseLayout.format === 1) {
+			if (Float16ArrayCtor !== undefined) {
+				const halfFloats = new Float16ArrayCtor(
+					view.buffer,
+					view.byteOffset,
+					view.byteLength >>> 1,
+				);
+				let localIndex = 0;
+				let row = 0;
+				let column = 0;
+				while (localIndex < ENTITY_COUNT) {
+					const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
+					let x = (column - half) * GRID_SPACING;
+					const z = (row - half) * GRID_SPACING;
+					let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+					let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+					for (let ix = 0; ix < rowCount; ix += 1) {
+						const out = localIndex * 12;
+						halfFloats[out] = CUBE_SCALE;
+						halfFloats[out + 1] = 0;
+						halfFloats[out + 2] = 0;
+						halfFloats[out + 3] = x;
+						halfFloats[out + 4] = 0;
+						halfFloats[out + 5] = CUBE_SCALE;
+						halfFloats[out + 6] = 0;
+						halfFloats[out + 7] = waveSin * 0.12;
+						halfFloats[out + 8] = 0;
+						halfFloats[out + 9] = 0;
+						halfFloats[out + 10] = CUBE_SCALE;
+						halfFloats[out + 11] = z;
+						const nextSin = waveSin * cosStep + waveCos * sinStep;
+						waveCos = waveCos * cosStep - waveSin * sinStep;
+						waveSin = nextSin;
+						localIndex += 1;
+						x += GRID_SPACING;
+					}
+					row += 1;
+					column = 0;
+				}
+				return;
+			}
+			const halfRows = new Uint16Array(view.buffer, view.byteOffset, view.byteLength >>> 1);
+			const zeroH = f32ToF16Bits(0);
+			const scaleH = f32ToF16Bits(CUBE_SCALE);
+			let localIndex = 0;
+			let row = 0;
+			let column = 0;
+			while (localIndex < ENTITY_COUNT) {
+				const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
+				let x = (column - half) * GRID_SPACING;
+				const z = (row - half) * GRID_SPACING;
+				let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+				let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+				for (let ix = 0; ix < rowCount; ix += 1) {
+					const out = localIndex * 12;
+					halfRows[out] = scaleH;
+					halfRows[out + 1] = zeroH;
+					halfRows[out + 2] = zeroH;
+					halfRows[out + 3] = f32ToF16Bits(x);
+					halfRows[out + 4] = zeroH;
+					halfRows[out + 5] = scaleH;
+					halfRows[out + 6] = zeroH;
+					halfRows[out + 7] = f32ToF16Bits(waveSin * 0.12);
+					halfRows[out + 8] = zeroH;
+					halfRows[out + 9] = zeroH;
+					halfRows[out + 10] = scaleH;
+					halfRows[out + 11] = f32ToF16Bits(z);
+					const nextSin = waveSin * cosStep + waveCos * sinStep;
+					waveCos = waveCos * cosStep - waveSin * sinStep;
+					waveSin = nextSin;
+					localIndex += 1;
+					x += GRID_SPACING;
+				}
+				row += 1;
+				column = 0;
+			}
+			return;
+		}
+		const floats = new Float32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
+		let localIndex = 0;
+		let row = 0;
+		let column = 0;
+		while (localIndex < ENTITY_COUNT) {
+			const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
+			let x = (column - half) * GRID_SPACING;
+			const z = (row - half) * GRID_SPACING;
+			let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+			let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+			for (let ix = 0; ix < rowCount; ix += 1) {
+				const out = localIndex * 12;
+				floats[out] = CUBE_SCALE;
+				floats[out + 1] = 0;
+				floats[out + 2] = 0;
+				floats[out + 3] = x;
+				floats[out + 4] = 0;
+				floats[out + 5] = CUBE_SCALE;
+				floats[out + 6] = 0;
+				floats[out + 7] = waveSin * 0.12;
+				floats[out + 8] = 0;
+				floats[out + 9] = 0;
+				floats[out + 10] = CUBE_SCALE;
+				floats[out + 11] = z;
+				const nextSin = waveSin * cosStep + waveCos * sinStep;
+				waveCos = waveCos * cosStep - waveSin * sinStep;
+				waveSin = nextSin;
+				localIndex += 1;
+				x += GRID_SPACING;
+			}
+			row += 1;
+			column = 0;
+		}
+		return;
+	}
+	const words = new Uint32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
+	const floats = new Float32Array(view.buffer, view.byteOffset, view.byteLength >>> 2);
 	if (!fullRows) {
 		let i = 0;
 		let waveSin = Math.sin(waveTime);
@@ -407,11 +609,12 @@ function uploadInitialGlobalTransforms(renderer: Renderer): void {
 		renderer.transformStorage,
 		renderer.world.writeGlobalTransformBlobRangeViews(
 			0,
-			renderer.transformWordCapacity,
+			renderer.transformWordUploadCount,
 			(bytes) =>
 				writeMassCubesTransformBlob(
 					bytes,
 					renderer.transformRefs,
+					renderer.denseTransformLayout,
 					renderer.perSide,
 					0,
 					true,
@@ -426,11 +629,12 @@ function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
 		renderer.transformStorage,
 		renderer.world.writeGlobalTransformBlobRangeViews(
 			0,
-			renderer.transformWordCapacity,
+			renderer.transformWordUploadCount,
 			(bytes) =>
 				writeMassCubesTransformBlob(
 					bytes,
 					renderer.transformRefs,
+					renderer.denseTransformLayout,
 					renderer.perSide,
 					t,
 					false,
@@ -577,7 +781,12 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformRefsBytes.byteOffset,
 		transformRefsBytes.byteLength >>> 2,
 	);
+	const denseTransformLayout = detectDenseTransformLayout(transformRefs);
 	const transformWordCapacity = world.globalTransformBlobWordCapacity();
+	const transformWordUploadCount =
+		denseTransformLayout?.wordsPerEntity === undefined
+			? transformWordCapacity
+			: ENTITY_COUNT * denseTransformLayout.wordsPerEntity;
 	const transformStorage = device.createBuffer({
 		size: Math.max(transformWordCapacity * 4, 4),
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -639,6 +848,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		world,
 		transformRefs,
 		transformWordCapacity,
+		transformWordUploadCount,
+		denseTransformLayout,
 		perSide,
 		frame: 0,
 		lastFrameStartMs: -1,
