@@ -353,7 +353,9 @@ fn World::can_add_missing_component_from_setter(
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
 /// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
-pub fn World::new() -> World {
+pub fn World::new_with_global_transform_format(
+  global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
+) -> World {
   let registry = ComponentRegistry::new()
   let tf_layout = @comp.transform3d_gpu_layout()
   if !tf_layout.is_valid() {
@@ -363,7 +365,10 @@ pub fn World::new() -> World {
     "Transform3D",
     tf_layout.stride,
   )
-  let gt_layout = @comp.global_transform_gpu_layout()
+  let gt_layout = match global_transform_gpu_format {
+    Affine3x4F32 => @comp.global_transform_gpu_layout()
+    Affine3x4F16 => @comp.global_transform_gpu_layout_f16()
+  }
   if !gt_layout.is_valid() {
     abort("builtin GlobalTransform layout invalid")
   }
@@ -435,8 +440,21 @@ pub fn World::new() -> World {
     system_access_structural_write,
     transform_component_id,
     global_transform_component_id,
+    global_transform_gpu_format,
     child_of_component_id,
   }
+}
+
+///|
+pub fn World::new() -> World {
+  World::new_with_global_transform_format(Affine3x4F32)
+}
+
+///|
+pub fn World::global_transform_gpu_format(
+  self : World,
+) -> @comp.GlobalTransformGpuFormat {
+  self.global_transform_gpu_format
 }
 
 ///|

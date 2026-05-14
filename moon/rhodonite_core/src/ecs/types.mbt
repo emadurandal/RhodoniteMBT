@@ -309,5 +309,6 @@ pub struct World {
   priv mut system_access_structural_write : Bool
   priv transform_component_id : ComponentTypeId
   priv global_transform_component_id : ComponentTypeId
+  priv global_transform_gpu_format : @comp.GlobalTransformGpuFormat
   priv child_of_component_id : ComponentTypeId
 }

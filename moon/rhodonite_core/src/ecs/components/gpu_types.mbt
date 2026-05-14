@@ -11,6 +11,7 @@ pub(all) enum GpuFieldKind {
   /// std140-style `vec3`: 16-byte column (12 bytes payload + 4 padding).
   Vec3F32
   Vec4F32
+  Vec4F16
   Mat4x4F32
 } derive(Eq)
 
@@ -25,7 +26,8 @@ pub(all) struct GpuField {
 }
 
 ///|
-/// CPU-side mirror of a WGSL-friendly layout (std140-style packing). Stride is padded to 16 bytes for storage-buffer alignment.
+/// CPU-side mirror of a WGSL-friendly layout. `std140` layouts keep 16-byte stride padding;
+/// explicit storage layouts may use smaller host-shareable strides such as 24-byte `vec4<f16>` rows.
 pub(all) struct GpuLayout {
   fields : Array[GpuField]
   stride : Int

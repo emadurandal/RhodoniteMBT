@@ -1,4 +1,12 @@
 ///|
+fn World::global_transform_gpu_layout_stride(self : World) -> Int {
+  match self.global_transform_gpu_format {
+    Affine3x4F32 => 48
+    Affine3x4F16 => 24
+  }
+}
+
+///|
 /// Assigns builtin [`GlobalTransform`] for `entity`: archetype signature uses zero-byte SoA row; payload is flat GPU only.
 pub fn World::set_global_transform(
   self : World,
@@ -20,7 +28,11 @@ pub fn World::set_global_transform(
   match self.ensure_gpu_store_capacity(id, entity.index + 1) {
     Some(store) => {
       store.mut_entity_row(entity.index, fn(view) {
-        @comp.matrix44f_write_affine3x4_to_gpu_row(m, view)
+        @comp.matrix44f_write_global_transform_to_gpu_row(
+          m,
+          view,
+          self.global_transform_gpu_format,
+        )
       })
       self.replace_gpu_store(store)
       true
@@ -40,7 +52,13 @@ pub fn World::get_global_transform(
     return None
   }
   match self.component_bytes(entity, id) {
-    Some(bytes) => Some(@comp.matrix44f_from_affine3x4_gpu_bytes(bytes))
+    Some(bytes) =>
+      Some(
+        @comp.matrix44f_from_global_transform_gpu_bytes(
+          bytes,
+          self.global_transform_gpu_format,
+        ),
+      )
     None => None
   }
 }
@@ -63,7 +81,7 @@ pub fn World::write_global_transforms_dense(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 48 {
+    if stride != self.global_transform_gpu_layout_stride() {
       abort(
         "World::write_global_transforms_dense: GlobalTransform stride mismatch",
       )
@@ -101,7 +119,7 @@ pub fn World::write_global_transforms_dense_views(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 48 {
+    if stride != self.global_transform_gpu_layout_stride() {
       abort(
         "World::write_global_transforms_dense_views: GlobalTransform stride mismatch",
       )
@@ -142,7 +160,7 @@ pub fn World::write_global_transforms_dense_range_views(
     return []
   }
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    if range.stride() != 48 {
+    if range.stride() != self.global_transform_gpu_layout_stride() {
       abort(
         "World::write_global_transforms_dense_range_views: GlobalTransform stride mismatch",
       )
@@ -183,7 +201,7 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
   }
   match self.ensure_gpu_store_capacity(gt, count) {
     Some(store) => {
-      if store.stride != 48 {
+      if store.stride != self.global_transform_gpu_layout_stride() {
         abort(
           "World::write_global_transforms_dense_wasm_bytes_range: GlobalTransform stride mismatch",
         )
@@ -319,7 +337,11 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
   gt_row : MutArrayView[Byte],
 ) -> Bool {
   if !has_child_of {
-    @comp.matrix44f_write_affine3x4_to_gpu_row(leaf_local_matrix, gt_row)
+    @comp.matrix44f_write_global_transform_to_gpu_row(
+      leaf_local_matrix,
+      gt_row,
+      self.global_transform_gpu_format,
+    )
     true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
@@ -333,7 +355,11 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
           ) {
           None => false
           Some(world_m) => {
-            @comp.matrix44f_write_affine3x4_to_gpu_row(world_m, gt_row)
+            @comp.matrix44f_write_global_transform_to_gpu_row(
+              world_m,
+              gt_row,
+              self.global_transform_gpu_format,
+            )
             true
           }
         }
@@ -696,14 +722,15 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     }
   }
   if !matched {
-    return true
+    return false
   }
   let gt_store = match
     self.ensure_gpu_store_capacity(gt, self.locations.length()) {
     Some(store) => store
     None => return false
   }
-  if gt_store.stride != 48 {
+  let gt_stride = self.global_transform_gpu_layout_stride()
+  if gt_store.stride != gt_stride {
     return false
   }
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -733,7 +760,7 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
           e,
           true,
           local_m,
-          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 48),
+          gt_store.bytes.mut_view(start=gt_base, end=gt_base + gt_stride),
         ),
       )
       if dirty_first < 0 {

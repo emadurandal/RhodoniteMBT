@@ -12,9 +12,17 @@ pub(all) struct GlobalTransform {
 }
 
 ///|
+/// GPU row format for builtin [`GlobalTransform`].
+pub(all) enum GlobalTransformGpuFormat {
+  Affine3x4F32
+  Affine3x4F16
+} derive(Eq)
+
+///|
 /// Mutable typed view over one flat GPU GlobalTransform row.
 pub struct GlobalTransformGpuMutRow {
   priv view : MutArrayView[Byte]
+  priv format : GlobalTransformGpuFormat
 }
 
 ///|
@@ -37,13 +45,33 @@ pub fn GlobalTransformGpuMutRow::from_gpu_row(
   if row.length() != 48 {
     abort("GlobalTransformGpuMutRow::from_gpu_row: length mismatch")
   }
-  { view: row }
+  { view: row, format: Affine3x4F32 }
+}
+
+///|
+pub fn GlobalTransformGpuMutRow::from_gpu_row_format(
+  row : MutArrayView[Byte],
+  format : GlobalTransformGpuFormat,
+) -> GlobalTransformGpuMutRow {
+  let expected = match format {
+    Affine3x4F32 => 48
+    Affine3x4F16 => 24
+  }
+  if row.length() != expected {
+    abort("GlobalTransformGpuMutRow::from_gpu_row_format: length mismatch")
+  }
+  { view: row, format }
 }
 
 ///|
 pub fn GlobalTransformGpuMutRow::view(
   self : GlobalTransformGpuMutRow,
 ) -> GlobalTransform {
+  if self.format != Affine3x4F32 {
+    abort(
+      "GlobalTransformGpuMutRow::view: fp16 rows do not expose Matrix44RefF",
+    )
+  }
   GlobalTransform::view_affine3x4_gpu_row(self.view)
 }
 
@@ -52,14 +80,14 @@ pub fn GlobalTransformGpuMutRow::write_matrix(
   self : GlobalTransformGpuMutRow,
   m : @m44.Matrix44F,
 ) -> Unit {
-  matrix44f_write_affine3x4_to_gpu_row(m, self.view)
+  matrix44f_write_global_transform_to_gpu_row(m, self.view, self.format)
 }
 
 ///|
 pub fn GlobalTransformGpuMutRow::write_identity(
   self : GlobalTransformGpuMutRow,
 ) -> Unit {
-  global_transform_write_identity_row(self.view)
+  global_transform_write_identity_row_format(self.view, self.format)
 }
 
 ///|
@@ -85,6 +113,20 @@ pub fn global_transform_gpu_layout() -> GpuLayout {
     ],
     stride: 48,
     align: 16,
+  }
+}
+
+///|
+/// Three `vec4<f16>` rows: `row0`, `row1`, `row2` (24-byte stride).
+pub fn global_transform_gpu_layout_f16() -> GpuLayout {
+  {
+    fields: [
+      { name: "world_row0", kind: Vec4F16, offset: 0, size: 8, align: 8 },
+      { name: "world_row1", kind: Vec4F16, offset: 8, size: 8, align: 8 },
+      { name: "world_row2", kind: Vec4F16, offset: 16, size: 8, align: 8 },
+    ],
+    stride: 24,
+    align: 8,
   }
 }
 
@@ -118,6 +160,128 @@ pub fn matrix44f_from_affine3x4_gpu_bytes(
         get_gpu_f32(bytes, base + 44),
         (1.0 : Float),
       ] : FixedArray[Float]),
+  }
+}
+
+///|
+fn get_gpu_u16(buf : FixedArray[Byte], offset : Int) -> UInt {
+  buf[offset].to_uint() | (buf[offset + 1].to_uint() << 8)
+}
+
+///|
+fn put_gpu_u16_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : UInt,
+) -> Unit {
+  buf[offset] = (value & 0xFFU).to_byte()
+  buf[offset + 1] = ((value >> 8) & 0xFFU).to_byte()
+}
+
+///|
+fn f32_to_f16_bits(value : Float) -> UInt {
+  let bits = value.reinterpret_as_uint()
+  let sign = (bits >> 16) & 0x8000U
+  let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
+  let mant = bits & 0x7FFFFFU
+  if exp == 255 {
+    if mant == 0U {
+      return sign | 0x7C00U
+    }
+    return sign | 0x7E00U
+  }
+  let half_exp = exp - 127 + 15
+  if half_exp >= 31 {
+    return sign | 0x7C00U
+  }
+  if half_exp <= 0 {
+    if half_exp < -10 {
+      return sign
+    }
+    let mantissa = mant | 0x800000U
+    let shift = 14 - half_exp
+    let mut half_mant = mantissa >> shift
+    if ((mantissa >> (shift - 1)) & 1U) != 0U {
+      half_mant = half_mant + 1U
+    }
+    return sign | half_mant
+  }
+  let mut half = sign | (half_exp.reinterpret_as_uint() << 10) | (mant >> 13)
+  if ((mant >> 12) & 1U) != 0U {
+    half = half + 1U
+  }
+  half
+}
+
+///|
+fn f16_bits_to_f32(bits16 : UInt) -> Float {
+  let sign = (bits16 & 0x8000U) << 16
+  let exp = (bits16 >> 10) & 0x1FU
+  let mant = bits16 & 0x03FFU
+  let bits32 = if exp == 0U {
+    if mant == 0U {
+      sign
+    } else {
+      let mut m = mant
+      let mut e = -14
+      while (m & 0x0400U) == 0U {
+        m = m << 1
+        e = e - 1
+      }
+      m = m & 0x03FFU
+      sign | ((e + 127).reinterpret_as_uint() << 23) | (m << 13)
+    }
+  } else if exp == 0x1FU {
+    sign | 0x7F800000U | (mant << 13)
+  } else {
+    sign |
+    ((exp.reinterpret_as_int() - 15 + 127).reinterpret_as_uint() << 23) |
+    (mant << 13)
+  }
+  Float::reinterpret_from_uint(bits32)
+}
+
+///|
+/// Decodes one GPU affine 3x4 fp16 row into an owned [`@m44.Matrix44F`].
+pub fn matrix44f_from_affine3x4_f16_gpu_bytes(
+  bytes : FixedArray[Byte],
+) -> @m44.Matrix44F {
+  let stride = 24
+  if bytes.length() != stride {
+    abort("matrix44f_from_affine3x4_f16_gpu_bytes: length mismatch")
+  }
+  let base = 0
+  @m44.Matrix44F::{
+    data: (
+      [
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 0)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 8)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 16)),
+        (0.0 : Float),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 2)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 10)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 18)),
+        (0.0 : Float),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 4)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 12)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 20)),
+        (0.0 : Float),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 6)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 14)),
+        f16_bits_to_f32(get_gpu_u16(bytes, base + 22)),
+        (1.0 : Float),
+      ] : FixedArray[Float]),
+  }
+}
+
+///|
+pub fn matrix44f_from_global_transform_gpu_bytes(
+  bytes : FixedArray[Byte],
+  format : GlobalTransformGpuFormat,
+) -> @m44.Matrix44F {
+  match format {
+    Affine3x4F32 => matrix44f_from_affine3x4_gpu_bytes(bytes)
+    Affine3x4F16 => matrix44f_from_affine3x4_f16_gpu_bytes(bytes)
   }
 }
 
@@ -217,6 +381,39 @@ pub fn global_transform_write_identity_row(buf : MutArrayView[Byte]) -> Unit {
 }
 
 ///|
+/// Writes an identity matrix into one fp16 affine 3x4 GlobalTransform row.
+pub fn global_transform_write_identity_row_f16(
+  buf : MutArrayView[Byte],
+) -> Unit {
+  if buf.length() != 24 {
+    abort("global_transform_write_identity_row_f16: length mismatch")
+  }
+  put_gpu_u16_mut_view(buf, 0, f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 2, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 4, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 6, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 8, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 10, f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 12, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 14, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 16, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 18, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 20, f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 22, f32_to_f16_bits(0.0))
+}
+
+///|
+pub fn global_transform_write_identity_row_format(
+  buf : MutArrayView[Byte],
+  format : GlobalTransformGpuFormat,
+) -> Unit {
+  match format {
+    Affine3x4F32 => global_transform_write_identity_row(buf)
+    Affine3x4F16 => global_transform_write_identity_row_f16(buf)
+  }
+}
+
+///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
 #cfg(not(target="js"))
 pub fn matrix44f_write_affine3x4_to_gpu_row(
@@ -241,6 +438,42 @@ pub fn matrix44f_write_affine3x4_to_gpu_row(
   @writes.put_u32_le_mut_view(buf, base + 36, d[6].reinterpret_as_uint())
   @writes.put_u32_le_mut_view(buf, base + 40, d[10].reinterpret_as_uint())
   @writes.put_u32_le_mut_view(buf, base + 44, d[14].reinterpret_as_uint())
+}
+
+///|
+/// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 fp16 GPU row.
+pub fn matrix44f_write_affine3x4_f16_to_gpu_row(
+  m : @m44.Matrix44F,
+  buf : MutArrayView[Byte],
+) -> Unit {
+  if buf.length() != 24 {
+    abort("matrix44f_write_affine3x4_f16_to_gpu_row: length mismatch")
+  }
+  let d = m.data
+  put_gpu_u16_mut_view(buf, 0, f32_to_f16_bits(d[0]))
+  put_gpu_u16_mut_view(buf, 2, f32_to_f16_bits(d[4]))
+  put_gpu_u16_mut_view(buf, 4, f32_to_f16_bits(d[8]))
+  put_gpu_u16_mut_view(buf, 6, f32_to_f16_bits(d[12]))
+  put_gpu_u16_mut_view(buf, 8, f32_to_f16_bits(d[1]))
+  put_gpu_u16_mut_view(buf, 10, f32_to_f16_bits(d[5]))
+  put_gpu_u16_mut_view(buf, 12, f32_to_f16_bits(d[9]))
+  put_gpu_u16_mut_view(buf, 14, f32_to_f16_bits(d[13]))
+  put_gpu_u16_mut_view(buf, 16, f32_to_f16_bits(d[2]))
+  put_gpu_u16_mut_view(buf, 18, f32_to_f16_bits(d[6]))
+  put_gpu_u16_mut_view(buf, 20, f32_to_f16_bits(d[10]))
+  put_gpu_u16_mut_view(buf, 22, f32_to_f16_bits(d[14]))
+}
+
+///|
+pub fn matrix44f_write_global_transform_to_gpu_row(
+  m : @m44.Matrix44F,
+  buf : MutArrayView[Byte],
+  format : GlobalTransformGpuFormat,
+) -> Unit {
+  match format {
+    Affine3x4F32 => matrix44f_write_affine3x4_to_gpu_row(m, buf)
+    Affine3x4F16 => matrix44f_write_affine3x4_f16_to_gpu_row(m, buf)
+  }
 }
 
 ///|

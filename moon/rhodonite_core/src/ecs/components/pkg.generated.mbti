@@ -19,15 +19,29 @@ pub fn get_gpu_f32_mut_view(MutArrayView[Byte], Int) -> Float
 
 pub fn global_transform_gpu_layout() -> GpuLayout
 
+pub fn global_transform_gpu_layout_f16() -> GpuLayout
+
 pub fn global_transform_write_identity_row(MutArrayView[Byte]) -> Unit
+
+pub fn global_transform_write_identity_row_f16(MutArrayView[Byte]) -> Unit
+
+pub fn global_transform_write_identity_row_format(MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
+pub fn matrix44f_from_affine3x4_f16_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
+
 pub fn matrix44f_from_affine3x4_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
+
+pub fn matrix44f_from_global_transform_gpu_bytes(FixedArray[Byte], GlobalTransformGpuFormat) -> @matrix44.Matrix44[Float]
 
 pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
 
+pub fn matrix44f_write_affine3x4_f16_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
+
 pub fn matrix44f_write_affine3x4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
+
+pub fn matrix44f_write_global_transform_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
 
 pub fn matrix44f_write_std140_mat4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 
@@ -73,10 +87,16 @@ pub(all) struct GlobalTransform {
 pub fn GlobalTransform::view_affine3x4_gpu_row(MutArrayView[Byte]) -> Self
 pub fn GlobalTransform::view_std140_gpu_row(MutArrayView[Byte]) -> Self
 
+pub(all) enum GlobalTransformGpuFormat {
+  Affine3x4F32
+  Affine3x4F16
+} derive(Eq)
+
 pub struct GlobalTransformGpuMutRow {
   // private fields
 }
 pub fn GlobalTransformGpuMutRow::from_gpu_row(MutArrayView[Byte]) -> Self
+pub fn GlobalTransformGpuMutRow::from_gpu_row_format(MutArrayView[Byte], GlobalTransformGpuFormat) -> Self
 pub fn GlobalTransformGpuMutRow::view(Self) -> GlobalTransform
 pub fn GlobalTransformGpuMutRow::write_identity(Self) -> Unit
 pub fn GlobalTransformGpuMutRow::write_matrix(Self, @matrix44.Matrix44[Float]) -> Unit
@@ -96,6 +116,7 @@ pub(all) enum GpuFieldKind {
   Vec3F32Packed
   Vec3F32
   Vec4F32
+  Vec4F16
   Mat4x4F32
 } derive(Eq)
 pub fn GpuFieldKind::align(Self) -> Int
@@ -109,6 +130,7 @@ pub(all) struct GpuLayout {
 pub fn GpuLayout::empty(Int) -> Self
 pub fn GpuLayout::is_valid(Self) -> Bool
 pub fn GpuLayout::std140(Array[(String, GpuFieldKind)]) -> Self
+pub fn GpuLayout::storage(Array[(String, GpuFieldKind)]) -> Self
 
 pub(all) struct Transform3D {
   position : @vector3.Vector3Ref[Byte]

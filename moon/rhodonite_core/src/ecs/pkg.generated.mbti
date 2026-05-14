@@ -206,11 +206,13 @@ pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
 pub fn World::global_transform_component(Self) -> ComponentTypeId
+pub fn World::global_transform_gpu_format(Self) -> @components.GlobalTransformGpuFormat
 pub fn World::gpu_component_active_indices(Self, ComponentTypeId) -> Array[Int]
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self
+pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool

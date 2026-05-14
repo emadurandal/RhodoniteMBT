@@ -41,6 +41,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function component_type_id_index(component: MoonComponentTypeId): number;
 
 	export function world_new(): MoonWorld;
+	export function world_new_with_global_transform_f16(): MoonWorld;
 	export function world_create_entity(world: MoonWorld): MoonEntityId;
 	export function world_destroy_entity(world: MoonWorld, entity: MoonEntityId): MoonBool;
 	export function world_is_alive(world: MoonWorld, entity: MoonEntityId): MoonBool;
@@ -269,6 +270,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function gpu_layout_empty(stride: number): MoonGpuLayout;
 	export function gpu_layout_transform3d(): MoonGpuLayout;
 	export function gpu_layout_global_transform(): MoonGpuLayout;
+	export function gpu_layout_global_transform_f16(): MoonGpuLayout;
 	export function gpu_layout_child_of(): MoonGpuLayout;
 	export function gpu_layout_stride(layout: MoonGpuLayout): number;
 	export function gpu_layout_align(layout: MoonGpuLayout): number;

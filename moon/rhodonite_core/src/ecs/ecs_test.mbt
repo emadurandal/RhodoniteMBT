@@ -431,6 +431,67 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 }
 
 ///|
+test "GlobalTransform fp16 world uses 24 byte GPU rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let gt_id = world.global_transform_component()
+  match world.component_gpu_layout(gt_id) {
+    Some(layout) => {
+      assert_eq(layout.stride, 24)
+      assert_true(layout.is_valid())
+    }
+    None => abort("expected GlobalTransform layout")
+  }
+  let entity = world.create_entity()
+  let m = @m44.Matrix44::new_col_major(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (2.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.5 : Float),
+    (0.0 : Float),
+    (4.0 : Float),
+    (0.25 : Float),
+    (-2.0 : Float),
+    (1.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, m))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, m)
+    None => abort("expected fp16 Matrix44F")
+  }
+  let writes = world.drain_gpu_writes(gt_id)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].bytes.length(), 24)
+}
+
+///|
+test "spawn_transform_global_batch initializes fp16 GlobalTransform rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let entities = world.spawn_transform_global_batch(1, fn(
+    _i,
+    _entity,
+    tf_row,
+    gt_row,
+  ) {
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+    )
+    @comp.global_transform_write_identity_row_format(gt_row, Affine3x4F16)
+  })
+  assert_eq(entities.length(), 1)
+  match world.get_global_transform(entities[0]) {
+    Some(read) => assert_eq(read, @m44.Matrix44F::identity())
+    None => abort("expected fp16 batch GlobalTransform")
+  }
+}
+
+///|
 test "get_gpu_f32 reads put_gpu_f32" {
   let buf = @comp.gpu_component_bytes(16)
   @comp.put_gpu_f32(buf, 4, 2.5)

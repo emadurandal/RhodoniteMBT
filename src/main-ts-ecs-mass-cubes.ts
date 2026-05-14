@@ -7,6 +7,8 @@ import {
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
+const USE_FP16_GLOBAL_TRANSFORM = true;
+const USE_FLOAT16_ARRAY_PACKER = true;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
@@ -16,6 +18,59 @@ const INDEX_U16_COUNT = 36;
 const CAMERA_ELEVATION_RAD = 0.42;
 const GRID_SPACING = 0.14;
 const CUBE_SCALE = 0.055;
+const F16_SCRATCH_F32 = new Float32Array(1);
+const F16_SCRATCH_U32 = new Uint32Array(F16_SCRATCH_F32.buffer);
+const F32_TO_F16_BASE = new Uint16Array(512);
+const F32_TO_F16_SHIFT = new Uint8Array(512);
+type Float16ArrayLike = {
+	readonly length: number;
+	[index: number]: number;
+};
+type Float16ArrayConstructorLike = {
+	new (
+		buffer: ArrayBufferLike,
+		byteOffset?: number,
+		length?: number,
+	): Float16ArrayLike;
+};
+const Float16ArrayCtor = (
+	globalThis as typeof globalThis & {
+		Float16Array?: Float16ArrayConstructorLike;
+	}
+).Float16Array;
+
+for (let i = 0; i < 256; i += 1) {
+	const e = i - 127;
+	if (e < -24) {
+		F32_TO_F16_BASE[i] = 0x0000;
+		F32_TO_F16_BASE[i | 0x100] = 0x8000;
+		F32_TO_F16_SHIFT[i] = 24;
+		F32_TO_F16_SHIFT[i | 0x100] = 24;
+	} else if (e < -14) {
+		const base = 0x0400 >> (-e - 14);
+		const shift = -e - 1;
+		F32_TO_F16_BASE[i] = base;
+		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
+		F32_TO_F16_SHIFT[i] = shift;
+		F32_TO_F16_SHIFT[i | 0x100] = shift;
+	} else if (e <= 15) {
+		const base = (e + 15) << 10;
+		F32_TO_F16_BASE[i] = base;
+		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
+		F32_TO_F16_SHIFT[i] = 13;
+		F32_TO_F16_SHIFT[i | 0x100] = 13;
+	} else if (e < 128) {
+		F32_TO_F16_BASE[i] = 0x7c00;
+		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
+		F32_TO_F16_SHIFT[i] = 24;
+		F32_TO_F16_SHIFT[i | 0x100] = 24;
+	} else {
+		F32_TO_F16_BASE[i] = 0x7c00;
+		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
+		F32_TO_F16_SHIFT[i] = 13;
+		F32_TO_F16_SHIFT[i | 0x100] = 13;
+	}
+}
 
 type Mat4 = Float32Array;
 
@@ -60,6 +115,19 @@ function writeU16(bytes: Uint8Array, offset: number, value: number): void {
 		value,
 		true,
 	);
+}
+
+function f32ToF16Bits(value: number): number {
+	F16_SCRATCH_F32[0] = Math.fround(value);
+	const bits = F16_SCRATCH_U32[0] ?? 0;
+	const index = (bits >>> 23) & 0x1ff;
+	return (F32_TO_F16_BASE[index] ?? 0) + ((bits & 0x007fffff) >>> (F32_TO_F16_SHIFT[index] ?? 24));
+}
+
+function setF16(bytes: ByteView, offset: number, value: number): void {
+	const bits = f32ToF16Bits(value);
+	bytes.set(offset, bits & 0xff);
+	bytes.set(offset + 1, (bits >>> 8) & 0xff);
 }
 
 function mat4Identity(): Mat4 {
@@ -310,11 +378,12 @@ function uploadGlobalTransformWrites(
 ): void {
 	for (const write of writes) {
 		const bytes = write.bytes();
-		queue.writeBuffer(
-			buffer,
-			write.byteOffset(),
-			bytes.asUint8Array() ?? bytes.toUint8ArrayCopy(),
-		);
+		const backing = bytes.buffer;
+		if (backing instanceof Uint8Array) {
+			queue.writeBuffer(buffer, write.byteOffset(), backing, bytes.start, bytes.length);
+		} else {
+			queue.writeBuffer(buffer, write.byteOffset(), bytes.toUint8ArrayCopy());
+		}
 	}
 }
 
@@ -326,6 +395,25 @@ function rangeAsF32(bytes: ByteView): Float32Array | null {
 	return new Float32Array(view.buffer, view.byteOffset, view.byteLength >> 2);
 }
 
+function rangeAsU16(bytes: ByteView): Uint16Array | null {
+	const view = bytes.asUint8Array();
+	if (view === null || (view.byteOffset & 1) !== 0) {
+		return null;
+	}
+	return new Uint16Array(view.buffer, view.byteOffset, view.byteLength >> 1);
+}
+
+function rangeAsF16(bytes: ByteView): Float16ArrayLike | null {
+	if (!USE_FLOAT16_ARRAY_PACKER) {
+		return null;
+	}
+	const view = bytes.asUint8Array();
+	if (Float16ArrayCtor === undefined || view === null || (view.byteOffset & 1) !== 0) {
+		return null;
+	}
+	return new Float16ArrayCtor(view.buffer, view.byteOffset, view.byteLength >> 1);
+}
+
 function writeMassCubesFullRange(
 	bytes: ByteView,
 	stride: number,
@@ -335,6 +423,111 @@ function writeMassCubesFullRange(
 	waveTime: number,
 ): void {
 	const matrices = rangeAsF32(bytes);
+	if (stride === 24) {
+		const halfFloats = rangeAsF16(bytes);
+		if (halfFloats !== null) {
+			const half = (perSide - 1) * 0.5;
+			const sinStep = Math.sin(0.09);
+			const cosStep = Math.cos(0.09);
+			let localIndex = 0;
+			let row = Math.trunc(firstEntityIndex / perSide);
+			let column = firstEntityIndex % perSide;
+			while (localIndex < count) {
+				const rowCount = Math.min(perSide - column, count - localIndex);
+				let x = (column - half) * GRID_SPACING;
+				const z = (row - half) * GRID_SPACING;
+				const globalIndex = firstEntityIndex + localIndex;
+				let waveSin = Math.sin(globalIndex * 0.09 + waveTime);
+				let waveCos = Math.cos(globalIndex * 0.09 + waveTime);
+				for (let ix = 0; ix < rowCount; ix += 1) {
+					const out = localIndex * 12;
+					halfFloats[out] = CUBE_SCALE;
+					halfFloats[out + 1] = 0;
+					halfFloats[out + 2] = 0;
+					halfFloats[out + 3] = x;
+					halfFloats[out + 4] = 0;
+					halfFloats[out + 5] = CUBE_SCALE;
+					halfFloats[out + 6] = 0;
+					halfFloats[out + 7] = waveSin * 0.12;
+					halfFloats[out + 8] = 0;
+					halfFloats[out + 9] = 0;
+					halfFloats[out + 10] = CUBE_SCALE;
+					halfFloats[out + 11] = z;
+
+					const nextSin = waveSin * cosStep + waveCos * sinStep;
+					waveCos = waveCos * cosStep - waveSin * sinStep;
+					waveSin = nextSin;
+					localIndex += 1;
+					x += GRID_SPACING;
+				}
+				row += 1;
+				column = 0;
+			}
+			return;
+		}
+		const halfRows = rangeAsU16(bytes);
+		if (halfRows === null) {
+			for (let i = 0; i < count; i += 1) {
+				const index = firstEntityIndex + i;
+				const [x, z] = gridXzForIndex(index, perSide);
+				const y = Math.sin(index * 0.09 + waveTime) * 0.12;
+				const base = i * stride;
+				setF16(bytes, base, CUBE_SCALE);
+				setF16(bytes, base + 2, 0);
+				setF16(bytes, base + 4, 0);
+				setF16(bytes, base + 6, x);
+				setF16(bytes, base + 8, 0);
+				setF16(bytes, base + 10, CUBE_SCALE);
+				setF16(bytes, base + 12, 0);
+				setF16(bytes, base + 14, y);
+				setF16(bytes, base + 16, 0);
+				setF16(bytes, base + 18, 0);
+				setF16(bytes, base + 20, CUBE_SCALE);
+				setF16(bytes, base + 22, z);
+			}
+			return;
+		}
+		const zeroH = f32ToF16Bits(0);
+		const scaleH = f32ToF16Bits(CUBE_SCALE);
+		const half = (perSide - 1) * 0.5;
+		const sinStep = Math.sin(0.09);
+		const cosStep = Math.cos(0.09);
+		let localIndex = 0;
+		let row = Math.trunc(firstEntityIndex / perSide);
+		let column = firstEntityIndex % perSide;
+		while (localIndex < count) {
+			const rowCount = Math.min(perSide - column, count - localIndex);
+			let x = (column - half) * GRID_SPACING;
+			const z = (row - half) * GRID_SPACING;
+			const globalIndex = firstEntityIndex + localIndex;
+			let waveSin = Math.sin(globalIndex * 0.09 + waveTime);
+			let waveCos = Math.cos(globalIndex * 0.09 + waveTime);
+			for (let ix = 0; ix < rowCount; ix += 1) {
+				const out = localIndex * 12;
+				halfRows[out] = scaleH;
+				halfRows[out + 1] = zeroH;
+				halfRows[out + 2] = zeroH;
+				halfRows[out + 3] = f32ToF16Bits(x);
+				halfRows[out + 4] = zeroH;
+				halfRows[out + 5] = scaleH;
+				halfRows[out + 6] = zeroH;
+				halfRows[out + 7] = f32ToF16Bits(waveSin * 0.12);
+				halfRows[out + 8] = zeroH;
+				halfRows[out + 9] = zeroH;
+				halfRows[out + 10] = scaleH;
+				halfRows[out + 11] = f32ToF16Bits(z);
+
+				const nextSin = waveSin * cosStep + waveCos * sinStep;
+				waveCos = waveCos * cosStep - waveSin * sinStep;
+				waveSin = nextSin;
+				localIndex += 1;
+				x += GRID_SPACING;
+			}
+			row += 1;
+			column = 0;
+		}
+		return;
+	}
 	if (matrices === null || stride !== 48) {
 		for (let i = 0; i < count; i += 1) {
 			const index = firstEntityIndex + i;
@@ -405,6 +598,45 @@ function writeMassCubesYRange(
 	waveTime: number,
 ): void {
 	const matrices = rangeAsF32(bytes);
+	if (stride === 24) {
+		const halfFloats = rangeAsF16(bytes);
+		if (halfFloats !== null) {
+			const sinStep = Math.sin(0.09);
+			const cosStep = Math.cos(0.09);
+			let localIndex = 0;
+			let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
+			let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
+			while (localIndex < count) {
+				halfFloats[localIndex * 12 + 7] = waveSin * 0.12;
+				const nextSin = waveSin * cosStep + waveCos * sinStep;
+				waveCos = waveCos * cosStep - waveSin * sinStep;
+				waveSin = nextSin;
+				localIndex += 1;
+			}
+			return;
+		}
+		const halfRows = rangeAsU16(bytes);
+		if (halfRows === null) {
+			for (let i = 0; i < count; i += 1) {
+				const index = firstEntityIndex + i;
+				setF16(bytes, i * stride + 14, Math.sin(index * 0.09 + waveTime) * 0.12);
+			}
+			return;
+		}
+		const sinStep = Math.sin(0.09);
+		const cosStep = Math.cos(0.09);
+		let localIndex = 0;
+		let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
+		let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
+		while (localIndex < count) {
+			halfRows[localIndex * 12 + 7] = f32ToF16Bits(waveSin * 0.12);
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			localIndex += 1;
+		}
+		return;
+	}
 	if (matrices === null || stride !== 48) {
 		for (let i = 0; i < count; i += 1) {
 			const index = firstEntityIndex + i;
@@ -497,7 +729,57 @@ function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
 	);
 }
 
-function shaderWgsl(): string {
+function shaderWgsl(useFp16GlobalTransform: boolean): string {
+	if (useFp16GlobalTransform) {
+		return `
+enable f16;
+
+struct CameraUniform {
+  view_proj: mat4x4<f32>,
+}
+
+struct WorldAffine3x4h {
+  row0: vec4<f16>,
+  row1: vec4<f16>,
+  row2: vec4<f16>,
+}
+
+@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4h>;
+@group(1) @binding(0) var<uniform> camera: CameraUniform;
+
+struct VertexOut {
+  @builtin(position) position: vec4<f32>,
+  @location(0) color: vec3<f32>,
+};
+
+@vertex
+fn vertexMain(
+  @location(0) local_pos: vec3<f32>,
+  @location(1) inst: vec4<f32>,
+) -> VertexOut {
+  let idx = u32(inst.x);
+  let color = vec3<f32>(inst.y, inst.z, inst.w);
+  let world_m = world_from_entity[idx];
+  let local_h = vec4<f32>(local_pos, 1.0);
+  let world_pos = vec4<f32>(
+    dot(vec4<f32>(world_m.row0), local_h),
+    dot(vec4<f32>(world_m.row1), local_h),
+    dot(vec4<f32>(world_m.row2), local_h),
+    1.0,
+  );
+  let clip = camera.view_proj * world_pos;
+  var o: VertexOut;
+  o.position = clip;
+  o.color = color;
+  return o;
+}
+
+@fragment
+fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
+  return vec4<f32>(color, 1.0);
+}
+`;
+	}
 	return `
 struct CameraUniform {
   view_proj: mat4x4<f32>,
@@ -551,7 +833,12 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	if (adapter === null) {
 		throw new Error("WebGPU adapter is not available.");
 	}
-	const device = await adapter.requestDevice();
+	if (USE_FP16_GLOBAL_TRANSFORM && !adapter.features.has("shader-f16")) {
+		throw new Error("USE_FP16_GLOBAL_TRANSFORM requires WebGPU shader-f16.");
+	}
+	const device = await adapter.requestDevice({
+		requiredFeatures: USE_FP16_GLOBAL_TRANSFORM ? ["shader-f16"] : [],
+	});
 	const queue = device.queue;
 	const context = canvas.getContext("webgpu");
 	if (context === null) {
@@ -560,7 +847,9 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	const format = navigator.gpu.getPreferredCanvasFormat();
 	context.configure({ device, format, alphaMode: "opaque" });
 
-	const shader = device.createShaderModule({ code: shaderWgsl() });
+	const shader = device.createShaderModule({
+		code: shaderWgsl(USE_FP16_GLOBAL_TRANSFORM),
+	});
 	const pipeline = device.createRenderPipeline({
 		layout: "auto",
 		vertex: {
@@ -592,7 +881,9 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		},
 	});
 
-	const world = World.new();
+	const world = USE_FP16_GLOBAL_TRANSFORM
+		? World.newWithGlobalTransformF16()
+		: World.new();
 	const globalTransformComponent = world.globalTransformComponent();
 	const transformComponent = world.transformComponent();
 	const perSide = gridSideLen(ENTITY_COUNT);

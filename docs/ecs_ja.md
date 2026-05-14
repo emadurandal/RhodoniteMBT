@@ -332,8 +332,10 @@ WebGPU upload 側には次の API があります。
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、`write_global_transforms_dense_range_views` にサンプル側 callback を渡して dense な `GlobalTransform` 範囲を一括更新します。初期化 callback は affine 3x4 row 全体を書き、frame ごとの callback は Y translation lane（`row1.w`）だけを更新します。GPU buffer は 48 byte の affine row を保持するため、borrowed upload range は full dense row span のままですが、従来の 64 byte mat4 row より 25% 小さくなります。ライブラリは dense range と dirty 記録だけを担当し、grid-wave の計算はサンプル側にあります。
-ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。[`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo は MoonBit `wasm` の release entrypoint で、MoonBit 所有の `FixedArray[Float]` affine upload buffer を exported wasm linear memory に保持します。TypeScript demo と同じ 48 byte row を書き、同じ full transform span を upload しますが、以前の `FixedArray[Byte]` 経由の f32 byte packing は避けます。[`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo は、ブラウザ WebGPU が MoonBit wasm-gc array を `TypedArray` view として扱えないため、TypeScript upload buffer を使います。frame ごとの表示用 upload path は、同じ wave を wasm-gc と TypeScript で二重計算しないよう host 側が所有します。
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、`write_global_transforms_dense_range_views` にサンプル側 callback を渡して dense な `GlobalTransform` 範囲を一括更新します。初期化 callback は affine 3x4 row 全体を書き、frame ごとの callback は Y translation lane（`row1.w`）だけを更新します。default の GPU buffer は 48 byte の affine row を保持するため、borrowed upload range は full dense row span のままですが、従来の 64 byte mat4 row より 25% 小さくなります。ライブラリは dense range と dirty 記録だけを担当し、grid-wave の計算はサンプル側にあります。
+ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。冒頭の `USE_FP16_GLOBAL_TRANSFORM` flag を有効にすると `World` 全体を 24 byte の `vec4<f16>` affine row に切り替え、WebGPU `shader-f16` を要求します。flag を無効にすると default の 48 byte `vec4<f32>` row を使います。[`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo は MoonBit `wasm` の release entrypoint で、MoonBit 所有の `FixedArray[Float]` affine upload buffer を exported wasm linear memory に保持します。TypeScript demo の fp32 mode と同じ 48 byte row を書き、同じ full transform span を upload しますが、以前の `FixedArray[Byte]` 経由の f32 byte packing は避けます。[`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo は、ブラウザ WebGPU が MoonBit wasm-gc array を `TypedArray` view として扱えないため、TypeScript upload buffer を使います。frame ごとの表示用 upload path は、同じ wave を wasm-gc と TypeScript で二重計算しないよう host 側が所有します。
+
+`World::new()` は default の 48 byte fp32 `GlobalTransform` GPU layout を使います。`World::new_with_global_transform_format(Affine3x4F16)` は builtin `GlobalTransform` を 24 byte fp16 storage-buffer layout にします。これは World 作成時に固定する選択で、shader と GPU buffer も同じ format 前提で作る必要があります。
 
 Dense GlobalTransform helper には所有型と view 型の両方があります。
 
@@ -390,7 +392,7 @@ for (const write of world.drainGpuWriteViews(material)) {
 | 順序 | 名前 | 種別 | 役割 |
 |------|------|------|------|
 | 0 | `Transform3D` | CpuOnly | ローカル TRS 等。SoA に保持。`set_transform` / `get_transform`。 |
-| 1 | `GlobalTransform` | GpuVisible | ワールド affine 行列（`vec4<f32>` 3 行、48 byte stride）。フラット GPU ストア。`set_global_transform` / `get_global_transform`。 |
+| 1 | `GlobalTransform` | GpuVisible | ワールド affine 行列。default は `vec4<f32>` 3 行（48 byte stride）、fp16 world は `vec4<f16>` 3 行（24 byte stride）。フラット GPU ストア。`set_global_transform` / `get_global_transform`。 |
 | 2 | `ChildOf` | CpuOnly | 親 `EntityId` の index/generation。`set_child_of` / `get_child_of`。 |
 
 階層とワールド行列:
@@ -406,7 +408,7 @@ flowchart BT
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
 - **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では `RawQuery::for_each_archetype` による column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は fast path で 48 byte affine `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。affine 3x4 layout は、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は fast path で affine `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。default は 48 byte の `vec4<f32>` row、fp16 world では 24 byte の `vec4<f16>` row です。どちらの affine 3x4 layout も、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
 
 ---
 

@@ -30,6 +30,7 @@ import {
 	world_is_alive,
 	world_location,
 	world_new,
+	world_new_with_global_transform_f16,
 	world_register_cpu_component,
 	world_register_gpu_component,
 	world_remove_component,
@@ -118,6 +119,10 @@ export class World {
 
 	static new(): World {
 		return new World(world_new());
+	}
+
+	static newWithGlobalTransformF16(): World {
+		return new World(world_new_with_global_transform_f16());
 	}
 
 	createEntity(): EntityId {

@@ -599,10 +599,11 @@ pub fn QueryRow::write_global_transform(
     component, "QueryRow::write_global_transform",
   )
   f(
-    @comp.GlobalTransformGpuMutRow::from_gpu_row(
+    @comp.GlobalTransformGpuMutRow::from_gpu_row_format(
       self.component_mut_view(
         component, "QueryRow::write_global_transform", true,
       ),
+      self.world.global_transform_gpu_format,
     ),
   )
 }

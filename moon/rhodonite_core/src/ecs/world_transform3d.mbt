@@ -115,7 +115,7 @@ pub fn World::spawn_transform_global_batch(
     Some(store) => store
     None => return []
   }
-  if gt_store.stride != 48 {
+  if gt_store.stride != self.global_transform_gpu_layout_stride() {
     abort(
       "World::spawn_transform_global_batch: GlobalTransform stride mismatch",
     )

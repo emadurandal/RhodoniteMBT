@@ -36,6 +36,11 @@ pub fn world_new() -> @ecs.World {
 }
 
 ///|
+pub fn world_new_with_global_transform_f16() -> @ecs.World {
+  @ecs.World::new_with_global_transform_format(Affine3x4F16)
+}
+
+///|
 pub fn world_create_entity(world : @ecs.World) -> @ecs.EntityId {
   world.create_entity()
 }
@@ -276,7 +281,10 @@ pub fn world_spawn_transform_global_batch_identity(
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     )
-    @comp.global_transform_write_identity_row(gt_row)
+    @comp.global_transform_write_identity_row_format(
+      gt_row,
+      world.global_transform_gpu_format(),
+    )
   })
 }
 
@@ -520,6 +528,11 @@ pub fn gpu_layout_global_transform() -> @comp.GpuLayout {
 }
 
 ///|
+pub fn gpu_layout_global_transform_f16() -> @comp.GpuLayout {
+  @comp.global_transform_gpu_layout_f16()
+}
+
+///|
 pub fn gpu_layout_child_of() -> @comp.GpuLayout {
   @comp.child_of_cpu_layout()
 }
@@ -558,6 +571,7 @@ pub fn gpu_field_kind_name(field : @comp.GpuField) -> String {
     Vec3F32Packed => "Vec3F32Packed"
     Vec3F32 => "Vec3F32"
     Vec4F32 => "Vec4F32"
+    Vec4F16 => "Vec4F16"
     Mat4x4F32 => "Mat4x4F32"
   }
 }
