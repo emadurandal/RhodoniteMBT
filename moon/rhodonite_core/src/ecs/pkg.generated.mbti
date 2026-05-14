@@ -13,8 +13,6 @@ pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTran
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
-pub fn global_transform_words_for_format(@components.GlobalTransformGpuFormat) -> Int
-
 pub fn transform_propagation_system(World) -> System
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
