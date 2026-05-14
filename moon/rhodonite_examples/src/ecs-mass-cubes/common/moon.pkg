@@ -9,7 +9,3 @@ import {
   "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,
 }
-
-options(
-  "native-stub": [ "mass_cubes_native.c" ],
-)

@@ -7,7 +7,17 @@ import {
 }
 
 // Values
+pub fn compute_global_transform_upload_range(FixedArray[Byte], Int, GlobalTransformDenseLayout?) -> GlobalTransformUploadRange
+
+pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTransformDenseLayout?
+
+pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
+
+pub fn global_transform_words_for_format(@components.GlobalTransformGpuFormat) -> Int
+
 pub fn transform_propagation_system(World) -> System
+
+pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 
 // Errors
 
@@ -56,9 +66,33 @@ pub(all) struct GlobalTransformBlobResizeEvent {
 
 type GlobalTransformBlobStore
 
+pub struct GlobalTransformBlobWriter {
+  // private fields
+}
+pub fn GlobalTransformBlobWriter::set_affine3x4_at(Self, Int, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Unit
+pub fn GlobalTransformBlobWriter::set_element_at(Self, Int, Int, Int, Float) -> Unit
+
+pub(all) struct GlobalTransformDenseLayout {
+  format : @components.GlobalTransformGpuFormat
+  words_per_entity : Int
+}
+
 pub(all) struct GlobalTransformRef {
   format : @components.GlobalTransformGpuFormat
   word_offset : Int
+}
+
+pub(all) struct GlobalTransformRun {
+  first_index : Int
+  end_index : Int
+  format : @components.GlobalTransformGpuFormat
+  first_word : Int
+  words_per_entity : Int
+}
+
+pub(all) struct GlobalTransformUploadRange {
+  first_word : Int
+  word_count : Int
 }
 
 type GpuComponentStore
@@ -245,6 +279,7 @@ pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
+pub fn World::write_global_transform_blob_range_by_refs(Self, FixedArray[Byte], Int, GlobalTransformUploadRange, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transform_blob_range_views(Self, Int, Int, (MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transform_refs_into(Self, Array[EntityId], FixedArray[Byte], Int, Int) -> Unit
 pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
