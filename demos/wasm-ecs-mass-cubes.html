@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoonBit WASM WebGPU — ecs-mass-cubes</title>
+  </head>
+  <body>
+    <div id="app">
+      <h1>MoonBit WASM WebGPU ecs-mass-cubes</h1>
+      <p>
+        MoonBit/WASM が ECS の dense <code>GlobalTransform</code> 更新を実行し、
+        TypeScript host bridge 経由でブラウザ WebGPU に描画を委譲するサンプル。
+      </p>
+      <pre
+        id="ecs-mass-cubes-perf"
+        style="
+          font-family: ui-monospace, monospace;
+          font-size: 0.95rem;
+          margin: 0.5rem auto;
+          padding: 0.35rem 0.5rem;
+          background: #111827;
+          color: #e5e7eb;
+          border-radius: 6px;
+          max-width: 800px;
+          text-align: center;
+        "
+      >
+        FPS …
+      </pre>
+      <canvas id="webgpu-canvas" width="800" height="600"></canvas>
+    </div>
+    <script type="module" src="/src/main-wasm-ecs-mass-cubes.ts"></script>
+  </body>
+</html>

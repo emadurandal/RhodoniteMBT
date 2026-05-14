@@ -22,6 +22,7 @@ export default defineConfig({
 				ecsSceneGraph: "demos/ecs-scene-graph.html",
 				tsEcsMassCubes: "demos/ts-ecs-mass-cubes.html",
 				triangleWithBuffer: "demos/triangle-with-buffer.html",
+				wasmEcsMassCubes: "demos/wasm-ecs-mass-cubes.html",
 			},
 		},
 	},

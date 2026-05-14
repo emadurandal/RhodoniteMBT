@@ -47,6 +47,14 @@ TypeScript wrapper:
 pnpm run dev:js:ts-ecs-mass-cubes
 ```
 
+The ECS mass-cubes sample also has a MoonBit `wasm-gc` browser variant. The
+WASM module owns the ECS dense transform update, while a TypeScript host bridge
+owns browser WebGPU objects and `GPUQueue.writeBuffer` calls:
+
+```bash
+pnpm run dev:wasm:ecs-mass-cubes
+```
+
 ### Native
 
 ```bash
