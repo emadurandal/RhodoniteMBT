@@ -23,6 +23,7 @@ export default defineConfig({
 				tsEcsMassCubes: "demos/ts-ecs-mass-cubes.html",
 				triangleWithBuffer: "demos/triangle-with-buffer.html",
 				wasmEcsMassCubes: "demos/wasm-ecs-mass-cubes.html",
+				wasmGcEcsMassCubes: "demos/wasm-gc-ecs-mass-cubes.html",
 			},
 		},
 	},
