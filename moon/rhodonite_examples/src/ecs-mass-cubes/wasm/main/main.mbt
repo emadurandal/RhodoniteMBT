@@ -166,6 +166,7 @@ fn write_mass_cubes_full_wasm_bytes(
   let mut local_i = 0
   let mut row = 0
   let mut column = 0
+  let mut base = 0
   while local_i < count {
     let remaining_in_row = per_side - column
     let remaining_count = count - local_i
@@ -184,7 +185,6 @@ fn write_mass_cubes_full_wasm_bytes(
     )
     let mut row_i = 0
     while row_i < row_count {
-      let base = local_i * stride
       put_f32_le_fixed_float_unchecked(bytes, base + 0, cube_scale)
       put_f32_le_fixed_float_unchecked(bytes, base + 4, 0.0)
       put_f32_le_fixed_float_unchecked(bytes, base + 8, 0.0)
@@ -202,6 +202,7 @@ fn write_mass_cubes_full_wasm_bytes(
       wave_s = next_s
       x = x + grid_spacing_f
       local_i = local_i + 1
+      base = base + stride
       row_i = row_i + 1
     }
     row = row + 1
@@ -220,18 +221,16 @@ fn write_mass_cubes_y_wasm_bytes(
   let sin_step = Float::from_double(@math.sin(0.09))
   let cos_step = Float::from_double(@math.cos(0.09))
   let mut local_i = 0
+  let mut y_off = 28
   let mut wave_s = Float::from_double(@math.sin(wave_time))
   let mut wave_c = Float::from_double(@math.cos(wave_time))
   while local_i < count {
-    put_f32_le_fixed_float_unchecked(
-      bytes,
-      local_i * stride + 28,
-      wave_s * 0.12,
-    )
+    put_f32_le_fixed_float_unchecked(bytes, y_off, wave_s * 0.12)
     let next_s = wave_s * cos_step + wave_c * sin_step
     wave_c = wave_c * cos_step - wave_s * sin_step
     wave_s = next_s
     local_i = local_i + 1
+    y_off = y_off + stride
   }
 }
 
@@ -266,13 +265,12 @@ fn write_initial_global_transforms_for_target(
 ///|
 #cfg(target="wasm")
 fn host_write_initial_global_transforms_for_target(
-  world : @ecs.World,
+  _world : @ecs.World,
   _per_side : Int,
+  upload_ptr : Int,
+  upload_len : Int,
 ) -> Unit {
-  host_write_initial_global_transform_bytes(
-    world.global_transform_wasm_gpu_bytes_payload_ptr(),
-    world.global_transform_wasm_gpu_bytes_len(),
-  )
+  host_write_initial_global_transform_bytes(upload_ptr, upload_len)
 }
 
 ///|
@@ -280,6 +278,8 @@ fn host_write_initial_global_transforms_for_target(
 fn host_write_initial_global_transforms_for_target(
   _world : @ecs.World,
   per_side : Int,
+  _upload_ptr : Int,
+  _upload_len : Int,
 ) -> Unit {
   host_write_initial_global_transforms(per_side, 0.0)
 }
@@ -289,6 +289,8 @@ fn host_write_initial_global_transforms_for_target(
 fn write_global_transform_y_for_target(
   world : @ecs.World,
   wave_time : Double,
+  upload_ptr : Int,
+  upload_len : Int,
 ) -> Unit {
   ignore(
     world.write_global_transforms_dense_wasm_bytes_range(entity_count, (
@@ -297,10 +299,7 @@ fn write_global_transform_y_for_target(
       count,
     ) => write_mass_cubes_y_wasm_bytes(bytes, stride, count, wave_time)),
   )
-  host_write_global_transform_bytes(
-    world.global_transform_wasm_gpu_bytes_payload_ptr(),
-    world.global_transform_wasm_gpu_bytes_len(),
-  )
+  host_write_global_transform_bytes(upload_ptr, upload_len)
 }
 
 ///|
@@ -308,6 +307,8 @@ fn write_global_transform_y_for_target(
 fn write_global_transform_y_for_target(
   _world : @ecs.World,
   wave_time : Double,
+  _upload_ptr : Int,
+  _upload_len : Int,
 ) -> Unit {
   host_write_global_transform_y(wave_time)
 }
@@ -317,10 +318,36 @@ struct WasmRenderer {
   world : @ecs.World
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
+  upload_ptr : Int
+  upload_len : Int
 }
 
 ///|
 let demo_renderer : @ref.Ref[WasmRenderer?] = @ref.new(None)
+
+///|
+#cfg(target="wasm")
+fn global_transform_upload_ptr_for_target(world : @ecs.World) -> Int {
+  world.global_transform_wasm_gpu_bytes_payload_ptr()
+}
+
+///|
+#cfg(target="wasm-gc")
+fn global_transform_upload_ptr_for_target(_world : @ecs.World) -> Int {
+  0
+}
+
+///|
+#cfg(target="wasm")
+fn global_transform_upload_len_for_target(world : @ecs.World) -> Int {
+  world.global_transform_wasm_gpu_bytes_len()
+}
+
+///|
+#cfg(target="wasm-gc")
+fn global_transform_upload_len_for_target(_world : @ecs.World) -> Int {
+  0
+}
 
 ///|
 pub fn create_wasm_renderer() -> Unit {
@@ -352,13 +379,19 @@ pub fn create_wasm_renderer() -> Unit {
   ignore(world.drain_resize_events())
   let stride = @comp.global_transform_gpu_layout().stride
   write_initial_global_transforms_for_target(world, per_side)
+  let upload_ptr = global_transform_upload_ptr_for_target(world)
+  let upload_len = global_transform_upload_len_for_target(world)
   host_initialize_renderer(per_side, stride)
-  host_write_initial_global_transforms_for_target(world, per_side)
+  host_write_initial_global_transforms_for_target(
+    world, per_side, upload_ptr, upload_len,
+  )
   ignore(gt)
   demo_renderer.val = Some({
     world,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
+    upload_ptr,
+    upload_len,
   })
 }
 
@@ -382,7 +415,12 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
       renderer.perf_last_frame_start_ms.val = t_frame_start
       renderer.frame.val = renderer.frame.val + 1
       let wave_time = renderer.frame.val.to_double() * 0.018 * 1.8
-      write_global_transform_y_for_target(renderer.world, wave_time)
+      write_global_transform_y_for_target(
+        renderer.world,
+        wave_time,
+        renderer.upload_ptr,
+        renderer.upload_len,
+      )
       let cpu_ms = host_now_ms() - t_frame_start
       host_render_frame(fps, cpu_ms)
     }

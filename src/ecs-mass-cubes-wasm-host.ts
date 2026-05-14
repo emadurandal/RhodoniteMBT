@@ -1,6 +1,6 @@
 import "./style.css";
 
-const ENTITY_COUNT = 600_000;
+const ENTITY_COUNT = 1_000_000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
@@ -28,6 +28,10 @@ type Renderer = {
 	readonly transformData: Float32Array;
 	perSide: number;
 	transformStride: number;
+	wasmTransformUploadBuffer?: ArrayBufferLike;
+	wasmTransformUploadPtr?: number;
+	wasmTransformUploadByteLength?: number;
+	wasmTransformUploadView?: Uint8Array;
 };
 
 type WasmExports = {
@@ -318,11 +322,24 @@ function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): voi
 	}
 }
 
-function writeTransformBytesFromWasmMemory(
-	renderer: Renderer,
+function writeWasmBytesToBuffer(
+	queue: GPUQueue,
+	gpuBuffer: GPUBuffer,
 	memory: WebAssembly.Memory | undefined,
 	ptr: number,
 	byteLength: number,
+	getCached: () => {
+		buffer?: ArrayBufferLike;
+		ptr?: number;
+		byteLength?: number;
+		view?: Uint8Array;
+	},
+	setCached: (
+		buffer: ArrayBufferLike,
+		ptr: number,
+		byteLength: number,
+		view: Uint8Array,
+	) => void,
 ): void {
 	if (memory === undefined) {
 		throw new Error("WASM linear memory is not exported.");
@@ -330,10 +347,45 @@ function writeTransformBytesFromWasmMemory(
 	if (ptr <= 0 || byteLength <= 0) {
 		throw new Error(`Invalid WASM transform byte range: ${ptr}, ${byteLength}`);
 	}
-	renderer.queue.writeBuffer(
+	const buffer = memory.buffer;
+	const cached = getCached();
+	let view = cached.view;
+	if (
+		view === undefined ||
+		cached.buffer !== buffer ||
+		cached.ptr !== ptr ||
+		cached.byteLength !== byteLength
+	) {
+		view = new Uint8Array(buffer, ptr, byteLength);
+		setCached(buffer, ptr, byteLength, view);
+	}
+	queue.writeBuffer(gpuBuffer, 0, view);
+}
+
+function writeTransformBytesFromWasmMemory(
+	renderer: Renderer,
+	memory: WebAssembly.Memory | undefined,
+	ptr: number,
+	byteLength: number,
+): void {
+	writeWasmBytesToBuffer(
+		renderer.queue,
 		renderer.transformStorage,
-		0,
-		new Uint8Array(memory.buffer, ptr, byteLength),
+		memory,
+		ptr,
+		byteLength,
+		() => ({
+			buffer: renderer.wasmTransformUploadBuffer,
+			ptr: renderer.wasmTransformUploadPtr,
+			byteLength: renderer.wasmTransformUploadByteLength,
+			view: renderer.wasmTransformUploadView,
+		}),
+		(buffer, cachedPtr, cachedByteLength, view) => {
+			renderer.wasmTransformUploadBuffer = buffer;
+			renderer.wasmTransformUploadPtr = cachedPtr;
+			renderer.wasmTransformUploadByteLength = cachedByteLength;
+			renderer.wasmTransformUploadView = view;
+		},
 	);
 }
 
