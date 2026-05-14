@@ -81,13 +81,6 @@ fn GlobalTransformBlobWriter::format_and_relative_word_offset(
 }
 
 ///|
-pub fn global_transform_words_for_format(
-  format : @comp.GlobalTransformGpuFormat,
-) -> Int {
-  @comp.global_transform_word_count(format)
-}
-
-///|
 pub fn detect_dense_global_transform_layout(
   refs : FixedArray[Byte],
   count : Int,
@@ -262,47 +255,11 @@ extern "js" fn global_transform_element_setter_js(
   #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
   #|   const halfLane = scalarIndex & 1;
   #|   const makeF16Bits = () => {
-  #|     let cache = globalThis.__rhodonite_f32_to_f16_table;
+  #|     let cache = globalThis.__rhodonite_f32_to_f16_scratch;
   #|     if (!cache) {
-  #|       const base = new Uint16Array(512);
-  #|       const shift = new Uint8Array(512);
-  #|       for (let i = 0; i < 256; i++) {
-  #|         const e = i - 127;
-  #|         if (e < -24) {
-  #|           base[i] = 0x0000;
-  #|           base[i | 0x100] = 0x8000;
-  #|           shift[i] = 24;
-  #|           shift[i | 0x100] = 24;
-  #|         } else if (e < -14) {
-  #|           const b = 0x0400 >> (-e - 14);
-  #|           const s = -e - 1;
-  #|           base[i] = b;
-  #|           base[i | 0x100] = b | 0x8000;
-  #|           shift[i] = s;
-  #|           shift[i | 0x100] = s;
-  #|         } else if (e <= 15) {
-  #|           const b = (e + 15) << 10;
-  #|           base[i] = b;
-  #|           base[i | 0x100] = b | 0x8000;
-  #|           shift[i] = 13;
-  #|           shift[i | 0x100] = 13;
-  #|         } else if (e < 128) {
-  #|           base[i] = 0x7c00;
-  #|           base[i | 0x100] = 0xfc00;
-  #|           shift[i] = 24;
-  #|           shift[i | 0x100] = 24;
-  #|         } else {
-  #|           base[i] = 0x7c00;
-  #|           base[i | 0x100] = 0xfc00;
-  #|           shift[i] = 13;
-  #|           shift[i | 0x100] = 13;
-  #|         }
-  #|       }
   #|       const scratchF32 = new Float32Array(1);
   #|       const scratchU32 = new Uint32Array(scratchF32.buffer);
-  #|       cache = globalThis.__rhodonite_f32_to_f16_table = {
-  #|         base,
-  #|         shift,
+  #|       cache = globalThis.__rhodonite_f32_to_f16_scratch = {
   #|         scratchF32,
   #|         scratchU32,
   #|       };
@@ -310,8 +267,33 @@ extern "js" fn global_transform_element_setter_js(
   #|     return (value) => {
   #|       cache.scratchF32[0] = Math.fround(value);
   #|       const bits = cache.scratchU32[0] >>> 0;
-  #|       const index = (bits >>> 23) & 0x1ff;
-  #|       return cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
+  #|       const sign = (bits >>> 16) & 0x8000;
+  #|       const exp = (bits >>> 23) & 0xff;
+  #|       const mant = bits & 0x007fffff;
+  #|       if (exp === 255) {
+  #|         return mant === 0 ? sign | 0x7c00 : sign | 0x7e00;
+  #|       }
+  #|       const halfExp = exp - 127 + 15;
+  #|       if (halfExp >= 31) {
+  #|         return sign | 0x7c00;
+  #|       }
+  #|       if (halfExp <= 0) {
+  #|         if (halfExp < -10) {
+  #|           return sign;
+  #|         }
+  #|         const mantissa = mant | 0x00800000;
+  #|         const shift = 14 - halfExp;
+  #|         let halfMant = mantissa >>> shift;
+  #|         if (((mantissa >>> (shift - 1)) & 1) !== 0) {
+  #|           halfMant += 1;
+  #|         }
+  #|         return sign | halfMant;
+  #|       }
+  #|       let half = sign | (halfExp << 10) | (mant >>> 13);
+  #|       if (((mant >>> 12) & 1) !== 0) {
+  #|         half += 1;
+  #|       }
+  #|       return half;
   #|     };
   #|   };
   #|   if (denseFormatCode === 0) {
@@ -323,14 +305,6 @@ extern "js" fn global_transform_element_setter_js(
   #|   }
   #|   if (denseFormatCode === 1) {
   #|     const baseWord = (scalarIndex >> 1) - firstWord;
-  #|     const Float16ArrayCtor = globalThis.Float16Array;
-  #|     if (typeof Float16ArrayCtor === "function") {
-  #|       const halfFloats = new Float16ArrayCtor(src.buffer, src.byteOffset + start, byteLength >> 1);
-  #|       return (index, value) => {
-  #|         if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
-  #|         halfFloats[(index * wordsPerEntity + baseWord) * 2 + halfLane] = value;
-  #|       };
-  #|     }
   #|     const f32ToF16Bits = makeF16Bits();
   #|     return (index, value) => {
   #|       if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
