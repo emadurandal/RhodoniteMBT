@@ -380,7 +380,11 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   const gtIndex = gt.index;
   #|   const coIndex = co.index;
   #|   const gtStore = world.gpu_stores[gtIndex];
-  #|   if (!gtStore || gtStore.stride < 48) return false;
+  #|   if (!gtStore) return false;
+  #|   const gtStride = gtStore.stride;
+  #|   const gtIsF32 = gtStride === 48;
+  #|   const gtIsF16 = gtStride === 24;
+  #|   if (!gtIsF32 && !gtIsF16) return false;
   #|
   #|   const archetypes = world.archetypes;
   #|   let hasChildArchetype = false;
@@ -403,15 +407,87 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     gtStore.bytes = converted;
   #|   }
   #|   const gtBytes = gtStore.bytes;
-  #|   if ((gtBytes.byteOffset & 3) !== 0 || (gtBytes.byteLength & 3) !== 0) return false;
-  #|   let gtF32 = gtBytes.__rhodonite_f32_view;
-  #|   if (!gtF32 || gtF32.buffer !== gtBytes.buffer || gtF32.byteOffset !== gtBytes.byteOffset || gtF32.length !== (gtBytes.byteLength >> 2)) {
-  #|     gtF32 = new Float32Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 2);
-  #|     gtBytes.__rhodonite_f32_view = gtF32;
+  #|   let gtF32 = null;
+  #|   let gtF16 = null;
+  #|   let gtU16 = null;
+  #|   let f32ToF16Bits = null;
+  #|   if (gtIsF32) {
+  #|     if ((gtBytes.byteOffset & 3) !== 0 || (gtBytes.byteLength & 3) !== 0) return false;
+  #|     gtF32 = gtBytes.__rhodonite_f32_view;
+  #|     if (!gtF32 || gtF32.buffer !== gtBytes.buffer || gtF32.byteOffset !== gtBytes.byteOffset || gtF32.length !== (gtBytes.byteLength >> 2)) {
+  #|       gtF32 = new Float32Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 2);
+  #|       gtBytes.__rhodonite_f32_view = gtF32;
+  #|     }
+  #|   } else {
+  #|     if ((gtBytes.byteOffset & 1) !== 0 || (gtBytes.byteLength & 1) !== 0) return false;
+  #|     const Float16ArrayCtor = globalThis.Float16Array;
+  #|     if (typeof Float16ArrayCtor === "function") {
+  #|       gtF16 = gtBytes.__rhodonite_f16_view;
+  #|       if (!gtF16 || gtF16.buffer !== gtBytes.buffer || gtF16.byteOffset !== gtBytes.byteOffset || gtF16.length !== (gtBytes.byteLength >> 1)) {
+  #|         gtF16 = new Float16ArrayCtor(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 1);
+  #|         gtBytes.__rhodonite_f16_view = gtF16;
+  #|       }
+  #|     } else {
+  #|       gtU16 = gtBytes.__rhodonite_u16_view;
+  #|       if (!gtU16 || gtU16.buffer !== gtBytes.buffer || gtU16.byteOffset !== gtBytes.byteOffset || gtU16.length !== (gtBytes.byteLength >> 1)) {
+  #|         gtU16 = new Uint16Array(gtBytes.buffer, gtBytes.byteOffset, gtBytes.byteLength >> 1);
+  #|         gtBytes.__rhodonite_u16_view = gtU16;
+  #|       }
+  #|       let cache = globalThis.__rhodonite_f32_to_f16_table;
+  #|       if (!cache) {
+  #|         const base = new Uint16Array(512);
+  #|         const shift = new Uint8Array(512);
+  #|         for (let i = 0; i < 256; i++) {
+  #|           const e = i - 127;
+  #|           if (e < -24) {
+  #|             base[i] = 0x0000;
+  #|             base[i | 0x100] = 0x8000;
+  #|             shift[i] = 24;
+  #|             shift[i | 0x100] = 24;
+  #|           } else if (e < -14) {
+  #|             const b = 0x0400 >> (-e - 14);
+  #|             const s = -e - 1;
+  #|             base[i] = b;
+  #|             base[i | 0x100] = b | 0x8000;
+  #|             shift[i] = s;
+  #|             shift[i | 0x100] = s;
+  #|           } else if (e <= 15) {
+  #|             const b = (e + 15) << 10;
+  #|             base[i] = b;
+  #|             base[i | 0x100] = b | 0x8000;
+  #|             shift[i] = 13;
+  #|             shift[i | 0x100] = 13;
+  #|           } else if (e < 128) {
+  #|             base[i] = 0x7c00;
+  #|             base[i | 0x100] = 0xfc00;
+  #|             shift[i] = 24;
+  #|             shift[i | 0x100] = 24;
+  #|           } else {
+  #|             base[i] = 0x7c00;
+  #|             base[i | 0x100] = 0xfc00;
+  #|             shift[i] = 13;
+  #|             shift[i | 0x100] = 13;
+  #|           }
+  #|         }
+  #|         const scratchF32 = new Float32Array(1);
+  #|         const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|         cache = globalThis.__rhodonite_f32_to_f16_table = {
+  #|           base,
+  #|           shift,
+  #|           scratchF32,
+  #|           scratchU32,
+  #|         };
+  #|       }
+  #|       f32ToF16Bits = (value) => {
+  #|         cache.scratchF32[0] = Math.fround(value);
+  #|         const bits = cache.scratchU32[0] >>> 0;
+  #|         const index = (bits >>> 23) & 0x1ff;
+  #|         return cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
+  #|       };
+  #|     }
   #|   }
-  #|   const gtStride = gtStore.stride;
-  #|   if ((gtStride & 3) !== 0) return false;
-  #|   const gtStrideF32 = gtStride >> 2;
+  #|   const gtStrideF32 = gtIsF32 ? (gtStride >> 2) : 0;
+  #|   const gtStrideU16 = gtIsF16 ? (gtStride >> 1) : 0;
   #|   const capacity = Math.floor(gtBytes.length / gtStride);
   #|   const dirtyRanges = gtStore.__rhodonite_dirty_ranges ||
   #|     (gtStore.__rhodonite_dirty_ranges = []);
@@ -506,19 +582,49 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       const r21 = Math.fround(2 * Math.fround(yz + wx));
   #|       const r22 = Math.fround(1 - Math.fround(2 * Math.fround(xx + yy)));
   #|
-  #|       const out = entityIndex * gtStrideF32;
-  #|       gtF32[out] = Math.fround(r00 * sx);
-  #|       gtF32[out + 1] = Math.fround(r01 * sy);
-  #|       gtF32[out + 2] = Math.fround(r02 * sz);
-  #|       gtF32[out + 3] = px;
-  #|       gtF32[out + 4] = Math.fround(r10 * sx);
-  #|       gtF32[out + 5] = Math.fround(r11 * sy);
-  #|       gtF32[out + 6] = Math.fround(r12 * sz);
-  #|       gtF32[out + 7] = py;
-  #|       gtF32[out + 8] = Math.fround(r20 * sx);
-  #|       gtF32[out + 9] = Math.fround(r21 * sy);
-  #|       gtF32[out + 10] = Math.fround(r22 * sz);
-  #|       gtF32[out + 11] = pz;
+  #|       if (gtIsF32) {
+  #|         const out = entityIndex * gtStrideF32;
+  #|         gtF32[out] = Math.fround(r00 * sx);
+  #|         gtF32[out + 1] = Math.fround(r01 * sy);
+  #|         gtF32[out + 2] = Math.fround(r02 * sz);
+  #|         gtF32[out + 3] = px;
+  #|         gtF32[out + 4] = Math.fround(r10 * sx);
+  #|         gtF32[out + 5] = Math.fround(r11 * sy);
+  #|         gtF32[out + 6] = Math.fround(r12 * sz);
+  #|         gtF32[out + 7] = py;
+  #|         gtF32[out + 8] = Math.fround(r20 * sx);
+  #|         gtF32[out + 9] = Math.fround(r21 * sy);
+  #|         gtF32[out + 10] = Math.fround(r22 * sz);
+  #|         gtF32[out + 11] = pz;
+  #|       } else if (gtF16) {
+  #|         const out = entityIndex * gtStrideU16;
+  #|         gtF16[out] = Math.fround(r00 * sx);
+  #|         gtF16[out + 1] = Math.fround(r01 * sy);
+  #|         gtF16[out + 2] = Math.fround(r02 * sz);
+  #|         gtF16[out + 3] = px;
+  #|         gtF16[out + 4] = Math.fround(r10 * sx);
+  #|         gtF16[out + 5] = Math.fround(r11 * sy);
+  #|         gtF16[out + 6] = Math.fround(r12 * sz);
+  #|         gtF16[out + 7] = py;
+  #|         gtF16[out + 8] = Math.fround(r20 * sx);
+  #|         gtF16[out + 9] = Math.fround(r21 * sy);
+  #|         gtF16[out + 10] = Math.fround(r22 * sz);
+  #|         gtF16[out + 11] = pz;
+  #|       } else {
+  #|         const out = entityIndex * gtStrideU16;
+  #|         gtU16[out] = f32ToF16Bits(r00 * sx);
+  #|         gtU16[out + 1] = f32ToF16Bits(r01 * sy);
+  #|         gtU16[out + 2] = f32ToF16Bits(r02 * sz);
+  #|         gtU16[out + 3] = f32ToF16Bits(px);
+  #|         gtU16[out + 4] = f32ToF16Bits(r10 * sx);
+  #|         gtU16[out + 5] = f32ToF16Bits(r11 * sy);
+  #|         gtU16[out + 6] = f32ToF16Bits(r12 * sz);
+  #|         gtU16[out + 7] = f32ToF16Bits(py);
+  #|         gtU16[out + 8] = f32ToF16Bits(r20 * sx);
+  #|         gtU16[out + 9] = f32ToF16Bits(r21 * sy);
+  #|         gtU16[out + 10] = f32ToF16Bits(r22 * sz);
+  #|         gtU16[out + 11] = f32ToF16Bits(pz);
+  #|       }
   #|
   #|       if (rangeFirst < 0) {
   #|         rangeFirst = entityIndex;

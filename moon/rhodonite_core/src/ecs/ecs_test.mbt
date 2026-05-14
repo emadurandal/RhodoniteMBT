@@ -1515,6 +1515,36 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
 }
 
 ///|
+test "update_global_transforms_from_transforms writes fp16 GlobalTransform rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let e = world.create_entity()
+  let buf = transform3d_bytes_translation(
+    (7.0 : Float),
+    (0.25 : Float),
+    (-2.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
+  assert_true(world.set_transform(e, tf))
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(e) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (7.0 : Float))
+      assert_eq(m.at(1, 3), (0.25 : Float))
+      assert_eq(m.at(2, 3), (-2.0 : Float))
+    }
+    None => abort("expected fp16 Matrix44F")
+  }
+  let writes = world.drain_gpu_writes(world.global_transform_component())
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].bytes.length(), 24)
+}
+
+///|
 test "update_global_transforms_from_transforms handles mixed child and root archetypes" {
   let world = World::new()
   let parent = world.create_entity()
