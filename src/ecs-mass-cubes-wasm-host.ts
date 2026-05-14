@@ -32,6 +32,7 @@ type Renderer = {
 
 type WasmExports = {
 	_start?: () => void;
+	memory?: WebAssembly.Memory;
 	create_wasm_renderer: () => void;
 	ecs_mass_cubes_wasm_render_tick: () => void;
 };
@@ -321,6 +322,25 @@ function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): voi
 	}
 }
 
+function writeTransformBytesFromWasmMemory(
+	renderer: Renderer,
+	memory: WebAssembly.Memory | undefined,
+	ptr: number,
+	byteLength: number,
+): void {
+	if (memory === undefined) {
+		throw new Error("WASM linear memory is not exported.");
+	}
+	if (ptr <= 0 || byteLength <= 0) {
+		throw new Error(`Invalid WASM transform byte range: ${ptr}, ${byteLength}`);
+	}
+	renderer.queue.writeBuffer(
+		renderer.transformStorage,
+		0,
+		new Uint8Array(memory.buffer, ptr, byteLength),
+	);
+}
+
 function shaderWgsl(): string {
 	return `
 struct CameraUniform {
@@ -471,7 +491,11 @@ function updatePerfOverlay(label: string, fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  ${label} ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function createHostImports(renderer: Renderer, label: string): WebAssembly.Imports {
+function createHostImports(
+	renderer: Renderer,
+	label: string,
+	getMemory: () => WebAssembly.Memory | undefined,
+): WebAssembly.Imports {
 	return {
 		rhodonite_ecs_mass_cubes_host: {
 			now_ms: () => performance.now(),
@@ -486,6 +510,12 @@ function createHostImports(renderer: Renderer, label: string): WebAssembly.Impor
 			write_global_transform_y: (waveTime: number) => {
 				writeMassCubesYTransformData(renderer, waveTime);
 				renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformData);
+			},
+			write_initial_global_transform_bytes: (ptr: number, byteLength: number) => {
+				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
+			},
+			write_global_transform_bytes: (ptr: number, byteLength: number) => {
+				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
 			},
 			render_frame: (fps: number, cpuMs: number) => {
 				const colorView = renderer.context.getCurrentTexture().createView();
@@ -542,11 +572,14 @@ async function instantiateWasm(
 		}
 		return response.arrayBuffer();
 	});
+	let memory: WebAssembly.Memory | undefined;
 	const { instance } = await WebAssembly.instantiate(
 		bytes,
-		createHostImports(renderer, label),
+		createHostImports(renderer, label, () => memory),
 	);
-	return instance.exports as unknown as WasmExports;
+	const exports = instance.exports as unknown as WasmExports;
+	memory = exports.memory;
+	return exports;
 }
 
 export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {

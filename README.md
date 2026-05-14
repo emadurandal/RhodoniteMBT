@@ -48,9 +48,10 @@ pnpm run dev:js:ts-ecs-mass-cubes
 ```
 
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
-variants. The WASM module owns the ECS dense transform update, while a
-TypeScript host bridge owns browser WebGPU objects and `GPUQueue.writeBuffer`
-calls. The dev scripts build release WASM artifacts for these high-load demos:
+variants. The non-GC WASM path uploads the ECS GlobalTransform store directly
+from exported linear memory, while the WASM-GC path keeps a TypeScript upload
+buffer because browser WebGPU cannot consume MoonBit GC arrays as `TypedArray`
+views. The dev scripts build release WASM artifacts for these high-load demos:
 
 ```bash
 pnpm run dev:wasm:ecs-mass-cubes

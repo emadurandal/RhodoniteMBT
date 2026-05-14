@@ -320,13 +320,15 @@ WebGPU upload 側には次の API があります。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、`write_global_transforms_dense_range_views` にサンプル側 callback を渡して dense な `GlobalTransform` 範囲を一括更新します。初期化 callback は mat4 row 全体を書き、frame ごとの callback は CPU 側の Y translation lane だけを更新します。GPU buffer は mat4 row のままなので、borrowed upload range は full dense row span です。ライブラリは dense range と dirty 記録だけを担当し、grid-wave の計算はサンプル側にあります。
-ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。[`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) と [`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) の demo は MoonBit `wasm` / `wasm-gc` の release entrypoint で dense ECS update を実行し、ブラウザ WebGPU 作業は TypeScript host bridge に委譲します。host bridge が WebGPU object と `GPUQueue.writeBuffer` upload を所有し、MoonBit の `ArrayView[Byte]` / `Bytes` を WebAssembly host 境界へ直接渡さない構成です。
+ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。[`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo は MoonBit `wasm` の release entrypoint で dense ECS `GlobalTransform` store を更新し、export された wasm linear memory からその store を直接 upload します。`World::global_transform_wasm_gpu_bytes_payload_ptr` と `World::global_transform_wasm_gpu_bytes_len` が wasm 専用の upload range を TypeScript host bridge に公開します。[`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo は、ブラウザ WebGPU が MoonBit wasm-gc array を `TypedArray` view として扱えないため、TypeScript upload buffer を使います。frame ごとの表示用 upload path は、同じ wave を wasm-gc と TypeScript で二重計算しないよう host 側が所有します。
 
 Dense GlobalTransform helper には所有型と view 型の両方があります。
 
 - `write_global_transforms_dense(...) -> Array[GpuWrite]`
 - `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
 - `write_global_transforms_dense_range_views(count, write) -> Array[GpuWriteView]`
+- `write_global_transforms_dense_wasm_bytes_range(count, write) -> Bool` は非 GC wasm の direct-upload helper です。raw な GlobalTransform backing `FixedArray[Byte]` を書き、drain range は積みません。
+- `global_transform_wasm_gpu_bytes_payload_ptr()` / `global_transform_wasm_gpu_bytes_len()` は、非 GC wasm の host upload 用に builtin GlobalTransform GPU store を公開します。
 
 `write_global_transforms_dense_range_views` はユーザー定義ロジック向けの高スループット版です。`write` を 1 回だけ呼び、`GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を渡します。呼び出し側は entity ごとの callback なしに、連続 row 上で tight loop を実行できます。
 

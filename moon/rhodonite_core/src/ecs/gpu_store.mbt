@@ -38,6 +38,23 @@ fn GpuComponentStore::capacity(self : GpuComponentStore) -> Int {
 }
 
 ///|
+#cfg(target="wasm")
+fn fixedarray_object_ptr(bytes : FixedArray[Byte]) -> Int = "%identity"
+
+///|
+#cfg(target="wasm")
+fn GpuComponentStore::wasm_bytes_payload_ptr(self : GpuComponentStore) -> Int {
+  // MoonBit's current wasm array layout stores the byte payload after an 8-byte header.
+  fixedarray_object_ptr(self.bytes) + 8
+}
+
+///|
+#cfg(target="wasm")
+fn GpuComponentStore::wasm_bytes_len(self : GpuComponentStore) -> Int {
+  self.bytes.length()
+}
+
+///|
 /// Grows the byte array in `stride`-sized steps; returns true if new tail slots were appended.
 #cfg(target="js")
 extern "js" fn ensure_gpu_store_capacity_js(

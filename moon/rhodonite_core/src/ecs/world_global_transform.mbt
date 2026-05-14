@@ -156,6 +156,82 @@ pub fn World::write_global_transforms_dense_range_views(
 }
 
 ///|
+/// Bulk-writes dense GlobalTransform rows into the raw wasm backing store.
+///
+/// This non-GC wasm fast path lets a host upload the same linear-memory buffer
+/// returned by `global_transform_wasm_gpu_bytes_payload_ptr`, avoiding both
+/// `MutArrayView` wrapper traffic and host-side transform recomputation. It is
+/// intended for immediate full-buffer host upload and does not enqueue drain
+/// ranges.
+#cfg(target="wasm")
+pub fn World::write_global_transforms_dense_wasm_bytes_range(
+  self : World,
+  count : Int,
+  write : (FixedArray[Byte], Int, Int) -> Unit,
+) -> Bool {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transforms_dense_wasm_bytes_range",
+  )
+  if count < 0 {
+    abort(
+      "World::write_global_transforms_dense_wasm_bytes_range: count must be non-negative",
+    )
+  }
+  if count == 0 {
+    return true
+  }
+  match self.ensure_gpu_store_capacity(gt, count) {
+    Some(store) => {
+      if store.stride != 64 {
+        abort(
+          "World::write_global_transforms_dense_wasm_bytes_range: GlobalTransform stride mismatch",
+        )
+      }
+      self.query_depth = self.query_depth + 1
+      write(store.bytes, store.stride, count)
+      self.query_depth = self.query_depth - 1
+      self.replace_gpu_store(store)
+      true
+    }
+    None => false
+  }
+}
+
+///|
+/// Returns the linear-memory payload pointer for the builtin GlobalTransform GPU store.
+///
+/// This is only available on the non-GC wasm backend, where JavaScript can create
+/// a `Uint8Array` view over the exported wasm memory and upload the ECS GPU store
+/// without recomputing the transform data on the host side. The pointer is valid
+/// until the GlobalTransform GPU store grows and reallocates.
+#cfg(target="wasm")
+pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_read(
+    gt, "World::global_transform_wasm_gpu_bytes_payload_ptr",
+  )
+  match self.gpu_store(gt) {
+    Some(store) => store.wasm_bytes_payload_ptr()
+    None => 0
+  }
+}
+
+///|
+/// Returns the byte length of the builtin GlobalTransform GPU store payload.
+#cfg(target="wasm")
+pub fn World::global_transform_wasm_gpu_bytes_len(self : World) -> Int {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_read(
+    gt, "World::global_transform_wasm_gpu_bytes_len",
+  )
+  match self.gpu_store(gt) {
+    Some(store) => store.wasm_bytes_len()
+    None => 0
+  }
+}
+
+///|
 /// `leaf_local_matrix`: when [`Some`], used for `leaf` instead of [`get_transform`] (TF+GT bulk row path).
 fn World::multiply_world_chain_matrix(
   self : World,
