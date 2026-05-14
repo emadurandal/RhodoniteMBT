@@ -50,7 +50,7 @@ fn index_triangle_u16_bytes() -> FixedArray[Byte] {
 
 ///|
 pub(all) struct WebGPURenderer {
-  context : @wgpu.GPUCanvasContext
+  context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
@@ -61,6 +61,23 @@ pub(all) struct WebGPURenderer {
 ///|
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
+  Some(
+    create_renderer_for_device(
+      device,
+      queue,
+      format,
+      context=Some(canvas_context),
+    ),
+  )
+}
+
+///|
+pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
   let vertex_bytes = vertex_triangle_interleaved_bytes()
   let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vbuf = device.create_buffer(vertex_buffer_byte_length, vusage)
@@ -70,14 +87,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let ibuf = device.create_buffer(index_buffer_allocation_byte_length, iusage)
   queue.write_buffer_from_fixed_array(ibuf, 0UL, index_bytes)
   let pipeline = create_pipeline(device, format)
-  Some({
-    context: canvas_context,
-    device,
-    queue,
-    pipeline,
-    vertex_buffer: vbuf,
-    index_buffer: ibuf,
-  })
+  { context, device, queue, pipeline, vertex_buffer: vbuf, index_buffer: ibuf }
 }
 
 ///|
@@ -130,8 +140,24 @@ fn render_frame_with_options(
   clearColor~ : @wgpu.GPUColor,
   index_count~ : Int,
 ) -> Unit {
-  let texture = renderer.context.get_current_texture()
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
   let view = texture.create_view()
+  render_frame_to_view(renderer, view, clearColor~, index_count~)
+  @wgpu.textureView_release(view)
+  canvas_context.present()
+}
+
+///|
+pub fn render_frame_to_view(
+  renderer : WebGPURenderer,
+  view : @wgpu.GPUTextureView,
+  clearColor? : @wgpu.GPUColor = { r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
+  index_count? : Int = 3,
+) -> Unit {
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -163,8 +189,6 @@ fn render_frame_with_options(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @wgpu.textureView_release(view)
-  renderer.context.present()
 }
 
 ///|

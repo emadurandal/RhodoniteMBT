@@ -88,7 +88,9 @@ pnpm run test:examples:visual
 pnpm run test:examples:visual:update
 ```
 
-The visual snapshot package uses [`mizchi/canvas`](https://github.com/mizchi/canvas-mbt) as a deterministic headless rasterizer. It supports small text PPM snapshots plus PNG golden files with exact or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
+The visual regression package renders existing examples through native WebGPU,
+reads back an offscreen RGBA8 texture, and compares PNG golden files with exact
+or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
 
 ## Publish order (outline)
 

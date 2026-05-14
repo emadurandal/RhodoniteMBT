@@ -1,6 +1,6 @@
 ///|
 pub(all) struct WebGPURenderer {
-  context : @wgpu.GPUCanvasContext
+  context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
@@ -9,8 +9,25 @@ pub(all) struct WebGPURenderer {
 ///|
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
+  Some(
+    create_renderer_for_device(
+      device,
+      queue,
+      format,
+      context=Some(canvas_context),
+    ),
+  )
+}
+
+///|
+pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
   let pipeline = create_pipeline(device, format)
-  Some({ context: canvas_context, device, queue, pipeline })
+  { context, device, queue, pipeline }
 }
 
 ///|
@@ -47,8 +64,24 @@ fn render_frame_with_options(
   clearColor~ : @wgpu.GPUColor,
   vertex_count~ : Int,
 ) -> Unit {
-  let texture = renderer.context.get_current_texture()
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
   let view = texture.create_view()
+  render_frame_to_view(renderer, view, clearColor~, vertex_count~)
+  @wgpu.textureView_release(view)
+  canvas_context.present()
+}
+
+///|
+pub fn render_frame_to_view(
+  renderer : WebGPURenderer,
+  view : @wgpu.GPUTextureView,
+  clearColor? : @wgpu.GPUColor = { r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
+  vertex_count? : Int = 3,
+) -> Unit {
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -68,8 +101,6 @@ fn render_frame_with_options(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @wgpu.textureView_release(view)
-  renderer.context.present()
 }
 
 ///|

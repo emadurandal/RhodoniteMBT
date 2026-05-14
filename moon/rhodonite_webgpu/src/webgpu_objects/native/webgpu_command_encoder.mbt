@@ -100,6 +100,22 @@ pub fn webgpu_command_encoder_finish(
 }
 
 ///|
+pub fn webgpu_command_encoder_copy_texture_to_buffer_rgba8(
+  encoder : WebGPUCommandEncoder,
+  texture : WebGPUTexture,
+  buffer : GPUBuffer,
+  width : UInt,
+  height : UInt,
+) -> Unit {
+  encoder.encoder.raw.copy_texture_to_buffer_rgba8(
+    texture.texture.raw,
+    buffer.raw,
+    width,
+    height,
+  )
+}
+
+///|
 pub fn webgpu_command_encoder_release(encoder : WebGPUCommandEncoder) -> Unit {
   encoder.encoder.raw.release()
 }

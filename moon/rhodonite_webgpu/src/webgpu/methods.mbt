@@ -22,6 +22,14 @@ pub async fn GPUInstance::request_adapter(self : GPUInstance) -> GPUAdapter {
 }
 
 ///|
+#cfg(target="native")
+pub fn GPUInstance::request_adapter_sync(
+  self : GPUInstance,
+) -> GPUAdapter raise Error {
+  { raw: @raw.native_webgpu_instance_request_adapter(self.raw) }
+}
+
+///|
 pub fn GPUInstance::process_events(self : GPUInstance) -> Unit {
   webgpu_instance_process_events(self)
 }
@@ -34,6 +42,14 @@ pub fn GPUInstance::release(self : GPUInstance) -> Unit {
 ///|
 pub async fn GPUAdapter::request_device(self : GPUAdapter) -> GPUDevice {
   { raw: @raw.webgpu_adapter_request_device(self.raw) }
+}
+
+///|
+#cfg(target="native")
+pub fn GPUAdapter::request_device_sync(
+  self : GPUAdapter,
+) -> GPUDevice raise Error {
+  { raw: @raw.native_webgpu_adapter_request_device(self.raw) }
 }
 
 ///|
@@ -113,8 +129,24 @@ pub fn global_transform_ref_instance_vertex_buffer_layout(
 pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16UL
 
 ///|
+/// WebGPU `GPUTextureUsage.COPY_SRC`（0x1）。
+pub const GPU_TEXTURE_USAGE_COPY_SRC : UInt64 = 1UL
+
+///|
+/// WebGPU `GPUTextureUsage.COPY_DST`（0x2）。
+pub const GPU_TEXTURE_USAGE_COPY_DST : UInt64 = 2UL
+
+///|
 /// WebGPU `GPUBufferUsage.VERTEX`（0x20）。
 pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32UL
+
+///|
+/// WebGPU `GPUBufferUsage.MAP_READ`（0x1）。
+pub const GPU_BUFFER_USAGE_MAP_READ : UInt64 = 1UL
+
+///|
+/// WebGPU `GPUBufferUsage.COPY_SRC`（0x4）。
+pub const GPU_BUFFER_USAGE_COPY_SRC : UInt64 = 4UL
 
 ///|
 /// WebGPU `GPUBufferUsage.COPY_DST`（0x8）。
@@ -184,6 +216,37 @@ pub fn GPUDevice::create_texture(
       usage,
     ),
   }
+}
+
+///|
+pub fn rgba8_copy_bytes_per_row(width : UInt) -> UInt64 {
+  let unpadded = width.to_uint64() * 4UL
+  let align = 256UL
+  let rem = unpadded % align
+  if rem == 0UL {
+    unpadded
+  } else {
+    unpadded + (align - rem)
+  }
+}
+
+///|
+pub fn rgba8_copy_padded_byte_length(width : UInt, height : UInt) -> UInt64 {
+  rgba8_copy_bytes_per_row(width) * height.to_uint64()
+}
+
+///|
+pub fn GPUDevice::create_rgba8_render_texture(
+  self : GPUDevice,
+  width : UInt,
+  height : UInt,
+) -> GPUTexture {
+  self.create_texture(
+    width,
+    height,
+    "rgba8unorm",
+    GPU_TEXTURE_USAGE_RENDER_ATTACHMENT | GPU_TEXTURE_USAGE_COPY_SRC,
+  )
 }
 
 ///|
@@ -312,6 +375,18 @@ pub fn GPUBuffer::readback_view(
 }
 
 ///|
+/// Reads a native GPU buffer range into an owned `Bytes`.
+#cfg(target="native")
+pub fn GPUBuffer::readback(
+  self : GPUBuffer,
+  instance : GPUInstance,
+  offset : UInt64,
+  size : UInt64,
+) -> Bytes {
+  @raw.webgpu_buffer_readback(self.raw, instance.raw, offset, size)
+}
+
+///|
 pub fn GPURenderPassEncoder::set_vertex_buffer(
   self : GPURenderPassEncoder,
   slot : Int,
@@ -425,6 +500,27 @@ pub fn GPUCommandEncoder::begin_render_pass(
 ///|
 pub fn GPUCommandEncoder::finish(self : GPUCommandEncoder) -> GPUCommandBuffer {
   @raw.webgpu_command_encoder_finish(self.raw)
+}
+
+///|
+/// Copies an RGBA8 texture into a buffer using WebGPU's padded row layout.
+///
+/// The destination buffer must be at least `rgba8_copy_padded_byte_length(width, height)` bytes.
+#cfg(any(target="js", target="native"))
+pub fn GPUCommandEncoder::copy_texture_to_buffer_rgba8(
+  self : GPUCommandEncoder,
+  texture : GPUTexture,
+  buffer : GPUBuffer,
+  width : UInt,
+  height : UInt,
+) -> Unit {
+  @raw.webgpu_command_encoder_copy_texture_to_buffer_rgba8(
+    self.raw,
+    texture.raw,
+    buffer.raw,
+    width,
+    height,
+  )
 }
 
 ///|

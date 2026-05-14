@@ -80,7 +80,7 @@ fn empty_offsets() -> Array[UInt] {
 
 ///|
 pub(all) struct WebGPURenderer {
-  context : @wgpu.GPUCanvasContext
+  context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
@@ -152,6 +152,23 @@ fn ecs_scene_shader_wgsl() -> String {
 ///|
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
+  Some(
+    create_renderer_for_device(
+      device,
+      queue,
+      format,
+      context=Some(canvas_context),
+    ),
+  )
+}
+
+///|
+pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
   let shader = device.create_shader_module(ecs_scene_shader_wgsl())
   let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
     array_stride: vertex_stride_local.to_uint64(),
@@ -273,8 +290,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   push_local_transforms(world, bodies, 0.0)
   ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
   queue.drain_and_upload_global_transform_writes(transform_storage, world)
-  Some({
-    context: canvas_context,
+  {
+    context,
     device,
     queue,
     pipeline,
@@ -294,7 +311,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     bodies,
     gt,
     frame: @ref.new(0),
-  })
+  }
 }
 
 ///|
@@ -371,6 +388,22 @@ fn push_local_transforms(
 
 ///|
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_frame_to_view(renderer, color_view)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+pub fn render_frame_to_view(
+  renderer : WebGPURenderer,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.022
   push_local_transforms(renderer.world, renderer.bodies, t)
@@ -396,8 +429,6 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     0UL,
     cam_bytes,
   )
-  let texture = renderer.context.get_current_texture()
-  let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -442,8 +473,6 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  @wgpu.textureView_release(color_view)
-  renderer.context.present()
 }
 
 ///|

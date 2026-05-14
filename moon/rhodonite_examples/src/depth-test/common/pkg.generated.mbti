@@ -10,7 +10,11 @@ import {
 // Values
 pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
 
+pub fn create_renderer_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> WebGPURenderer
+
 pub fn render_frame(WebGPURenderer) -> Unit
+
+pub fn render_frame_to_view(WebGPURenderer, @webgpu_objects.GPUTextureView) -> Unit
 
 pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 
@@ -18,7 +22,7 @@ pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 
 // Types and methods
 pub(all) struct WebGPURenderer {
-  context : @webgpu.GPUCanvasContext
+  context : @webgpu.GPUCanvasContext?
   device : @webgpu.GPUDevice
   queue : @webgpu.GPUQueue
   pipeline : @webgpu.GPURenderPipeline

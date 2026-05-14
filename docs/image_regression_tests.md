@@ -1,89 +1,13 @@
 # Image Regression Tests
 
-RhodoniteMBT keeps the first image regression layer inside
-`emadurandal/rhodonite_examples`, not in the public `rhodonite_core`,
-`rhodonite_webgpu`, or facade packages. The package
-[`moon/rhodonite_examples/src/visual_regression`](../moon/rhodonite_examples/src/visual_regression)
-depends on [`mizchi/canvas`](https://github.com/mizchi/canvas-mbt), which is a
-pure MoonBit headless 2D canvas rasterizer with PNG output.
+`moon/rhodonite_examples/src/visual_regression` is the visual regression layer
+for existing examples. It renders the real native WebGPU sample renderer into
+an offscreen `rgba8unorm` texture, copies that texture into a readback buffer,
+unpacks the padded RGBA rows, and compares the resulting image with PNG golden
+files.
 
-## Snapshot Formats
-
-MoonBit snapshot tests store text, so small fixtures can use ASCII PPM (`P3`).
-Large or rendering-technique fixtures should use PNG golden files instead.
-
-### PPM
-
-The PPM helper writes `canvas.pixels` as text and snapshots that file via
-`@test.Test::snapshot` when visual snapshots are being updated. During normal
-test runs, it reads the checked-in PPM and compares pixels with a configurable
-mismatch rate:
-
-```moonbit
-test "visual basic triangle reference" (t : @test.Test) {
-  let canvas = render_basic_triangle_reference()
-  match_or_update_canvas_ppm_snapshot(
-    t,
-    canvas,
-    filename="basic_triangle_reference.ppm",
-    max_mismatch_rate=0.0,
-  )
-}
-```
-
-The checked-in snapshots live under the package-local `__snapshot__` directory.
-PPM keeps the artifact image-like and viewer-friendly while still producing
-plain text diffs in code review.
-
-`max_mismatch_rate` is the allowed ratio of differing pixels, from `0.0` to
-`1.0`. A pixel is different when any RGB channel exceeds `channel_tolerance`
-(default `0`):
-
-```moonbit
-match_or_update_canvas_ppm_snapshot(
-  t,
-  canvas,
-  filename="antialiased_shape.ppm",
-  max_mismatch_rate=0.002,
-  channel_tolerance=2,
-)
-```
-
-### PNG
-
-PNG golden files live under the package-local `__image_snapshots__` directory.
-They are a better fit for larger images because the repository stores compact
-binary PNGs instead of large text PPM files:
-
-```moonbit
-test "visual basic triangle PNG golden" {
-  let canvas = render_basic_triangle_reference()
-  match_or_update_canvas_png_snapshot(
-    canvas,
-    filename="basic_triangle_reference.png",
-    max_mismatch_rate=0.0,
-  )
-}
-```
-
-Normal PNG comparison decodes the golden with `mizchi/image` and compares RGBA
-pixels with `max_mismatch_rate` and `channel_tolerance`.
-
-For perceptual comparison, use `mizchi/pixelmatch`, which compares colors in
-YIQ space and can ignore anti-aliased edge pixels:
-
-```moonbit
-match_or_update_canvas_png_snapshot_perceptual(
-  canvas,
-  filename="lighting_1024.png",
-  max_mismatch_rate=0.001,
-  perceptual_threshold=0.1,
-  include_aa=false,
-)
-```
-
-`perceptual_threshold` follows pixelmatch semantics: lower values are more
-sensitive, higher values tolerate larger perceptual color differences.
+This is intentionally **not** a CPU-side canvas reference. A test only validates
+pixels produced by the WebGPU backend and the sample renderer path.
 
 ## Commands
 
@@ -101,32 +25,68 @@ just test-visual
 just update-visual-snapshots
 ```
 
-Use the update command only after inspecting the rendered change. The update
-command sets `RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1`, causing the helper to call
-MoonBit's snapshot writer instead of the tolerance-based comparator.
+`test:examples:visual:update` sets `RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1` and
+rewrites PNG golden files from the current WebGPU readback output. Use it only
+after inspecting the rendered change.
 
-## Scope
+Native WebGPU adapter creation can fail on headless machines or machines
+without a supported backend. In that case the tests print a skip message and
+pass without comparing pixels. Run the update command on a native WebGPU-capable
+machine to create or refresh golden PNGs.
 
-This layer is deterministic CPU-side visual regression testing. PPM is best for
-small, stable render contracts: geometry placement, color palettes, sprite-like
-fixtures, projection math outputs that can be rasterized in 2D, and expected
-reference images for examples. PNG is the preferred path for larger fixtures,
-lighting/material tests, or any output where text diffs would be too large.
+## Golden Files
 
-It does not replace browser/native WebGPU pixel readback tests. For WebGPU
-backend validation, add a separate integration path that renders to an
-offscreen texture/canvas, reads RGBA bytes, and compares those bytes against a
-fixture with a tolerance. Keep that path target-specific; keep the
-`canvas-mbt` snapshot layer pure MoonBit and JS-targeted for fast CI feedback.
+PNG golden files live under:
 
-## Conventions
+```text
+moon/rhodonite_examples/src/visual_regression/__image_snapshots__/
+```
 
-- Keep fixture canvases small, usually 32-128 px wide.
-- Prefer `antialias=false` unless the test is specifically about raster edges.
-- Keep `max_mismatch_rate=0.0` for deterministic fixtures. Use a non-zero rate
-  only for intentionally tolerant output.
-- Fill the background explicitly; PPM snapshots intentionally ignore alpha.
-- Commit generated PPM files under `__snapshot__`.
-- Commit generated PNG files under `__image_snapshots__`.
-- Add new image fixtures under `moon/rhodonite_examples/src/visual_regression`
-  unless a narrower package already owns the rendering contract.
+The current test set covers:
+
+| Sample | Golden file |
+|--------|-------------|
+| `basic-triangle` | `basic_triangle_sample.png` |
+| `triangle-with-buffer` | `triangle_with_buffer_sample.png` |
+| `depth-test` | `depth_test_sample.png` |
+| `ecs-scene-graph` | `ecs_scene_graph_sample.png` |
+| `ecs-mass-cubes` | `ecs_mass_cubes_sample.png` |
+
+If a PNG is missing, a WebGPU-capable normal test run fails with a message that
+points at the update command. On machines where adapter creation fails, the
+test is skipped before snapshot IO.
+
+## Comparison
+
+The helper decodes PNGs with `mizchi/image` and uses `mizchi/pixelmatch` for
+perceptual comparison:
+
+```moonbit
+match_or_update_rgba_png_snapshot_perceptual(
+  image,
+  filename="basic_triangle_sample.png",
+  max_mismatch_rate=0.0005,
+  perceptual_threshold=0.1,
+)
+```
+
+`max_mismatch_rate` is the allowed ratio of differing pixels. The current sample
+tests use `0.0005`, which allows a tiny amount of backend or driver variance
+while still catching visible regressions. `perceptual_threshold` follows
+pixelmatch semantics: lower values are more sensitive, higher values tolerate
+larger perceptual color differences.
+
+Exact RGBA comparison is also available through
+`match_or_update_rgba_png_snapshot` with `channel_tolerance`.
+
+## Implementation Notes
+
+- The visual package is `supported_targets = "native"`.
+- It overrides `emadurandal/rhodonite_webgpu/webgpu_objects/native`.
+- `rhodonite_webgpu` exposes offscreen RGBA texture creation, texture-to-buffer
+  copy, padded-row sizing helpers, and native buffer readback.
+- Sample renderers expose `create_renderer_for_device` and
+  `render_frame_to_view`, so the same renderer state and draw code can target a
+  swapchain view or an offscreen test texture.
+- The readback texture size is currently `800x600`, matching the native/demo
+  sample canvas size.

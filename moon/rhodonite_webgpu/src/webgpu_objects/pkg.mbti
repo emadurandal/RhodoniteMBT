@@ -53,6 +53,8 @@ pub fn webgpu_queue_submit(WebGPUQueue, GPUCommandBuffer) -> Unit
 pub fn webgpu_queue_write_buffer(WebGPUQueue, GPUBuffer, UInt64, Bytes) -> Unit
 pub fn webgpu_queue_write_buffer_array_view(WebGPUQueue, GPUBuffer, UInt64, ArrayView[Byte]) -> Unit
 pub fn webgpu_queue_write_buffer_bytes_range(WebGPUQueue, GPUBuffer, UInt64, Bytes, UInt64, UInt64) -> Unit
+pub fn webgpu_command_encoder_copy_texture_to_buffer_rgba8(WebGPUCommandEncoder, WebGPUTexture, GPUBuffer, UInt, UInt) -> Unit
+pub fn webgpu_buffer_readback(GPUBuffer, WebGPUInstance, UInt64, UInt64) -> Bytes
 pub fn webgpu_buffer_readback_view(GPUBuffer, WebGPUInstance, UInt64, UInt64) -> BytesView
 pub fn webgpu_render_pass_encoder_set_pipeline(WebGPURenderPassEncoder, GPURenderPipeline) -> Unit
 pub fn webgpu_render_pass_encoder_draw(WebGPURenderPassEncoder, Int) -> Unit

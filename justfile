@@ -16,10 +16,10 @@ info:
 	moon info
 
 test-visual:
-	moon test --target js moon/rhodonite_examples/src/visual_regression
+	moon test --target native moon/rhodonite_examples/src/visual_regression
 
 update-visual-snapshots:
-	RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1 moon test --target js --update moon/rhodonite_examples/src/visual_regression
+	RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1 moon test --target native moon/rhodonite_examples/src/visual_regression
 
 # Publish rhodonite_core → rhodonite_webgpu → rhodonite to mooncakes (not rhodonite_examples).
 # Prerequisites: `moon login`; network for registry.
