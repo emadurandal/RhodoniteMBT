@@ -5,8 +5,8 @@
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "build:moon": "cd moon/rhodonite_examples && moon build --target js",
-    "build:moon:wasm": "cd moon/rhodonite_examples && moon build --target wasm src/ecs-mass-cubes/wasm/main",
-    "build:moon:wasm-gc": "cd moon/rhodonite_examples && moon build --target wasm-gc src/ecs-mass-cubes/wasm/main",
+    "build:moon:wasm": "cd moon/rhodonite_examples && moon build --target wasm --release src/ecs-mass-cubes/wasm/main",
+    "build:moon:wasm-gc": "cd moon/rhodonite_examples && moon build --target wasm-gc --release src/ecs-mass-cubes/wasm/main",
     "dev:js:basic-triangle": "pnpm run build:moon && vite --open /demos/basic-triangle.html",
     "dev:js:triangle-with-buffer": "pnpm run build:moon && vite --open /demos/triangle-with-buffer.html",
     "dev:js:depth-test": "pnpm run build:moon && vite --open /demos/depth-test.html",

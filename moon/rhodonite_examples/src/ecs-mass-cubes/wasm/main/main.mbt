@@ -26,6 +26,19 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
+fn put_f32_le_mut_view_unchecked(
+  bytes : MutArrayView[Byte],
+  off : Int,
+  d : Double,
+) -> Unit {
+  let u = Float::from_double(d).reinterpret_as_uint()
+  bytes.unsafe_set(off, (u & 0xFFU).to_byte())
+  bytes.unsafe_set(off + 1, ((u >> 8) & 0xFFU).to_byte())
+  bytes.unsafe_set(off + 2, ((u >> 16) & 0xFFU).to_byte())
+  bytes.unsafe_set(off + 3, ((u >> 24) & 0xFFU).to_byte())
+}
+
+///|
 fn grid_side_len(n : Int) -> Int {
   let mut s = 1
   while s * s < n {
@@ -77,22 +90,22 @@ fn write_mass_cubes_full_range(
     let mut row_i = 0
     while row_i < row_count {
       let base = local_i * stride
-      @writes.put_f32_le_mut_view(bytes, base + 0, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 4, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 8, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 12, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 16, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 20, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 24, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 28, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 32, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 36, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 40, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 44, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 48, x)
-      @writes.put_f32_le_mut_view(bytes, base + 52, wave_s * 0.12)
-      @writes.put_f32_le_mut_view(bytes, base + 56, z)
-      @writes.put_f32_le_mut_view(bytes, base + 60, 1.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 0, scale_d)
+      put_f32_le_mut_view_unchecked(bytes, base + 4, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 8, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 12, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 16, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 20, scale_d)
+      put_f32_le_mut_view_unchecked(bytes, base + 24, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 28, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 32, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 36, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 40, scale_d)
+      put_f32_le_mut_view_unchecked(bytes, base + 44, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 48, x)
+      put_f32_le_mut_view_unchecked(bytes, base + 52, wave_s * 0.12)
+      put_f32_le_mut_view_unchecked(bytes, base + 56, z)
+      put_f32_le_mut_view_unchecked(bytes, base + 60, 1.0)
       let next_s = wave_s * cos_step + wave_c * sin_step
       wave_c = wave_c * cos_step - wave_s * sin_step
       wave_s = next_s
@@ -120,7 +133,7 @@ fn write_mass_cubes_y_range(
   let mut wave_s = @math.sin(first.to_double() * 0.09 + wave_time)
   let mut wave_c = @math.cos(first.to_double() * 0.09 + wave_time)
   while local_i < count {
-    @writes.put_f32_le_mut_view(bytes, local_i * stride + 52, wave_s * 0.12)
+    put_f32_le_mut_view_unchecked(bytes, local_i * stride + 52, wave_s * 0.12)
     let next_s = wave_s * cos_step + wave_c * sin_step
     wave_c = wave_c * cos_step - wave_s * sin_step
     wave_s = next_s
