@@ -878,6 +878,9 @@ pub fn World::drain_gpu_writes(
   component : ComponentTypeId,
 ) -> Array[GpuWrite] {
   self.assert_system_component_write(component, "World::drain_gpu_writes")
+  if component == self.global_transform_component_id {
+    return self.global_transform_blob.drain_writes()
+  }
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_writes()
@@ -895,6 +898,9 @@ pub fn World::drain_gpu_write_views(
   component : ComponentTypeId,
 ) -> Array[GpuWriteView] {
   self.assert_system_component_write(component, "World::drain_gpu_write_views")
+  if component == self.global_transform_component_id {
+    return self.global_transform_blob.drain_write_views()
+  }
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_write_views()

@@ -69,7 +69,7 @@ fn make_world(
     ignore(world.set_global_transform(e, id))
   }
   let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gt)
+  let _ = world.drain_global_transform_blob_write_views()
   (world, tf, gt, per_side)
 }
 
@@ -81,7 +81,7 @@ fn make_world_batch(
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let per_side = grid_side_len(count)
-  let _ = world.spawn_transform_global_batch(count, fn(i, _e, tf_row, gt_row) {
+  let _ = world.spawn_transform_global_batch(count, fn(i, _e, tf_row, _gt_row) {
     let (x, z) = grid_xz_for_index(i, per_side)
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row,
@@ -96,10 +96,9 @@ fn make_world_batch(
       (1.0 : Float),
       (1.0 : Float),
     )
-    @comp.global_transform_write_identity_row(gt_row)
   })
   let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_write_views(gt)
+  let _ = world.drain_global_transform_blob_write_views()
   (world, tf, gt, per_side)
 }
 
@@ -180,10 +179,10 @@ fn bench_builtin_positions(count : Int) -> Unit {
 
 ///|
 fn bench_global_and_drain(count : Int) -> Unit {
-  let (world, _, gt, _) = make_world(count)
+  let (world, _, _gt, _) = make_world(count)
   let started = monotonic_ms()
   world.update_global_transforms_from_transforms()
-  let writes = world.drain_gpu_writes(gt)
+  let writes = world.drain_global_transform_blob_write_views()
   let mut uploaded = 0
   for i = 0; i < writes.length(); i = i + 1 {
     uploaded = uploaded + writes[i].bytes.length()
@@ -193,10 +192,10 @@ fn bench_global_and_drain(count : Int) -> Unit {
 
 ///|
 fn bench_global_and_drain_views(count : Int) -> Unit {
-  let (world, _, gt, _) = make_world_batch(count)
+  let (world, _, _gt, _) = make_world_batch(count)
   let started = monotonic_ms()
   world.update_global_transforms_from_transforms()
-  let writes = world.drain_gpu_write_views(gt)
+  let writes = world.drain_global_transform_blob_write_views()
   let mut uploaded = 0
   for i = 0; i < writes.length(); i = i + 1 {
     uploaded = uploaded + writes[i].bytes.length()

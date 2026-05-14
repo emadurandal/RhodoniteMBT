@@ -36,20 +36,6 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
-#cfg(target="wasm-gc")
-fn put_f32_le_mut_view_unchecked(
-  bytes : MutArrayView[Byte],
-  off : Int,
-  d : Double,
-) -> Unit {
-  let u = Float::from_double(d).reinterpret_as_uint()
-  bytes.unsafe_set(off, (u & 0xFFU).to_byte())
-  bytes.unsafe_set(off + 1, ((u >> 8) & 0xFFU).to_byte())
-  bytes.unsafe_set(off + 2, ((u >> 16) & 0xFFU).to_byte())
-  bytes.unsafe_set(off + 3, ((u >> 24) & 0xFFU).to_byte())
-}
-
-///|
 #cfg(target="wasm")
 fn fixedarray_float_object_ptr(values : FixedArray[Float]) -> Int = "%identity"
 
@@ -77,64 +63,6 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
   let fx = ix.to_double() - half
   let fz = iz.to_double() - half
   (Float::from_double(fx * grid_spacing), Float::from_double(fz * grid_spacing))
-}
-
-///|
-#cfg(target="wasm-gc")
-fn write_mass_cubes_full_range(
-  range : @ecs.GpuComponentWriteRange,
-  per_side : Int,
-  wave_time : Double,
-) -> Unit {
-  let bytes = range.bytes()
-  let stride = range.stride()
-  let first = range.first_entity_index()
-  let count = range.count()
-  let half = (per_side - 1).to_double() * 0.5
-  let scale_d = cube_scale.to_double()
-  let sin_step = @math.sin(0.09)
-  let cos_step = @math.cos(0.09)
-  let mut local_i = 0
-  let mut row = first / per_side
-  let mut column = first % per_side
-  while local_i < count {
-    let remaining_in_row = per_side - column
-    let remaining_count = count - local_i
-    let row_count = if remaining_count > remaining_in_row {
-      remaining_in_row
-    } else {
-      remaining_count
-    }
-    let mut x = (column.to_double() - half) * grid_spacing
-    let z = (row.to_double() - half) * grid_spacing
-    let global_i = first + local_i
-    let mut wave_s = @math.sin(global_i.to_double() * 0.09 + wave_time)
-    let mut wave_c = @math.cos(global_i.to_double() * 0.09 + wave_time)
-    let mut row_i = 0
-    while row_i < row_count {
-      let base = local_i * stride
-      put_f32_le_mut_view_unchecked(bytes, base + 0, scale_d)
-      put_f32_le_mut_view_unchecked(bytes, base + 4, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 8, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 12, x)
-      put_f32_le_mut_view_unchecked(bytes, base + 16, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 20, scale_d)
-      put_f32_le_mut_view_unchecked(bytes, base + 24, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 28, wave_s * 0.12)
-      put_f32_le_mut_view_unchecked(bytes, base + 32, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 36, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 40, scale_d)
-      put_f32_le_mut_view_unchecked(bytes, base + 44, z)
-      let next_s = wave_s * cos_step + wave_c * sin_step
-      wave_c = wave_c * cos_step - wave_s * sin_step
-      wave_s = next_s
-      x = x + grid_spacing
-      local_i = local_i + 1
-      row_i = row_i + 1
-    }
-    row = row + 1
-    column = 0
-  }
 }
 
 ///|
@@ -245,16 +173,12 @@ fn write_initial_global_transforms_for_target(
 ///|
 #cfg(target="wasm-gc")
 fn write_initial_global_transforms_for_target(
-  world : @ecs.World,
-  count : Int,
-  per_side : Int,
+  _world : @ecs.World,
+  _count : Int,
+  _per_side : Int,
   _upload_f32 : FixedArray[Float],
 ) -> Unit {
-  ignore(
-    world.write_global_transforms_dense_range_views(count, range => {
-      write_mass_cubes_full_range(range, per_side, 0.0)
-    }),
-  )
+  ()
 }
 
 ///|
@@ -364,7 +288,7 @@ pub fn create_wasm_renderer() -> Unit {
     i,
     _entity,
     tf_row,
-    gt_row,
+    _gt_row,
   ) {
     let (gx, gz) = grid_xz_for_index(i, per_side)
     @comp.Transform3D::write_trs_to_component_mut_view(
@@ -380,10 +304,9 @@ pub fn create_wasm_renderer() -> Unit {
       cube_scale,
       cube_scale,
     )
-    @comp.global_transform_write_identity_row(gt_row)
   })
   ignore(world.drain_resize_events())
-  let stride = @comp.global_transform_gpu_layout().stride
+  let stride = 48
   let upload_f32 = make_upload_f32_for_target(count)
   write_initial_global_transforms_for_target(world, count, per_side, upload_f32)
   let upload_ptr = global_transform_upload_ptr_for_target(upload_f32)

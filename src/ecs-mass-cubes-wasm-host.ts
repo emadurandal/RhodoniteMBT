@@ -4,7 +4,7 @@ const ENTITY_COUNT = 800_000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
-const INSTANCE_STRIDE = 16;
+const INSTANCE_STRIDE = 24;
 const VERTS_PER_CUBE = 8;
 const INDEX_U16_COUNT = 36;
 const CAMERA_ELEVATION_RAD = 0.42;
@@ -55,6 +55,14 @@ function writeF32(bytes: Uint8Array, offset: number, value: number): void {
 
 function writeU16(bytes: Uint8Array, offset: number, value: number): void {
 	new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint16(
+		offset,
+		value,
+		true,
+	);
+}
+
+function writeU32(bytes: Uint8Array, offset: number, value: number): void {
+	new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
 		offset,
 		value,
 		true,
@@ -241,14 +249,14 @@ function instanceColorRgb(index: number): [number, number, number] {
 
 function instanceBytes(): Uint8Array {
 	const bytes = new Uint8Array(ENTITY_COUNT * INSTANCE_STRIDE);
-	const view = new Float32Array(bytes.buffer);
 	for (let index = 0; index < ENTITY_COUNT; index += 1) {
 		const [r, g, b] = instanceColorRgb(index);
-		const base = index * 4;
-		view[base] = index;
-		view[base + 1] = r;
-		view[base + 2] = g;
-		view[base + 3] = b;
+		const base = index * INSTANCE_STRIDE;
+		writeU32(bytes, base, 0);
+		writeU32(bytes, base + 4, index * 12);
+		writeF32(bytes, base + 8, r);
+		writeF32(bytes, base + 12, g);
+		writeF32(bytes, base + 16, b);
 	}
 	return bytes;
 }
@@ -395,13 +403,7 @@ struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
-struct WorldAffine3x4 {
-  row0: vec4<f32>,
-  row1: vec4<f32>,
-  row2: vec4<f32>,
-}
-
-@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
+@group(0) @binding(0) var<storage, read> transform_words: array<u32>;
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
 
 struct VertexOut {
@@ -412,16 +414,33 @@ struct VertexOut {
 @vertex
 fn vertexMain(
   @location(0) local_pos: vec3<f32>,
-  @location(1) inst: vec4<f32>,
+  @location(1) transform_ref: vec2<u32>,
+  @location(2) color: vec3<f32>,
 ) -> VertexOut {
-  let idx = u32(inst.x);
-  let color = vec3<f32>(inst.y, inst.z, inst.w);
-  let world_m = world_from_entity[idx];
+  let word_offset = transform_ref.y;
+  let row0 = vec4<f32>(
+    bitcast<f32>(transform_words[word_offset + 0u]),
+    bitcast<f32>(transform_words[word_offset + 1u]),
+    bitcast<f32>(transform_words[word_offset + 2u]),
+    bitcast<f32>(transform_words[word_offset + 3u]),
+  );
+  let row1 = vec4<f32>(
+    bitcast<f32>(transform_words[word_offset + 4u]),
+    bitcast<f32>(transform_words[word_offset + 5u]),
+    bitcast<f32>(transform_words[word_offset + 6u]),
+    bitcast<f32>(transform_words[word_offset + 7u]),
+  );
+  let row2 = vec4<f32>(
+    bitcast<f32>(transform_words[word_offset + 8u]),
+    bitcast<f32>(transform_words[word_offset + 9u]),
+    bitcast<f32>(transform_words[word_offset + 10u]),
+    bitcast<f32>(transform_words[word_offset + 11u]),
+  );
   let local_h = vec4<f32>(local_pos, 1.0);
   let world_pos = vec4<f32>(
-    dot(world_m.row0, local_h),
-    dot(world_m.row1, local_h),
-    dot(world_m.row2, local_h),
+    dot(row0, local_h),
+    dot(row1, local_h),
+    dot(row2, local_h),
     1.0,
   );
   let clip = camera.view_proj * world_pos;
@@ -467,7 +486,10 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 				{
 					arrayStride: INSTANCE_STRIDE,
 					stepMode: "instance",
-					attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }],
+					attributes: [
+						{ shaderLocation: 1, offset: 0, format: "uint32x2" },
+						{ shaderLocation: 2, offset: 8, format: "float32x3" },
+					],
 				},
 			],
 		},

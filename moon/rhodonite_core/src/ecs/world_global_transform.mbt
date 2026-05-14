@@ -1,13 +1,85 @@
 ///|
-fn World::global_transform_gpu_layout_stride(self : World) -> Int {
-  match self.global_transform_gpu_format {
-    Affine3x4F32 => 48
-    Affine3x4F16 => 24
+fn World::global_transform_ref_from_bytes(
+  self : World,
+  bytes : FixedArray[Byte],
+) -> GlobalTransformRef {
+  ignore(self)
+  let (format, word_offset) = @comp.global_transform_ref_from_component_bytes(
+    bytes,
+  )
+  { format, word_offset }
+}
+
+///|
+fn World::global_transform_ref_unchecked(
+  self : World,
+  entity : EntityId,
+) -> GlobalTransformRef? {
+  let id = self.global_transform_component_id
+  if !self.is_alive(entity) {
+    return None
+  }
+  let loc = match self.locations[entity.index] {
+    Some(loc) => loc
+    None => return None
+  }
+  if !component_array_contains(
+      self.archetypes[loc.archetype_index].components,
+      id,
+    ) {
+    return None
+  }
+  match self.archetypes[loc.archetype_index].component_bytes(loc.row, id) {
+    Some(bytes) => Some(self.global_transform_ref_from_bytes(bytes))
+    None => None
   }
 }
 
 ///|
-/// Assigns builtin [`GlobalTransform`] for `entity`: archetype signature uses zero-byte SoA row; payload is flat GPU only.
+pub fn World::global_transform_ref(
+  self : World,
+  entity : EntityId,
+) -> GlobalTransformRef? {
+  let id = self.global_transform_component_id
+  self.assert_system_component_read(id, "World::global_transform_ref")
+  self.global_transform_ref_unchecked(entity)
+}
+
+///|
+fn World::alloc_global_transform_ref(
+  self : World,
+  format : @comp.GlobalTransformGpuFormat,
+  matrix : @m44.Matrix44F,
+) -> GlobalTransformRef {
+  let word_offset = self.global_transform_blob.alloc(format)
+  self.global_transform_blob.write_matrix(format, word_offset, matrix)
+  { format, word_offset }
+}
+
+///|
+fn World::write_global_transform_ref_component(
+  self : World,
+  entity : EntityId,
+  gt_ref : GlobalTransformRef,
+) -> Bool {
+  self.set_component_bytes(
+    entity,
+    self.global_transform_component_id,
+    @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset),
+  )
+}
+
+///|
+fn World::release_global_transform_ref(self : World, entity : EntityId) -> Unit {
+  match self.global_transform_ref_unchecked(entity) {
+    Some(gt_ref) =>
+      self.global_transform_blob.free(gt_ref.format, gt_ref.word_offset)
+    None => ()
+  }
+}
+
+///|
+/// Assigns builtin [`GlobalTransform`] for `entity`; payload is stored in the packed u32 blob.
 pub fn World::set_global_transform(
   self : World,
   entity : EntityId,
@@ -21,23 +93,68 @@ pub fn World::set_global_transform(
       ) {
       return false
     }
-    if !self.add_component(entity, id) {
-      return false
+    let gt_ref = self.alloc_global_transform_ref(
+      self.global_transform_default_format,
+      m,
+    )
+    self.add_component_bytes(
+      entity,
+      id,
+      @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset),
+    )
+  } else {
+    match self.global_transform_ref(entity) {
+      Some(gt_ref) => {
+        self.global_transform_blob.write_matrix(
+          gt_ref.format,
+          gt_ref.word_offset,
+          m,
+        )
+        true
+      }
+      None => false
     }
   }
-  match self.ensure_gpu_store_capacity(id, entity.index + 1) {
-    Some(store) => {
-      store.mut_entity_row(entity.index, fn(view) {
-        @comp.matrix44f_write_global_transform_to_gpu_row(
-          m,
-          view,
-          self.global_transform_gpu_format,
-        )
-      })
-      self.replace_gpu_store(store)
-      true
+}
+
+///|
+pub fn World::set_global_transform_format(
+  self : World,
+  entity : EntityId,
+  format : @comp.GlobalTransformGpuFormat,
+) -> Bool {
+  let id = self.global_transform_component_id
+  self.assert_system_component_write(id, "World::set_global_transform_format")
+  if !self.is_alive(entity) {
+    return false
+  }
+  let matrix = match self.get_global_transform(entity) {
+    Some(m) => m
+    None => @m44.Matrix44F::identity()
+  }
+  match self.global_transform_ref(entity) {
+    Some(old_ref) => {
+      if old_ref.format == format {
+        return true
+      }
+      self.global_transform_blob.free(old_ref.format, old_ref.word_offset)
     }
-    None => false
+    None =>
+      if !self.can_add_missing_component_from_setter(
+          id, "World::set_global_transform_format",
+        ) {
+        return false
+      }
+  }
+  let new_ref = self.alloc_global_transform_ref(format, matrix)
+  if self.has_component(entity, id) {
+    self.write_global_transform_ref_component(entity, new_ref)
+  } else {
+    self.add_component_bytes(
+      entity,
+      id,
+      @comp.global_transform_ref_bytes(new_ref.format, new_ref.word_offset),
+    )
   }
 }
 
@@ -51,12 +168,12 @@ pub fn World::get_global_transform(
   if !self.is_alive(entity) || !self.has_component(entity, id) {
     return None
   }
-  match self.component_bytes(entity, id) {
-    Some(bytes) =>
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) =>
       Some(
-        @comp.matrix44f_from_global_transform_gpu_bytes(
-          bytes,
-          self.global_transform_gpu_format,
+        self.global_transform_blob.read_matrix(
+          gt_ref.format,
+          gt_ref.word_offset,
         ),
       )
     None => None
@@ -64,37 +181,120 @@ pub fn World::get_global_transform(
 }
 
 ///|
-/// Bulk-writes dense GlobalTransform rows `[0, count)` and returns the upload ranges.
+pub fn World::drain_global_transform_blob_write_views(
+  self : World,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::drain_global_transform_blob_write_views",
+  )
+  self.global_transform_blob.drain_write_views()
+}
+
+///|
+pub fn World::write_global_transform_blob_range_views(
+  self : World,
+  first_word : Int,
+  word_count : Int,
+  write : (MutArrayView[Byte]) -> Unit,
+) -> Array[GpuWriteView] {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::write_global_transform_blob_range_views",
+  )
+  self.global_transform_blob.write_word_range_views(
+    first_word, word_count, write,
+  )
+}
+
+///|
+pub fn World::drain_global_transform_blob_resize_events(
+  self : World,
+) -> Array[GlobalTransformBlobResizeEvent] {
+  self.assert_system_structural_write(
+    "World::drain_global_transform_blob_resize_events",
+  )
+  self.global_transform_blob.drain_resize_events()
+}
+
+///|
+pub fn World::global_transform_blob_word_capacity(self : World) -> Int {
+  self.global_transform_blob.word_capacity()
+}
+
+///|
+pub fn World::extract_global_transform_refs(
+  self : World,
+  entities : Array[EntityId],
+) -> FixedArray[Byte] {
+  let stride = 8
+  let out = FixedArray::make(entities.length() * stride, (0 : Byte))
+  for i = 0; i < entities.length(); i = i + 1 {
+    match self.global_transform_ref(entities[i]) {
+      Some(gt_ref) => {
+        @writes.put_u32_le(
+          out,
+          i * stride,
+          @comp.global_transform_format_code(gt_ref.format),
+        )
+        @writes.put_u32_le(
+          out,
+          i * stride + 4,
+          gt_ref.word_offset.reinterpret_as_uint(),
+        )
+      }
+      None => ()
+    }
+  }
+  out
+}
+
+///|
+pub fn World::write_global_transform_refs_into(
+  self : World,
+  entities : Array[EntityId],
+  dst : FixedArray[Byte],
+  stride : Int,
+  offset : Int,
+) -> Unit {
+  if stride < offset + 8 {
+    abort("World::write_global_transform_refs_into: stride too small")
+  }
+  if dst.length() < entities.length() * stride {
+    abort("World::write_global_transform_refs_into: dst too small")
+  }
+  for i = 0; i < entities.length(); i = i + 1 {
+    match self.global_transform_ref(entities[i]) {
+      Some(gt_ref) => {
+        @writes.put_u32_le(
+          dst,
+          i * stride + offset,
+          @comp.global_transform_format_code(gt_ref.format),
+        )
+        @writes.put_u32_le(
+          dst,
+          i * stride + offset + 4,
+          gt_ref.word_offset.reinterpret_as_uint(),
+        )
+      }
+      None => ()
+    }
+  }
+}
+
+///|
+/// Removed dense row API. Use blob refs plus `drain_global_transform_blob_write_views`.
 pub fn World::write_global_transforms_dense(
   self : World,
   count : Int,
   write : (Int, MutArrayView[Byte]) -> Unit,
 ) -> Array[GpuWrite] {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(gt, "World::write_global_transforms_dense")
-  if count < 0 {
-    abort("World::write_global_transforms_dense: count must be non-negative")
-  }
-  if count == 0 {
-    return []
-  }
-  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    let bytes = range.bytes()
-    let stride = range.stride()
-    if stride != self.global_transform_gpu_layout_stride() {
-      abort(
-        "World::write_global_transforms_dense: GlobalTransform stride mismatch",
-      )
-    }
-    for i = 0; i < count; i = i + 1 {
-      let base = i * stride
-      write(i, bytes.mut_view(start=base, end=base + stride))
-    }
-  })
-  if !ok {
-    return []
-  }
-  self.drain_gpu_writes(gt)
+  ignore(self)
+  ignore(count)
+  ignore(write)
+  abort(
+    "World::write_global_transforms_dense: removed; use packed GlobalTransform blob APIs",
+  )
 }
 
 ///|
@@ -104,35 +304,12 @@ pub fn World::write_global_transforms_dense_views(
   count : Int,
   write : (Int, MutArrayView[Byte]) -> Unit,
 ) -> Array[GpuWriteView] {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_views",
+  ignore(self)
+  ignore(count)
+  ignore(write)
+  abort(
+    "World::write_global_transforms_dense_views: removed; use packed GlobalTransform blob APIs",
   )
-  if count < 0 {
-    abort(
-      "World::write_global_transforms_dense_views: count must be non-negative",
-    )
-  }
-  if count == 0 {
-    return []
-  }
-  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    let bytes = range.bytes()
-    let stride = range.stride()
-    if stride != self.global_transform_gpu_layout_stride() {
-      abort(
-        "World::write_global_transforms_dense_views: GlobalTransform stride mismatch",
-      )
-    }
-    for i = 0; i < count; i = i + 1 {
-      let base = i * stride
-      write(i, bytes.mut_view(start=base, end=base + stride))
-    }
-  })
-  if !ok {
-    return []
-  }
-  self.drain_gpu_write_views(gt)
 }
 
 ///|
@@ -147,30 +324,12 @@ pub fn World::write_global_transforms_dense_range_views(
   count : Int,
   write : (GpuComponentWriteRange) -> Unit,
 ) -> Array[GpuWriteView] {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_range_views",
+  ignore(self)
+  ignore(count)
+  ignore(write)
+  abort(
+    "World::write_global_transforms_dense_range_views: removed; use packed GlobalTransform blob APIs",
   )
-  if count < 0 {
-    abort(
-      "World::write_global_transforms_dense_range_views: count must be non-negative",
-    )
-  }
-  if count == 0 {
-    return []
-  }
-  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    if range.stride() != self.global_transform_gpu_layout_stride() {
-      abort(
-        "World::write_global_transforms_dense_range_views: GlobalTransform stride mismatch",
-      )
-    }
-    write(range)
-  })
-  if !ok {
-    return []
-  }
-  self.drain_gpu_write_views(gt)
 }
 
 ///|
@@ -187,33 +346,12 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
   count : Int,
   write : (FixedArray[Byte], Int, Int) -> Unit,
 ) -> Bool {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_wasm_bytes_range",
+  ignore(self)
+  ignore(count)
+  ignore(write)
+  abort(
+    "World::write_global_transforms_dense_wasm_bytes_range: removed; use packed GlobalTransform blob APIs",
   )
-  if count < 0 {
-    abort(
-      "World::write_global_transforms_dense_wasm_bytes_range: count must be non-negative",
-    )
-  }
-  if count == 0 {
-    return true
-  }
-  match self.ensure_gpu_store_capacity(gt, count) {
-    Some(store) => {
-      if store.stride != self.global_transform_gpu_layout_stride() {
-        abort(
-          "World::write_global_transforms_dense_wasm_bytes_range: GlobalTransform stride mismatch",
-        )
-      }
-      self.query_depth = self.query_depth + 1
-      write(store.bytes, store.stride, count)
-      self.query_depth = self.query_depth - 1
-      self.replace_gpu_store(store)
-      true
-    }
-    None => false
-  }
 }
 
 ///|
@@ -225,28 +363,16 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
 /// until the GlobalTransform GPU store grows and reallocates.
 #cfg(target="wasm")
 pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_read(
-    gt, "World::global_transform_wasm_gpu_bytes_payload_ptr",
-  )
-  match self.gpu_store(gt) {
-    Some(store) => store.wasm_bytes_payload_ptr()
-    None => 0
-  }
+  ignore(self)
+  0
 }
 
 ///|
 /// Returns the byte length of the builtin GlobalTransform GPU store payload.
 #cfg(target="wasm")
 pub fn World::global_transform_wasm_gpu_bytes_len(self : World) -> Int {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_read(
-    gt, "World::global_transform_wasm_gpu_bytes_len",
-  )
-  match self.gpu_store(gt) {
-    Some(store) => store.wasm_bytes_len()
-    None => 0
-  }
+  ignore(self)
+  0
 }
 
 ///|
@@ -328,42 +454,36 @@ pub fn World::compute_global_transform(
 ///|
 /// Used only by [`update_global_transforms_from_transforms`]: entity comes from a TF+GT query row and
 /// `leaf_local_matrix` was decoded from that row's Transform SoA view (no [`get_transform`] on the leaf).
-/// Writes the world matrix into `gt_row` (one std140 GPU row) and returns whether a matrix was written.
+/// Writes the world matrix into the entity's packed GlobalTransform blob slot.
 fn World::compute_global_transform_for_tf_gt_bulk_row(
   self : World,
   entity : EntityId,
   has_child_of : Bool,
   leaf_local_matrix : @m44.Matrix44F,
-  gt_row : MutArrayView[Byte],
 ) -> Bool {
-  if !has_child_of {
-    @comp.matrix44f_write_global_transform_to_gpu_row(
-      leaf_local_matrix,
-      gt_row,
-      self.global_transform_gpu_format,
-    )
-    true
+  let world_m = if !has_child_of {
+    Some(leaf_local_matrix)
   } else {
     match self.build_child_of_ancestor_chain(entity) {
-      None => false
+      None => None
       Some(chain) =>
-        match
-          self.multiply_world_chain_matrix(
-            entity,
-            chain,
-            Some(leaf_local_matrix),
-          ) {
-          None => false
-          Some(world_m) => {
-            @comp.matrix44f_write_global_transform_to_gpu_row(
-              world_m,
-              gt_row,
-              self.global_transform_gpu_format,
-            )
-            true
-          }
-        }
+        self.multiply_world_chain_matrix(entity, chain, Some(leaf_local_matrix))
     }
+  }
+  match world_m {
+    Some(m) =>
+      match self.global_transform_ref(entity) {
+        Some(gt_ref) => {
+          self.global_transform_blob.write_matrix(
+            gt_ref.format,
+            gt_ref.word_offset,
+            m,
+          )
+          true
+        }
+        None => false
+      }
+    None => false
   }
 }
 
@@ -798,9 +918,7 @@ fn World::try_update_global_transforms_no_child_fast_path(
 }
 
 ///|
-/// Fallback for hierarchy-capable transform propagation that still walks archetypes directly.
-/// It only handles archetypes that actually carry [`ChildOf`]; no-child archetypes are handled by
-/// the fast path above even when the world contains a mix of hierarchical and flat transforms.
+/// Fallback for transform propagation that walks archetypes directly and writes packed blob slots.
 fn World::try_update_global_transforms_from_transforms_archetype_path(
   self : World,
   tf : ComponentTypeId,
@@ -815,9 +933,6 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
       !component_array_contains(comps, gt) {
       continue
     }
-    if !component_array_contains(comps, co) {
-      continue
-    }
     matched = true
     let tf_col_index = arch.column_index(tf)
     if tf_col_index < 0 {
@@ -830,15 +945,6 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
   if !matched {
     return false
   }
-  let gt_store = match
-    self.ensure_gpu_store_capacity(gt, self.locations.length()) {
-    Some(store) => store
-    None => return false
-  }
-  let gt_stride = self.global_transform_gpu_layout_stride()
-  if gt_store.stride != gt_stride {
-    return false
-  }
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let arch = self.archetypes[ai]
     let comps = arch.components
@@ -846,43 +952,21 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
       !component_array_contains(comps, gt) {
       continue
     }
-    if !component_array_contains(comps, co) {
-      continue
-    }
+    let has_co = component_array_contains(comps, co)
     let tf_col = arch.columns[arch.column_index(tf)]
     let tf_bytes = tf_col.bytes
     let tf_stride = tf_col.stride
-    let mut dirty_first = -1
-    let mut dirty_prev = -1
     for row = 0; row < arch.entities.length(); row = row + 1 {
       let e = arch.entities[row]
       let tf_base = row * tf_stride
       let local_m = @comp.Transform3D::local_matrix_from_component_view(
         tf_bytes[tf_base:tf_base + tf_stride],
       )
-      let gt_base = e.index * gt_store.stride
       ignore(
-        self.compute_global_transform_for_tf_gt_bulk_row(
-          e,
-          true,
-          local_m,
-          gt_store.bytes.mut_view(start=gt_base, end=gt_base + gt_stride),
-        ),
+        self.compute_global_transform_for_tf_gt_bulk_row(e, has_co, local_m),
       )
-      if dirty_first < 0 {
-        dirty_first = e.index
-        dirty_prev = e.index
-      } else if e.index == dirty_prev + 1 {
-        dirty_prev = e.index
-      } else {
-        gt_store.mark_dirty_range(dirty_first, dirty_prev)
-        dirty_first = e.index
-        dirty_prev = e.index
-      }
     }
-    gt_store.mark_dirty_range(dirty_first, dirty_prev)
   }
-  self.replace_gpu_store(gt_store)
   true
 }
 
@@ -910,20 +994,7 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
     ) {
     return
   }
-  let required : Array[ComponentTypeId] = [tf, gt]
-  let query = Query::new(required)
-  query.for_each(self, row => {
-    let e = row.entity()
-    let local_m = row.read_transform3d().local_matrix()
-    row.write(gt, gt_row => {
-      ignore(
-        self.compute_global_transform_for_tf_gt_bulk_row(
-          e,
-          self.has_component(e, co),
-          local_m,
-          gt_row,
-        ),
-      )
-    })
-  })
+  abort(
+    "World::update_global_transforms_from_transforms: archetype path unavailable",
+  )
 }

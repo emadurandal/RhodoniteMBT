@@ -120,6 +120,15 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		component: MoonComponentTypeId,
 	): MoonGpuWriteView[];
+	export function world_drain_global_transform_blob_write_views(
+		world: MoonWorld,
+	): MoonGpuWriteView[];
+	export function world_write_global_transform_blob_range_views(
+		world: MoonWorld,
+		firstWord: number,
+		wordCount: number,
+		f: (bytes: MoonByteView) => void,
+	): MoonGpuWriteView[];
 	export function world_drain_gpu_writes_copy(
 		world: MoonWorld,
 		component: MoonComponentTypeId,
@@ -146,6 +155,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
+	export function world_global_transform_blob_word_capacity(
+		world: MoonWorld,
+	): number;
+	export function world_extract_global_transform_refs(
+		world: MoonWorld,
+		entities: MoonEntityId[],
+	): Uint8Array | number[];
 	export function world_write_global_transforms_dense_range_views(
 		world: MoonWorld,
 		count: number,

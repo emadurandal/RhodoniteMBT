@@ -47,9 +47,9 @@
 - CPU SoA と GPU row を同じ callback payload として扱える。
 - component 型ごとの generic / reflection が薄い MoonBit 環境でも、低レベル API を少ない型で表現できる。
 
-現在の `update_global_transforms_from_transforms` はこの利点を活かして、`Transform3D` の SoA row を読み、`GlobalTransform` の GPU row へ直接書いています。`ChildOf` を持たない archetype は fast path に残し、`ChildOf` を含む archetype だけを階層 path で処理するため、scene の一部に親子関係があっても flat な大量 entity は巻き込まれません。`update_transform3d_positions` も正式な bulk API として追加され、JS では公開 archetype-column API、非 JS では direct archetype sweep で position だけを更新します。
+現在の `update_global_transforms_from_transforms` はこの利点を活かして、`Transform3D` の SoA row を読み、`GlobalTransform` の packed blob slot へ直接書いています。`ChildOf` を持たない archetype は fast path に残し、`ChildOf` を含む archetype だけを階層 path で処理するため、scene の一部に親子関係があっても flat な大量 entity は巻き込まれません。`update_transform3d_positions` も正式な bulk API として追加され、JS では公開 archetype-column API、非 JS では direct archetype sweep で position だけを更新します。
 
-大量生成向けには `World::spawn_transform_global_batch` が追加されています。これは builtin `[Transform3D, GlobalTransform]` archetype に entity を直接 append し、callback に CPU row / GPU row の mutable view を渡します。任意 signature 向けには `World::spawn_batch` があり、`SpawnBatchRow::write` から CPU/GPU row を直接初期化できます。これらにより、component 追加時の temporary bytes と archetype migration を避けられます。
+大量生成向けには `World::spawn_transform_global_batch` が追加されています。これは builtin `[Transform3D, GlobalTransform]` archetype に entity を直接 append し、callback に `Transform3D` CPU row と `GlobalTransform` ref row の mutable view を渡します。任意 signature 向けには `World::spawn_batch` があり、`SpawnBatchRow::write` から CPU/GPU row を直接初期化できます。これらにより、component 追加時の temporary bytes と archetype migration を避けられます。
 
 ## `MutArrayView[Byte]` 公開の問題点
 

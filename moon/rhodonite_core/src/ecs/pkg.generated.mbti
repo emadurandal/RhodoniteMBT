@@ -49,6 +49,18 @@ pub(all) struct EntityLocation {
   row : Int
 }
 
+pub(all) struct GlobalTransformBlobResizeEvent {
+  required_word_capacity : Int
+  needs_full_upload : Bool
+}
+
+type GlobalTransformBlobStore
+
+pub(all) struct GlobalTransformRef {
+  format : @components.GlobalTransformGpuFormat
+  word_offset : Int
+}
+
 type GpuComponentStore
 
 pub struct GpuComponentWriteRange {
@@ -199,14 +211,19 @@ pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
+pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[GlobalTransformBlobResizeEvent]
+pub fn World::drain_global_transform_blob_write_views(Self) -> Array[GpuWriteView]
 pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
 pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
+pub fn World::extract_global_transform_refs(Self, Array[EntityId]) -> FixedArray[Byte]
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::get_transform(Self, EntityId) -> @components.Transform3D?
+pub fn World::global_transform_blob_word_capacity(Self) -> Int
 pub fn World::global_transform_component(Self) -> ComponentTypeId
 pub fn World::global_transform_gpu_format(Self) -> @components.GlobalTransformGpuFormat
+pub fn World::global_transform_ref(Self, EntityId) -> GlobalTransformRef?
 pub fn World::gpu_component_active_indices(Self, ComponentTypeId) -> Array[Int]
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
@@ -219,6 +236,7 @@ pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
+pub fn World::set_global_transform_format(Self, EntityId, @components.GlobalTransformGpuFormat) -> Bool
 pub fn World::set_transform(Self, EntityId, @components.Transform3D) -> Bool
 pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn World::spawn_batch(Self, Array[ComponentTypeId], Int, (Int, EntityId, SpawnBatchRow) -> Unit) -> Array[EntityId]
@@ -227,6 +245,8 @@ pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
+pub fn World::write_global_transform_blob_range_views(Self, Int, Int, (MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
+pub fn World::write_global_transform_refs_into(Self, Array[EntityId], FixedArray[Byte], Int, Int) -> Unit
 pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
 pub fn World::write_global_transforms_dense_range_views(Self, Int, (GpuComponentWriteRange) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transforms_dense_views(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]

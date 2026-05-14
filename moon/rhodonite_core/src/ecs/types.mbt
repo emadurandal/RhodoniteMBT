@@ -119,6 +119,13 @@ pub(all) struct GpuResizeEvent {
 }
 
 ///|
+/// Emitted when the packed builtin GlobalTransform word blob grows.
+pub(all) struct GlobalTransformBlobResizeEvent {
+  required_word_capacity : Int
+  needs_full_upload : Bool
+}
+
+///|
 /// Thin query descriptor for system-style iteration over a fixed `required` component set.
 pub struct Query {
   priv required : Array[ComponentTypeId]
@@ -227,6 +234,25 @@ pub struct GpuComponentWriteRange {
 }
 
 ///|
+/// CPU-side handle stored in the builtin GlobalTransform component and mirrored into render items.
+pub(all) struct GlobalTransformRef {
+  format : @comp.GlobalTransformGpuFormat
+  word_offset : Int
+}
+
+///|
+/// Packed `u32` backing store for builtin GlobalTransform affine rows.
+struct GlobalTransformBlobStore {
+  mut bytes : FixedArray[Byte]
+  mut next_word_offset : Int
+  free_f16_offsets : Array[Int]
+  free_f32_offsets : Array[Int]
+  dirty_word_first : Array[Int]
+  dirty_word_last : Array[Int]
+  resize_events : Array[GlobalTransformBlobResizeEvent]
+}
+
+///|
 /// Deferred structural or payload mutation command applied after query/system iteration.
 pub(all) enum WorldCommand {
   CreateEntity(EntityId)
@@ -296,6 +322,7 @@ pub struct World {
   priv archetype_signature_cache : Array[ArchetypeSignatureCacheEntry]
   priv component_archetypes : Array[Array[Int]]
   priv gpu_stores : Array[GpuComponentStore?]
+  priv global_transform_blob : GlobalTransformBlobStore
   priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
@@ -309,6 +336,6 @@ pub struct World {
   priv mut system_access_structural_write : Bool
   priv transform_component_id : ComponentTypeId
   priv global_transform_component_id : ComponentTypeId
-  priv global_transform_gpu_format : @comp.GlobalTransformGpuFormat
+  priv global_transform_default_format : @comp.GlobalTransformGpuFormat
   priv child_of_component_id : ComponentTypeId
 }

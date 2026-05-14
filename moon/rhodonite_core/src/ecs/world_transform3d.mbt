@@ -78,15 +78,23 @@ pub fn World::spawn_transform_global_batch(
   let arch_index = self.ensure_archetype(components)
   let arch = self.archetypes[arch_index]
   let tf_col_index = arch.column_index(tf)
+  let gt_col_index = arch.column_index(gt)
   if tf_col_index < 0 {
     abort("World::spawn_transform_global_batch: missing Transform3D column")
   }
+  if gt_col_index < 0 {
+    abort("World::spawn_transform_global_batch: missing GlobalTransform column")
+  }
   let tf_col = arch.columns[tf_col_index]
+  let gt_col = arch.columns[gt_col_index]
   if tf_col.stride != 48 {
     abort("World::spawn_transform_global_batch: Transform3D stride mismatch")
   }
-  let mut max_index = -1
-  let mut min_index = 2147483647
+  if gt_col.stride != 8 {
+    abort(
+      "World::spawn_transform_global_batch: GlobalTransform ref stride mismatch",
+    )
+  }
   for i = 0; i < count; i = i + 1 {
     let entity = if self.free_indices.length() > 0 {
       let last = self.free_indices.length() - 1
@@ -103,22 +111,7 @@ pub fn World::spawn_transform_global_batch(
       self.locations.push(None)
       EntityId::new(index, 0)
     }
-    if entity.index > max_index {
-      max_index = entity.index
-    }
-    if entity.index < min_index {
-      min_index = entity.index
-    }
     entities.push(entity)
-  }
-  let gt_store = match self.ensure_gpu_store_capacity(gt, max_index + 1) {
-    Some(store) => store
-    None => return []
-  }
-  if gt_store.stride != self.global_transform_gpu_layout_stride() {
-    abort(
-      "World::spawn_transform_global_batch: GlobalTransform stride mismatch",
-    )
   }
   let start_row = arch.entities.length()
   arch.ensure_row_capacity(start_row + entities.length())
@@ -127,28 +120,24 @@ pub fn World::spawn_transform_global_batch(
     let row = start_row + i
     arch.entities.push(entity)
     self.locations[entity.index] = Some({ archetype_index: arch_index, row })
-    if !gt_store.active_flags[entity.index] {
-      gt_store.active_flags[entity.index] = true
-      gt_store.active_positions[entity.index] = gt_store.active_indices.length()
-      gt_store.active_indices.push(entity.index)
-    }
+    let gt_ref = self.alloc_global_transform_ref(
+      self.global_transform_default_format,
+      @m44.Matrix44F::identity(),
+    )
     let tf_base = row * tf_col.stride
-    let gt_base = entity.index * gt_store.stride
+    let gt_base = row * gt_col.stride
+    @comp.global_transform_write_ref_mut_view(
+      gt_col.bytes.mut_view(start=gt_base, end=gt_base + gt_col.stride),
+      gt_ref.format,
+      gt_ref.word_offset,
+    )
     write(
       i,
       entity,
       tf_col.bytes.mut_view(start=tf_base, end=tf_base + tf_col.stride),
-      gt_store.bytes.mut_view(start=gt_base, end=gt_base + gt_store.stride),
+      gt_col.bytes.mut_view(start=gt_base, end=gt_base + gt_col.stride),
     )
   }
-  if max_index - min_index + 1 == count {
-    gt_store.mark_dirty_range(min_index, max_index)
-  } else {
-    for i = 0; i < entities.length(); i = i + 1 {
-      gt_store.mark_dirty(entities[i].index)
-    }
-  }
-  self.replace_gpu_store(gt_store)
   entities
 }
 

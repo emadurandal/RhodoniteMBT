@@ -34,7 +34,7 @@ let canvas_height : UInt = 600U
 let vertex_stride_local : Int = 12
 
 ///|
-let instance_stride : Int = 16
+let instance_stride : Int = 24
 
 ///|
 let verts_per_cube : Int = 8
@@ -241,23 +241,6 @@ fn put_mat4_col_major_f64_to_bytes(
 }
 
 ///|
-fn max_gt_capacity_from_resize(
-  world : @ecs.World,
-  gt : @ecs.ComponentTypeId,
-) -> Int {
-  let mut cap = 0
-  let evs = world.drain_resize_events()
-  for i = 0; i < evs.length(); i = i + 1 {
-    if evs[i].component == gt {
-      if evs[i].required_capacity > cap {
-        cap = evs[i].required_capacity
-      }
-    }
-  }
-  cap
-}
-
-///|
 fn instance_color_rgb(idx : Int) -> (Double, Double, Double) {
   let i = idx % 125
   let r = (i % 5).to_double() * 0.22 + 0.12
@@ -294,115 +277,6 @@ fn animate_transforms_query(
 }
 
 ///|
-fn write_mass_cubes_full_range(
-  range : @ecs.GpuComponentWriteRange,
-  per_side : Int,
-  wave_time : Double,
-) -> Unit {
-  let bytes = range.bytes()
-  let stride = range.stride()
-  let first = range.first_entity_index()
-  let count = range.count()
-  let half = (per_side - 1).to_double() * 0.5
-  let scale_d = cube_scale.to_double()
-  let sin_step = @math.sin(0.09)
-  let cos_step = @math.cos(0.09)
-  let mut local_i = 0
-  let mut row = first / per_side
-  let mut column = first % per_side
-  while local_i < count {
-    let remaining_in_row = per_side - column
-    let remaining_count = count - local_i
-    let row_count = if remaining_count > remaining_in_row {
-      remaining_in_row
-    } else {
-      remaining_count
-    }
-    let mut x = (column.to_double() - half) * grid_spacing
-    let z = (row.to_double() - half) * grid_spacing
-    let global_i = first + local_i
-    let mut wave_s = @math.sin(global_i.to_double() * 0.09 + wave_time)
-    let mut wave_c = @math.cos(global_i.to_double() * 0.09 + wave_time)
-    let mut row_i = 0
-    while row_i < row_count {
-      let base = local_i * stride
-      @writes.put_f32_le_mut_view(bytes, base + 0, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 4, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 8, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 12, x)
-      @writes.put_f32_le_mut_view(bytes, base + 16, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 20, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 24, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 28, wave_s * 0.12)
-      @writes.put_f32_le_mut_view(bytes, base + 32, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 36, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 40, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 44, z)
-      let next_s = wave_s * cos_step + wave_c * sin_step
-      wave_c = wave_c * cos_step - wave_s * sin_step
-      wave_s = next_s
-      x = x + grid_spacing
-      local_i = local_i + 1
-      row_i = row_i + 1
-    }
-    row = row + 1
-    column = 0
-  }
-}
-
-///|
-fn write_mass_cubes_y_range(
-  range : @ecs.GpuComponentWriteRange,
-  wave_time : Double,
-) -> Unit {
-  let bytes = range.bytes()
-  let stride = range.stride()
-  let first = range.first_entity_index()
-  let count = range.count()
-  let sin_step = @math.sin(0.09)
-  let cos_step = @math.cos(0.09)
-  let mut local_i = 0
-  let mut wave_s = @math.sin(first.to_double() * 0.09 + wave_time)
-  let mut wave_c = @math.cos(first.to_double() * 0.09 + wave_time)
-  while local_i < count {
-    @writes.put_f32_le_mut_view(bytes, local_i * stride + 28, wave_s * 0.12)
-    let next_s = wave_s * cos_step + wave_c * sin_step
-    wave_c = wave_c * cos_step - wave_s * sin_step
-    wave_s = next_s
-    local_i = local_i + 1
-  }
-}
-
-///|
-fn update_global_transforms_for_mass_cubes_fast(
-  world : @ecs.World,
-  tf : @ecs.ComponentTypeId,
-  gt : @ecs.ComponentTypeId,
-  per_side : Int,
-  t : Double,
-) -> Array[@ecs.GpuWriteView] {
-  ignore(tf)
-  ignore(gt)
-  ignore(per_side)
-  let wave_time = t * 1.8
-  world.write_global_transforms_dense_range_views(entity_count, range => {
-    write_mass_cubes_y_range(range, wave_time)
-  })
-}
-
-///|
-fn initialize_global_transforms_for_mass_cubes(
-  world : @ecs.World,
-  per_side : Int,
-  t : Double,
-) -> Array[@ecs.GpuWriteView] {
-  let wave_time = t * 1.8
-  world.write_global_transforms_dense_range_views(entity_count, range => {
-    write_mass_cubes_full_range(range, per_side, wave_time)
-  })
-}
-
-///|
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -410,21 +284,10 @@ fn update_and_drain_global_transforms(
   per_side : Int,
   t : Double,
 ) -> Array[@ecs.GpuWriteView] {
-  let writes = update_global_transforms_for_mass_cubes_fast(
-    world, tf, gt, per_side, t,
-  )
-  if writes.length() > 0 {
-    return writes
-  }
-  let full_writes = initialize_global_transforms_for_mass_cubes(
-    world, per_side, t,
-  )
-  if full_writes.length() > 0 {
-    return full_writes
-  }
+  ignore(gt)
   animate_transforms_query(world, tf, per_side, t)
   world.update_global_transforms_from_transforms()
-  world.drain_gpu_write_views(gt)
+  world.drain_global_transform_blob_write_views()
 }
 
 ///|
@@ -476,13 +339,7 @@ fn ecs_mass_shader_wgsl() -> String {
     #|  view_proj: mat4x4<f32>,
     #|}
     #|
-    #|struct WorldAffine3x4 {
-    #|  row0: vec4<f32>,
-    #|  row1: vec4<f32>,
-    #|  row2: vec4<f32>,
-    #|}
-    #|
-    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
+    #|@group(0) @binding(0) var<storage, read> transform_words: array<u32>;
     #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
     #|
     #|struct VertexOut {
@@ -493,16 +350,49 @@ fn ecs_mass_shader_wgsl() -> String {
     #|@vertex
     #|fn vertexMain(
     #|  @location(0) local_pos: vec3<f32>,
-    #|  @location(1) inst: vec4<f32>,
+    #|  @location(1) transform_ref: vec2<u32>,
+    #|  @location(2) color: vec3<f32>,
     #|) -> VertexOut {
-    #|  let idx = u32(inst.x);
-    #|  let color = vec3<f32>(inst.y, inst.z, inst.w);
-    #|  let world_m = world_from_entity[idx];
+    #|  let format = transform_ref.x;
+    #|  let word_offset = transform_ref.y;
+    #|  var row0: vec4<f32>;
+    #|  var row1: vec4<f32>;
+    #|  var row2: vec4<f32>;
+    #|  if (format == 1u) {
+    #|    let r0xy = unpack2x16float(transform_words[word_offset + 0u]);
+    #|    let r0zw = unpack2x16float(transform_words[word_offset + 1u]);
+    #|    let r1xy = unpack2x16float(transform_words[word_offset + 2u]);
+    #|    let r1zw = unpack2x16float(transform_words[word_offset + 3u]);
+    #|    let r2xy = unpack2x16float(transform_words[word_offset + 4u]);
+    #|    let r2zw = unpack2x16float(transform_words[word_offset + 5u]);
+    #|    row0 = vec4<f32>(r0xy.x, r0xy.y, r0zw.x, r0zw.y);
+    #|    row1 = vec4<f32>(r1xy.x, r1xy.y, r1zw.x, r1zw.y);
+    #|    row2 = vec4<f32>(r2xy.x, r2xy.y, r2zw.x, r2zw.y);
+    #|  } else {
+    #|    row0 = vec4<f32>(
+    #|      bitcast<f32>(transform_words[word_offset + 0u]),
+    #|      bitcast<f32>(transform_words[word_offset + 1u]),
+    #|      bitcast<f32>(transform_words[word_offset + 2u]),
+    #|      bitcast<f32>(transform_words[word_offset + 3u]),
+    #|    );
+    #|    row1 = vec4<f32>(
+    #|      bitcast<f32>(transform_words[word_offset + 4u]),
+    #|      bitcast<f32>(transform_words[word_offset + 5u]),
+    #|      bitcast<f32>(transform_words[word_offset + 6u]),
+    #|      bitcast<f32>(transform_words[word_offset + 7u]),
+    #|    );
+    #|    row2 = vec4<f32>(
+    #|      bitcast<f32>(transform_words[word_offset + 8u]),
+    #|      bitcast<f32>(transform_words[word_offset + 9u]),
+    #|      bitcast<f32>(transform_words[word_offset + 10u]),
+    #|      bitcast<f32>(transform_words[word_offset + 11u]),
+    #|    );
+    #|  }
     #|  let local_h = vec4<f32>(local_pos, 1.0);
     #|  let world_pos = vec4<f32>(
-    #|    dot(world_m.row0, local_h),
-    #|    dot(world_m.row1, local_h),
-    #|    dot(world_m.row2, local_h),
+    #|    dot(row0, local_h),
+    #|    dot(row1, local_h),
+    #|    dot(row2, local_h),
     #|    1.0,
     #|  );
     #|  let clip = camera.view_proj * world_pos;
@@ -603,9 +493,14 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     step_mode: @wgpu.GPUVertexStepMode::Instance,
     attributes: [
       {
-        format: @wgpu.GPUVertexFormat::Float32x4,
+        format: @wgpu.GPUVertexFormat::Uint32x2,
         offset: 0UL,
         shader_location: 1U,
+      },
+      {
+        format: @wgpu.GPUVertexFormat::Float32x3,
+        offset: 8UL,
+        shader_location: 2U,
       },
     ],
   }
@@ -627,17 +522,12 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
-  let mut max_index_slot = 0
-  let _ = world.spawn_transform_global_batch(entity_count, fn(
+  let entities = world.spawn_transform_global_batch(entity_count, fn(
     i,
     e,
     tf_row,
-    gt_row,
+    _gt_row,
   ) {
-    let idx = e.index
-    if idx + 1 > max_index_slot {
-      max_index_slot = idx + 1
-    }
     let (gx, gz) = grid_xz_for_index(i, per_side)
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row,
@@ -652,22 +542,16 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
       cube_scale,
       cube_scale,
     )
-    @comp.global_transform_write_identity_row(gt_row)
     let base = i * instance_stride
-    let idx_f = idx.to_double()
-    let (cr, cg, cb) = instance_color_rgb(idx)
-    @writes.put_f32_le(instance_bytes, base + 0, idx_f)
-    @writes.put_f32_le(instance_bytes, base + 4, cr)
-    @writes.put_f32_le(instance_bytes, base + 8, cg)
-    @writes.put_f32_le(instance_bytes, base + 12, cb)
+    let (cr, cg, cb) = instance_color_rgb(e.index)
+    @writes.put_f32_le(instance_bytes, base + 8, cr)
+    @writes.put_f32_le(instance_bytes, base + 12, cg)
+    @writes.put_f32_le(instance_bytes, base + 16, cb)
   })
-  let stride = @comp.global_transform_gpu_layout().stride
-  let mut cap_entities = max_index_slot
-  let ev_cap = max_gt_capacity_from_resize(world, gt)
-  if ev_cap > cap_entities {
-    cap_entities = ev_cap
-  }
-  let storage_bytes = (cap_entities * stride).to_uint64()
+  world.write_global_transform_refs_into(
+    entities, instance_bytes, instance_stride, 0,
+  )
+  let storage_bytes = (world.global_transform_blob_word_capacity() * 4).to_uint64()
   let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let transform_storage = device.create_buffer(storage_bytes, s_usage)
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
@@ -718,9 +602,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
   )
   let depth_view = depth_texture.create_view()
-  let writes0 = initialize_global_transforms_for_mass_cubes(
-    world, per_side, 0.0,
-  )
+  let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
   upload_global_transform_writes(queue, transform_storage, writes0)
   Some({
     context: canvas_context,

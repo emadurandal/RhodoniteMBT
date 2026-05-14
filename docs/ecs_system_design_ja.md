@@ -69,6 +69,8 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 | `set_component_bytes` / `clear_gpu_component` | `writes` |
 | `drain_gpu_writes` | `writes` |
 | `drain_gpu_write_views` | `writes` |
+| `drain_global_transform_blob_write_views` | `writes` |
+| `drain_global_transform_blob_resize_events` | `structural_write` |
 | `gpu_component_active_indices` | `reads` または `writes` |
 | `drain_resize_events` | `structural_write` |
 | `add_component` / `add_component_bytes` / `remove_component` | `writes` + `structural_write` |
@@ -80,7 +82,7 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 
 GPU-visible component に対する `component_bytes` / `set_component_bytes` / `clear_gpu_component` は、entity が対象 component を archetype signature 上で持っている場合だけ操作できます。GPU store の slot は `EntityId.index` で引けますが、component 所有の有無は archetype signature を正とします。`add_component*` は同時に packed active index set へ entity index を追加し、`remove_component` / `destroy_entity` は zero clear 後に active set から外します。`World::gpu_component_active_indices` はこの packed set のコピーを返す read API です。`remove_component` 後は ownership が消えるため `component_bytes` は `None` になり、GPU 側には zero clear された dirty row が残ります。
 
-GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access、builtin `set_global_transform` は同じ resize event 生成規則に従います。JS / 非 JS とも capacity は幾何級数的に伸び、JS は `Uint8Array`、非 JS は MoonBit の byte array を使います。
+GPU store の capacity 拡張と `GpuResizeEvent` 発行は `World` 内部の共通経路に集約しています。`add_component`、`add_component_bytes`、`set_component_bytes`、`clear_gpu_component`、query の GPU row access は同じ resize event 生成規則に従います。JS / 非 JS とも capacity は幾何級数的に伸び、JS は `Uint8Array`、非 JS は MoonBit の byte array を使います。builtin `GlobalTransform` は例外で、GPU-visible store ではなく packed u32 blob 専用の resize/write event queue を使います。
 
 `drain_resize_events` は World が所有する resize event queue を消費します。Schedule 実行中に呼ぶ場合は、event queue に対する構造的 access として `structural_write` が必要です。Schedule 外では従来通り呼べます。
 
@@ -160,9 +162,10 @@ System が `QueryRow::write` または `RawQueryRow::write_view` で `GpuVisible
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  // row.write(gt) は GlobalTransform の flat GPU row。
-  // GpuVisible の mutable view を取得した時点で dirty になる。
-  row.write(gt, fn(gt_row) => ignore(gt_row))
+  // GlobalTransform は packed blob 参照を持つ CPU row。
+  // matrix payload は World::set_global_transform か propagation API で更新する。
+  let local = row.read_transform3d().local_matrix()
+  ignore(world.set_global_transform(row.entity(), local))
 })
 ```
 
@@ -188,13 +191,13 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `World::update_global_transforms_from_transforms` は、`ChildOf` を持たない `[Transform3D, GlobalTransform]` archetype を fast path のまま処理し、`ChildOf` を含む archetype だけを階層対応 path に回します。これにより、scene の一部に親子関係がある場合でも、flat な大量 entity が階層 path へ巻き込まれません。階層 path の親 lookup は `ChildOf` column から直接読み、`get_child_of` 経由の component bytes copy を避けます。
 
-大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row_format` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
+大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の 8 byte ref row が `MutArrayView[Byte]` として渡されます。`Transform3D` は `Transform3D::write_trs_to_component_mut_view` で直接初期化し、`GlobalTransform` の matrix payload は `World` が packed u32 blob に identity slot として確保します。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
 
 任意の component signature には `World::spawn_batch(components, count, write)` を使えます。指定 signature の archetype に直接 append し、`SpawnBatchRow::write(component, f)` から CPU row / GPU row を初期化します。expert path には `write_view` もあります。`GpuVisible` component は entity index slot を active 化し、連続 index なら dirty range としてまとめて記録します。callback 中は row view を貸し出しているため、通常 query と同じく構造変更 API は拒否されます。
 
-`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`GlobalTransform` の GPU row は default では 48 byte の affine 3x4（`vec4<f32>` 3 行）で、`World::new_with_global_transform_format(Affine3x4F16)` を使うと 24 byte の affine 3x4（`vec4<f16>` 3 行）になります。どちらも非一様 scale と親回転から生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行を送らないレイアウトです。`write_global_transforms_dense_views` は entity ごとの callback でこの flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。
+`GlobalTransform` の matrix payload は entity index dense row ではなく、world 所有の packed u32 blob に置きます。`GlobalTransform` component row は `{ format: u32, word_offset: u32 }` だけを持ち、renderer はこの 8 byte ref を instance buffer に複製します。payload は `Affine3x4F32` なら 12 words、`Affine3x4F16` なら 6 words です。shader は format tag で f32 load / `unpack2x16float` を分岐するため、精度差は draw 分割を要求しません。
 
-大量更新で callback 回数も避けたい場合は `write_global_transforms_dense_range_views` を使います。この API は `GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を 1 回だけ渡し、呼び出し側のロジックが連続 row 上で tight loop を実行できます。ライブラリ側は dense range の貸し出し、stride 検査、dirty range 記録、borrowed upload view への drain だけを担当します。`ecs-mass-cubes` と `ts-ecs-mass-cubes` の grid-wave 計算や y-only 更新はサンプル側 callback に置き、ライブラリには sample 固有の計算を持ち込みません。non-GC `wasm-ecs-mass-cubes` は同じ 48 byte affine row / full-span upload 条件のまま、sample 所有の `FixedArray[Float]` upload buffer を使って f32 byte packing を避けます。
+更新 path は `set_global_transform`、`set_global_transform_format`、`update_global_transforms_from_transforms` が packed blob を dirty word range として記録し、即時 upload では `drain_global_transform_blob_write_views` + `GPUQueue::write_buffer_from_array_view` を使います。renderer が transform 計算を所有する hot path では `write_global_transform_blob_range_views(first_word, word_count, write)` が mutable blob range を貸し、callback 後に同じ range を dirty として返します。buffer capacity は `global_transform_blob_word_capacity() * 4` で確保し、`drain_global_transform_blob_resize_events` が growth を通知します。`World::new_with_global_transform_format(Affine3x4F16)` は world 全体の固定 layout ではなく、新規 slot の default format だけを指定します。
 
 ## Conflict 検査
 
@@ -227,7 +230,7 @@ pub struct App {
 
 ## まだ残る課題
 
-- ユーザー定義 component 向けの typed row wrapper pattern。標準 component には `Transform3DRow` / `Transform3DMutRow` / `GlobalTransformGpuMutRow` / `ChildOf` 系 wrapper があるため、残る課題は custom component でも同じ書き味を作りやすくすること。
+- ユーザー定義 component 向けの typed row wrapper pattern。標準 component には `Transform3DRow` / `Transform3DMutRow` / `ChildOf` 系 wrapper と packed `GlobalTransform` API があるため、残る課題は custom component でも同じ書き味を作りやすくすること。
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
 - component-to-archetype index と signature cache は導入済み。残る課題は、query pattern ごとの長寿命 cache や、並列 chunk 分割と一体化した plan cache。

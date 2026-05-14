@@ -1,10 +1,10 @@
 ///|
-/// World-space affine matrix for rendering; stored in flat [`GpuComponentStore`] as three
-/// row-major `vec4<f32>` rows. The implicit bottom row is `[0, 0, 0, 1]`.
+/// World-space affine matrix view for legacy row callbacks. The builtin ECS component now stores
+/// only an 8-byte packed-blob reference; matrix payloads live in the world's u32 transform blob.
 
 ///|
-/// ECS bulk paths use [`GlobalTransform::view_affine3x4_gpu_row`] so [`matrix`] aliases the GPU row
-/// returned by raw or bulk write paths with **no** separate float storage.
+/// Compatibility helpers use [`GlobalTransform::view_affine3x4_gpu_row`] so [`matrix`] aliases a
+/// temporary affine row with **no** separate float storage.
 /// Encode/decode owned [`@m44.Matrix44F`] values with [`matrix44f_write_affine3x4_to_gpu_row`] /
 /// [`matrix44f_from_affine3x4_gpu_bytes`].
 pub(all) struct GlobalTransform {
@@ -17,6 +17,90 @@ pub(all) enum GlobalTransformGpuFormat {
   Affine3x4F32
   Affine3x4F16
 } derive(Eq)
+
+///|
+/// CPU-side payload for the builtin GlobalTransform component. The matrix bytes live in the
+/// world's packed u32 blob; this row only stores the blob reference.
+pub fn global_transform_ref_cpu_layout() -> GpuLayout {
+  GpuLayout::storage([("format", U32), ("word_offset", U32)])
+}
+
+///|
+pub fn global_transform_word_count(format : GlobalTransformGpuFormat) -> Int {
+  match format {
+    Affine3x4F32 => 12
+    Affine3x4F16 => 6
+  }
+}
+
+///|
+pub fn global_transform_format_code(format : GlobalTransformGpuFormat) -> UInt {
+  match format {
+    Affine3x4F32 => 0U
+    Affine3x4F16 => 1U
+  }
+}
+
+///|
+pub fn global_transform_format_from_code(
+  code : UInt,
+) -> GlobalTransformGpuFormat {
+  if code == 1U {
+    Affine3x4F16
+  } else {
+    Affine3x4F32
+  }
+}
+
+///|
+pub fn global_transform_ref_bytes(
+  format : GlobalTransformGpuFormat,
+  word_offset : Int,
+) -> FixedArray[Byte] {
+  let bytes = FixedArray::make(8, (0 : Byte))
+  @writes.put_u32_le(bytes, 0, global_transform_format_code(format))
+  @writes.put_u32_le(bytes, 4, word_offset.reinterpret_as_uint())
+  bytes
+}
+
+///|
+pub fn global_transform_ref_from_component_bytes(
+  bytes : FixedArray[Byte],
+) -> (GlobalTransformGpuFormat, Int) {
+  if bytes.length() != 8 {
+    abort("global_transform_ref_from_component_bytes: length mismatch")
+  }
+  (
+    global_transform_format_from_code(@writes.get_u32_le(bytes, 0)),
+    @writes.get_u32_le(bytes, 4).reinterpret_as_int(),
+  )
+}
+
+///|
+pub fn global_transform_ref_from_component_view(
+  bytes : ArrayView[Byte],
+) -> (GlobalTransformGpuFormat, Int) {
+  if bytes.length() != 8 {
+    abort("global_transform_ref_from_component_view: length mismatch")
+  }
+  (
+    global_transform_format_from_code(@writes.get_u32_le_byte_view(bytes, 0)),
+    @writes.get_u32_le_byte_view(bytes, 4).reinterpret_as_int(),
+  )
+}
+
+///|
+pub fn global_transform_write_ref_mut_view(
+  bytes : MutArrayView[Byte],
+  format : GlobalTransformGpuFormat,
+  word_offset : Int,
+) -> Unit {
+  if bytes.length() != 8 {
+    abort("global_transform_write_ref_mut_view: length mismatch")
+  }
+  @writes.put_u32_le_mut_view(bytes, 0, global_transform_format_code(format))
+  @writes.put_u32_le_mut_view(bytes, 4, word_offset.reinterpret_as_uint())
+}
 
 ///|
 /// Mutable typed view over one flat GPU GlobalTransform row.
@@ -473,6 +557,206 @@ pub fn matrix44f_write_global_transform_to_gpu_row(
   match format {
     Affine3x4F32 => matrix44f_write_affine3x4_to_gpu_row(m, buf)
     Affine3x4F16 => matrix44f_write_affine3x4_f16_to_gpu_row(m, buf)
+  }
+}
+
+///|
+fn put_packed_f16x2_mut_view(
+  buf : MutArrayView[Byte],
+  byte_offset : Int,
+  x : Float,
+  y : Float,
+) -> Unit {
+  let packed = f32_to_f16_bits(x) | (f32_to_f16_bits(y) << 16)
+  @writes.put_u32_le_mut_view(buf, byte_offset, packed)
+}
+
+///|
+fn get_packed_f16x2_low(bits : UInt) -> Float {
+  f16_bits_to_f32(bits & 0xFFFFU)
+}
+
+///|
+fn get_packed_f16x2_high(bits : UInt) -> Float {
+  f16_bits_to_f32((bits >> 16) & 0xFFFFU)
+}
+
+///|
+/// Writes column-major [`@m44.Matrix44F`] into the packed u32 GlobalTransform blob.
+pub fn matrix44f_write_global_transform_to_word_blob(
+  m : @m44.Matrix44F,
+  blob : MutArrayView[Byte],
+  word_offset : Int,
+  format : GlobalTransformGpuFormat,
+) -> Unit {
+  let words = global_transform_word_count(format)
+  let byte_offset = word_offset * 4
+  if word_offset < 0 || byte_offset + words * 4 > blob.length() {
+    abort("matrix44f_write_global_transform_to_word_blob: range mismatch")
+  }
+  let d = m.data
+  match format {
+    Affine3x4F32 => {
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 0,
+        d[0].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 4,
+        d[4].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 8,
+        d[8].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 12,
+        d[12].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 16,
+        d[1].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 20,
+        d[5].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 24,
+        d[9].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 28,
+        d[13].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 32,
+        d[2].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 36,
+        d[6].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 40,
+        d[10].reinterpret_as_uint(),
+      )
+      @writes.put_u32_le_mut_view(
+        blob,
+        byte_offset + 44,
+        d[14].reinterpret_as_uint(),
+      )
+    }
+    Affine3x4F16 => {
+      put_packed_f16x2_mut_view(blob, byte_offset + 0, d[0], d[4])
+      put_packed_f16x2_mut_view(blob, byte_offset + 4, d[8], d[12])
+      put_packed_f16x2_mut_view(blob, byte_offset + 8, d[1], d[5])
+      put_packed_f16x2_mut_view(blob, byte_offset + 12, d[9], d[13])
+      put_packed_f16x2_mut_view(blob, byte_offset + 16, d[2], d[6])
+      put_packed_f16x2_mut_view(blob, byte_offset + 20, d[10], d[14])
+    }
+  }
+}
+
+///|
+/// Decodes one matrix from the packed u32 GlobalTransform blob.
+pub fn matrix44f_from_global_transform_word_blob(
+  blob : FixedArray[Byte],
+  word_offset : Int,
+  format : GlobalTransformGpuFormat,
+) -> @m44.Matrix44F {
+  let words = global_transform_word_count(format)
+  let byte_offset = word_offset * 4
+  if word_offset < 0 || byte_offset + words * 4 > blob.length() {
+    abort("matrix44f_from_global_transform_word_blob: range mismatch")
+  }
+  match format {
+    Affine3x4F32 =>
+      @m44.Matrix44F::{
+        data: (
+          [
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 0),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 16),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 32),
+            ),
+            (0.0 : Float),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 4),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 20),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 36),
+            ),
+            (0.0 : Float),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 8),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 24),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 40),
+            ),
+            (0.0 : Float),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 12),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 28),
+            ),
+            Float::reinterpret_from_uint(
+              @writes.get_u32_le(blob, byte_offset + 44),
+            ),
+            (1.0 : Float),
+          ] : FixedArray[Float]),
+      }
+    Affine3x4F16 => {
+      let w0 = @writes.get_u32_le(blob, byte_offset + 0)
+      let w1 = @writes.get_u32_le(blob, byte_offset + 4)
+      let w2 = @writes.get_u32_le(blob, byte_offset + 8)
+      let w3 = @writes.get_u32_le(blob, byte_offset + 12)
+      let w4 = @writes.get_u32_le(blob, byte_offset + 16)
+      let w5 = @writes.get_u32_le(blob, byte_offset + 20)
+      @m44.Matrix44F::{
+        data: (
+          [
+            get_packed_f16x2_low(w0),
+            get_packed_f16x2_low(w2),
+            get_packed_f16x2_low(w4),
+            (0.0 : Float),
+            get_packed_f16x2_high(w0),
+            get_packed_f16x2_high(w2),
+            get_packed_f16x2_high(w4),
+            (0.0 : Float),
+            get_packed_f16x2_low(w1),
+            get_packed_f16x2_low(w3),
+            get_packed_f16x2_low(w5),
+            (0.0 : Float),
+            get_packed_f16x2_high(w1),
+            get_packed_f16x2_high(w3),
+            get_packed_f16x2_high(w5),
+            (1.0 : Float),
+          ] : FixedArray[Float]),
+      }
+    }
   }
 }
 

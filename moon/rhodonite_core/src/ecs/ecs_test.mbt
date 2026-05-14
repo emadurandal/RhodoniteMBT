@@ -431,16 +431,10 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 }
 
 ///|
-test "GlobalTransform fp16 world uses 24 byte GPU rows" {
+test "GlobalTransform fp16 world uses 24 byte packed blob slots" {
   let world = World::new_with_global_transform_format(Affine3x4F16)
   let gt_id = world.global_transform_component()
-  match world.component_gpu_layout(gt_id) {
-    Some(layout) => {
-      assert_eq(layout.stride, 24)
-      assert_true(layout.is_valid())
-    }
-    None => abort("expected GlobalTransform layout")
-  }
+  assert_eq(world.component_cpu_stride(gt_id), Some(8))
   let entity = world.create_entity()
   let m = @m44.Matrix44::new_col_major(
     (1.0 : Float),
@@ -477,12 +471,11 @@ test "spawn_transform_global_batch initializes fp16 GlobalTransform rows" {
     _i,
     _entity,
     tf_row,
-    gt_row,
+    _gt_row,
   ) {
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     )
-    @comp.global_transform_write_identity_row_format(gt_row, Affine3x4F16)
   })
   assert_eq(entities.length(), 1)
   match world.get_global_transform(entities[0]) {
@@ -1597,23 +1590,21 @@ test "update_global_transforms_from_transforms handles mixed child and root arch
 }
 
 ///|
-test "write_global_transforms_dense writes one contiguous upload range" {
+test "GlobalTransform refs extract packed render data" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense(2, fn(i, row) {
-    row[0] = ((10 + i) & 0xFF).to_byte()
-    row[47] = ((20 + i) & 0xFF).to_byte()
-  })
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 48)
-  assert_eq(writes[0].bytes[0], (10 : Byte))
-  assert_eq(writes[0].bytes[47], (20 : Byte))
-  assert_eq(writes[0].bytes[48], (11 : Byte))
-  assert_eq(writes[0].bytes[95], (21 : Byte))
-  assert_eq(
-    world.drain_gpu_writes(world.global_transform_component()).length(),
-    0,
-  )
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.set_global_transform(e0, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(e1, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform_format(e1, Affine3x4F16))
+  let refs = world.extract_global_transform_refs([e0, e1])
+  assert_eq(refs.length(), 16)
+  let (fmt0, off0) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  let (fmt1, off1) = @comp.global_transform_ref_from_component_view(refs[8:16])
+  assert_true(fmt0 == Affine3x4F32)
+  assert_true(fmt1 == Affine3x4F16)
+  assert_eq(off0, 0)
+  assert_eq(off1, 24)
 }
 
 ///|
@@ -1623,7 +1614,7 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
     i,
     _e,
     tf_row,
-    gt_row,
+    _gt_row,
   ) {
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row,
@@ -1638,7 +1629,6 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
       (1.0 : Float),
       (1.0 : Float),
     )
-    @comp.global_transform_write_identity_row(gt_row)
   })
   assert_eq(entities.length(), 2)
   let tf = world.transform_component()
@@ -1700,35 +1690,36 @@ test "spawn_batch creates arbitrary CPU and GPU components directly" {
 }
 
 ///|
-test "write_global_transforms_dense_range_views writes dense rows through one range callback" {
+test "GlobalTransform blob writes update through set_global_transform" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense_range_views(2, range => {
-    if range.first_entity_index() != 0 {
-      abort("expected first range entity index to be 0")
-    }
-    if range.count() != 2 {
-      abort("expected range count to be 2")
-    }
-    if range.stride() != 48 {
-      abort("expected GlobalTransform row stride to be 48")
-    }
-    let bytes = range.bytes()
-    @comp.put_gpu_f32_mut_view(bytes, 0, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 12, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 44, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48 + 12, (1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48 + 44, (-1.0 : Double))
-  })
+  let e = world.create_entity()
+  let m = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(e, m))
+  let _ = world.drain_gpu_write_views(world.global_transform_component())
+  let m2 = @m44.Matrix44::translation(
+    (4.0 : Float),
+    (5.0 : Float),
+    (6.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(e, m2))
+  match world.get_global_transform(e) {
+    Some(read) => assert_eq(read.at(0, 3), (4.0 : Float))
+    None => abort("expected blob-backed transform")
+  }
+  let writes = world.drain_gpu_write_views(world.global_transform_component())
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 48)
+  assert_eq(writes[0].bytes.length(), 48)
   let row0 = writes[0].bytes[0:48]
-  let row1 = writes[0].bytes[48:96]
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 12), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 44), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 12), (1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 44), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 12), (4.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 28), (5.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 44), (6.0 : Float))
 }

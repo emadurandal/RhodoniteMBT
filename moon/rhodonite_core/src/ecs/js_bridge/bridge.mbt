@@ -267,9 +267,42 @@ pub fn world_write_global_transforms_dense_range_views(
   count : Int,
   f : (MutArrayView[Byte], Int, Int, Int) -> Unit,
 ) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_range_views(count, range => {
-    f(range.bytes(), range.stride(), range.first_entity_index(), range.count())
-  })
+  ignore(world)
+  ignore(count)
+  ignore(f)
+  abort(
+    "world_write_global_transforms_dense_range_views: removed; use packed GlobalTransform blob APIs",
+  )
+}
+
+///|
+pub fn world_drain_global_transform_blob_write_views(
+  world : @ecs.World,
+) -> Array[@ecs.GpuWriteView] {
+  world.drain_global_transform_blob_write_views()
+}
+
+///|
+pub fn world_write_global_transform_blob_range_views(
+  world : @ecs.World,
+  first_word : Int,
+  word_count : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Array[@ecs.GpuWriteView] {
+  world.write_global_transform_blob_range_views(first_word, word_count, f)
+}
+
+///|
+pub fn world_global_transform_blob_word_capacity(world : @ecs.World) -> Int {
+  world.global_transform_blob_word_capacity()
+}
+
+///|
+pub fn world_extract_global_transform_refs(
+  world : @ecs.World,
+  entities : Array[@ecs.EntityId],
+) -> FixedArray[Byte] {
+  world.extract_global_transform_refs(entities)
 }
 
 ///|
@@ -277,13 +310,9 @@ pub fn world_spawn_transform_global_batch_identity(
   world : @ecs.World,
   count : Int,
 ) -> Array[@ecs.EntityId] {
-  world.spawn_transform_global_batch(count, fn(_i, _entity, tf_row, gt_row) {
+  world.spawn_transform_global_batch(count, fn(_i, _entity, tf_row, _gt_row) {
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
-    )
-    @comp.global_transform_write_identity_row_format(
-      gt_row,
-      world.global_transform_gpu_format(),
     )
   })
 }

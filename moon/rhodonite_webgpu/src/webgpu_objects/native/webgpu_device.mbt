@@ -54,6 +54,7 @@ fn vertex_format_to_u32(f : @webgpu_enums.GPUVertexFormat) -> UInt {
     Float32x2 => @wgpu.VERTEX_FORMAT_FLOAT32X2
     Float32x3 => @wgpu.VERTEX_FORMAT_FLOAT32X3
     Float32x4 => @wgpu.VERTEX_FORMAT_FLOAT32X4
+    Uint32x2 => @wgpu.VERTEX_FORMAT_UINT32X2
   }
 }
 

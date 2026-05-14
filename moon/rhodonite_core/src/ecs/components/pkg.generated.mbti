@@ -17,15 +17,31 @@ pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Float
 
 pub fn get_gpu_f32_mut_view(MutArrayView[Byte], Int) -> Float
 
+pub fn global_transform_format_code(GlobalTransformGpuFormat) -> UInt
+
+pub fn global_transform_format_from_code(UInt) -> GlobalTransformGpuFormat
+
 pub fn global_transform_gpu_layout() -> GpuLayout
 
 pub fn global_transform_gpu_layout_f16() -> GpuLayout
+
+pub fn global_transform_ref_bytes(GlobalTransformGpuFormat, Int) -> FixedArray[Byte]
+
+pub fn global_transform_ref_cpu_layout() -> GpuLayout
+
+pub fn global_transform_ref_from_component_bytes(FixedArray[Byte]) -> (GlobalTransformGpuFormat, Int)
+
+pub fn global_transform_ref_from_component_view(ArrayView[Byte]) -> (GlobalTransformGpuFormat, Int)
+
+pub fn global_transform_word_count(GlobalTransformGpuFormat) -> Int
 
 pub fn global_transform_write_identity_row(MutArrayView[Byte]) -> Unit
 
 pub fn global_transform_write_identity_row_f16(MutArrayView[Byte]) -> Unit
 
 pub fn global_transform_write_identity_row_format(MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
+
+pub fn global_transform_write_ref_mut_view(MutArrayView[Byte], GlobalTransformGpuFormat, Int) -> Unit
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
@@ -35,6 +51,8 @@ pub fn matrix44f_from_affine3x4_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix4
 
 pub fn matrix44f_from_global_transform_gpu_bytes(FixedArray[Byte], GlobalTransformGpuFormat) -> @matrix44.Matrix44[Float]
 
+pub fn matrix44f_from_global_transform_word_blob(FixedArray[Byte], Int, GlobalTransformGpuFormat) -> @matrix44.Matrix44[Float]
+
 pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
 
 pub fn matrix44f_write_affine3x4_f16_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
@@ -42,6 +60,8 @@ pub fn matrix44f_write_affine3x4_f16_to_gpu_row(@matrix44.Matrix44[Float], MutAr
 pub fn matrix44f_write_affine3x4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 
 pub fn matrix44f_write_global_transform_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
+
+pub fn matrix44f_write_global_transform_to_word_blob(@matrix44.Matrix44[Float], MutArrayView[Byte], Int, GlobalTransformGpuFormat) -> Unit
 
 pub fn matrix44f_write_std140_mat4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 

@@ -351,7 +351,8 @@ fn World::can_add_missing_component_from_setter(
 ///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
-/// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
+/// Builtin [`GlobalTransform`] follows at index `1` with CPU ref storage only;
+/// matrix payloads live in the world's packed u32 GlobalTransform blob.
 /// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
 pub fn World::new_with_global_transform_format(
   global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
@@ -365,28 +366,21 @@ pub fn World::new_with_global_transform_format(
     "Transform3D",
     tf_layout.stride,
   )
-  let gt_layout = match global_transform_gpu_format {
-    Affine3x4F32 => @comp.global_transform_gpu_layout()
-    Affine3x4F16 => @comp.global_transform_gpu_layout_f16()
-  }
+  let gt_layout = @comp.global_transform_ref_cpu_layout()
   if !gt_layout.is_valid() {
     abort("builtin GlobalTransform layout invalid")
   }
-  let global_transform_component_id = registry.register_gpu(
-    "GlobalTransform", gt_layout,
+  let global_transform_component_id = registry.register_cpu(
+    "GlobalTransform",
+    gt_layout.stride,
   )
   let co_layout = @comp.child_of_cpu_layout()
   if !co_layout.is_valid() {
     abort("builtin ChildOf layout invalid")
   }
   let child_of_component_id = registry.register_cpu("ChildOf", co_layout.stride)
-  let gpu_stores : Array[GpuComponentStore?] = [
-    None,
-    Some(
-      GpuComponentStore::new(global_transform_component_id, gt_layout.stride),
-    ),
-    None,
-  ]
+  let gpu_stores : Array[GpuComponentStore?] = [None, None, None]
+  let global_transform_blob = GlobalTransformBlobStore::new()
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
   let reserved : Array[Bool] = []
@@ -430,6 +424,7 @@ pub fn World::new_with_global_transform_format(
     archetype_signature_cache,
     component_archetypes,
     gpu_stores,
+    global_transform_blob,
     resize_events,
     query_depth,
     component_registration_lock_depth,
@@ -440,7 +435,7 @@ pub fn World::new_with_global_transform_format(
     system_access_structural_write,
     transform_component_id,
     global_transform_component_id,
-    global_transform_gpu_format,
+    global_transform_default_format: global_transform_gpu_format,
     child_of_component_id,
   }
 }
@@ -454,7 +449,7 @@ pub fn World::new() -> World {
 pub fn World::global_transform_gpu_format(
   self : World,
 ) -> @comp.GlobalTransformGpuFormat {
-  self.global_transform_gpu_format
+  self.global_transform_default_format
 }
 
 ///|
@@ -681,6 +676,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
     Some(loc) => loc
     None => return false
   }
+  self.release_global_transform_ref(entity)
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.clear_gpu_slots(entity.index)
@@ -854,7 +850,15 @@ pub fn World::add_component(
     Some(rc) =>
       match rc.kind {
         CpuOnly => {
-          let bytes = FixedArray::make(rc.cpu_stride, (0 : Byte))
+          let bytes = if component == self.global_transform_component_id {
+            let gt_ref = self.alloc_global_transform_ref(
+              self.global_transform_default_format,
+              @m44.Matrix44F::identity(),
+            )
+            @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset)
+          } else {
+            FixedArray::make(rc.cpu_stride, (0 : Byte))
+          }
           self.add_component_signature(entity, component, bytes)
         }
         GpuVisible =>
@@ -957,6 +961,9 @@ pub fn World::remove_component(
   let loc = match self.locations[entity.index] {
     Some(loc) => loc
     None => return false
+  }
+  if component == self.global_transform_component_id {
+    self.release_global_transform_ref(entity)
   }
   let old_arch = self.archetypes[loc.archetype_index]
   let new_components = sorted_with_removed(old_arch.components, component)

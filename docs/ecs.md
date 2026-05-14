@@ -136,7 +136,7 @@ This API creates entities directly in the `[Transform3D, GlobalTransform]` arche
 The callback receives direct row views:
 
 ```moonbit
-let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, gt_row) {
+let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, _gt_row) {
   @comp.Transform3D::write_trs_to_component_mut_view(
     tf_row,
     px,
@@ -150,13 +150,12 @@ let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, g
     sy,
     sz,
   )
-  @comp.global_transform_write_identity_row(gt_row)
   ignore(i)
   ignore(entity)
 })
 ```
 
-The callback must fully initialize both rows. `Transform3D::write_trs_to_component_mut_view` and `global_transform_write_identity_row` exist for this purpose and avoid intermediate `FixedArray[Byte]` allocations.
+The callback initializes the `Transform3D` row directly. `GlobalTransform` is now an 8-byte CPU row containing `{ format, word_offset }`; `spawn_transform_global_batch` allocates an identity slot in the packed transform blob for each entity, so the callback does not write matrix bytes itself.
 
 For arbitrary component signatures, use `World::spawn_batch(components, count, write)`. It canonicalizes the signature, appends entities directly to the matching archetype, activates any `GpuVisible` slots, and marks those GPU rows dirty as one contiguous range when entity indices are dense.
 
@@ -319,20 +318,19 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, then calls `write_global_transforms_dense_range_views` with sample-owned callbacks that bulk-write the dense `GlobalTransform` range. The initialization callback writes full affine 3x4 rows; the per-frame callback updates only the Y translation lane (`row1.w`). By default the GPU buffer stores 48-byte affine rows, so the borrowed upload range remains the full dense row span but is 25% smaller than the previous 64-byte mat4 rows. The library only provides the dense range and dirty tracking; grid-wave math stays in the sample.
-The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper for the same dense-range callback path and submits borrowed write views with the native browser WebGPU API. Its `USE_FP16_GLOBAL_TRANSFORM` flag switches the whole `World` to 24-byte `vec4<f16>` affine rows and requests WebGPU `shader-f16`; disabling the flag keeps the default 48-byte `vec4<f32>` rows. The [`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo builds a release MoonBit `wasm` entrypoint and keeps a MoonBit-owned `FixedArray[Float]` affine upload buffer in exported wasm linear memory. It writes the same 48-byte rows and uploads the same full transform span as the TypeScript demo's fp32 mode, but avoids the older byte-by-byte f32 packing path through `FixedArray[Byte]`. The [`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo still uses a TypeScript upload buffer because browser WebGPU cannot create a `TypedArray` view over MoonBit wasm-gc arrays; its per-frame visual upload path is host-owned to avoid recomputing the same wave once in wasm-gc and again in TypeScript.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) and [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) now bind one storage buffer as `array<u32>`. Their instance buffers carry an 8-byte `GlobalTransform` ref (`format`, `word_offset`) plus color, and the WGSL loads either 12 f32 words or 6 packed-f16 words from the same blob in one draw.
 
-`World::new()` keeps the default 48-byte fp32 `GlobalTransform` GPU layout. `World::new_with_global_transform_format(Affine3x4F16)` selects a 24-byte fp16 storage-buffer layout for the builtin `GlobalTransform`; this is a world-wide choice fixed at creation time, so shaders and GPU buffers must be created for the same format.
+`World::new()` uses fp32 as the default allocation format. `World::new_with_global_transform_format(Affine3x4F16)` changes only the default for newly allocated `GlobalTransform` slots; individual entities can later move between `Affine3x4F32` and `Affine3x4F16` with `set_global_transform_format(entity, format)`. The shader does not need separate draw calls for the two formats because the per-instance ref includes the format tag.
 
-Dense GlobalTransform helper variants:
+Packed GlobalTransform upload APIs:
 
-- `write_global_transforms_dense(...) -> Array[GpuWrite]`
-- `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_range_views(count, write) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_wasm_bytes_range(count, write) -> Bool` is a non-GC wasm direct-upload helper. It writes the raw GlobalTransform backing `FixedArray[Byte]` and does not enqueue drain ranges.
-- `global_transform_wasm_gpu_bytes_payload_ptr()` / `global_transform_wasm_gpu_bytes_len()` expose the builtin GlobalTransform GPU store for non-GC wasm host uploads. The current non-GC MassCubes browser demo uses a sample-owned f32 upload buffer instead, because direct f32 stores are faster for its all-rows-per-frame wave update.
-
-`write_global_transforms_dense_range_views` is the high-throughput variant for user-defined logic. It calls `write` once with a `GpuComponentWriteRange` (`bytes`, `stride`, `first_entity_index`, `count`), allowing caller code to run a tight loop over contiguous rows without a callback per entity.
+- `global_transform_ref(entity)` returns the entity's `{ format, word_offset }`.
+- `write_global_transform_refs_into(entities, dst, stride, offset)` writes refs into an instance buffer.
+- `extract_global_transform_refs(entities)` returns a tightly packed ref blob for JS/TS callers.
+- `global_transform_blob_word_capacity()` sizes the WebGPU storage buffer in `u32` words.
+- `drain_global_transform_blob_write_views()` returns borrowed byte ranges for the packed blob.
+- `write_global_transform_blob_range_views(first_word, word_count, write)` lends a mutable blob byte range for renderer-owned bulk writers, marks that word range dirty, and returns borrowed upload views. This is the hot path used by the TS mass-cubes demo.
+- `drain_global_transform_blob_resize_events()` reports packed blob growth; renderers should recreate the storage buffer and full-upload when needed.
 
 ---
 
@@ -390,12 +388,12 @@ flowchart BT
   child[Child TF plus ChildOf]
   root -->|"ChildOf parent"| child
   child -->|"compute_global_transform chain"| worldM[World matrix]
-  worldM -->|"update_global_transforms_from_transforms"| gtGpu[GlobalTransform GPU row]
+  worldM -->|"update_global_transforms_from_transforms"| gtBlob[GlobalTransform packed blob slot]
 ```
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
 - **`update_transform3d_positions`**: Bulk-updates only the position field of built-in `Transform3D` without constructing a `QueryRow` per entity. JS uses the public archetype-column path; non-JS uses a direct archetype sweep with fixed-offset f32 writes.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` write affine `GlobalTransform` rows directly and record contiguous dirty ranges when possible; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column. The default affine 3x4 layout is 48-byte `vec4<f32>` rows; fp16 worlds use 24-byte `vec4<f16>` rows. Both preserve shear from non-uniform scale combined with parent rotation while avoiding the implicit `[0,0,0,1]` row upload.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` stay on the direct fast path; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column. The result is written to each entity's packed blob slot and marked dirty as a word range. `Affine3x4F32` slots use 12 `u32` words; `Affine3x4F16` slots use 6 packed-half words. Both preserve shear from non-uniform scale combined with parent rotation while avoiding the implicit `[0,0,0,1]` row upload.
 
 ---
 
@@ -432,7 +430,7 @@ let required = [world.transform_component(), world.global_transform_component()]
 let query = Query::new(required)
 query.for_each(world, fn(row) {
   let local = row.read_transform3d().local_matrix()
-  row.write_global_transform(fn(gt) => gt.write_matrix(local))
+  ignore(world.set_global_transform(row.entity(), local))
   ...
 })
 
@@ -442,7 +440,7 @@ let writes = world.drain_gpu_writes(gt)
 // queue.write_buffer_from_fixed_array(buffer, w.byte_offset, w.bytes)
 
 // Immediate borrowed upload path
-let views = world.drain_gpu_write_views(gt)
+let views = world.drain_global_transform_blob_write_views()
 // queue.write_buffer_from_array_view(buffer, v.byte_offset, v.bytes)
 ```
 

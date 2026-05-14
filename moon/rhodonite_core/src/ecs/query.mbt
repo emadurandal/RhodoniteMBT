@@ -598,14 +598,31 @@ pub fn QueryRow::write_global_transform(
   self.world.assert_system_component_write(
     component, "QueryRow::write_global_transform",
   )
+  let format = match self.world.global_transform_ref(self.entity) {
+    Some(gt_ref) => gt_ref.format
+    None => self.world.global_transform_default_format
+  }
+  let row_bytes = FixedArray::make(
+    @comp.global_transform_word_count(format) * 4,
+    (0 : Byte),
+  )
+  let current = match self.world.get_global_transform(self.entity) {
+    Some(m) => m
+    None => @m44.Matrix44F::identity()
+  }
+  @comp.matrix44f_write_global_transform_to_gpu_row(
+    current,
+    row_bytes.mut_view(start=0, end=row_bytes.length()),
+    format,
+  )
   f(
     @comp.GlobalTransformGpuMutRow::from_gpu_row_format(
-      self.component_mut_view(
-        component, "QueryRow::write_global_transform", true,
-      ),
-      self.world.global_transform_gpu_format,
+      row_bytes.mut_view(start=0, end=row_bytes.length()),
+      format,
     ),
   )
+  let next = @comp.matrix44f_from_global_transform_gpu_bytes(row_bytes, format)
+  ignore(self.world.set_global_transform(self.entity, next))
 }
 
 ///|
