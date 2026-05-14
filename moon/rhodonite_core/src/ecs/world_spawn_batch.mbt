@@ -67,6 +67,10 @@ pub fn World::spawn_batch(
     abort("World::spawn_batch: duplicate component")
   }
   let signature = sorted_component_signature(components)
+  let spawn_global_transform = component_array_contains(
+    signature,
+    self.global_transform_component_id,
+  )
   let gpu_components : Array[ComponentTypeId] = []
   for i = 0; i < signature.length(); i = i + 1 {
     let component = signature[i]
@@ -106,6 +110,17 @@ pub fn World::spawn_batch(
     let entity = entities[i]
     let row = arch.push_empty_row(entity)
     self.locations[entity.index] = Some({ archetype_index: arch_index, row })
+    if spawn_global_transform {
+      let gt_ref = self.alloc_global_transform_ref(
+        self.global_transform_default_format,
+        @m44.Matrix44F::identity(),
+      )
+      arch.set_component_bytes(
+        row,
+        self.global_transform_component_id,
+        @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset),
+      )
+    }
     for gi = 0; gi < gpu_components.length(); gi = gi + 1 {
       match
         self.ensure_gpu_store_capacity(gpu_components[gi], entity.index + 1) {
