@@ -1,0 +1,9 @@
+import {
+  "mizchi/canvas" @canvas,
+  "mizchi/image" @image,
+  "mizchi/pixelmatch" @pixelmatch,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/core/test" @test,
+}
+
+supported_targets = "js"

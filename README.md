@@ -81,6 +81,15 @@ pnpm run test:core:mbt
 
 With a root [`moon.work`](moon.work), running plain `moon test` from `moon/rhodonite_core` can include `rhodonite_webgpu` in the workspace plan and fail while `webgpu_objects` stays unresolved. [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) therefore runs from the repo root and passes only packages under `moon/rhodonite_core/src` that contain `*_test.mbt` (no need to edit `package.json` when adding packages).
 
+### Example visual snapshots
+
+```bash
+pnpm run test:examples:visual
+pnpm run test:examples:visual:update
+```
+
+The visual snapshot package uses [`mizchi/canvas`](https://github.com/mizchi/canvas-mbt) as a deterministic headless rasterizer. It supports small text PPM snapshots plus PNG golden files with exact or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
+
 ## Publish order (outline)
 
 When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/module_boundaries.md](docs/module_boundaries.md) — Release units.
