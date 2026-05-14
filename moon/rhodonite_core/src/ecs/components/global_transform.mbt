@@ -263,7 +263,7 @@ fn put_gpu_u16_mut_view(
 }
 
 ///|
-fn f32_to_f16_bits(value : Float) -> UInt {
+pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
   let bits = value.reinterpret_as_uint()
   let sign = (bits >> 16) & 0x8000U
   let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
@@ -472,18 +472,18 @@ pub fn global_transform_write_identity_row_f16(
   if buf.length() != 24 {
     abort("global_transform_write_identity_row_f16: length mismatch")
   }
-  put_gpu_u16_mut_view(buf, 0, f32_to_f16_bits(1.0))
-  put_gpu_u16_mut_view(buf, 2, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 4, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 6, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 8, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 10, f32_to_f16_bits(1.0))
-  put_gpu_u16_mut_view(buf, 12, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 14, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 16, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 18, f32_to_f16_bits(0.0))
-  put_gpu_u16_mut_view(buf, 20, f32_to_f16_bits(1.0))
-  put_gpu_u16_mut_view(buf, 22, f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 0, global_transform_f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 2, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 4, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 6, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 8, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 10, global_transform_f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 12, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 14, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 16, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 18, global_transform_f32_to_f16_bits(0.0))
+  put_gpu_u16_mut_view(buf, 20, global_transform_f32_to_f16_bits(1.0))
+  put_gpu_u16_mut_view(buf, 22, global_transform_f32_to_f16_bits(0.0))
 }
 
 ///|
@@ -534,18 +534,18 @@ pub fn matrix44f_write_affine3x4_f16_to_gpu_row(
     abort("matrix44f_write_affine3x4_f16_to_gpu_row: length mismatch")
   }
   let d = m.data
-  put_gpu_u16_mut_view(buf, 0, f32_to_f16_bits(d[0]))
-  put_gpu_u16_mut_view(buf, 2, f32_to_f16_bits(d[4]))
-  put_gpu_u16_mut_view(buf, 4, f32_to_f16_bits(d[8]))
-  put_gpu_u16_mut_view(buf, 6, f32_to_f16_bits(d[12]))
-  put_gpu_u16_mut_view(buf, 8, f32_to_f16_bits(d[1]))
-  put_gpu_u16_mut_view(buf, 10, f32_to_f16_bits(d[5]))
-  put_gpu_u16_mut_view(buf, 12, f32_to_f16_bits(d[9]))
-  put_gpu_u16_mut_view(buf, 14, f32_to_f16_bits(d[13]))
-  put_gpu_u16_mut_view(buf, 16, f32_to_f16_bits(d[2]))
-  put_gpu_u16_mut_view(buf, 18, f32_to_f16_bits(d[6]))
-  put_gpu_u16_mut_view(buf, 20, f32_to_f16_bits(d[10]))
-  put_gpu_u16_mut_view(buf, 22, f32_to_f16_bits(d[14]))
+  put_gpu_u16_mut_view(buf, 0, global_transform_f32_to_f16_bits(d[0]))
+  put_gpu_u16_mut_view(buf, 2, global_transform_f32_to_f16_bits(d[4]))
+  put_gpu_u16_mut_view(buf, 4, global_transform_f32_to_f16_bits(d[8]))
+  put_gpu_u16_mut_view(buf, 6, global_transform_f32_to_f16_bits(d[12]))
+  put_gpu_u16_mut_view(buf, 8, global_transform_f32_to_f16_bits(d[1]))
+  put_gpu_u16_mut_view(buf, 10, global_transform_f32_to_f16_bits(d[5]))
+  put_gpu_u16_mut_view(buf, 12, global_transform_f32_to_f16_bits(d[9]))
+  put_gpu_u16_mut_view(buf, 14, global_transform_f32_to_f16_bits(d[13]))
+  put_gpu_u16_mut_view(buf, 16, global_transform_f32_to_f16_bits(d[2]))
+  put_gpu_u16_mut_view(buf, 18, global_transform_f32_to_f16_bits(d[6]))
+  put_gpu_u16_mut_view(buf, 20, global_transform_f32_to_f16_bits(d[10]))
+  put_gpu_u16_mut_view(buf, 22, global_transform_f32_to_f16_bits(d[14]))
 }
 
 ///|
@@ -567,7 +567,8 @@ fn put_packed_f16x2_mut_view(
   x : Float,
   y : Float,
 ) -> Unit {
-  let packed = f32_to_f16_bits(x) | (f32_to_f16_bits(y) << 16)
+  let packed = global_transform_f32_to_f16_bits(x) |
+    (global_transform_f32_to_f16_bits(y) << 16)
   @writes.put_u32_le_mut_view(buf, byte_offset, packed)
 }
 
