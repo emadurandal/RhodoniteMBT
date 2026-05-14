@@ -18,6 +18,8 @@ pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 // Errors
 
 // Types and methods
+type DenseTransformLayout
+
 pub(all) struct WebGPURenderer {
   context : @webgpu.GPUCanvasContext
   device : @webgpu.GPUDevice
@@ -38,6 +40,7 @@ pub(all) struct WebGPURenderer {
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
+  dense_transform_layout : DenseTransformLayout?
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]

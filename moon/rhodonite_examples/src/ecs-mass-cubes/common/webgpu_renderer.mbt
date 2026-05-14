@@ -55,6 +55,12 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
+struct DenseTransformLayout {
+  format : @comp.GlobalTransformGpuFormat
+  words_per_entity : Int
+}
+
+///|
 /// Smallest `s` with `s * s >= n` for a roughly square XZ grid.
 fn grid_side_len(n : Int) -> Int {
   let mut s = 1
@@ -260,6 +266,224 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+fn f32_to_f16_bits(value : Float) -> UInt {
+  let bits = value.reinterpret_as_uint()
+  let sign = (bits >> 16) & 0x8000U
+  let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
+  let mant = bits & 0x7FFFFFU
+  if exp == 255 {
+    if mant == 0U {
+      return sign | 0x7C00U
+    }
+    return sign | 0x7E00U
+  }
+  let half_exp = exp - 127 + 15
+  if half_exp >= 31 {
+    return sign | 0x7C00U
+  }
+  if half_exp <= 0 {
+    if half_exp < -10 {
+      return sign
+    }
+    let mantissa = mant | 0x800000U
+    let shift = 14 - half_exp
+    let mut half_mant = mantissa >> shift
+    if ((mantissa >> (shift - 1)) & 1U) != 0U {
+      half_mant = half_mant + 1U
+    }
+    return sign | half_mant
+  }
+  let mut half = sign | (half_exp.reinterpret_as_uint() << 10) | (mant >> 13)
+  if ((mant >> 12) & 1U) != 0U {
+    half = half + 1U
+  }
+  half
+}
+
+///|
+fn put_packed_f16x2_mut_view(
+  buf : MutArrayView[Byte],
+  byte_offset : Int,
+  x : Float,
+  y : Float,
+) -> Unit {
+  let packed = f32_to_f16_bits(x) | (f32_to_f16_bits(y) << 16)
+  @writes.put_u32_le_mut_view(buf, byte_offset, packed)
+}
+
+///|
+fn put_f32_word_mut_view(
+  buf : MutArrayView[Byte],
+  word_offset : Int,
+  value : Float,
+) -> Unit {
+  @writes.put_u32_le_mut_view(buf, word_offset * 4, value.reinterpret_as_uint())
+}
+
+///|
+fn detect_dense_transform_layout(
+  refs : FixedArray[Byte],
+  count : Int,
+) -> DenseTransformLayout? {
+  if refs.length() < count * 8 {
+    return None
+  }
+  let format_code = @writes.get_u32_le(refs, 0)
+  if format_code != 0U && format_code != 1U {
+    return None
+  }
+  let format = @comp.global_transform_format_from_code(format_code)
+  let words_per_entity = @comp.global_transform_word_count(format)
+  for i = 0; i < count; i = i + 1 {
+    let base = i * 8
+    if @writes.get_u32_le(refs, base) != format_code {
+      return None
+    }
+    if @writes.get_u32_le(refs, base + 4).reinterpret_as_int() !=
+      i * words_per_entity {
+      return None
+    }
+  }
+  Some({ format, words_per_entity })
+}
+
+///|
+fn write_mass_cubes_transform_blob_dense(
+  bytes : MutArrayView[Byte],
+  layout : DenseTransformLayout,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+) -> Unit {
+  let wave_time = t * 1.8
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let zero = (0.0 : Float)
+  match layout.format {
+    Affine3x4F16 => {
+      if !full_rows {
+        let mut i = 0
+        let mut wave_sin = @math.sin(wave_time)
+        let mut wave_cos = @math.cos(wave_time)
+        while i < entity_count {
+          let y = Float::from_double(wave_sin * 0.12)
+          put_packed_f16x2_mut_view(
+            bytes,
+            (i * layout.words_per_entity + 3) * 4,
+            zero,
+            y,
+          )
+          let next_sin = wave_sin * cos_step + wave_cos * sin_step
+          wave_cos = wave_cos * cos_step - wave_sin * sin_step
+          wave_sin = next_sin
+          i = i + 1
+        }
+        return
+      }
+      let half = (per_side - 1).to_double() * 0.5
+      let step = Float::from_double(grid_spacing)
+      let mut local_index = 0
+      let mut row = 0
+      while local_index < entity_count {
+        let remaining = entity_count - local_index
+        let row_count = if per_side < remaining { per_side } else { remaining }
+        let mut x = Float::from_double((0.0 - half) * grid_spacing)
+        let z = Float::from_double((row.to_double() - half) * grid_spacing)
+        let phase = local_index.to_double() * 0.09 + wave_time
+        let mut wave_sin = @math.sin(phase)
+        let mut wave_cos = @math.cos(phase)
+        for _ix = 0; _ix < row_count; _ix = _ix + 1 {
+          let base = local_index * layout.words_per_entity * 4
+          let y = Float::from_double(wave_sin * 0.12)
+          put_packed_f16x2_mut_view(bytes, base + 0, cube_scale, zero)
+          put_packed_f16x2_mut_view(bytes, base + 4, zero, x)
+          put_packed_f16x2_mut_view(bytes, base + 8, zero, cube_scale)
+          put_packed_f16x2_mut_view(bytes, base + 12, zero, y)
+          put_packed_f16x2_mut_view(bytes, base + 16, zero, zero)
+          put_packed_f16x2_mut_view(bytes, base + 20, cube_scale, z)
+          let next_sin = wave_sin * cos_step + wave_cos * sin_step
+          wave_cos = wave_cos * cos_step - wave_sin * sin_step
+          wave_sin = next_sin
+          local_index = local_index + 1
+          x = x + step
+        }
+        row = row + 1
+      }
+    }
+    Affine3x4F32 => {
+      if !full_rows {
+        let mut i = 0
+        let mut wave_sin = @math.sin(wave_time)
+        let mut wave_cos = @math.cos(wave_time)
+        while i < entity_count {
+          let y = Float::from_double(wave_sin * 0.12)
+          put_f32_word_mut_view(bytes, i * layout.words_per_entity + 7, y)
+          let next_sin = wave_sin * cos_step + wave_cos * sin_step
+          wave_cos = wave_cos * cos_step - wave_sin * sin_step
+          wave_sin = next_sin
+          i = i + 1
+        }
+        return
+      }
+      let half = (per_side - 1).to_double() * 0.5
+      let step = Float::from_double(grid_spacing)
+      let mut local_index = 0
+      let mut row = 0
+      while local_index < entity_count {
+        let remaining = entity_count - local_index
+        let row_count = if per_side < remaining { per_side } else { remaining }
+        let mut x = Float::from_double((0.0 - half) * grid_spacing)
+        let z = Float::from_double((row.to_double() - half) * grid_spacing)
+        let phase = local_index.to_double() * 0.09 + wave_time
+        let mut wave_sin = @math.sin(phase)
+        let mut wave_cos = @math.cos(phase)
+        for _ix = 0; _ix < row_count; _ix = _ix + 1 {
+          let base = local_index * layout.words_per_entity
+          let y = Float::from_double(wave_sin * 0.12)
+          put_f32_word_mut_view(bytes, base + 0, cube_scale)
+          @writes.put_u32_le_mut_view(bytes, (base + 1) * 4, 0U)
+          @writes.put_u32_le_mut_view(bytes, (base + 2) * 4, 0U)
+          put_f32_word_mut_view(bytes, base + 3, x)
+          @writes.put_u32_le_mut_view(bytes, (base + 4) * 4, 0U)
+          put_f32_word_mut_view(bytes, base + 5, cube_scale)
+          @writes.put_u32_le_mut_view(bytes, (base + 6) * 4, 0U)
+          put_f32_word_mut_view(bytes, base + 7, y)
+          @writes.put_u32_le_mut_view(bytes, (base + 8) * 4, 0U)
+          @writes.put_u32_le_mut_view(bytes, (base + 9) * 4, 0U)
+          put_f32_word_mut_view(bytes, base + 10, cube_scale)
+          put_f32_word_mut_view(bytes, base + 11, z)
+          let next_sin = wave_sin * cos_step + wave_cos * sin_step
+          wave_cos = wave_cos * cos_step - wave_sin * sin_step
+          wave_sin = next_sin
+          local_index = local_index + 1
+          x = x + step
+        }
+        row = row + 1
+      }
+    }
+  }
+}
+
+///|
+fn write_dense_global_transform_views(
+  world : @ecs.World,
+  layout : DenseTransformLayout,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+) -> Array[@ecs.GpuWriteView] {
+  world.write_global_transform_blob_range_views(
+    0,
+    entity_count * layout.words_per_entity,
+    fn(bytes) {
+      write_mass_cubes_transform_blob_dense(
+        bytes, layout, per_side, t, full_rows,
+      )
+    },
+  )
+}
+
+///|
 fn animate_transforms_query(
   world : @ecs.World,
   tf_id : @ecs.ComponentTypeId,
@@ -283,11 +507,19 @@ fn update_and_drain_global_transforms(
   gt : @ecs.ComponentTypeId,
   per_side : Int,
   t : Double,
+  dense_transform_layout : DenseTransformLayout?,
+  full_rows : Bool,
 ) -> Array[@ecs.GpuWriteView] {
-  ignore(gt)
-  animate_transforms_query(world, tf, per_side, t)
-  world.update_global_transforms_from_transforms()
-  world.drain_global_transform_blob_write_views()
+  match dense_transform_layout {
+    Some(layout) =>
+      write_dense_global_transform_views(world, layout, per_side, t, full_rows)
+    None => {
+      ignore(gt)
+      animate_transforms_query(world, tf, per_side, t)
+      world.update_global_transforms_from_transforms()
+      world.drain_global_transform_blob_write_views()
+    }
+  }
 }
 
 ///|
@@ -327,6 +559,7 @@ pub(all) struct WebGPURenderer {
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
+  dense_transform_layout : DenseTransformLayout?
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
@@ -516,7 +749,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   @wgpu.shaderModule_release(shader)
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
-  let world = @ecs.World::new()
+  let world = @ecs.World::new_with_global_transform_format(Affine3x4F16)
   let gt = world.global_transform_component()
   let tf = world.transform_component()
   let per_side = grid_side_len(entity_count)
@@ -550,6 +783,10 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   })
   world.write_global_transform_refs_into(
     entities, instance_bytes, instance_stride, 0,
+  )
+  let transform_refs = world.extract_global_transform_refs(entities)
+  let dense_transform_layout = detect_dense_transform_layout(
+    transform_refs, entity_count,
   )
   let storage_bytes = (world.global_transform_blob_word_capacity() * 4).to_uint64()
   let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
@@ -602,7 +839,9 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
   )
   let depth_view = depth_texture.create_view()
-  let writes0 = update_and_drain_global_transforms(world, tf, gt, per_side, 0.0)
+  let writes0 = update_and_drain_global_transforms(
+    world, tf, gt, per_side, 0.0, dense_transform_layout, true,
+  )
   upload_global_transform_writes(queue, transform_storage, writes0)
   Some({
     context: canvas_context,
@@ -624,6 +863,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     gt,
     tf,
     per_side,
+    dense_transform_layout,
     bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
@@ -655,6 +895,8 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     gt,
     renderer.per_side,
     t,
+    renderer.dense_transform_layout,
+    false,
   )
   upload_global_transform_writes(
     renderer.queue,
