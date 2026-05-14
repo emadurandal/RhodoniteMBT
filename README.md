@@ -88,9 +88,9 @@ pnpm run test:examples:visual
 pnpm run test:examples:visual:update
 ```
 
-The visual regression package renders existing examples through native WebGPU,
-reads back an offscreen RGBA8 texture, and compares PNG golden files with exact
-or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
+The visual regression setup renders existing examples through native WebGPU and
+browser WebGPU, reads back offscreen RGBA8 textures, and compares PNG golden
+files with exact or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
 
 ## Publish order (outline)
 

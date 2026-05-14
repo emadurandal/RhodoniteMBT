@@ -53,3 +53,12 @@ pub fn webgpu_buffer_readback(
 ) -> Bytes {
   buffer.raw.readback(instance.instance.raw, offset, size)
 }
+
+///|
+pub async fn webgpu_buffer_readback_async(
+  _buffer : GPUBuffer,
+  _offset : UInt64,
+  _size : UInt64,
+) -> Bytes {
+  abort("webgpu_buffer_readback_async is only available through the JS backend")
+}

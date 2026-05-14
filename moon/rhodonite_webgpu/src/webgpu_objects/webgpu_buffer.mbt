@@ -14,3 +14,7 @@ pub fn webgpu_buffer_readback(
   UInt64,
   UInt64,
 ) -> Bytes
+
+///|
+#cfg(target="js")
+pub async fn webgpu_buffer_readback_async(GPUBuffer, UInt64, UInt64) -> Bytes

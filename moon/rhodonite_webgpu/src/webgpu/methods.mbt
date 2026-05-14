@@ -387,6 +387,17 @@ pub fn GPUBuffer::readback(
 }
 
 ///|
+/// Reads a JS WebGPU buffer range into an owned `Bytes` after `mapAsync`.
+#cfg(target="js")
+pub async fn GPUBuffer::readback_async(
+  self : GPUBuffer,
+  offset : UInt64,
+  size : UInt64,
+) -> Bytes {
+  @raw.webgpu_buffer_readback_async(self.raw, offset, size)
+}
+
+///|
 pub fn GPURenderPassEncoder::set_vertex_buffer(
   self : GPURenderPassEncoder,
   slot : Int,
