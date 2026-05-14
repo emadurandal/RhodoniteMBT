@@ -325,6 +325,8 @@ TypeScript bulk writers can use `GlobalTransformBlobWriter` to keep fp32/fp16 pa
 
 The MassCubes samples expose a source-level precision-mode constant near the top of their user source. The modes cover all-fp32, all-fp16, first-half fp32 / second-half fp16, and even-entity-id fp32 / odd-entity-id fp16. Mixed modes still use the same instance ref and one draw call; the renderer uploads only the active packed-word span needed by the selected refs.
 
+For renderer-side upload performance, prefer assigning fp32/fp16 formats in entity-contiguous ranges when possible. Dense all-fp32/all-fp16 and long same-format runs can be optimized once per run, while alternating formats such as even-id fp32 / odd-id fp16 force frequent format changes and are mainly useful as stress-test patterns.
+
 `World::new()` uses fp32 as the default allocation format. `World::new_with_global_transform_format(Affine3x4F16)` changes only the default for newly allocated `GlobalTransform` slots; individual entities can later move between `Affine3x4F32` and `Affine3x4F16` with `set_global_transform_format(entity, format)`. The shader does not need separate draw calls for the two formats because the per-instance ref includes the format tag.
 
 Packed GlobalTransform upload APIs:

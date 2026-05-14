@@ -338,6 +338,8 @@ TypeScript の bulk writer では `GlobalTransformBlobWriter` を使うと、ren
 
 MassCubes sample 群は、ユーザーソース冒頭の精度モード定数で all-fp32、all-fp16、前半 fp32 / 後半 fp16、偶数 entity id fp32 / 奇数 entity id fp16 を切り替えられます。mixed mode でも instance ref と draw call は共通で、renderer は選択された ref が必要とする active packed-word span だけを upload します。
 
+renderer 側 upload 性能を重視する場合、fp32/fp16 format はできるだけ entity の連続範囲ごとに割り当てることを推奨します。all-fp32/all-fp16 の dense 配置や、同じ format が長く続く run は run ごとに最適化できます。一方、偶数 entity は fp32 / 奇数 entity は fp16 のように交互配置すると format 変更が頻発するため、主に stress-test 用 pattern と考えてください。
+
 `World::new()` は新規 `GlobalTransform` slot の default format を fp32 にします。`World::new_with_global_transform_format(Affine3x4F16)` は default allocation format だけを fp16 に変えます。個々の entity は `set_global_transform_format(entity, format)` で `Affine3x4F32` / `Affine3x4F16` を切り替えられます。format tag は instance ref に含まれるため、shader と draw call は共通です。
 
 Packed GlobalTransform upload API:
