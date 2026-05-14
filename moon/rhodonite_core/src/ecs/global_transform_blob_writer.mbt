@@ -268,6 +268,355 @@ pub fn GlobalTransformBlobWriter::set_element_at(
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn global_transform_element_setter_js(
+  bytes : MutArrayView[Byte],
+  refs : FixedArray[Byte],
+  count : Int,
+  first_word : Int,
+  dense_format_code : Int,
+  words_per_entity : Int,
+  scalar_index : Int,
+) -> (Int, Float) -> Unit =
+  #| (
+  #|   bytes,
+  #|   refs,
+  #|   count,
+  #|   firstWord,
+  #|   denseFormatCode,
+  #|   wordsPerEntity,
+  #|   scalarIndex,
+  #| ) => {
+  #|   const src = bytes.buf;
+  #|   const start = bytes.start;
+  #|   const byteLength = bytes.end - bytes.start;
+  #|   if (!ArrayBuffer.isView(src)) {
+  #|     throw new Error("GlobalTransform element setter requires typed byte storage.");
+  #|   }
+  #|   const words = new Uint32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const halfLane = scalarIndex & 1;
+  #|   const makeF16Bits = () => {
+  #|     let cache = globalThis.__rhodonite_f32_to_f16_table;
+  #|     if (!cache) {
+  #|       const base = new Uint16Array(512);
+  #|       const shift = new Uint8Array(512);
+  #|       for (let i = 0; i < 256; i++) {
+  #|         const e = i - 127;
+  #|         if (e < -24) {
+  #|           base[i] = 0x0000;
+  #|           base[i | 0x100] = 0x8000;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else if (e < -14) {
+  #|           const b = 0x0400 >> (-e - 14);
+  #|           const s = -e - 1;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = s;
+  #|           shift[i | 0x100] = s;
+  #|         } else if (e <= 15) {
+  #|           const b = (e + 15) << 10;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         } else if (e < 128) {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         }
+  #|       }
+  #|       const scratchF32 = new Float32Array(1);
+  #|       const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|       cache = globalThis.__rhodonite_f32_to_f16_table = {
+  #|         base,
+  #|         shift,
+  #|         scratchF32,
+  #|         scratchU32,
+  #|       };
+  #|     }
+  #|     return (value) => {
+  #|       cache.scratchF32[0] = Math.fround(value);
+  #|       const bits = cache.scratchU32[0] >>> 0;
+  #|       const index = (bits >>> 23) & 0x1ff;
+  #|       return cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
+  #|     };
+  #|   };
+  #|   if (denseFormatCode === 0) {
+  #|     const baseWord = scalarIndex - firstWord;
+  #|     return (index, value) => {
+  #|       if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
+  #|       floats[index * wordsPerEntity + baseWord] = value;
+  #|     };
+  #|   }
+  #|   if (denseFormatCode === 1) {
+  #|     const baseWord = (scalarIndex >> 1) - firstWord;
+  #|     const Float16ArrayCtor = globalThis.Float16Array;
+  #|     if (typeof Float16ArrayCtor === "function") {
+  #|       const halfFloats = new Float16ArrayCtor(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|       return (index, value) => {
+  #|         if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
+  #|         halfFloats[(index * wordsPerEntity + baseWord) * 2 + halfLane] = value;
+  #|       };
+  #|     }
+  #|     const f32ToF16Bits = makeF16Bits();
+  #|     return (index, value) => {
+  #|       if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
+  #|       const word = index * wordsPerEntity + baseWord;
+  #|       const half = f32ToF16Bits(value);
+  #|       words[word] = halfLane === 0
+  #|         ? ((words[word] & 0xffff0000) | half)
+  #|         : ((words[word] & 0x0000ffff) | (half << 16));
+  #|     };
+  #|   }
+  #|   if (!ArrayBuffer.isView(refs)) {
+  #|     throw new Error("GlobalTransform mixed refs require typed ref storage.");
+  #|   }
+  #|   const refWords = new Uint32Array(refs.buffer, refs.byteOffset, refs.byteLength >> 2);
+  #|   const f32ToF16Bits = makeF16Bits();
+  #|   return (index, value) => {
+  #|     if (index < 0 || index >= count) throw new RangeError("GlobalTransform index out of range");
+  #|     const refBase = index * 2;
+  #|     const format = refWords[refBase] ?? 0;
+  #|     const wordOffset = (refWords[refBase + 1] ?? 0) - firstWord;
+  #|     if (format === 1) {
+  #|       const word = wordOffset + (scalarIndex >> 1);
+  #|       const half = f32ToF16Bits(value);
+  #|       words[word] = halfLane === 0
+  #|         ? ((words[word] & 0xffff0000) | half)
+  #|         : ((words[word] & 0x0000ffff) | (half << 16));
+  #|     } else {
+  #|       floats[wordOffset + scalarIndex] = value;
+  #|     }
+  #|   };
+  #| }
+
+///|
+#cfg(target="native")
+#borrow(bytes)
+extern "C" fn global_transform_element_setter_set_dense_f32_native(
+  bytes : MutArrayView[Byte],
+  index : Int,
+  value : Float,
+  first_word : Int,
+  words_per_entity : Int,
+  scalar_index : Int,
+) -> Unit = "rhodonite_global_transform_element_setter_set_dense_f32"
+
+///|
+#cfg(target="native")
+#borrow(bytes)
+extern "C" fn global_transform_element_setter_set_dense_f16_native(
+  bytes : MutArrayView[Byte],
+  index : Int,
+  value : Float,
+  first_word : Int,
+  words_per_entity : Int,
+  scalar_index : Int,
+) -> Unit = "rhodonite_global_transform_element_setter_set_dense_f16"
+
+///|
+#cfg(target="native")
+#borrow(bytes, refs)
+extern "C" fn global_transform_element_setter_set_mixed_native(
+  bytes : MutArrayView[Byte],
+  refs : FixedArray[Byte],
+  index : Int,
+  value : Float,
+  first_word : Int,
+  scalar_index : Int,
+) -> Unit = "rhodonite_global_transform_element_setter_set_mixed"
+
+///|
+#cfg(target="js")
+pub fn GlobalTransformBlobWriter::element_setter(
+  self : GlobalTransformBlobWriter,
+  row : Int,
+  column : Int,
+) -> (Int, Float) -> Unit {
+  if row < 0 || row > 2 || column < 0 || column > 3 {
+    abort("GlobalTransformBlobWriter::element_setter: invalid row or column")
+  }
+  let scalar_index = row * 4 + column
+  match self.dense_layout {
+    Some(layout) => {
+      let dense_format_code = match layout.format {
+        Affine3x4F32 => 0
+        Affine3x4F16 => 1
+      }
+      global_transform_element_setter_js(
+        self.bytes,
+        self.refs,
+        self.count,
+        self.first_word,
+        dense_format_code,
+        layout.words_per_entity,
+        scalar_index,
+      )
+    }
+    None =>
+      global_transform_element_setter_js(
+        self.bytes,
+        self.refs,
+        self.count,
+        self.first_word,
+        -1,
+        0,
+        scalar_index,
+      )
+  }
+}
+
+///|
+#cfg(target="native")
+pub fn GlobalTransformBlobWriter::element_setter(
+  self : GlobalTransformBlobWriter,
+  row : Int,
+  column : Int,
+) -> (Int, Float) -> Unit {
+  if row < 0 || row > 2 || column < 0 || column > 3 {
+    abort("GlobalTransformBlobWriter::element_setter: invalid row or column")
+  }
+  let scalar_index = row * 4 + column
+  match self.dense_layout {
+    Some(layout) =>
+      match layout.format {
+        Affine3x4F32 =>
+          fn(index, value) {
+            if index < 0 || index >= self.count {
+              abort("GlobalTransform element setter: index out of range")
+            }
+            global_transform_element_setter_set_dense_f32_native(
+              self.bytes,
+              index,
+              value,
+              self.first_word,
+              layout.words_per_entity,
+              scalar_index,
+            )
+          }
+        Affine3x4F16 =>
+          fn(index, value) {
+            if index < 0 || index >= self.count {
+              abort("GlobalTransform element setter: index out of range")
+            }
+            global_transform_element_setter_set_dense_f16_native(
+              self.bytes,
+              index,
+              value,
+              self.first_word,
+              layout.words_per_entity,
+              scalar_index,
+            )
+          }
+      }
+    None =>
+      fn(index, value) {
+        if index < 0 || index >= self.count {
+          abort("GlobalTransform element setter: index out of range")
+        }
+        global_transform_element_setter_set_mixed_native(
+          self.bytes,
+          self.refs,
+          index,
+          value,
+          self.first_word,
+          scalar_index,
+        )
+      }
+  }
+}
+
+///|
+#cfg(not(any(target="js", target="native")))
+pub fn GlobalTransformBlobWriter::element_setter(
+  self : GlobalTransformBlobWriter,
+  row : Int,
+  column : Int,
+) -> (Int, Float) -> Unit {
+  if row < 0 || row > 2 || column < 0 || column > 3 {
+    abort("GlobalTransformBlobWriter::element_setter: invalid row or column")
+  }
+  let scalar_index = row * 4 + column
+  match self.dense_layout {
+    Some(layout) =>
+      match layout.format {
+        Affine3x4F32 =>
+          fn(index, value) {
+            if index < 0 || index >= self.count {
+              abort("GlobalTransform element setter: index out of range")
+            }
+            put_global_transform_f32_word(
+              self.bytes,
+              index * layout.words_per_entity + scalar_index - self.first_word,
+              value,
+            )
+          }
+        Affine3x4F16 =>
+          fn(index, value) {
+            if index < 0 || index >= self.count {
+              abort("GlobalTransform element setter: index out of range")
+            }
+            let word = index * layout.words_per_entity +
+              scalar_index / 2 -
+              self.first_word
+            let byte_offset = word * 4
+            let old = @writes.get_u32_le_mut_view(self.bytes, byte_offset)
+            let half = global_transform_f32_to_f16_bits(value)
+            let next = if scalar_index % 2 == 0 {
+              (old & 0xFFFF0000U) | half
+            } else {
+              (old & 0x0000FFFFU) | (half << 16)
+            }
+            @writes.put_u32_le_mut_view(self.bytes, byte_offset, next)
+          }
+      }
+    None =>
+      fn(index, value) {
+        if index < 0 || index >= self.count {
+          abort("GlobalTransform element setter: index out of range")
+        }
+        let base = index * 8
+        if base + 8 > self.refs.length() {
+          abort("GlobalTransform element setter: refs length mismatch")
+        }
+        let format = @comp.global_transform_format_from_code(
+          @writes.get_u32_le(self.refs, base),
+        )
+        let word_offset = @writes.get_u32_le(self.refs, base + 4).reinterpret_as_int() -
+          self.first_word
+        match format {
+          Affine3x4F32 =>
+            put_global_transform_f32_word(
+              self.bytes,
+              word_offset + scalar_index,
+              value,
+            )
+          Affine3x4F16 => {
+            let word = word_offset + scalar_index / 2
+            let byte_offset = word * 4
+            let old = @writes.get_u32_le_mut_view(self.bytes, byte_offset)
+            let half = global_transform_f32_to_f16_bits(value)
+            let next = if scalar_index % 2 == 0 {
+              (old & 0xFFFF0000U) | half
+            } else {
+              (old & 0x0000FFFFU) | (half << 16)
+            }
+            @writes.put_u32_le_mut_view(self.bytes, byte_offset, next)
+          }
+        }
+      }
+  }
+}
+
+///|
 pub fn GlobalTransformBlobWriter::set_affine3x4_at(
   self : GlobalTransformBlobWriter,
   index : Int,

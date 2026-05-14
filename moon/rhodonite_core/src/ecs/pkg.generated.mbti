@@ -69,6 +69,7 @@ type GlobalTransformBlobStore
 pub struct GlobalTransformBlobWriter {
   // private fields
 }
+pub fn GlobalTransformBlobWriter::element_setter(Self, Int, Int) -> (Int, Float) -> Unit
 pub fn GlobalTransformBlobWriter::set_affine3x4_at(Self, Int, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Unit
 pub fn GlobalTransformBlobWriter::set_element_at(Self, Int, Int, Int, Float) -> Unit
 

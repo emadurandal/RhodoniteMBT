@@ -3,3 +3,7 @@ import {
   "emadurandal/rhodonite_core/ecs/components" @comp,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
 }
+
+options(
+  "native-stub": [ "global_transform_blob_writer_native.c" ],
+)

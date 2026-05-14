@@ -316,11 +316,12 @@ fn write_mass_cubes_transform_blob(
   let sin_step = @math.sin(0.09)
   let cos_step = @math.cos(0.09)
   if !full_rows {
+    let set_y = writer.element_setter(1, 3)
     let mut i = 0
     let mut wave_sin = @math.sin(wave_time)
     let mut wave_cos = @math.cos(wave_time)
     while i < entity_count {
-      writer.set_element_at(i, 1, 3, Float::from_double(wave_sin * 0.12))
+      set_y(i, Float::from_double(wave_sin * 0.12))
       let next_sin = wave_sin * cos_step + wave_cos * sin_step
       wave_cos = wave_cos * cos_step - wave_sin * sin_step
       wave_sin = next_sin

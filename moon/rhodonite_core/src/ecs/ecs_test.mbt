@@ -1776,6 +1776,8 @@ test "GlobalTransform blob range writer writes mixed refs" {
         (1.0 : Float),
         (-2.0 : Float),
       )
+      let set_y = writer.element_setter(1, 3)
+      set_y(1, (0.5 : Float))
     },
   )
   assert_eq(writes.length(), 1)
@@ -1790,7 +1792,7 @@ test "GlobalTransform blob range writer writes mixed refs" {
   match world.get_global_transform(e1) {
     Some(m) => {
       assert_eq(m.at(0, 3), (7.0 : Float))
-      assert_eq(m.at(1, 3), (0.25 : Float))
+      assert_eq(m.at(1, 3), (0.5 : Float))
       assert_eq(m.at(2, 3), (-2.0 : Float))
     }
     None => abort("expected f16 transform")
