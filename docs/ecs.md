@@ -224,7 +224,7 @@ If a row callback is still the right shape for the system, prepare the query onc
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
   let tf_bytes = row.read_view(tf)
-  let global_tf = @comp.GlobalTransform::view_std140_gpu_row(row.write_view(gt))
+  let global_tf = @comp.GlobalTransform::view_affine3x4_gpu_row(row.write_view(gt))
   ignore(tf_bytes)
   ignore(global_tf)
 })
@@ -311,7 +311,7 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, then calls `write_global_transforms_dense_range_views` with sample-owned callbacks that bulk-write the dense `GlobalTransform` range. The initialization callback writes the full mat4 rows; the per-frame callback updates only the CPU-side Y translation lane. Because the GPU buffer still stores mat4 rows, the borrowed upload range remains the full dense row span. The library only provides the dense range and dirty tracking; grid-wave math stays in the sample.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) uses the owned drain path. [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) uses `spawn_transform_global_batch`, then calls `write_global_transforms_dense_range_views` with sample-owned callbacks that bulk-write the dense `GlobalTransform` range. The initialization callback writes full affine 3x4 rows; the per-frame callback updates only the Y translation lane (`row1.w`). Because the GPU buffer stores 48-byte affine rows, the borrowed upload range remains the full dense row span but is 25% smaller than the previous 64-byte mat4 rows. The library only provides the dense range and dirty tracking; grid-wave math stays in the sample.
 The browser-only [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo uses the TypeScript ECS wrapper for the same dense-range callback path and submits borrowed write views with the native browser WebGPU API. The [`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo builds a release MoonBit `wasm` entrypoint, updates the dense ECS `GlobalTransform` store in MoonBit, and uploads that store directly from exported wasm linear memory. `World::global_transform_wasm_gpu_bytes_payload_ptr` and `World::global_transform_wasm_gpu_bytes_len` expose that wasm-only upload range to the TypeScript host bridge. The [`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo still uses a TypeScript upload buffer because browser WebGPU cannot create a `TypedArray` view over MoonBit wasm-gc arrays; its per-frame visual upload path is host-owned to avoid recomputing the same wave once in wasm-gc and again in TypeScript.
 
 Dense GlobalTransform helper variants:
@@ -367,7 +367,7 @@ Registered in `World::new` in this order (`ComponentTypeId.index` 0, 1, 2):
 | Order | Name | Kind | Role |
 |-------|------|------|------|
 | 0 | `Transform3D` | CpuOnly | Local TRS, etc., in SoA. `set_transform` / `get_transform`. |
-| 1 | `GlobalTransform` | GpuVisible | World matrix (std140-friendly layout) in flat GPU store. `set_global_transform` / `get_global_transform`. |
+| 1 | `GlobalTransform` | GpuVisible | World affine matrix (three `vec4<f32>` rows, 48-byte stride) in flat GPU store. `set_global_transform` / `get_global_transform`. |
 | 2 | `ChildOf` | CpuOnly | Parent `EntityId` index/generation. `set_child_of` / `get_child_of`. |
 
 Hierarchy and world matrix:
@@ -383,7 +383,7 @@ flowchart BT
 
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
 - **`update_transform3d_positions`**: Bulk-updates only the position field of built-in `Transform3D` without constructing a `QueryRow` per entity. JS uses the public archetype-column path; non-JS uses a direct archetype sweep with fixed-offset f32 writes.
-- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` write `GlobalTransform` rows directly and record contiguous dirty ranges when possible; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column.
+- **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` write 48-byte affine `GlobalTransform` rows directly and record contiguous dirty ranges when possible; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column. The affine 3x4 layout preserves shear from non-uniform scale combined with parent rotation while avoiding the implicit `[0,0,0,1]` row upload.
 
 ---
 

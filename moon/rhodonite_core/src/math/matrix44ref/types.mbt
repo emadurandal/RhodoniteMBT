@@ -1,11 +1,12 @@
 ///|
 /// Borrowed 4×4 matrix in **column-major** order (`values[col * 4 + row]`). The view
 /// must hold **16** elements of type `T` (`Float`, `Double`, ...), **or** (Float only) one
-/// 64-byte std140 `mat4x4<f32>` GPU row via [`std140_row`].
+/// GPU transform row via [`std140_row`]. GPU rows may be the legacy 64-byte std140
+/// `mat4x4<f32>` layout or the compact 48-byte affine 3x4 layout.
 pub(all) struct Matrix44Ref[T] {
   values : MutArrayView[T]?
-  /// When [`Some`], this is one std140 `mat4x4<f32>` row (16 LE `f32`, column-major);
-  /// [`values`] must be [`None`] and only [`Matrix44Ref[Float]`] / [`Matrix44RefF`] uses this path.
+  /// When [`Some`], this is one GPU transform row; [`values`] must be [`None`] and only
+  /// [`Matrix44Ref[Float]`] / [`Matrix44RefF`] uses this path.
   std140_row : MutArrayView[Byte]?
 }
 

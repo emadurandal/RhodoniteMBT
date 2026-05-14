@@ -329,19 +329,15 @@ fn write_mass_cubes_full_range(
       @writes.put_f32_le_mut_view(bytes, base + 0, scale_d)
       @writes.put_f32_le_mut_view(bytes, base + 4, 0.0)
       @writes.put_f32_le_mut_view(bytes, base + 8, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 12, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 12, x)
       @writes.put_f32_le_mut_view(bytes, base + 16, 0.0)
       @writes.put_f32_le_mut_view(bytes, base + 20, scale_d)
       @writes.put_f32_le_mut_view(bytes, base + 24, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 28, 0.0)
+      @writes.put_f32_le_mut_view(bytes, base + 28, wave_s * 0.12)
       @writes.put_f32_le_mut_view(bytes, base + 32, 0.0)
       @writes.put_f32_le_mut_view(bytes, base + 36, 0.0)
       @writes.put_f32_le_mut_view(bytes, base + 40, scale_d)
-      @writes.put_f32_le_mut_view(bytes, base + 44, 0.0)
-      @writes.put_f32_le_mut_view(bytes, base + 48, x)
-      @writes.put_f32_le_mut_view(bytes, base + 52, wave_s * 0.12)
-      @writes.put_f32_le_mut_view(bytes, base + 56, z)
-      @writes.put_f32_le_mut_view(bytes, base + 60, 1.0)
+      @writes.put_f32_le_mut_view(bytes, base + 44, z)
       let next_s = wave_s * cos_step + wave_c * sin_step
       wave_c = wave_c * cos_step - wave_s * sin_step
       wave_s = next_s
@@ -369,7 +365,7 @@ fn write_mass_cubes_y_range(
   let mut wave_s = @math.sin(first.to_double() * 0.09 + wave_time)
   let mut wave_c = @math.cos(first.to_double() * 0.09 + wave_time)
   while local_i < count {
-    @writes.put_f32_le_mut_view(bytes, local_i * stride + 52, wave_s * 0.12)
+    @writes.put_f32_le_mut_view(bytes, local_i * stride + 28, wave_s * 0.12)
     let next_s = wave_s * cos_step + wave_c * sin_step
     wave_c = wave_c * cos_step - wave_s * sin_step
     wave_s = next_s
@@ -480,7 +476,13 @@ fn ecs_mass_shader_wgsl() -> String {
     #|  view_proj: mat4x4<f32>,
     #|}
     #|
-    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<mat4x4<f32>>;
+    #|struct WorldAffine3x4 {
+    #|  row0: vec4<f32>,
+    #|  row1: vec4<f32>,
+    #|  row2: vec4<f32>,
+    #|}
+    #|
+    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
     #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
     #|
     #|struct VertexOut {
@@ -496,7 +498,13 @@ fn ecs_mass_shader_wgsl() -> String {
     #|  let idx = u32(inst.x);
     #|  let color = vec3<f32>(inst.y, inst.z, inst.w);
     #|  let world_m = world_from_entity[idx];
-    #|  let world_pos = world_m * vec4<f32>(local_pos, 1.0);
+    #|  let local_h = vec4<f32>(local_pos, 1.0);
+    #|  let world_pos = vec4<f32>(
+    #|    dot(world_m.row0, local_h),
+    #|    dot(world_m.row1, local_h),
+    #|    dot(world_m.row2, local_h),
+    #|    1.0,
+    #|  );
     #|  let clip = camera.view_proj * world_pos;
     #|  var o: VertexOut;
     #|  o.position = clip;

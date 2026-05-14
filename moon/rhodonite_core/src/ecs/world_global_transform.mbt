@@ -20,7 +20,7 @@ pub fn World::set_global_transform(
   match self.ensure_gpu_store_capacity(id, entity.index + 1) {
     Some(store) => {
       store.mut_entity_row(entity.index, fn(view) {
-        @comp.matrix44f_write_std140_mat4_to_gpu_row(m, view)
+        @comp.matrix44f_write_affine3x4_to_gpu_row(m, view)
       })
       self.replace_gpu_store(store)
       true
@@ -40,7 +40,7 @@ pub fn World::get_global_transform(
     return None
   }
   match self.component_bytes(entity, id) {
-    Some(bytes) => Some(@comp.matrix44f_from_std140_gpu_bytes(bytes))
+    Some(bytes) => Some(@comp.matrix44f_from_affine3x4_gpu_bytes(bytes))
     None => None
   }
 }
@@ -63,7 +63,7 @@ pub fn World::write_global_transforms_dense(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 64 {
+    if stride != 48 {
       abort(
         "World::write_global_transforms_dense: GlobalTransform stride mismatch",
       )
@@ -101,7 +101,7 @@ pub fn World::write_global_transforms_dense_views(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 64 {
+    if stride != 48 {
       abort(
         "World::write_global_transforms_dense_views: GlobalTransform stride mismatch",
       )
@@ -142,7 +142,7 @@ pub fn World::write_global_transforms_dense_range_views(
     return []
   }
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
-    if range.stride() != 64 {
+    if range.stride() != 48 {
       abort(
         "World::write_global_transforms_dense_range_views: GlobalTransform stride mismatch",
       )
@@ -183,7 +183,7 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
   }
   match self.ensure_gpu_store_capacity(gt, count) {
     Some(store) => {
-      if store.stride != 64 {
+      if store.stride != 48 {
         abort(
           "World::write_global_transforms_dense_wasm_bytes_range: GlobalTransform stride mismatch",
         )
@@ -319,7 +319,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
   gt_row : MutArrayView[Byte],
 ) -> Bool {
   if !has_child_of {
-    @comp.matrix44f_write_std140_mat4_to_gpu_row(leaf_local_matrix, gt_row)
+    @comp.matrix44f_write_affine3x4_to_gpu_row(leaf_local_matrix, gt_row)
     true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
@@ -333,7 +333,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
           ) {
           None => false
           Some(world_m) => {
-            @comp.matrix44f_write_std140_mat4_to_gpu_row(world_m, gt_row)
+            @comp.matrix44f_write_affine3x4_to_gpu_row(world_m, gt_row)
             true
           }
         }
@@ -354,7 +354,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   const gtIndex = gt.index;
   #|   const coIndex = co.index;
   #|   const gtStore = world.gpu_stores[gtIndex];
-  #|   if (!gtStore || gtStore.stride < 64) return false;
+  #|   if (!gtStore || gtStore.stride < 48) return false;
   #|
   #|   const archetypes = world.archetypes;
   #|   let hasChildArchetype = false;
@@ -482,21 +482,17 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|
   #|       const out = entityIndex * gtStrideF32;
   #|       gtF32[out] = Math.fround(r00 * sx);
-  #|       gtF32[out + 1] = Math.fround(r10 * sx);
-  #|       gtF32[out + 2] = Math.fround(r20 * sx);
-  #|       gtF32[out + 3] = 0;
-  #|       gtF32[out + 4] = Math.fround(r01 * sy);
+  #|       gtF32[out + 1] = Math.fround(r01 * sy);
+  #|       gtF32[out + 2] = Math.fround(r02 * sz);
+  #|       gtF32[out + 3] = px;
+  #|       gtF32[out + 4] = Math.fround(r10 * sx);
   #|       gtF32[out + 5] = Math.fround(r11 * sy);
-  #|       gtF32[out + 6] = Math.fround(r21 * sy);
-  #|       gtF32[out + 7] = 0;
-  #|       gtF32[out + 8] = Math.fround(r02 * sz);
-  #|       gtF32[out + 9] = Math.fround(r12 * sz);
+  #|       gtF32[out + 6] = Math.fround(r12 * sz);
+  #|       gtF32[out + 7] = py;
+  #|       gtF32[out + 8] = Math.fround(r20 * sx);
+  #|       gtF32[out + 9] = Math.fround(r21 * sy);
   #|       gtF32[out + 10] = Math.fround(r22 * sz);
-  #|       gtF32[out + 11] = 0;
-  #|       gtF32[out + 12] = px;
-  #|       gtF32[out + 13] = py;
-  #|       gtF32[out + 14] = pz;
-  #|       gtF32[out + 15] = 1;
+  #|       gtF32[out + 11] = pz;
   #|
   #|       if (rangeFirst < 0) {
   #|         rangeFirst = entityIndex;
@@ -568,7 +564,7 @@ fn World::try_update_global_transforms_no_child_fast_path(
     Some(store) => store
     None => return false
   }
-  if gt_store.stride < 64 {
+  if gt_store.stride < 48 {
     return false
   }
   let mut has_child_archetype = false
@@ -641,21 +637,17 @@ fn World::try_update_global_transforms_no_child_fast_path(
 
       let out = entity_index * gt_store.stride
       put_f32_fixed_le(gt_store.bytes, out, r00 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 4, r10 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 8, r20 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 12, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 16, r01 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 4, r01 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 8, r02 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 12, px)
+      put_f32_fixed_le(gt_store.bytes, out + 16, r10 * sx)
       put_f32_fixed_le(gt_store.bytes, out + 20, r11 * sy)
-      put_f32_fixed_le(gt_store.bytes, out + 24, r21 * sy)
-      put_f32_fixed_le(gt_store.bytes, out + 28, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 32, r02 * sz)
-      put_f32_fixed_le(gt_store.bytes, out + 36, r12 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 24, r12 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 28, py)
+      put_f32_fixed_le(gt_store.bytes, out + 32, r20 * sx)
+      put_f32_fixed_le(gt_store.bytes, out + 36, r21 * sy)
       put_f32_fixed_le(gt_store.bytes, out + 40, r22 * sz)
-      put_f32_fixed_le(gt_store.bytes, out + 44, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 48, px)
-      put_f32_fixed_le(gt_store.bytes, out + 52, py)
-      put_f32_fixed_le(gt_store.bytes, out + 56, pz)
-      put_f32_fixed_le(gt_store.bytes, out + 60, (1.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out + 44, pz)
       if dirty_first < 0 {
         dirty_first = entity_index
         dirty_prev = entity_index
@@ -711,7 +703,7 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     Some(store) => store
     None => return false
   }
-  if gt_store.stride != 64 {
+  if gt_store.stride != 48 {
     return false
   }
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -742,7 +734,7 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
           e,
           has_child_of,
           local_m,
-          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 64),
+          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 48),
         ),
       )
       if dirty_first < 0 {

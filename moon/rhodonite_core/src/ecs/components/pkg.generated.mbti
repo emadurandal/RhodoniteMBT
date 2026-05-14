@@ -23,7 +23,11 @@ pub fn global_transform_write_identity_row(MutArrayView[Byte]) -> Unit
 
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
 
+pub fn matrix44f_from_affine3x4_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
+
 pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
+
+pub fn matrix44f_write_affine3x4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 
 pub fn matrix44f_write_std140_mat4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 
@@ -51,6 +55,7 @@ pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
 pub(all) struct GlobalTransform {
   matrix : @matrix44ref.Matrix44Ref[Float]
 }
+pub fn GlobalTransform::view_affine3x4_gpu_row(MutArrayView[Byte]) -> Self
 pub fn GlobalTransform::view_std140_gpu_row(MutArrayView[Byte]) -> Self
 
 pub(all) struct GpuField {

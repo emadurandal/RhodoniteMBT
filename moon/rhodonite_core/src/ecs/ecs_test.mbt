@@ -1511,15 +1511,15 @@ test "write_global_transforms_dense writes one contiguous upload range" {
   let world = World::new()
   let writes = world.write_global_transforms_dense(2, fn(i, row) {
     row[0] = ((10 + i) & 0xFF).to_byte()
-    row[63] = ((20 + i) & 0xFF).to_byte()
+    row[47] = ((20 + i) & 0xFF).to_byte()
   })
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(writes[0].bytes.length(), 2 * 48)
   assert_eq(writes[0].bytes[0], (10 : Byte))
-  assert_eq(writes[0].bytes[63], (20 : Byte))
-  assert_eq(writes[0].bytes[64], (11 : Byte))
-  assert_eq(writes[0].bytes[127], (21 : Byte))
+  assert_eq(writes[0].bytes[47], (20 : Byte))
+  assert_eq(writes[0].bytes[48], (11 : Byte))
+  assert_eq(writes[0].bytes[95], (21 : Byte))
   assert_eq(
     world.drain_gpu_writes(world.global_transform_component()).length(),
     0,
@@ -1566,13 +1566,13 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
   let writes = world.drain_gpu_write_views(gt)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 64)
+  assert_eq(writes[0].bytes.length(), 2 * 48)
   assert_eq(
-    @comp.get_gpu_f32_byte_view(writes[0].bytes[0:64], 0),
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[0:48], 0),
     (1.0 : Float),
   )
   assert_eq(
-    @comp.get_gpu_f32_byte_view(writes[0].bytes[64:128], 60),
+    @comp.get_gpu_f32_byte_view(writes[0].bytes[48:96], 40),
     (1.0 : Float),
   )
 }
@@ -1621,26 +1621,26 @@ test "write_global_transforms_dense_range_views writes dense rows through one ra
     if range.count() != 2 {
       abort("expected range count to be 2")
     }
-    if range.stride() != 64 {
-      abort("expected GlobalTransform row stride to be 64")
+    if range.stride() != 48 {
+      abort("expected GlobalTransform row stride to be 48")
     }
     let bytes = range.bytes()
     @comp.put_gpu_f32_mut_view(bytes, 0, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 56, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 64, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 64 + 48, (1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 64 + 56, (-1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 12, (-1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 44, (-1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 48, (0.5 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 48 + 12, (1.0 : Double))
+    @comp.put_gpu_f32_mut_view(bytes, 48 + 44, (-1.0 : Double))
   })
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 64)
-  let row0 = writes[0].bytes[0:64]
-  let row1 = writes[0].bytes[64:128]
+  assert_eq(writes[0].bytes.length(), 2 * 48)
+  let row0 = writes[0].bytes[0:48]
+  let row1 = writes[0].bytes[48:96]
   assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 48), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 12), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 44), (-1.0 : Float))
   assert_eq(@comp.get_gpu_f32_byte_view(row1, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 48), (1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 56), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 12), (1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row1, 44), (-1.0 : Float))
 }

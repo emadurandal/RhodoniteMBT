@@ -1,5 +1,5 @@
 ///|
-/// Element type for [`Matrix44Ref`]: supports optional std140 GPU `mat4x4<f32>` byte row ([`Float`] only).
+/// Element type for [`Matrix44Ref`]: supports optional GPU transform byte row ([`Float`] only).
 pub(open) trait Matrix44RefElem {
   read_std140_mat4_cell(MutArrayView[Byte], Int, Int) -> Self
   write_std140_mat4_cell(MutArrayView[Byte], Int, Int, Self) -> Unit
@@ -7,9 +7,25 @@ pub(open) trait Matrix44RefElem {
 
 ///|
 pub impl Matrix44RefElem for Float with read_std140_mat4_cell(bytes, row, col) -> Float {
-  Float::reinterpret_from_uint(
-    @writes.get_u32_le_mut_view(bytes, (col * 4 + row) * 4),
-  )
+  match bytes.length() {
+    64 =>
+      Float::reinterpret_from_uint(
+        @writes.get_u32_le_mut_view(bytes, (col * 4 + row) * 4),
+      )
+    48 =>
+      if row == 3 {
+        if col == 3 {
+          (1.0 : Float)
+        } else {
+          (0.0 : Float)
+        }
+      } else {
+        Float::reinterpret_from_uint(
+          @writes.get_u32_le_mut_view(bytes, (row * 4 + col) * 4),
+        )
+      }
+    _ => abort("Matrix44RefElem: unsupported GPU row length")
+  }
 }
 
 ///|
@@ -19,7 +35,21 @@ pub impl Matrix44RefElem for Float with write_std140_mat4_cell(
   col,
   v,
 ) -> Unit {
-  @writes.put_f32_le_mut_view(bytes, (col * 4 + row) * 4, v.to_double())
+  match bytes.length() {
+    64 => @writes.put_f32_le_mut_view(bytes, (col * 4 + row) * 4, v.to_double())
+    48 =>
+      if row == 3 {
+        let expected = if col == 3 { (1.0 : Float) } else { (0.0 : Float) }
+        if v != expected {
+          abort(
+            "Matrix44RefElem: affine 3x4 row cannot store non-affine bottom row",
+          )
+        }
+      } else {
+        @writes.put_f32_le_mut_view(bytes, (row * 4 + col) * 4, v.to_double())
+      }
+    _ => abort("Matrix44RefElem: unsupported GPU row length")
+  }
 }
 
 ///|

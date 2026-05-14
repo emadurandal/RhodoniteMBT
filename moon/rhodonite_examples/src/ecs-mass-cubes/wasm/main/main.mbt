@@ -129,19 +129,15 @@ fn write_mass_cubes_full_range(
       put_f32_le_mut_view_unchecked(bytes, base + 0, scale_d)
       put_f32_le_mut_view_unchecked(bytes, base + 4, 0.0)
       put_f32_le_mut_view_unchecked(bytes, base + 8, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 12, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 12, x)
       put_f32_le_mut_view_unchecked(bytes, base + 16, 0.0)
       put_f32_le_mut_view_unchecked(bytes, base + 20, scale_d)
       put_f32_le_mut_view_unchecked(bytes, base + 24, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 28, 0.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 28, wave_s * 0.12)
       put_f32_le_mut_view_unchecked(bytes, base + 32, 0.0)
       put_f32_le_mut_view_unchecked(bytes, base + 36, 0.0)
       put_f32_le_mut_view_unchecked(bytes, base + 40, scale_d)
-      put_f32_le_mut_view_unchecked(bytes, base + 44, 0.0)
-      put_f32_le_mut_view_unchecked(bytes, base + 48, x)
-      put_f32_le_mut_view_unchecked(bytes, base + 52, wave_s * 0.12)
-      put_f32_le_mut_view_unchecked(bytes, base + 56, z)
-      put_f32_le_mut_view_unchecked(bytes, base + 60, 1.0)
+      put_f32_le_mut_view_unchecked(bytes, base + 44, z)
       let next_s = wave_s * cos_step + wave_c * sin_step
       wave_c = wave_c * cos_step - wave_s * sin_step
       wave_s = next_s
@@ -192,19 +188,15 @@ fn write_mass_cubes_full_wasm_bytes(
       put_f32_le_fixed_float_unchecked(bytes, base + 0, cube_scale)
       put_f32_le_fixed_float_unchecked(bytes, base + 4, 0.0)
       put_f32_le_fixed_float_unchecked(bytes, base + 8, 0.0)
-      put_f32_le_fixed_float_unchecked(bytes, base + 12, 0.0)
+      put_f32_le_fixed_float_unchecked(bytes, base + 12, x)
       put_f32_le_fixed_float_unchecked(bytes, base + 16, 0.0)
       put_f32_le_fixed_float_unchecked(bytes, base + 20, cube_scale)
       put_f32_le_fixed_float_unchecked(bytes, base + 24, 0.0)
-      put_f32_le_fixed_float_unchecked(bytes, base + 28, 0.0)
+      put_f32_le_fixed_float_unchecked(bytes, base + 28, wave_s * 0.12)
       put_f32_le_fixed_float_unchecked(bytes, base + 32, 0.0)
       put_f32_le_fixed_float_unchecked(bytes, base + 36, 0.0)
       put_f32_le_fixed_float_unchecked(bytes, base + 40, cube_scale)
-      put_f32_le_fixed_float_unchecked(bytes, base + 44, 0.0)
-      put_f32_le_fixed_float_unchecked(bytes, base + 48, x)
-      put_f32_le_fixed_float_unchecked(bytes, base + 52, wave_s * 0.12)
-      put_f32_le_fixed_float_unchecked(bytes, base + 56, z)
-      put_f32_le_fixed_float_unchecked(bytes, base + 60, 1.0)
+      put_f32_le_fixed_float_unchecked(bytes, base + 44, z)
       let next_s = wave_s * cos_step + wave_c * sin_step
       wave_c = wave_c * cos_step - wave_s * sin_step
       wave_s = next_s
@@ -233,7 +225,7 @@ fn write_mass_cubes_y_wasm_bytes(
   while local_i < count {
     put_f32_le_fixed_float_unchecked(
       bytes,
-      local_i * stride + 52,
+      local_i * stride + 28,
       wave_s * 0.12,
     )
     let next_s = wave_s * cos_step + wave_c * sin_step

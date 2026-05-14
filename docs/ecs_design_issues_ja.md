@@ -43,7 +43,7 @@
 利点:
 
 - `FixedArray[Byte]` へのコピーなしで component row を読める、書ける。
-- `Transform3D::from_component_mut_view` や `GlobalTransform::view_std140_gpu_row` のように、バイト列の上に typed view を被せられる。
+- `Transform3D::from_component_mut_view` や `GlobalTransform::view_affine3x4_gpu_row` のように、バイト列の上に typed view を被せられる。
 - CPU SoA と GPU row を同じ callback payload として扱える。
 - component 型ごとの generic / reflection が薄い MoonBit 環境でも、低レベル API を少ない型で表現できる。
 

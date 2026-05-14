@@ -333,7 +333,7 @@ function writeMassCubesFullRange(
 	waveTime: number,
 ): void {
 	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 64) {
+	if (matrices === null || stride !== 48) {
 		for (let i = 0; i < count; i += 1) {
 			const index = firstEntityIndex + i;
 			const [x, z] = gridXzForIndex(index, perSide);
@@ -342,19 +342,15 @@ function writeMassCubesFullRange(
 			bytes.setF32(base, CUBE_SCALE);
 			bytes.setF32(base + 4, 0);
 			bytes.setF32(base + 8, 0);
-			bytes.setF32(base + 12, 0);
+			bytes.setF32(base + 12, x);
 			bytes.setF32(base + 16, 0);
 			bytes.setF32(base + 20, CUBE_SCALE);
 			bytes.setF32(base + 24, 0);
-			bytes.setF32(base + 28, 0);
+			bytes.setF32(base + 28, y);
 			bytes.setF32(base + 32, 0);
 			bytes.setF32(base + 36, 0);
 			bytes.setF32(base + 40, CUBE_SCALE);
-			bytes.setF32(base + 44, 0);
-			bytes.setF32(base + 48, x);
-			bytes.setF32(base + 52, y);
-			bytes.setF32(base + 56, z);
-			bytes.setF32(base + 60, 1);
+			bytes.setF32(base + 44, z);
 		}
 		return;
 	}
@@ -377,25 +373,21 @@ function writeMassCubesFullRange(
 			matrices[out] = CUBE_SCALE;
 			matrices[out + 1] = 0;
 			matrices[out + 2] = 0;
-			matrices[out + 3] = 0;
+			matrices[out + 3] = x;
 			matrices[out + 4] = 0;
 			matrices[out + 5] = CUBE_SCALE;
 			matrices[out + 6] = 0;
-			matrices[out + 7] = 0;
+			matrices[out + 7] = waveSin * 0.12;
 			matrices[out + 8] = 0;
 			matrices[out + 9] = 0;
 			matrices[out + 10] = CUBE_SCALE;
-			matrices[out + 11] = 0;
-			matrices[out + 12] = x;
-			matrices[out + 13] = waveSin * 0.12;
-			matrices[out + 14] = z;
-			matrices[out + 15] = 1;
+			matrices[out + 11] = z;
 
 			const nextSin = waveSin * cosStep + waveCos * sinStep;
 			waveCos = waveCos * cosStep - waveSin * sinStep;
 			waveSin = nextSin;
 			localIndex += 1;
-			out += 16;
+			out += 12;
 			x += GRID_SPACING;
 		}
 		row += 1;
@@ -411,10 +403,10 @@ function writeMassCubesYRange(
 	waveTime: number,
 ): void {
 	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 64) {
+	if (matrices === null || stride !== 48) {
 		for (let i = 0; i < count; i += 1) {
 			const index = firstEntityIndex + i;
-			bytes.setF32(i * stride + 52, Math.sin(index * 0.09 + waveTime) * 0.12);
+			bytes.setF32(i * stride + 28, Math.sin(index * 0.09 + waveTime) * 0.12);
 		}
 		return;
 	}
@@ -426,12 +418,12 @@ function writeMassCubesYRange(
 	let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
 	let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
 	while (localIndex < count) {
-		matrices[out + 13] = waveSin * 0.12;
+		matrices[out + 7] = waveSin * 0.12;
 		const nextSin = waveSin * cosStep + waveCos * sinStep;
 		waveCos = waveCos * cosStep - waveSin * sinStep;
 		waveSin = nextSin;
 		localIndex += 1;
-		out += 16;
+		out += 12;
 	}
 }
 
@@ -509,7 +501,13 @@ struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
-@group(0) @binding(0) var<storage, read> world_from_entity: array<mat4x4<f32>>;
+struct WorldAffine3x4 {
+  row0: vec4<f32>,
+  row1: vec4<f32>,
+  row2: vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
 
 struct VertexOut {
@@ -525,7 +523,13 @@ fn vertexMain(
   let idx = u32(inst.x);
   let color = vec3<f32>(inst.y, inst.z, inst.w);
   let world_m = world_from_entity[idx];
-  let world_pos = world_m * vec4<f32>(local_pos, 1.0);
+  let local_h = vec4<f32>(local_pos, 1.0);
+  let world_pos = vec4<f32>(
+    dot(world_m.row0, local_h),
+    dot(world_m.row1, local_h),
+    dot(world_m.row2, local_h),
+    1.0,
+  );
   let clip = camera.view_proj * world_pos;
   var o: VertexOut;
   o.position = clip;
@@ -600,7 +604,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		.drainResizeEvents()
 		.filter((event) => event.component().index() === globalTransformComponent.index())
 		.reduce((max, event) => Math.max(max, event.requiredCapacity()), 0);
-	const transformStride = world.componentGpuLayout(globalTransformComponent)?.stride() ?? 64;
+	const transformStride = world.componentGpuLayout(globalTransformComponent)?.stride() ?? 48;
 	const transformStorage = device.createBuffer({
 		size: Math.max(maxIndexSlot, resizeCapacity) * transformStride,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,

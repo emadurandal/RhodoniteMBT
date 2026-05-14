@@ -34,6 +34,7 @@ pub fn[T : Sub + Matrix44RefElem] Matrix44Ref::sub_matrix(Self[T], Self[T]) -> @
 pub fn[T : Matrix44RefElem] Matrix44Ref::to_matrix44(Self[T]) -> @matrix44.Matrix44[T]
 pub fn Matrix44Ref::transform_point(Self[Float], @vector3.Vector3[Float]) -> @vector3.Vector3[Float]
 pub fn[T : Matrix44RefElem] Matrix44Ref::transpose(Self[T]) -> @matrix44.Matrix44[T]
+pub fn Matrix44Ref::view_affine3x4_le_gpu_row(MutArrayView[Byte]) -> Self[Float]
 pub fn Matrix44Ref::view_std140_mat4x4_le_gpu_row(MutArrayView[Byte]) -> Self[Float]
 pub fn[T : Matrix44RefElem] Matrix44Ref::write_col_major(Self[T], T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T) -> Unit
 pub fn[T : Matrix44RefElem] Matrix44Ref::write_from_cols(Self[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T], @vector4.Vector4[T]) -> Unit

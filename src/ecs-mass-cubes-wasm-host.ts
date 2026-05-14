@@ -254,7 +254,7 @@ function writeMassCubesFullTransformData(
 	perSide: number,
 	waveTime: number,
 ): void {
-	if (renderer.transformStride !== 64) {
+	if (renderer.transformStride !== 48) {
 		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
 	const matrices = renderer.transformData;
@@ -275,25 +275,21 @@ function writeMassCubesFullTransformData(
 			matrices[out] = CUBE_SCALE;
 			matrices[out + 1] = 0;
 			matrices[out + 2] = 0;
-			matrices[out + 3] = 0;
+			matrices[out + 3] = x;
 			matrices[out + 4] = 0;
 			matrices[out + 5] = CUBE_SCALE;
 			matrices[out + 6] = 0;
-			matrices[out + 7] = 0;
+			matrices[out + 7] = waveSin * 0.12;
 			matrices[out + 8] = 0;
 			matrices[out + 9] = 0;
 			matrices[out + 10] = CUBE_SCALE;
-			matrices[out + 11] = 0;
-			matrices[out + 12] = x;
-			matrices[out + 13] = waveSin * 0.12;
-			matrices[out + 14] = z;
-			matrices[out + 15] = 1;
+			matrices[out + 11] = z;
 
 			const nextSin = waveSin * cosStep + waveCos * sinStep;
 			waveCos = waveCos * cosStep - waveSin * sinStep;
 			waveSin = nextSin;
 			localIndex += 1;
-			out += 16;
+			out += 12;
 			x += GRID_SPACING;
 		}
 		row += 1;
@@ -302,7 +298,7 @@ function writeMassCubesFullTransformData(
 }
 
 function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): void {
-	if (renderer.transformStride !== 64) {
+	if (renderer.transformStride !== 48) {
 		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
 	const matrices = renderer.transformData;
@@ -313,12 +309,12 @@ function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): voi
 	let waveSin = Math.sin(waveTime);
 	let waveCos = Math.cos(waveTime);
 	while (localIndex < ENTITY_COUNT) {
-		matrices[out + 13] = waveSin * 0.12;
+		matrices[out + 7] = waveSin * 0.12;
 		const nextSin = waveSin * cosStep + waveCos * sinStep;
 		waveCos = waveCos * cosStep - waveSin * sinStep;
 		waveSin = nextSin;
 		localIndex += 1;
-		out += 16;
+		out += 12;
 	}
 }
 
@@ -347,7 +343,13 @@ struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
-@group(0) @binding(0) var<storage, read> world_from_entity: array<mat4x4<f32>>;
+struct WorldAffine3x4 {
+  row0: vec4<f32>,
+  row1: vec4<f32>,
+  row2: vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
 
 struct VertexOut {
@@ -363,7 +365,13 @@ fn vertexMain(
   let idx = u32(inst.x);
   let color = vec3<f32>(inst.y, inst.z, inst.w);
   let world_m = world_from_entity[idx];
-  let world_pos = world_m * vec4<f32>(local_pos, 1.0);
+  let local_h = vec4<f32>(local_pos, 1.0);
+  let world_pos = vec4<f32>(
+    dot(world_m.row0, local_h),
+    dot(world_m.row1, local_h),
+    dot(world_m.row2, local_h),
+    1.0,
+  );
   let clip = camera.view_proj * world_pos;
   var o: VertexOut;
   o.position = clip;
@@ -425,7 +433,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	});
 
 	const transformStorage = device.createBuffer({
-		size: ENTITY_COUNT * 64,
+		size: ENTITY_COUNT * 48,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 	});
 	const cameraUniform = device.createBuffer({
@@ -477,9 +485,9 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformStorage,
 		bindTransforms,
 		bindCamera,
-		transformData: new Float32Array(ENTITY_COUNT * 16),
+		transformData: new Float32Array(ENTITY_COUNT * 12),
 		perSide: gridSideLen(ENTITY_COUNT),
-		transformStride: 64,
+		transformStride: 48,
 	};
 }
 
