@@ -716,7 +716,6 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     if !component_array_contains(comps, co) {
       continue
     }
-    let has_child_of = component_array_contains(comps, co)
     let tf_col = arch.columns[arch.column_index(tf)]
     let tf_bytes = tf_col.bytes
     let tf_stride = tf_col.stride
@@ -732,7 +731,7 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
       ignore(
         self.compute_global_transform_for_tf_gt_bulk_row(
           e,
-          has_child_of,
+          true,
           local_m,
           gt_store.bytes.mut_view(start=gt_base, end=gt_base + 48),
         ),
