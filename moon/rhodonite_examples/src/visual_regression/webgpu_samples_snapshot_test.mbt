@@ -86,95 +86,76 @@ fn render_webgpu_sample(
 
 ///|
 fn assert_webgpu_sample(
-  filename : String,
+  sample : VisualSample,
   render : (@wgpu.GPUDevice, @wgpu.GPUQueue, String, @wgpu.GPUTextureView) -> Unit raise,
 ) -> Unit raise {
   match render_webgpu_sample(render) {
     Some(image) =>
       match_or_update_rgba_png_snapshot_perceptual(
         image,
-        filename~,
-        max_mismatch_rate=0.0005,
-        perceptual_threshold=0.1,
+        filename=sample.filename,
+        max_mismatch_rate=sample.max_mismatch_rate,
+        perceptual_threshold=sample.perceptual_threshold,
       )
     None => ()
   }
 }
 
 ///|
-test "visual WebGPU sample basic triangle PNG golden" {
-  assert_webgpu_sample("basic_triangle_sample.png", fn(
-    device,
-    queue,
-    format,
-    view,
-  ) {
-    let renderer = @basic_triangle.create_renderer_for_device(
-      device, queue, format,
-    )
-    @basic_triangle.render_frame_to_view(renderer, view)
-    renderer.release()
-  })
+test "visual WebGPU native samples PNG golden" {
+  let samples = visual_samples_for_target("native")
+  for i = 0; i < samples.length(); i = i + 1 {
+    let sample = samples[i]
+    assert_webgpu_sample(sample, fn(device, queue, format, view) raise {
+      render_native_visual_sample(sample.id, device, queue, format, view)
+    })
+  }
 }
 
 ///|
-test "visual WebGPU sample triangle with buffer PNG golden" {
-  assert_webgpu_sample("triangle_with_buffer_sample.png", fn(
-    device,
-    queue,
-    format,
-    view,
-  ) {
-    let renderer = @triangle_with_buffer.create_renderer_for_device(
-      device, queue, format,
-    )
-    @triangle_with_buffer.render_frame_to_view(renderer, view)
-    renderer.release()
-  })
-}
-
-///|
-test "visual WebGPU sample depth test PNG golden" {
-  assert_webgpu_sample("depth_test_sample.png", fn(
-    device,
-    queue,
-    format,
-    view,
-  ) {
-    let renderer = @depth_test.create_renderer_for_device(device, queue, format)
-    @depth_test.render_frame_to_view(renderer, view)
-    renderer.release()
-  })
-}
-
-///|
-test "visual WebGPU sample ECS scene graph PNG golden" {
-  assert_webgpu_sample("ecs_scene_graph_sample.png", fn(
-    device,
-    queue,
-    format,
-    view,
-  ) {
-    let renderer = @ecs_scene_graph.create_renderer_for_device(
-      device, queue, format,
-    )
-    @ecs_scene_graph.render_frame_to_view(renderer, view)
-    renderer.release()
-  })
-}
-
-///|
-test "visual WebGPU sample ECS mass cubes PNG golden" {
-  assert_webgpu_sample("ecs_mass_cubes_sample.png", fn(
-    device,
-    queue,
-    format,
-    view,
-  ) {
-    let renderer = @ecs_mass_cubes.create_renderer_for_device(
-      device, queue, format,
-    )
-    @ecs_mass_cubes.render_frame_to_view(renderer, view)
-    renderer.release()
-  })
+fn render_native_visual_sample(
+  id : String,
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  view : @wgpu.GPUTextureView,
+) -> Unit raise {
+  match id {
+    "basic-triangle" => {
+      let renderer = @basic_triangle.create_renderer_for_device(
+        device, queue, format,
+      )
+      @basic_triangle.render_frame_to_view(renderer, view)
+      renderer.release()
+    }
+    "triangle-with-buffer" => {
+      let renderer = @triangle_with_buffer.create_renderer_for_device(
+        device, queue, format,
+      )
+      @triangle_with_buffer.render_frame_to_view(renderer, view)
+      renderer.release()
+    }
+    "depth-test" => {
+      let renderer = @depth_test.create_renderer_for_device(
+        device, queue, format,
+      )
+      @depth_test.render_frame_to_view(renderer, view)
+      renderer.release()
+    }
+    "ecs-scene-graph" => {
+      let renderer = @ecs_scene_graph.create_renderer_for_device(
+        device, queue, format,
+      )
+      @ecs_scene_graph.render_frame_to_view(renderer, view)
+      renderer.release()
+    }
+    "ecs-mass-cubes" => {
+      let renderer = @ecs_mass_cubes.create_renderer_for_device(
+        device, queue, format,
+      )
+      @ecs_mass_cubes.render_frame_to_view(renderer, view)
+      renderer.release()
+    }
+    _ => @test.fail("unknown native visual regression sample id: \{id}")
+  }
 }

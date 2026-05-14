@@ -54,13 +54,24 @@ native/browser machine to create or refresh golden PNGs.
 
 ## Golden Files
 
+The visual test matrix is externalized in:
+
+```text
+moon/rhodonite_examples/src/visual_regression/visual_samples.tsv
+```
+
+Both the native MoonBit test and the browser harness read this TSV. Each row
+contains `target`, `id`, display `name`, PNG `filename`,
+`max_mismatch_rate`, and `perceptual_threshold`. Add or remove visual cases in
+this file first, then wire a renderer for any new `id` in the relevant harness.
+
 PNG golden files live under:
 
 ```text
 moon/rhodonite_examples/src/visual_regression/__image_snapshots__/
 ```
 
-The current test set covers:
+The current manifest covers:
 
 | Sample | Golden file |
 |--------|-------------|
@@ -97,15 +108,15 @@ match_or_update_rgba_png_snapshot_perceptual(
 ```
 
 `max_mismatch_rate` is the allowed ratio of differing pixels. The current sample
-tests use `0.0005`, which allows a tiny amount of backend or driver variance
-while still catching visible regressions. `perceptual_threshold` follows
-pixelmatch semantics: lower values are more sensitive, higher values tolerate
-larger perceptual color differences.
+manifest uses `0.0005`, which allows a tiny amount of backend or driver
+variance while still catching visible regressions. `perceptual_threshold`
+follows pixelmatch semantics: lower values are more sensitive, higher values
+tolerate larger perceptual color differences.
 
 Exact RGBA comparison is also available through
 `match_or_update_rgba_png_snapshot` with `channel_tolerance`.
 
-The browser harness uses the same `max_mismatch_rate=0.0005` and a YIQ-based
+The browser harness uses the per-row manifest thresholds and a YIQ-based
 perceptual threshold equivalent to pixelmatch's threshold scale. It decodes and
 encodes PNGs inside the browser using `createImageBitmap` and `OffscreenCanvas`,
 then sends comparison results or updated PNG bytes back to the Node runner.
@@ -122,6 +133,8 @@ then sends comparison results or updated PNG bytes back to the Node runner.
 - Sample renderers expose `create_renderer_for_device` and
   `render_frame_to_view`, so the same renderer state and draw code can target a
   swapchain view or an offscreen test texture.
+- The sample list and thresholds are data in `visual_samples.tsv`; code only
+  maps manifest `id` values to concrete native/browser renderer entry points.
 - Browser visual tests are driven by `scripts/run-browser-visual-regression.mjs`,
   which starts Vite and a separate local result server, opens a headless
   Chrome/Chromium page, and waits for the page to POST its result. Browser

@@ -68,6 +68,16 @@ moonbit_bytes_t rhodonite_visual_read_binary_file(moonbit_string_t path_s) {
   return out;
 }
 
+moonbit_string_t rhodonite_visual_read_text_file(moonbit_string_t path_s) {
+  moonbit_bytes_t bytes = rhodonite_visual_read_binary_file(path_s);
+  int32_t len = Moonbit_array_length(bytes);
+  moonbit_string_t out = moonbit_make_string_raw(len);
+  for (int32_t i = 0; i < len; i++) {
+    ((uint16_t *)out)[i] = (uint16_t)(unsigned char)bytes[i];
+  }
+  return out;
+}
+
 void rhodonite_visual_write_binary_file(
   moonbit_string_t path_s,
   moonbit_bytes_t data

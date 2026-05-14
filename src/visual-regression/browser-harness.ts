@@ -1,16 +1,27 @@
 const width = 800;
 const height = 600;
-const maxMismatchRate = 0.0005;
-const perceptualThreshold = 0.1;
+const manifestPath =
+	"/moon/rhodonite_examples/src/visual_regression/visual_samples.tsv";
 const snapshotDir =
 	"/moon/rhodonite_examples/src/visual_regression/__image_snapshots__/";
 const resultEndpoint =
 	new URLSearchParams(window.location.search).get("result") ??
 	"/__rhodonite_visual_regression_browser__";
 
+type VisualSampleManifestEntry = {
+	target: string;
+	id: string;
+	name: string;
+	filename: string;
+	maxMismatchRate: number;
+	perceptualThreshold: number;
+};
+
 type BrowserSnapshotSample = {
 	name: string;
 	filename: string;
+	maxMismatchRate: number;
+	perceptualThreshold: number;
 	render: () => Promise<Uint8Array>;
 };
 
@@ -113,8 +124,9 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	const samples = createSamples(snapshotModule);
-	await addMassCubesVariantSamples(samples);
+	const manifest = await loadVisualManifest("browser");
+	const renderers = await createRendererRegistry(snapshotModule);
+	const samples = createSamples(manifest, renderers);
 
 	const results: SampleResult[] = [];
 	const failures: SampleFailure[] = [];
@@ -147,7 +159,7 @@ async function main(): Promise<void> {
 			const mismatches = countPerceptualMismatches(
 				actual,
 				expected,
-				perceptualThreshold,
+				sample.perceptualThreshold,
 			);
 			const mismatchRate = mismatches / (width * height);
 			results.push({
@@ -156,11 +168,11 @@ async function main(): Promise<void> {
 				mismatches,
 				mismatchRate,
 			});
-			if (mismatchRate > maxMismatchRate) {
+			if (mismatchRate > sample.maxMismatchRate) {
 				failures.push({
 					name: sample.name,
 					filename: sample.filename,
-					message: `mismatch rate ${mismatchRate} exceeds ${maxMismatchRate}: ${mismatches}/${width * height} pixels differ`,
+					message: `mismatch rate ${mismatchRate} exceeds ${sample.maxMismatchRate}: ${mismatches}/${width * height} pixels differ`,
 				});
 			}
 		} catch (error) {
@@ -189,48 +201,28 @@ async function main(): Promise<void> {
 	});
 }
 
-function createSamples(snapshotModule: SnapshotModule): BrowserSnapshotSample[] {
-	return [
-		{
-			name: "basic-triangle browser",
-			filename: "basic_triangle_browser_sample.png",
-			render: async () =>
-				toUint8Array(await snapshotModule.render_basic_triangle_browser_snapshot()),
-		},
-		{
-			name: "triangle-with-buffer browser",
-			filename: "triangle_with_buffer_browser_sample.png",
-			render: async () =>
-				toUint8Array(
-					await snapshotModule.render_triangle_with_buffer_browser_snapshot(),
-				),
-		},
-		{
-			name: "depth-test browser",
-			filename: "depth_test_browser_sample.png",
-			render: async () =>
-				toUint8Array(await snapshotModule.render_depth_test_browser_snapshot()),
-		},
-		{
-			name: "ecs-scene-graph browser",
-			filename: "ecs_scene_graph_browser_sample.png",
-			render: async () =>
-				toUint8Array(
-					await snapshotModule.render_ecs_scene_graph_browser_snapshot(),
-				),
-		},
-		{
-			name: "ecs-mass-cubes browser",
-			filename: "ecs_mass_cubes_browser_sample.png",
-			render: async () =>
-				toUint8Array(await snapshotModule.render_ecs_mass_cubes_browser_snapshot()),
-		},
-	];
+function createSamples(
+	manifest: VisualSampleManifestEntry[],
+	renderers: Map<string, () => Promise<Uint8Array>>,
+): BrowserSnapshotSample[] {
+	return manifest.map((entry) => {
+		const render = renderers.get(entry.id);
+		if (!render) {
+			throw new Error(`unknown browser visual regression sample id: ${entry.id}`);
+		}
+		return {
+			name: entry.name,
+			filename: entry.filename,
+			maxMismatchRate: entry.maxMismatchRate,
+			perceptualThreshold: entry.perceptualThreshold,
+			render,
+		};
+	});
 }
 
-async function addMassCubesVariantSamples(
-	samples: BrowserSnapshotSample[],
-): Promise<void> {
+async function createRendererRegistry(
+	snapshotModule: SnapshotModule,
+): Promise<Map<string, () => Promise<Uint8Array>>> {
 	const [tsModule, wasmHost, wasmModule, wasmGcModule] = await Promise.all([
 		import("../main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
 		import("../ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
@@ -241,36 +233,126 @@ async function addMassCubesVariantSamples(
 			"../../_build/wasm-gc/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
 		) as Promise<{ default: string }>,
 	]);
-	samples.push(
-		{
-			name: "ts-ecs-mass-cubes browser",
-			filename: "ts_ecs_mass_cubes_browser_sample.png",
-			render: async () =>
+	return new Map<string, () => Promise<Uint8Array>>([
+		[
+			"basic-triangle",
+			async () =>
+				toUint8Array(await snapshotModule.render_basic_triangle_browser_snapshot()),
+		],
+		[
+			"triangle-with-buffer",
+			async () =>
+				toUint8Array(
+					await snapshotModule.render_triangle_with_buffer_browser_snapshot(),
+				),
+		],
+		[
+			"depth-test",
+			async () =>
+				toUint8Array(await snapshotModule.render_depth_test_browser_snapshot()),
+		],
+		[
+			"ecs-scene-graph",
+			async () =>
+				toUint8Array(
+					await snapshotModule.render_ecs_scene_graph_browser_snapshot(),
+				),
+		],
+		[
+			"ecs-mass-cubes",
+			async () =>
+				toUint8Array(await snapshotModule.render_ecs_mass_cubes_browser_snapshot()),
+		],
+		[
+			"ts-ecs-mass-cubes",
+			async () =>
 				toUint8Array(await tsModule.renderTsEcsMassCubesBrowserSnapshot()),
-		},
-		{
-			name: "wasm-ecs-mass-cubes browser",
-			filename: "wasm_ecs_mass_cubes_browser_sample.png",
-			render: async () =>
+		],
+		[
+			"wasm-ecs-mass-cubes",
+			async () =>
 				toUint8Array(
 					await wasmHost.renderEcsMassCubesWasmSnapshot(
 						wasmModule.default,
 						"WASM",
 					),
 				),
-		},
-		{
-			name: "wasm-gc-ecs-mass-cubes browser",
-			filename: "wasm_gc_ecs_mass_cubes_browser_sample.png",
-			render: async () =>
+		],
+		[
+			"wasm-gc-ecs-mass-cubes",
+			async () =>
 				toUint8Array(
 					await wasmHost.renderEcsMassCubesWasmSnapshot(
 						wasmGcModule.default,
 						"WASM-GC",
 					),
 				),
-		},
-	);
+		],
+	]);
+}
+
+async function loadVisualManifest(
+	target: string,
+): Promise<VisualSampleManifestEntry[]> {
+	const response = await fetch(`${manifestPath}?t=${Date.now()}`);
+	if (!response.ok) {
+		throw new Error(`visual regression manifest is missing: ${manifestPath}`);
+	}
+	const manifest = await response.text();
+	const samples = parseVisualManifest(manifest, target);
+	if (samples.length === 0) {
+		throw new Error(`visual regression manifest has no samples for ${target}`);
+	}
+	return samples;
+}
+
+function parseVisualManifest(
+	manifest: string,
+	target: string,
+): VisualSampleManifestEntry[] {
+	return manifest
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0 && !line.startsWith("#"))
+		.map((line, index) => {
+			const fields = line.split("\t");
+			if (fields.length !== 6) {
+				throw new Error(
+					`visual regression manifest line ${index + 1} must have 6 TSV fields`,
+				);
+			}
+			const [
+				sampleTarget,
+				id,
+				name,
+				filename,
+				maxMismatchRate,
+				perceptualThreshold,
+			] = fields.map((field) => field.trim());
+			return {
+				target: sampleTarget,
+				id,
+				name,
+				filename,
+				maxMismatchRate: parseManifestNumber(
+					maxMismatchRate,
+					"max_mismatch_rate",
+				),
+				perceptualThreshold: parseManifestNumber(
+					perceptualThreshold,
+					"perceptual_threshold",
+				),
+			};
+		})
+		.filter((entry) => entry.target === target);
+}
+
+function parseManifestNumber(value: string, field: string): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) {
+		throw new Error(`visual regression manifest ${field} is not a number: ${value}`);
+	}
+	return parsed;
 }
 
 function toUint8Array(value: unknown): Uint8Array {

@@ -12,6 +12,11 @@ extern "C" fn read_binary_file(path : String) -> Bytes = "rhodonite_visual_read_
 
 ///|
 #cfg(target="native")
+#borrow(path)
+extern "C" fn read_text_file(path : String) -> String = "rhodonite_visual_read_text_file"
+
+///|
+#cfg(target="native")
 #borrow(path, data)
 extern "C" fn write_binary_file(path : String, data : Bytes) -> Unit = "rhodonite_visual_write_binary_file"
 
