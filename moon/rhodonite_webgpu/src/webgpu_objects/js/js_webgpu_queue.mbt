@@ -53,7 +53,7 @@ extern "js" fn queue_writeBuffer_bytes_range(
   size : Double,
 ) -> Unit =
   #| (queue, buffer, offset, data, dataOffset, size) => {
-  #|   queue.writeBuffer(buffer, offset, data.subarray(dataOffset, dataOffset + size));
+  #|   queue.writeBuffer(buffer, offset, data, dataOffset, size);
   #| }
 
 ///|

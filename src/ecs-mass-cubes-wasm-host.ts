@@ -10,6 +10,28 @@ const INDEX_U16_COUNT = 36;
 const CAMERA_ELEVATION_RAD = 0.42;
 const GRID_SPACING = 0.14;
 const CUBE_SCALE = 0.055;
+const TRANSFORM_WORDS_PER_ENTITY = 6;
+const TRANSFORM_BYTES_PER_ENTITY = TRANSFORM_WORDS_PER_ENTITY * 4;
+const F16_SCRATCH_F32 = new Float32Array(1);
+const F16_SCRATCH_U32 = new Uint32Array(F16_SCRATCH_F32.buffer);
+const F32_TO_F16_BASE = new Uint16Array(512);
+const F32_TO_F16_SHIFT = new Uint8Array(512);
+type Float16ArrayLike = {
+	readonly length: number;
+	[index: number]: number;
+};
+type Float16ArrayConstructorLike = {
+	new (
+		buffer: ArrayBufferLike,
+		byteOffset?: number,
+		length?: number,
+	): Float16ArrayLike;
+};
+const Float16ArrayCtor = (
+	globalThis as typeof globalThis & {
+		Float16Array?: Float16ArrayConstructorLike;
+	}
+).Float16Array;
 
 type Mat4 = Float32Array;
 
@@ -25,7 +47,8 @@ type Renderer = {
 	readonly transformStorage: GPUBuffer;
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
-	readonly transformData: Float32Array;
+	readonly transformBytes: Uint8Array;
+	readonly transformHalves: Float16ArrayLike | Uint16Array;
 	perSide: number;
 	transformStride: number;
 	wasmTransformUploadBuffer?: ArrayBufferLike;
@@ -33,6 +56,39 @@ type Renderer = {
 	wasmTransformUploadByteLength?: number;
 	wasmTransformUploadView?: Uint8Array;
 };
+
+for (let i = 0; i < 256; i += 1) {
+	const e = i - 127;
+	if (e < -24) {
+		F32_TO_F16_BASE[i] = 0x0000;
+		F32_TO_F16_BASE[i | 0x100] = 0x8000;
+		F32_TO_F16_SHIFT[i] = 24;
+		F32_TO_F16_SHIFT[i | 0x100] = 24;
+	} else if (e < -14) {
+		const base = 0x0400 >> (-e - 14);
+		const shift = -e - 1;
+		F32_TO_F16_BASE[i] = base;
+		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
+		F32_TO_F16_SHIFT[i] = shift;
+		F32_TO_F16_SHIFT[i | 0x100] = shift;
+	} else if (e <= 15) {
+		const base = (e + 15) << 10;
+		F32_TO_F16_BASE[i] = base;
+		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
+		F32_TO_F16_SHIFT[i] = 13;
+		F32_TO_F16_SHIFT[i | 0x100] = 13;
+	} else if (e < 128) {
+		F32_TO_F16_BASE[i] = 0x7c00;
+		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
+		F32_TO_F16_SHIFT[i] = 24;
+		F32_TO_F16_SHIFT[i | 0x100] = 24;
+	} else {
+		F32_TO_F16_BASE[i] = 0x7c00;
+		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
+		F32_TO_F16_SHIFT[i] = 13;
+		F32_TO_F16_SHIFT[i | 0x100] = 13;
+	}
+}
 
 type WasmExports = {
 	_start?: () => void;
@@ -67,6 +123,21 @@ function writeU32(bytes: Uint8Array, offset: number, value: number): void {
 		value,
 		true,
 	);
+}
+
+function f32ToF16Bits(value: number): number {
+	F16_SCRATCH_F32[0] = Math.fround(value);
+	const bits = F16_SCRATCH_U32[0] ?? 0;
+	const index = (bits >>> 23) & 0x1ff;
+	return (F32_TO_F16_BASE[index] ?? 0) + ((bits & 0x007fffff) >>> (F32_TO_F16_SHIFT[index] ?? 24));
+}
+
+function writeHalf(halves: Float16ArrayLike | Uint16Array, index: number, value: number): void {
+	if (Float16ArrayCtor !== undefined) {
+		halves[index] = value;
+	} else {
+		halves[index] = f32ToF16Bits(value);
+	}
 }
 
 function mat4Identity(): Mat4 {
@@ -250,13 +321,13 @@ function instanceColorRgb(index: number): [number, number, number] {
 function instanceBytes(): Uint8Array {
 	const bytes = new Uint8Array(ENTITY_COUNT * INSTANCE_STRIDE);
 	for (let index = 0; index < ENTITY_COUNT; index += 1) {
-		const [r, g, b] = instanceColorRgb(index);
-		const base = index * INSTANCE_STRIDE;
-		writeU32(bytes, base, 0);
-		writeU32(bytes, base + 4, index * 12);
-		writeF32(bytes, base + 8, r);
-		writeF32(bytes, base + 12, g);
-		writeF32(bytes, base + 16, b);
+			const [r, g, b] = instanceColorRgb(index);
+			const base = index * INSTANCE_STRIDE;
+			writeU32(bytes, base, 1);
+			writeU32(bytes, base + 4, index * TRANSFORM_WORDS_PER_ENTITY);
+			writeF32(bytes, base + 8, r);
+			writeF32(bytes, base + 12, g);
+			writeF32(bytes, base + 16, b);
 	}
 	return bytes;
 }
@@ -266,10 +337,10 @@ function writeMassCubesFullTransformData(
 	perSide: number,
 	waveTime: number,
 ): void {
-	if (renderer.transformStride !== 48) {
+	if (renderer.transformStride !== TRANSFORM_BYTES_PER_ENTITY) {
 		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
-	const matrices = renderer.transformData;
+	const halves = renderer.transformHalves;
 	const half = (perSide - 1) * 0.5;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
@@ -280,22 +351,22 @@ function writeMassCubesFullTransformData(
 	while (localIndex < ENTITY_COUNT) {
 		const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
 		let x = (column - half) * GRID_SPACING;
-		const z = (row - half) * GRID_SPACING;
-		let waveSin = Math.sin(localIndex * 0.09 + waveTime);
-		let waveCos = Math.cos(localIndex * 0.09 + waveTime);
-		for (let ix = 0; ix < rowCount; ix += 1) {
-			matrices[out] = CUBE_SCALE;
-			matrices[out + 1] = 0;
-			matrices[out + 2] = 0;
-			matrices[out + 3] = x;
-			matrices[out + 4] = 0;
-			matrices[out + 5] = CUBE_SCALE;
-			matrices[out + 6] = 0;
-			matrices[out + 7] = waveSin * 0.12;
-			matrices[out + 8] = 0;
-			matrices[out + 9] = 0;
-			matrices[out + 10] = CUBE_SCALE;
-			matrices[out + 11] = z;
+			const z = (row - half) * GRID_SPACING;
+			let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+			let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+			for (let ix = 0; ix < rowCount; ix += 1) {
+				writeHalf(halves, out, CUBE_SCALE);
+				writeHalf(halves, out + 1, 0);
+				writeHalf(halves, out + 2, 0);
+				writeHalf(halves, out + 3, x);
+				writeHalf(halves, out + 4, 0);
+				writeHalf(halves, out + 5, CUBE_SCALE);
+				writeHalf(halves, out + 6, 0);
+				writeHalf(halves, out + 7, waveSin * 0.12);
+				writeHalf(halves, out + 8, 0);
+				writeHalf(halves, out + 9, 0);
+				writeHalf(halves, out + 10, CUBE_SCALE);
+				writeHalf(halves, out + 11, z);
 
 			const nextSin = waveSin * cosStep + waveCos * sinStep;
 			waveCos = waveCos * cosStep - waveSin * sinStep;
@@ -310,23 +381,34 @@ function writeMassCubesFullTransformData(
 }
 
 function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): void {
-	if (renderer.transformStride !== 48) {
+	if (renderer.transformStride !== TRANSFORM_BYTES_PER_ENTITY) {
 		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
-	const matrices = renderer.transformData;
+	const halves = renderer.transformHalves;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
 	let localIndex = 0;
 	let out = 0;
 	let waveSin = Math.sin(waveTime);
 	let waveCos = Math.cos(waveTime);
-	while (localIndex < ENTITY_COUNT) {
-		matrices[out + 7] = waveSin * 0.12;
-		const nextSin = waveSin * cosStep + waveCos * sinStep;
-		waveCos = waveCos * cosStep - waveSin * sinStep;
-		waveSin = nextSin;
-		localIndex += 1;
-		out += 12;
+	if (Float16ArrayCtor !== undefined) {
+		while (localIndex < ENTITY_COUNT) {
+			halves[out + 7] = waveSin * 0.12;
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			localIndex += 1;
+			out += 12;
+		}
+	} else {
+		while (localIndex < ENTITY_COUNT) {
+			halves[out + 7] = f32ToF16Bits(waveSin * 0.12);
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			localIndex += 1;
+			out += 12;
+		}
 	}
 }
 
@@ -417,25 +499,16 @@ fn vertexMain(
   @location(1) transform_ref: vec2<u32>,
   @location(2) color: vec3<f32>,
 ) -> VertexOut {
-  let word_offset = transform_ref.y;
-  let row0 = vec4<f32>(
-    bitcast<f32>(transform_words[word_offset + 0u]),
-    bitcast<f32>(transform_words[word_offset + 1u]),
-    bitcast<f32>(transform_words[word_offset + 2u]),
-    bitcast<f32>(transform_words[word_offset + 3u]),
-  );
-  let row1 = vec4<f32>(
-    bitcast<f32>(transform_words[word_offset + 4u]),
-    bitcast<f32>(transform_words[word_offset + 5u]),
-    bitcast<f32>(transform_words[word_offset + 6u]),
-    bitcast<f32>(transform_words[word_offset + 7u]),
-  );
-  let row2 = vec4<f32>(
-    bitcast<f32>(transform_words[word_offset + 8u]),
-    bitcast<f32>(transform_words[word_offset + 9u]),
-    bitcast<f32>(transform_words[word_offset + 10u]),
-    bitcast<f32>(transform_words[word_offset + 11u]),
-  );
+	  let word_offset = transform_ref.y;
+	  let r0xy = unpack2x16float(transform_words[word_offset + 0u]);
+	  let r0zw = unpack2x16float(transform_words[word_offset + 1u]);
+	  let r1xy = unpack2x16float(transform_words[word_offset + 2u]);
+	  let r1zw = unpack2x16float(transform_words[word_offset + 3u]);
+	  let r2xy = unpack2x16float(transform_words[word_offset + 4u]);
+	  let r2zw = unpack2x16float(transform_words[word_offset + 5u]);
+	  let row0 = vec4<f32>(r0xy.x, r0xy.y, r0zw.x, r0zw.y);
+	  let row1 = vec4<f32>(r1xy.x, r1xy.y, r1zw.x, r1zw.y);
+	  let row2 = vec4<f32>(r2xy.x, r2xy.y, r2zw.x, r2zw.y);
   let local_h = vec4<f32>(local_pos, 1.0);
   let world_pos = vec4<f32>(
     dot(row0, local_h),
@@ -507,7 +580,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	});
 
 	const transformStorage = device.createBuffer({
-		size: ENTITY_COUNT * 48,
+		size: ENTITY_COUNT * TRANSFORM_BYTES_PER_ENTITY,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 	});
 	const cameraUniform = device.createBuffer({
@@ -547,6 +620,11 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		usage: GPUTextureUsage.RENDER_ATTACHMENT,
 	});
 
+	const transformBytes = new Uint8Array(ENTITY_COUNT * TRANSFORM_BYTES_PER_ENTITY);
+	const transformHalves =
+		Float16ArrayCtor !== undefined
+			? new Float16ArrayCtor(transformBytes.buffer, transformBytes.byteOffset, transformBytes.byteLength >>> 1)
+			: new Uint16Array(transformBytes.buffer, transformBytes.byteOffset, transformBytes.byteLength >>> 1);
 	return {
 		context,
 		device,
@@ -559,9 +637,10 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformStorage,
 		bindTransforms,
 		bindCamera,
-		transformData: new Float32Array(ENTITY_COUNT * 12),
+		transformBytes,
+		transformHalves,
 		perSide: gridSideLen(ENTITY_COUNT),
-		transformStride: 48,
+		transformStride: TRANSFORM_BYTES_PER_ENTITY,
 	};
 }
 
@@ -585,15 +664,15 @@ function createHostImports(
 			initialize_renderer: (perSide: number, transformStride: number) => {
 				renderer.perSide = perSide;
 				renderer.transformStride = transformStride;
-			},
-			write_initial_global_transforms: (perSide: number, waveTime: number) => {
-				writeMassCubesFullTransformData(renderer, perSide, waveTime);
-				renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformData);
-			},
-			write_global_transform_y: (waveTime: number) => {
-				writeMassCubesYTransformData(renderer, waveTime);
-				renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformData);
-			},
+				},
+				write_initial_global_transforms: (perSide: number, waveTime: number) => {
+					writeMassCubesFullTransformData(renderer, perSide, waveTime);
+					renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformBytes);
+				},
+				write_global_transform_y: (waveTime: number) => {
+					writeMassCubesYTransformData(renderer, waveTime);
+					renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformBytes);
+				},
 			write_initial_global_transform_bytes: (ptr: number, byteLength: number) => {
 				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
 			},

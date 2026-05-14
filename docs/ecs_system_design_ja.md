@@ -173,7 +173,7 @@ query.for_each(world, fn(row) {
 
 builtin transform propagation のように連続 entity index をまとめて更新できる bulk path は、個別 dirty index ではなく dirty range を積めます。`drain_gpu_writes` は dirty range と個別 dirty index を統合し、重複 upload を避けながら owned bytes の `GpuWrite` を返します。即時 upload では `drain_gpu_write_views` が同じ dirty queue を消費し、JS / native とも `GpuComponentStore` の backing を `ArrayView[Byte]` として借用します。
 
-即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` の subarray をそのまま渡せます。native でも同 helper が `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡すため、view を新しい `Bytes` に compact しません。借用 view は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
+即時 upload する renderer path では `World::drain_gpu_write_views` を使えます。これは同じ dirty queue を消費しますが、payload を `FixedArray[Byte]` にコピーせず、`GpuWriteView` として `ArrayView[Byte]` を返します。JS では `GPUQueue::write_buffer_from_array_view` が underlying `Uint8Array` と source offset / size を `GPUQueue.writeBuffer` に渡します。native でも同 helper が `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡すため、view を新しい `Bytes` に compact しません。借用 view は `GpuComponentStore` の backing storage を指すため、同じ GPU component store を次に resize / mutate する前に upload まで使い切る前提です。
 
 ## Builtin Transform System
 

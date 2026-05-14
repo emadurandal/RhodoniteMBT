@@ -316,7 +316,7 @@ The built-in transform update can also be registered with `transform_propagation
 For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
-- `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards this as a `Uint8Array.subarray` to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
+- `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards the backing `Uint8Array` plus source offset/size to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 
 Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) and [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) now bind one storage buffer as `array<u32>`. Their instance buffers carry an 8-byte `GlobalTransform` ref (`format`, `word_offset`) plus color, and the WGSL loads either 12 f32 words or 6 packed-f16 words from the same blob in one draw.
 
@@ -329,7 +329,7 @@ Packed GlobalTransform upload APIs:
 - `extract_global_transform_refs(entities)` returns a tightly packed ref blob for JS/TS callers.
 - `global_transform_blob_word_capacity()` sizes the WebGPU storage buffer in `u32` words.
 - `drain_global_transform_blob_write_views()` returns borrowed byte ranges for the packed blob.
-- `write_global_transform_blob_range_views(first_word, word_count, write)` lends a mutable blob byte range for renderer-owned bulk writers, marks that word range dirty, and returns borrowed upload views. This is the hot path used by the TS mass-cubes demo.
+- `write_global_transform_blob_range_views(first_word, word_count, write)` lends a mutable blob byte range for renderer-owned bulk writers, marks that word range dirty, and returns borrowed upload views. This is the hot path used by the MassCubes demos when their transform refs are dense.
 - `drain_global_transform_blob_resize_events()` reports packed blob growth; renderers should recreate the storage buffer and full-upload when needed.
 
 ---

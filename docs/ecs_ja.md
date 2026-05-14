@@ -329,7 +329,7 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 WebGPU upload 側には次の API があります。
 
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
-- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
+- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では backing `Uint8Array` と source offset / size を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 
 実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は、`array<u32>` の storage buffer を 1 本 bind します。instance buffer には 8 byte の `GlobalTransform` ref（`format`, `word_offset`）と color を持たせ、WGSL が同じ blob から 12 個の f32 word または 6 個の packed-f16 word を読みます。精度差で draw を分けません。
 
@@ -342,7 +342,7 @@ Packed GlobalTransform upload API:
 - `extract_global_transform_refs(entities)`: JS/TS 向けに tightly packed な ref blob を返します。
 - `global_transform_blob_word_capacity()`: WebGPU storage buffer の `u32` word capacity です。
 - `drain_global_transform_blob_write_views()`: packed blob の dirty byte range を借用 view で返します。
-- `write_global_transform_blob_range_views(first_word, word_count, write)`: renderer 側 bulk writer に mutable blob byte range を貸し、対象 word range を dirty にして借用 upload view を返します。TS mass-cubes demo の hot path はこれを使います。
+- `write_global_transform_blob_range_views(first_word, word_count, write)`: renderer 側 bulk writer に mutable blob byte range を貸し、対象 word range を dirty にして借用 upload view を返します。MassCubes demo 群は transform ref が dense な場合、この hot path を使います。
 - `drain_global_transform_blob_resize_events()`: packed blob の growth 通知です。renderer は storage buffer を作り直し、必要に応じて full upload します。
 
 ---

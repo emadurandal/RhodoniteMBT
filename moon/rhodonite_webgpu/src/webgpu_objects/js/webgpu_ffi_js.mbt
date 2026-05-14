@@ -395,7 +395,7 @@ extern "js" fn queue_writeBuffer_array_view(
   data : ArrayView[Byte],
 ) -> Unit =
   #| (queue, buffer, offset, data) =>
-  #|   queue.writeBuffer(buffer, offset, data.buf.subarray(data.start, data.end))
+  #|   queue.writeBuffer(buffer, offset, data.buf, data.start, data.end - data.start)
 
 ///|
 extern "js" fn queue_submit(

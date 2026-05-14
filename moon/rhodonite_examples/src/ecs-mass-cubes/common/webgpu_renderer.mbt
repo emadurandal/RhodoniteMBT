@@ -266,6 +266,7 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+#cfg(not(any(target="js", target="native")))
 fn f32_to_f16_bits(value : Float) -> UInt {
   let bits = value.reinterpret_as_uint()
   let sign = (bits >> 16) & 0x8000U
@@ -301,6 +302,7 @@ fn f32_to_f16_bits(value : Float) -> UInt {
 }
 
 ///|
+#cfg(not(any(target="js", target="native")))
 fn put_packed_f16x2_mut_view(
   buf : MutArrayView[Byte],
   byte_offset : Int,
@@ -312,6 +314,7 @@ fn put_packed_f16x2_mut_view(
 }
 
 ///|
+#cfg(not(any(target="js", target="native")))
 fn put_f32_word_mut_view(
   buf : MutArrayView[Byte],
   word_offset : Int,
@@ -348,6 +351,255 @@ fn detect_dense_transform_layout(
 }
 
 ///|
+#cfg(target="js")
+extern "js" fn write_mass_cubes_transform_blob_dense_js(
+  bytes : MutArrayView[Byte],
+  format_code : UInt,
+  words_per_entity : Int,
+  entity_count : Int,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+  cube_scale : Float,
+  grid_spacing : Double,
+) -> Unit =
+  #| (
+  #|   bytes,
+  #|   formatCode,
+  #|   wordsPerEntity,
+  #|   entityCount,
+  #|   perSide,
+  #|   t,
+  #|   fullRows,
+  #|   cubeScale,
+  #|   gridSpacing,
+  #| ) => {
+  #|   const src = bytes.buf;
+  #|   const start = bytes.start;
+  #|   const byteLength = bytes.end - bytes.start;
+  #|   if (!ArrayBuffer.isView(src)) {
+  #|     throw new Error("MassCubes dense transform blob requires typed byte storage.");
+  #|   }
+  #|   const waveTime = t * 1.8;
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   const isF16 = formatCode === 1;
+  #|   let f32ToF16Bits = null;
+  #|   const makeF16Bits = () => {
+  #|     let cache = globalThis.__rhodonite_f32_to_f16_table;
+  #|     if (!cache) {
+  #|       const base = new Uint16Array(512);
+  #|       const shift = new Uint8Array(512);
+  #|       for (let i = 0; i < 256; i++) {
+  #|         const e = i - 127;
+  #|         if (e < -24) {
+  #|           base[i] = 0x0000;
+  #|           base[i | 0x100] = 0x8000;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else if (e < -14) {
+  #|           const b = 0x0400 >> (-e - 14);
+  #|           const s = -e - 1;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = s;
+  #|           shift[i | 0x100] = s;
+  #|         } else if (e <= 15) {
+  #|           const b = (e + 15) << 10;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         } else if (e < 128) {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         }
+  #|       }
+  #|       const scratchF32 = new Float32Array(1);
+  #|       const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|       cache = globalThis.__rhodonite_f32_to_f16_table = {
+  #|         base,
+  #|         shift,
+  #|         scratchF32,
+  #|         scratchU32,
+  #|       };
+  #|     }
+  #|     return (value) => {
+  #|       cache.scratchF32[0] = Math.fround(value);
+  #|       const bits = cache.scratchU32[0] >>> 0;
+  #|       const index = (bits >>> 23) & 0x1ff;
+  #|       return cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
+  #|     };
+  #|   };
+  #|   if (isF16) {
+  #|     let halfRows = null;
+  #|     const Float16ArrayCtor = globalThis.Float16Array;
+  #|     if (typeof Float16ArrayCtor === "function") {
+  #|       halfRows = new Float16ArrayCtor(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|     } else {
+  #|       halfRows = new Uint16Array(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|       f32ToF16Bits = makeF16Bits();
+  #|     }
+  #|     const writeHalf = f32ToF16Bits === null
+  #|       ? (index, value) => { halfRows[index] = value; }
+  #|       : (index, value) => { halfRows[index] = f32ToF16Bits(value); };
+  #|     if (!fullRows) {
+  #|       let waveSin = Math.sin(waveTime);
+  #|       let waveCos = Math.cos(waveTime);
+  #|       for (let i = 0; i < entityCount; i++) {
+  #|         writeHalf(i * 12 + 7, waveSin * 0.12);
+  #|         const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|         waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|         waveSin = nextSin;
+  #|       }
+  #|       return;
+  #|     }
+  #|     const half = (perSide - 1) * 0.5;
+  #|     let localIndex = 0;
+  #|     let row = 0;
+  #|     while (localIndex < entityCount) {
+  #|       const rowCount = Math.min(perSide, entityCount - localIndex);
+  #|       let x = -half * gridSpacing;
+  #|       const z = (row - half) * gridSpacing;
+  #|       let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+  #|       let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+  #|       for (let ix = 0; ix < rowCount; ix++) {
+  #|         const out = localIndex * 12;
+  #|         writeHalf(out, cubeScale);
+  #|         writeHalf(out + 1, 0);
+  #|         writeHalf(out + 2, 0);
+  #|         writeHalf(out + 3, x);
+  #|         writeHalf(out + 4, 0);
+  #|         writeHalf(out + 5, cubeScale);
+  #|         writeHalf(out + 6, 0);
+  #|         writeHalf(out + 7, waveSin * 0.12);
+  #|         writeHalf(out + 8, 0);
+  #|         writeHalf(out + 9, 0);
+  #|         writeHalf(out + 10, cubeScale);
+  #|         writeHalf(out + 11, z);
+  #|         const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|         waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|         waveSin = nextSin;
+  #|         localIndex++;
+  #|         x += gridSpacing;
+  #|       }
+  #|       row++;
+  #|     }
+  #|     return;
+  #|   }
+  #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   if (!fullRows) {
+  #|     let waveSin = Math.sin(waveTime);
+  #|     let waveCos = Math.cos(waveTime);
+  #|     for (let i = 0; i < entityCount; i++) {
+  #|       floats[i * wordsPerEntity + 7] = waveSin * 0.12;
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|     }
+  #|     return;
+  #|   }
+  #|   const half = (perSide - 1) * 0.5;
+  #|   let localIndex = 0;
+  #|   let row = 0;
+  #|   while (localIndex < entityCount) {
+  #|     const rowCount = Math.min(perSide, entityCount - localIndex);
+  #|     let x = -half * gridSpacing;
+  #|     const z = (row - half) * gridSpacing;
+  #|     let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+  #|     let waveCos = Math.cos(localIndex * 0.09 + waveTime);
+  #|     for (let ix = 0; ix < rowCount; ix++) {
+  #|       const out = localIndex * wordsPerEntity;
+  #|       floats[out] = cubeScale;
+  #|       floats[out + 1] = 0;
+  #|       floats[out + 2] = 0;
+  #|       floats[out + 3] = x;
+  #|       floats[out + 4] = 0;
+  #|       floats[out + 5] = cubeScale;
+  #|       floats[out + 6] = 0;
+  #|       floats[out + 7] = waveSin * 0.12;
+  #|       floats[out + 8] = 0;
+  #|       floats[out + 9] = 0;
+  #|       floats[out + 10] = cubeScale;
+  #|       floats[out + 11] = z;
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|       localIndex++;
+  #|       x += gridSpacing;
+  #|     }
+  #|     row++;
+  #|   }
+  #| }
+
+///|
+#cfg(target="js")
+fn write_mass_cubes_transform_blob_dense(
+  bytes : MutArrayView[Byte],
+  layout : DenseTransformLayout,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+) -> Unit {
+  write_mass_cubes_transform_blob_dense_js(
+    bytes,
+    @comp.global_transform_format_code(layout.format),
+    layout.words_per_entity,
+    entity_count,
+    per_side,
+    t,
+    full_rows,
+    cube_scale,
+    grid_spacing,
+  )
+}
+
+///|
+#cfg(target="native")
+#borrow(bytes)
+extern "C" fn write_mass_cubes_transform_blob_dense_native(
+  bytes : MutArrayView[Byte],
+  format_code : UInt,
+  words_per_entity : Int,
+  entity_count : Int,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+  cube_scale : Float,
+  grid_spacing : Double,
+) -> Unit = "rhodonite_mass_cubes_write_transform_blob_dense"
+
+///|
+#cfg(target="native")
+fn write_mass_cubes_transform_blob_dense(
+  bytes : MutArrayView[Byte],
+  layout : DenseTransformLayout,
+  per_side : Int,
+  t : Double,
+  full_rows : Bool,
+) -> Unit {
+  write_mass_cubes_transform_blob_dense_native(
+    bytes,
+    @comp.global_transform_format_code(layout.format),
+    layout.words_per_entity,
+    entity_count,
+    per_side,
+    t,
+    full_rows,
+    cube_scale,
+    grid_spacing,
+  )
+}
+
+///|
+#cfg(not(any(target="js", target="native")))
 fn write_mass_cubes_transform_blob_dense(
   bytes : MutArrayView[Byte],
   layout : DenseTransformLayout,

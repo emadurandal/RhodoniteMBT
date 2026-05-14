@@ -48,12 +48,9 @@ pnpm run dev:js:ts-ecs-mass-cubes
 ```
 
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
-variants. The non-GC WASM path keeps a MoonBit-owned f32 affine upload buffer
-in exported linear memory, avoiding byte-by-byte f32 packing while preserving
-the same 48-byte transform rows and full-buffer WebGPU upload as the TypeScript
-demo. The WASM-GC path keeps a TypeScript upload buffer because browser WebGPU
-cannot consume MoonBit GC arrays as `TypedArray` views. The dev scripts build
-release WASM artifacts for these high-load demos:
+variants. Both use the same packed fp16 transform upload path as the TypeScript
+demo, with the browser host maintaining the WebGPU upload buffer. The dev
+scripts build release WASM artifacts for these high-load demos:
 
 ```bash
 pnpm run dev:wasm:ecs-mass-cubes
