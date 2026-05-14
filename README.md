@@ -47,6 +47,19 @@ TypeScript wrapper:
 pnpm run dev:js:ts-ecs-mass-cubes
 ```
 
+The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
+variants. The non-GC WASM path keeps a MoonBit-owned f32 affine upload buffer
+in exported linear memory, avoiding byte-by-byte f32 packing while preserving
+the same 48-byte transform rows and full-buffer WebGPU upload as the TypeScript
+demo. The WASM-GC path keeps a TypeScript upload buffer because browser WebGPU
+cannot consume MoonBit GC arrays as `TypedArray` views. The dev scripts build
+release WASM artifacts for these high-load demos:
+
+```bash
+pnpm run dev:wasm:ecs-mass-cubes
+pnpm run dev:wasm-gc:ecs-mass-cubes
+```
+
 ### Native
 
 ```bash
@@ -54,7 +67,7 @@ pnpm install
 pnpm run dev:native:basic-triangle
 ```
 
-[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) runs the native binary; under workspace builds it lives at `_build/native/debug/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
+[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) builds release native binaries by default and runs the selected sample. Set `MOON_NATIVE_MODE=debug` to run the debug build while iterating. Under workspace builds the executable lives at `_build/native/<release|debug>/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
 
 ### Core (JS bridge / Vitest)
 

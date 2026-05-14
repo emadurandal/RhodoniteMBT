@@ -12,6 +12,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonPreparedQuery = object;
 	export type MoonQueryRow = object;
 	export type MoonQueryArchetype = object;
+	export type MoonSpawnBatchRow = object;
 	export type MoonRegisteredComponent = object;
 	export type MoonGpuLayout = { fields: MoonGpuField[]; stride: number; align: number };
 	export type MoonGpuField = {
@@ -141,26 +142,31 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
-	export function world_write_global_transforms_dense_grid_wave_views(
+	export function world_write_global_transforms_dense_range_views(
 		world: MoonWorld,
 		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
+		f: (
+			bytes: MoonByteView,
+			stride: number,
+			firstEntityIndex: number,
+			count: number,
+		) => void,
 	): MoonGpuWriteView[];
-	export function world_write_global_transforms_dense_grid_wave_copy(
-		world: MoonWorld,
-		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
-	): MoonGpuWriteCopy[];
 	export function world_spawn_transform_global_batch_identity(
 		world: MoonWorld,
 		count: number,
 	): MoonEntityId[];
+	export function world_spawn_batch(
+		world: MoonWorld,
+		components: MoonComponentTypeId[],
+		count: number,
+		f: (index: number, entity: MoonEntityId, row: MoonSpawnBatchRow) => void,
+	): MoonEntityId[];
+	export function spawn_batch_row_entity(row: MoonSpawnBatchRow): MoonEntityId;
+	export function spawn_batch_row_write_view(
+		row: MoonSpawnBatchRow,
+		component: MoonComponentTypeId,
+	): MoonByteView;
 
 	export function query_new(required: MoonComponentTypeId[]): MoonQuery;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
@@ -179,6 +185,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonPreparedQuery,
 		world: MoonWorld,
 		f: (archetype: MoonQueryArchetype) => void,
+	): void;
+	export function prepared_query_for_each(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+		f: (row: MoonQueryRow) => void,
 	): void;
 	export function query_row_entity(row: MoonQueryRow): MoonEntityId;
 	export function query_row_has(

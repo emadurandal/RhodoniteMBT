@@ -1,77 +1,125 @@
 ///|
-/// World-space matrix for rendering; stored in flat [`GpuComponentStore`] (column-major `f32`, matches WGSL `mat4x4<f32>`).
+/// World-space affine matrix for rendering; stored in flat [`GpuComponentStore`] as three
+/// row-major `vec4<f32>` rows. The implicit bottom row is `[0, 0, 0, 1]`.
 
 ///|
-/// ECS bulk paths use [`GlobalTransform::view_std140_gpu_row`] so [`matrix`] aliases the GPU row
+/// ECS bulk paths use [`GlobalTransform::view_affine3x4_gpu_row`] so [`matrix`] aliases the GPU row
 /// returned by [`QueryRow::write_view`] with **no** separate float storage.
-/// Encode/decode owned [`@m44.Matrix44F`] values with [`matrix44f_write_std140_mat4_to_gpu_row`] /
-/// [`matrix44f_from_std140_gpu_bytes`].
+/// Encode/decode owned [`@m44.Matrix44F`] values with [`matrix44f_write_affine3x4_to_gpu_row`] /
+/// [`matrix44f_from_affine3x4_gpu_bytes`].
 pub(all) struct GlobalTransform {
   matrix : @m44ref.Matrix44RefF
 }
 
 ///|
-/// `row` must be exactly [`global_transform_gpu_layout`].stride bytes (std140 `mat4x4<f32>`).
-pub fn GlobalTransform::view_std140_gpu_row(
+/// `row` must be exactly [`global_transform_gpu_layout`].stride bytes (affine 3x4, 48 bytes).
+pub fn GlobalTransform::view_affine3x4_gpu_row(
   row : MutArrayView[Byte],
 ) -> GlobalTransform {
   // Hot path: do not call global_transform_gpu_layout() (avoids per-row Array alloc).
-  let stride = 64
+  let stride = 48
   if row.length() != stride {
-    abort("GlobalTransform::view_std140_gpu_row: length mismatch")
+    abort("GlobalTransform::view_affine3x4_gpu_row: length mismatch")
   }
-  { matrix: @m44ref.Matrix44RefF::view_std140_mat4x4_le_gpu_row(row) }
+  { matrix: @m44ref.Matrix44RefF::view_affine3x4_le_gpu_row(row) }
 }
 
 ///|
-/// std140: one `mat4x4<f32>` (64-byte stride).
+/// Compatibility alias for older call sites. The backing row is now affine 3x4, not std140 mat4.
+pub fn GlobalTransform::view_std140_gpu_row(
+  row : MutArrayView[Byte],
+) -> GlobalTransform {
+  if row.length() == 64 {
+    { matrix: @m44ref.Matrix44RefF::view_std140_mat4x4_le_gpu_row(row) }
+  } else {
+    GlobalTransform::view_affine3x4_gpu_row(row)
+  }
+}
+
+///|
+/// Three `vec4<f32>` rows: `row0`, `row1`, `row2` (48-byte stride).
 pub fn global_transform_gpu_layout() -> GpuLayout {
   {
     fields: [
-      { name: "world_matrix", kind: Mat4x4F32, offset: 0, size: 64, align: 16 },
+      { name: "world_row0", kind: Vec4F32, offset: 0, size: 16, align: 16 },
+      { name: "world_row1", kind: Vec4F32, offset: 16, size: 16, align: 16 },
+      { name: "world_row2", kind: Vec4F32, offset: 32, size: 16, align: 16 },
     ],
-    stride: 64,
+    stride: 48,
     align: 16,
   }
 }
 
 ///|
-/// Decodes one GPU std140 `mat4x4<f32>` row into an owned [`@m44.Matrix44F`].
-pub fn matrix44f_from_std140_gpu_bytes(
+/// Decodes one GPU affine 3x4 row into an owned [`@m44.Matrix44F`].
+pub fn matrix44f_from_affine3x4_gpu_bytes(
   bytes : FixedArray[Byte],
 ) -> @m44.Matrix44F {
-  let stride = 64
+  let stride = 48
   if bytes.length() != stride {
-    abort("matrix44f_from_std140_gpu_bytes: length mismatch")
+    abort("matrix44f_from_affine3x4_gpu_bytes: length mismatch")
   }
   let base = 0
   @m44.Matrix44F::{
     data: (
       [
         get_gpu_f32(bytes, base + 0),
-        get_gpu_f32(bytes, base + 4),
-        get_gpu_f32(bytes, base + 8),
-        get_gpu_f32(bytes, base + 12),
         get_gpu_f32(bytes, base + 16),
-        get_gpu_f32(bytes, base + 20),
-        get_gpu_f32(bytes, base + 24),
-        get_gpu_f32(bytes, base + 28),
         get_gpu_f32(bytes, base + 32),
+        (0.0 : Float),
+        get_gpu_f32(bytes, base + 4),
+        get_gpu_f32(bytes, base + 20),
         get_gpu_f32(bytes, base + 36),
+        (0.0 : Float),
+        get_gpu_f32(bytes, base + 8),
+        get_gpu_f32(bytes, base + 24),
         get_gpu_f32(bytes, base + 40),
+        (0.0 : Float),
+        get_gpu_f32(bytes, base + 12),
+        get_gpu_f32(bytes, base + 28),
         get_gpu_f32(bytes, base + 44),
-        get_gpu_f32(bytes, base + 48),
-        get_gpu_f32(bytes, base + 52),
-        get_gpu_f32(bytes, base + 56),
-        get_gpu_f32(bytes, base + 60),
+        (1.0 : Float),
       ] : FixedArray[Float]),
   }
 }
 
 ///|
-/// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+/// Compatibility alias for older call sites. The backing row is now affine 3x4.
+pub fn matrix44f_from_std140_gpu_bytes(
+  bytes : FixedArray[Byte],
+) -> @m44.Matrix44F {
+  if bytes.length() == 64 {
+    let base = 0
+    @m44.Matrix44F::{
+      data: (
+        [
+          get_gpu_f32(bytes, base + 0),
+          get_gpu_f32(bytes, base + 4),
+          get_gpu_f32(bytes, base + 8),
+          get_gpu_f32(bytes, base + 12),
+          get_gpu_f32(bytes, base + 16),
+          get_gpu_f32(bytes, base + 20),
+          get_gpu_f32(bytes, base + 24),
+          get_gpu_f32(bytes, base + 28),
+          get_gpu_f32(bytes, base + 32),
+          get_gpu_f32(bytes, base + 36),
+          get_gpu_f32(bytes, base + 40),
+          get_gpu_f32(bytes, base + 44),
+          get_gpu_f32(bytes, base + 48),
+          get_gpu_f32(bytes, base + 52),
+          get_gpu_f32(bytes, base + 56),
+          get_gpu_f32(bytes, base + 60),
+        ] : FixedArray[Float]),
+    }
+  } else {
+    matrix44f_from_affine3x4_gpu_bytes(bytes)
+  }
+}
+
+///|
+/// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
 #cfg(target="js")
-extern "js" fn write_std140_mat4_to_gpu_row_js(
+extern "js" fn write_affine3x4_to_gpu_row_js(
   data : FixedArray[Float],
   buf : MutArrayView[Byte],
 ) -> Unit =
@@ -84,8 +132,9 @@ extern "js" fn write_std140_mat4_to_gpu_row_js(
   #|       f32: null,
   #|     });
   #|   if (!scratch.f32) scratch.f32 = new Float32Array(scratch.u32.buffer);
-  #|   for (let i = 0; i < 16; i++) {
-  #|     scratch.f32[0] = Math.fround(data[i]);
+  #|   const indices = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14];
+  #|   for (let i = 0; i < 12; i++) {
+  #|     scratch.f32[0] = Math.fround(data[indices[i]]);
   #|     const u = scratch.u32[0];
   #|     bytes[o] = u & 0xff;
   #|     bytes[o + 1] = (u >>> 8) & 0xff;
@@ -96,23 +145,23 @@ extern "js" fn write_std140_mat4_to_gpu_row_js(
   #| }
 
 ///|
-/// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+/// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
 #cfg(target="js")
-pub fn matrix44f_write_std140_mat4_to_gpu_row(
+pub fn matrix44f_write_affine3x4_to_gpu_row(
   m : @m44.Matrix44F,
   buf : MutArrayView[Byte],
 ) -> Unit {
-  // Hot path: fixed std140 mat4 row (must match global_transform_gpu_layout).
-  if buf.length() != 64 {
-    abort("matrix44f_write_std140_mat4_to_gpu_row: length mismatch")
+  // Hot path: fixed affine row (must match global_transform_gpu_layout).
+  if buf.length() != 48 {
+    abort("matrix44f_write_affine3x4_to_gpu_row: length mismatch")
   }
-  write_std140_mat4_to_gpu_row_js(m.data, buf)
+  write_affine3x4_to_gpu_row_js(m.data, buf)
 }
 
 ///|
-/// Writes an identity matrix into one std140 GlobalTransform row.
+/// Writes an identity matrix into one affine 3x4 GlobalTransform row.
 pub fn global_transform_write_identity_row(buf : MutArrayView[Byte]) -> Unit {
-  if buf.length() != 64 {
+  if buf.length() != 48 {
     abort("global_transform_write_identity_row: length mismatch")
   }
   put_gpu_f32_mut_view(buf, 0, 1.0)
@@ -127,26 +176,47 @@ pub fn global_transform_write_identity_row(buf : MutArrayView[Byte]) -> Unit {
   put_gpu_f32_mut_view(buf, 36, 0.0)
   put_gpu_f32_mut_view(buf, 40, 1.0)
   put_gpu_f32_mut_view(buf, 44, 0.0)
-  put_gpu_f32_mut_view(buf, 48, 0.0)
-  put_gpu_f32_mut_view(buf, 52, 0.0)
-  put_gpu_f32_mut_view(buf, 56, 0.0)
-  put_gpu_f32_mut_view(buf, 60, 1.0)
 }
 
 ///|
-/// Writes column-major [`@m44.Matrix44F`] into one std140 GPU row (same packing as WGSL `mat4x4`).
+/// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
 #cfg(not(target="js"))
+pub fn matrix44f_write_affine3x4_to_gpu_row(
+  m : @m44.Matrix44F,
+  buf : MutArrayView[Byte],
+) -> Unit {
+  // Hot path: fixed affine row (must match global_transform_gpu_layout).
+  if buf.length() != 48 {
+    abort("matrix44f_write_affine3x4_to_gpu_row: length mismatch")
+  }
+  let base = 0
+  let d = m.data
+  @writes.put_u32_le_mut_view(buf, base + 0, d[0].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 4, d[4].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 8, d[8].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 12, d[12].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 16, d[1].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 20, d[5].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 24, d[9].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 28, d[13].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 32, d[2].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 36, d[6].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 40, d[10].reinterpret_as_uint())
+  @writes.put_u32_le_mut_view(buf, base + 44, d[14].reinterpret_as_uint())
+}
+
+///|
+/// Compatibility alias for older call sites. The backing row is now affine 3x4.
 pub fn matrix44f_write_std140_mat4_to_gpu_row(
   m : @m44.Matrix44F,
   buf : MutArrayView[Byte],
 ) -> Unit {
-  // Hot path: fixed std140 mat4 row (must match global_transform_gpu_layout).
-  if buf.length() != 64 {
-    abort("matrix44f_write_std140_mat4_to_gpu_row: length mismatch")
-  }
-  let base = 0
-  let d = m.data
-  for i = 0; i < 16; i = i + 1 {
-    @writes.put_u32_le_mut_view(buf, base + i * 4, d[i].reinterpret_as_uint())
+  if buf.length() == 64 {
+    let d = m.data
+    for i = 0; i < 16; i = i + 1 {
+      @writes.put_u32_le_mut_view(buf, i * 4, d[i].reinterpret_as_uint())
+    }
+  } else {
+    matrix44f_write_affine3x4_to_gpu_row(m, buf)
   }
 }

@@ -257,31 +257,14 @@ pub fn world_update_global_transforms_from_transforms(
 }
 
 ///|
-pub fn world_write_global_transforms_dense_grid_wave_views(
+pub fn world_write_global_transforms_dense_range_views(
   world : @ecs.World,
   count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
+  f : (MutArrayView[Byte], Int, Int, Int) -> Unit,
 ) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_grid_wave_views(
-    count, per_side, time, scale, spacing,
-  )
-}
-
-///|
-pub fn world_write_global_transforms_dense_grid_wave_copy(
-  world : @ecs.World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[@ecs.GpuWrite] {
-  world.write_global_transforms_dense_grid_wave(
-    count, per_side, time, scale, spacing,
-  )
+  world.write_global_transforms_dense_range_views(count, range => {
+    f(range.bytes(), range.stride(), range.first_entity_index(), range.count())
+  })
 }
 
 ///|
@@ -295,6 +278,29 @@ pub fn world_spawn_transform_global_batch_identity(
     )
     @comp.global_transform_write_identity_row(gt_row)
   })
+}
+
+///|
+pub fn world_spawn_batch(
+  world : @ecs.World,
+  components : Array[@ecs.ComponentTypeId],
+  count : Int,
+  f : (Int, @ecs.EntityId, @ecs.SpawnBatchRow) -> Unit,
+) -> Array[@ecs.EntityId] {
+  world.spawn_batch(components, count, f)
+}
+
+///|
+pub fn spawn_batch_row_entity(row : @ecs.SpawnBatchRow) -> @ecs.EntityId {
+  row.entity()
+}
+
+///|
+pub fn spawn_batch_row_write_view(
+  row : @ecs.SpawnBatchRow,
+  component : @ecs.ComponentTypeId,
+) -> MutArrayView[Byte] {
+  row.write_view(component)
 }
 
 ///|
@@ -342,6 +348,15 @@ pub fn prepared_query_for_each_archetype(
   f : (@ecs.QueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
+}
+
+///|
+pub fn prepared_query_for_each(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+  f : (@ecs.QueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
 }
 
 ///|

@@ -1,10 +1,4 @@
 import "./style.css";
-import {
-	Query,
-	World,
-	type ByteView,
-	type ComponentTypeId,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
 const CANVAS_WIDTH = 800;
@@ -20,26 +14,31 @@ const CUBE_SCALE = 0.055;
 type Mat4 = Float32Array;
 
 type Renderer = {
-	readonly canvas: HTMLCanvasElement;
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
 	readonly pipeline: GPURenderPipeline;
-	readonly depthTexture: GPUTexture;
 	readonly depthView: GPUTextureView;
 	readonly vertexBuffer: GPUBuffer;
 	readonly instanceBuffer: GPUBuffer;
 	readonly indexBuffer: GPUBuffer;
 	readonly transformStorage: GPUBuffer;
-	readonly cameraUniform: GPUBuffer;
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
-	readonly world: World;
-	readonly transformComponent: ComponentTypeId;
-	readonly globalTransformComponent: ComponentTypeId;
-	readonly perSide: number;
-	frame: number;
-	lastFrameStartMs: number;
+	readonly transformData: Float32Array;
+	perSide: number;
+	transformStride: number;
+	wasmTransformUploadBuffer?: ArrayBufferLike;
+	wasmTransformUploadPtr?: number;
+	wasmTransformUploadByteLength?: number;
+	wasmTransformUploadView?: Uint8Array;
+};
+
+type WasmExports = {
+	_start?: () => void;
+	memory?: WebAssembly.Memory;
+	create_wasm_renderer: () => void;
+	ecs_mass_cubes_wasm_render_tick: () => void;
 };
 
 function gridSideLen(count: number): number {
@@ -240,135 +239,42 @@ function instanceColorRgb(index: number): [number, number, number] {
 	];
 }
 
-function gridXzForIndex(index: number, perSide: number): [number, number] {
-	const ix = index % perSide;
-	const iz = Math.floor(index / perSide);
-	const half = (perSide - 1) * 0.5;
-	return [(ix - half) * GRID_SPACING, (iz - half) * GRID_SPACING];
-}
-
-function instanceBytes(indices: number[]): Uint8Array {
-	const bytes = new Uint8Array(indices.length * INSTANCE_STRIDE);
-	indices.forEach((index, i) => {
+function instanceBytes(): Uint8Array {
+	const bytes = new Uint8Array(ENTITY_COUNT * INSTANCE_STRIDE);
+	const view = new Float32Array(bytes.buffer);
+	for (let index = 0; index < ENTITY_COUNT; index += 1) {
 		const [r, g, b] = instanceColorRgb(index);
-		const base = i * INSTANCE_STRIDE;
-		writeF32(bytes, base, index);
-		writeF32(bytes, base + 4, r);
-		writeF32(bytes, base + 8, g);
-		writeF32(bytes, base + 12, b);
-	});
+		const base = index * 4;
+		view[base] = index;
+		view[base + 1] = r;
+		view[base + 2] = g;
+		view[base + 3] = b;
+	}
 	return bytes;
 }
 
-function initializeTransformRows(
-	world: World,
-	transformComponent: ComponentTypeId,
-	perSide: number,
-): void {
-	Query.new([transformComponent]).forEach(world, (row) => {
-		const index = row.entity().index();
-		const [x, z] = gridXzForIndex(index, perSide);
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, 0);
-		bytes.setF32(8, z);
-		bytes.setF32(12, 0);
-		bytes.setF32(16, 0);
-		bytes.setF32(20, 0);
-		bytes.setF32(24, 1);
-		bytes.setF32(28, CUBE_SCALE);
-		bytes.setF32(32, CUBE_SCALE);
-		bytes.setF32(36, CUBE_SCALE);
-		bytes.setF32(40, 0);
-		bytes.setF32(44, 0);
-	});
-}
-
-function animateTransformsQuery(
-	world: World,
-	transformComponent: ComponentTypeId,
-	perSide: number,
-	t: number,
-): void {
-	Query.new([transformComponent]).forEach(world, (row) => {
-		const index = row.entity().index();
-		const [x, z] = gridXzForIndex(index, perSide);
-		const y = Math.sin(index * 0.09 + t * 1.8) * 0.12;
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, y);
-		bytes.setF32(8, z);
-	});
-}
-
-function uploadGlobalTransformWrites(
-	queue: GPUQueue,
-	buffer: GPUBuffer,
-	writes: ReturnType<World["drainGpuWriteViews"]>,
-): void {
-	for (const write of writes) {
-		const bytes = write.bytes();
-		queue.writeBuffer(
-			buffer,
-			write.byteOffset(),
-			bytes.asUint8Array() ?? bytes.toUint8ArrayCopy(),
-		);
-	}
-}
-
-function rangeAsF32(bytes: ByteView): Float32Array | null {
-	const view = bytes.asUint8Array();
-	if (view === null || (view.byteOffset & 3) !== 0) {
-		return null;
-	}
-	return new Float32Array(view.buffer, view.byteOffset, view.byteLength >> 2);
-}
-
-function writeMassCubesFullRange(
-	bytes: ByteView,
-	stride: number,
-	firstEntityIndex: number,
-	count: number,
+function writeMassCubesFullTransformData(
+	renderer: Renderer,
 	perSide: number,
 	waveTime: number,
 ): void {
-	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 48) {
-		for (let i = 0; i < count; i += 1) {
-			const index = firstEntityIndex + i;
-			const [x, z] = gridXzForIndex(index, perSide);
-			const y = Math.sin(index * 0.09 + waveTime) * 0.12;
-			const base = i * stride;
-			bytes.setF32(base, CUBE_SCALE);
-			bytes.setF32(base + 4, 0);
-			bytes.setF32(base + 8, 0);
-			bytes.setF32(base + 12, x);
-			bytes.setF32(base + 16, 0);
-			bytes.setF32(base + 20, CUBE_SCALE);
-			bytes.setF32(base + 24, 0);
-			bytes.setF32(base + 28, y);
-			bytes.setF32(base + 32, 0);
-			bytes.setF32(base + 36, 0);
-			bytes.setF32(base + 40, CUBE_SCALE);
-			bytes.setF32(base + 44, z);
-		}
-		return;
+	if (renderer.transformStride !== 48) {
+		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
-
+	const matrices = renderer.transformData;
 	const half = (perSide - 1) * 0.5;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
 	let localIndex = 0;
-	let row = Math.trunc(firstEntityIndex / perSide);
-	let column = firstEntityIndex % perSide;
+	let row = 0;
+	let column = 0;
 	let out = 0;
-	while (localIndex < count) {
-		const rowCount = Math.min(perSide - column, count - localIndex);
+	while (localIndex < ENTITY_COUNT) {
+		const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
 		let x = (column - half) * GRID_SPACING;
 		const z = (row - half) * GRID_SPACING;
-		const globalIndex = firstEntityIndex + localIndex;
-		let waveSin = Math.sin(globalIndex * 0.09 + waveTime);
-		let waveCos = Math.cos(globalIndex * 0.09 + waveTime);
+		let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+		let waveCos = Math.cos(localIndex * 0.09 + waveTime);
 		for (let ix = 0; ix < rowCount; ix += 1) {
 			matrices[out] = CUBE_SCALE;
 			matrices[out + 1] = 0;
@@ -395,29 +301,18 @@ function writeMassCubesFullRange(
 	}
 }
 
-function writeMassCubesYRange(
-	bytes: ByteView,
-	stride: number,
-	firstEntityIndex: number,
-	count: number,
-	waveTime: number,
-): void {
-	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 48) {
-		for (let i = 0; i < count; i += 1) {
-			const index = firstEntityIndex + i;
-			bytes.setF32(i * stride + 28, Math.sin(index * 0.09 + waveTime) * 0.12);
-		}
-		return;
+function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): void {
+	if (renderer.transformStride !== 48) {
+		throw new Error(`Unsupported transform stride: ${renderer.transformStride}`);
 	}
-
+	const matrices = renderer.transformData;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
 	let localIndex = 0;
 	let out = 0;
-	let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
-	let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
-	while (localIndex < count) {
+	let waveSin = Math.sin(waveTime);
+	let waveCos = Math.cos(waveTime);
+	while (localIndex < ENTITY_COUNT) {
 		matrices[out + 7] = waveSin * 0.12;
 		const nextSin = waveSin * cosStep + waveCos * sinStep;
 		waveCos = waveCos * cosStep - waveSin * sinStep;
@@ -427,71 +322,70 @@ function writeMassCubesYRange(
 	}
 }
 
-function uploadInitialGlobalTransforms(renderer: Renderer): void {
-	uploadGlobalTransformWrites(
-		renderer.queue,
-		renderer.transformStorage,
-		renderer.world.writeGlobalTransformsDenseRangeViews(
-			ENTITY_COUNT,
-			(bytes, stride, firstEntityIndex, count) =>
-				writeMassCubesFullRange(
-					bytes,
-					stride,
-					firstEntityIndex,
-					count,
-					renderer.perSide,
-					0,
-				),
-		),
-	);
+function writeWasmBytesToBuffer(
+	queue: GPUQueue,
+	gpuBuffer: GPUBuffer,
+	memory: WebAssembly.Memory | undefined,
+	ptr: number,
+	byteLength: number,
+	getCached: () => {
+		buffer?: ArrayBufferLike;
+		ptr?: number;
+		byteLength?: number;
+		view?: Uint8Array;
+	},
+	setCached: (
+		buffer: ArrayBufferLike,
+		ptr: number,
+		byteLength: number,
+		view: Uint8Array,
+	) => void,
+): void {
+	if (memory === undefined) {
+		throw new Error("WASM linear memory is not exported.");
+	}
+	if (ptr <= 0 || byteLength <= 0) {
+		throw new Error(`Invalid WASM transform byte range: ${ptr}, ${byteLength}`);
+	}
+	const buffer = memory.buffer;
+	const cached = getCached();
+	let view = cached.view;
+	if (
+		view === undefined ||
+		cached.buffer !== buffer ||
+		cached.ptr !== ptr ||
+		cached.byteLength !== byteLength
+	) {
+		view = new Uint8Array(buffer, ptr, byteLength);
+		setCached(buffer, ptr, byteLength, view);
+	}
+	queue.writeBuffer(gpuBuffer, 0, view);
 }
 
-function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
-	const waveTime = t * 1.8;
-	const writes = renderer.world.writeGlobalTransformsDenseRangeViews(
-		ENTITY_COUNT,
-		(bytes, stride, firstEntityIndex, count) =>
-			writeMassCubesYRange(
-				bytes,
-				stride,
-				firstEntityIndex,
-				count,
-				waveTime,
-			),
-	);
-	if (writes.length > 0) {
-		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, writes);
-		return;
-	}
-
-	const fullWrites = renderer.world.writeGlobalTransformsDenseRangeViews(
-		ENTITY_COUNT,
-		(bytes, stride, firstEntityIndex, count) =>
-			writeMassCubesFullRange(
-				bytes,
-				stride,
-				firstEntityIndex,
-				count,
-				renderer.perSide,
-				waveTime,
-			),
-	);
-	if (fullWrites.length > 0) {
-		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, fullWrites);
-		return;
-	}
-
-	animateTransformsQuery(
-		renderer.world,
-		renderer.transformComponent,
-		renderer.perSide,
-		t,
-	);
-	renderer.world.updateGlobalTransformsFromTransforms();
-	uploadGlobalTransformWrites(
+function writeTransformBytesFromWasmMemory(
+	renderer: Renderer,
+	memory: WebAssembly.Memory | undefined,
+	ptr: number,
+	byteLength: number,
+): void {
+	writeWasmBytesToBuffer(
 		renderer.queue,
 		renderer.transformStorage,
-		renderer.world.drainGpuWriteViews(renderer.globalTransformComponent),
+		memory,
+		ptr,
+		byteLength,
+		() => ({
+			buffer: renderer.wasmTransformUploadBuffer,
+			ptr: renderer.wasmTransformUploadPtr,
+			byteLength: renderer.wasmTransformUploadByteLength,
+			view: renderer.wasmTransformUploadView,
+		}),
+		(buffer, cachedPtr, cachedByteLength, view) => {
+			renderer.wasmTransformUploadBuffer = buffer;
+			renderer.wasmTransformUploadPtr = cachedPtr;
+			renderer.wasmTransformUploadByteLength = cachedByteLength;
+			renderer.wasmTransformUploadView = view;
+		},
 	);
 }
 
@@ -590,23 +484,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		},
 	});
 
-	const world = World.new();
-	const globalTransformComponent = world.globalTransformComponent();
-	const transformComponent = world.transformComponent();
-	const perSide = gridSideLen(ENTITY_COUNT);
-	const entities = world.spawnTransformGlobalBatchIdentity(ENTITY_COUNT);
-	initializeTransformRows(world, transformComponent, perSide);
-	const maxIndexSlot = entities.reduce(
-		(max, entity) => Math.max(max, entity.index() + 1),
-		0,
-	);
-	const resizeCapacity = world
-		.drainResizeEvents()
-		.filter((event) => event.component().index() === globalTransformComponent.index())
-		.reduce((max, event) => Math.max(max, event.requiredCapacity()), 0);
-	const transformStride = world.componentGpuLayout(globalTransformComponent)?.stride() ?? 48;
 	const transformStorage = device.createBuffer({
-		size: Math.max(maxIndexSlot, resizeCapacity) * transformStride,
+		size: ENTITY_COUNT * 48,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 	});
 	const cameraUniform = device.createBuffer({
@@ -629,12 +508,11 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 	});
 	queue.writeBuffer(vertexBuffer, 0, vertexPositionBytes(0.42));
-	const instanceData = instanceBytes(entities.map((entity) => entity.index()));
 	const instanceBuffer = device.createBuffer({
-		size: instanceData.byteLength,
+		size: ENTITY_COUNT * INSTANCE_STRIDE,
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 	});
-	queue.writeBuffer(instanceBuffer, 0, instanceData);
+	queue.writeBuffer(instanceBuffer, 0, instanceBytes());
 	const indexData = indexCubeU16Bytes();
 	const indexBuffer = device.createBuffer({
 		size: indexData.byteLength,
@@ -646,85 +524,131 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		format: "depth24plus",
 		usage: GPUTextureUsage.RENDER_ATTACHMENT,
 	});
-	const depthView = depthTexture.createView();
 
-	const renderer: Renderer = {
-		canvas,
+	return {
 		context,
 		device,
 		queue,
 		pipeline,
-		depthTexture,
-		depthView,
+		depthView: depthTexture.createView(),
 		vertexBuffer,
 		instanceBuffer,
 		indexBuffer,
 		transformStorage,
-		cameraUniform,
 		bindTransforms,
 		bindCamera,
-		world,
-		transformComponent,
-		globalTransformComponent,
-		perSide,
-		frame: 0,
-		lastFrameStartMs: -1,
+		transformData: new Float32Array(ENTITY_COUNT * 12),
+		perSide: gridSideLen(ENTITY_COUNT),
+		transformStride: 48,
 	};
-	uploadInitialGlobalTransforms(renderer);
-	return renderer;
 }
 
-function updatePerfOverlay(fps: number, cpuMs: number): void {
+function updatePerfOverlay(label: string, fps: number, cpuMs: number): void {
 	const el = document.getElementById("ecs-mass-cubes-perf");
 	if (el === null) {
 		return;
 	}
-	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
+	el.textContent = `FPS ${fps.toFixed(1)}  ·  ${label} ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function renderFrame(renderer: Renderer): void {
-	const frameStart = performance.now();
-	const fps =
-		renderer.lastFrameStartMs >= 0
-			? 1000 / Math.max(frameStart - renderer.lastFrameStartMs, 1.0e-9)
-			: 0;
-	renderer.lastFrameStartMs = frameStart;
-	renderer.frame += 1;
-	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
-
-	const colorView = renderer.context.getCurrentTexture().createView();
-	const encoder = renderer.device.createCommandEncoder();
-	const pass = encoder.beginRenderPass({
-		colorAttachments: [
-			{
-				view: colorView,
-				clearValue: { r: 0.03, g: 0.04, b: 0.09, a: 1 },
-				loadOp: "clear",
-				storeOp: "store",
+function createHostImports(
+	renderer: Renderer,
+	label: string,
+	getMemory: () => WebAssembly.Memory | undefined,
+): WebAssembly.Imports {
+	return {
+		rhodonite_ecs_mass_cubes_host: {
+			now_ms: () => performance.now(),
+			entity_count: () => ENTITY_COUNT,
+			initialize_renderer: (perSide: number, transformStride: number) => {
+				renderer.perSide = perSide;
+				renderer.transformStride = transformStride;
 			},
-		],
-		depthStencilAttachment: {
-			view: renderer.depthView,
-			depthClearValue: 1,
-			depthLoadOp: "clear",
-			depthStoreOp: "store",
+			write_initial_global_transforms: (perSide: number, waveTime: number) => {
+				writeMassCubesFullTransformData(renderer, perSide, waveTime);
+				renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformData);
+			},
+			write_global_transform_y: (waveTime: number) => {
+				writeMassCubesYTransformData(renderer, waveTime);
+				renderer.queue.writeBuffer(renderer.transformStorage, 0, renderer.transformData);
+			},
+			write_initial_global_transform_bytes: (ptr: number, byteLength: number) => {
+				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
+			},
+			write_global_transform_bytes: (ptr: number, byteLength: number) => {
+				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
+			},
+			render_frame: (fps: number, cpuMs: number) => {
+				const colorView = renderer.context.getCurrentTexture().createView();
+				const encoder = renderer.device.createCommandEncoder();
+				const pass = encoder.beginRenderPass({
+					colorAttachments: [
+						{
+							view: colorView,
+							clearValue: { r: 0.03, g: 0.04, b: 0.09, a: 1 },
+							loadOp: "clear",
+							storeOp: "store",
+						},
+					],
+					depthStencilAttachment: {
+						view: renderer.depthView,
+						depthClearValue: 1,
+						depthLoadOp: "clear",
+						depthStoreOp: "store",
+					},
+				});
+				pass.setPipeline(renderer.pipeline);
+				pass.setBindGroup(0, renderer.bindTransforms);
+				pass.setBindGroup(1, renderer.bindCamera);
+				pass.setIndexBuffer(renderer.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
+				pass.setVertexBuffer(
+					0,
+					renderer.vertexBuffer,
+					0,
+					VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL,
+				);
+				pass.setVertexBuffer(
+					1,
+					renderer.instanceBuffer,
+					0,
+					ENTITY_COUNT * INSTANCE_STRIDE,
+				);
+				pass.drawIndexed(INDEX_U16_COUNT, ENTITY_COUNT);
+				pass.end();
+				renderer.queue.submit([encoder.finish()]);
+				updatePerfOverlay(label, fps, cpuMs);
+			},
 		},
-	});
-	pass.setPipeline(renderer.pipeline);
-	pass.setBindGroup(0, renderer.bindTransforms);
-	pass.setBindGroup(1, renderer.bindCamera);
-	pass.setIndexBuffer(renderer.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
-	pass.setVertexBuffer(0, renderer.vertexBuffer, 0, VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL);
-	pass.setVertexBuffer(1, renderer.instanceBuffer, 0, ENTITY_COUNT * INSTANCE_STRIDE);
-	pass.drawIndexed(INDEX_U16_COUNT, ENTITY_COUNT);
-	pass.end();
-	renderer.queue.submit([encoder.finish()]);
-	updatePerfOverlay(fps, performance.now() - frameStart);
+	};
 }
 
-if (!navigator.gpu) {
-	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
-} else {
+async function instantiateWasm(
+	renderer: Renderer,
+	wasmUrl: string,
+	label: string,
+): Promise<WasmExports> {
+	const bytes = await fetch(wasmUrl).then((response) => {
+		if (!response.ok) {
+			throw new Error(`Failed to fetch WASM module: ${response.status}`);
+		}
+		return response.arrayBuffer();
+	});
+	let memory: WebAssembly.Memory | undefined;
+	const { instance } = await WebAssembly.instantiate(
+		bytes,
+		createHostImports(renderer, label, () => memory),
+	);
+	const exports = instance.exports as unknown as WasmExports;
+	memory = exports.memory;
+	return exports;
+}
+
+export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
+	if (!navigator.gpu) {
+		document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
+		return;
+	}
+
 	window.addEventListener("load", () => {
 		const canvas = document.getElementById("webgpu-canvas");
 		if (!(canvas instanceof HTMLCanvasElement)) {
@@ -732,17 +656,20 @@ if (!navigator.gpu) {
 			return;
 		}
 		void createRenderer(canvas)
-			.then((renderer) => {
+			.then(async (renderer) => {
+				const wasm = await instantiateWasm(renderer, wasmUrl, label);
+				wasm._start?.();
+				wasm.create_wasm_renderer();
 				const loop = () => {
-					renderFrame(renderer);
+					wasm.ecs_mass_cubes_wasm_render_tick();
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);
 			})
 			.catch((error: unknown) => {
-				console.error("Failed to initialize WebGPU:", error);
+				console.error("Failed to initialize WebGPU/WASM:", error);
 				document.body.innerHTML =
-					"<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
+					"<h1>Failed to initialize WebGPU/WASM. Check the console for errors.</h1>";
 			});
 	});
 }

@@ -147,6 +147,8 @@ query.for_each(world, fn(row) {
 
 CPU-only の bulk loop では `Query::for_each_archetype` を使えます。マッチした archetype ごとに required component の column index / stride を cache するため、`QueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
 
+row callback の形を保ちたい hot loop では、`Query::prepare` で得た `PreparedQuery::for_each` を使えます。`PreparedQuery::for_each_archetype` と同じく `world.archetype_version` が変わった場合だけ plan を作り直し、通常フレームでは archetype scan と access metadata 構築を再利用します。
+
 ## GPU-visible component の dirty 管理
 
 System が `QueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `read_view` を使うことで余分な dirty を避けられます。
@@ -181,9 +183,15 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 `World::update_transform3d_positions` は `Transform3D.position` 専用の bulk API です。JS では `Query::for_each_archetype` による公開 column path、非 JS では direct archetype sweep を使い、entity ごとの `QueryRow` 構築を避けます。
 
+`World::update_global_transforms_from_transforms` は、`ChildOf` を持たない `[Transform3D, GlobalTransform]` archetype を fast path のまま処理し、`ChildOf` を含む archetype だけを階層対応 path に回します。これにより、scene の一部に親子関係がある場合でも、flat な大量 entity が階層 path へ巻き込まれません。階層 path の親 lookup は `ChildOf` column から直接読み、`get_child_of` 経由の component bytes copy を避けます。
+
 大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
 
-`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`write_global_transforms_dense_views` / `write_global_transforms_dense_grid_wave_views` は `GlobalTransform` の flat GPU rows を直接更新して dirty range を積み、JS / native とも `drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。native の grid wave helper は C 側で backing bytes に直接書き込んだ後、返却は共通の `GpuWriteView` に統一しています。
+任意の component signature には `World::spawn_batch(components, count, write)` を使えます。指定 signature の archetype に直接 append し、`SpawnBatchRow::write_view(component)` から CPU row / GPU row を初期化します。`GpuVisible` component は entity index slot を active 化し、連続 index なら dirty range としてまとめて記録します。callback 中は row view を貸し出しているため、通常 query と同じく構造変更 API は拒否されます。
+
+`GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`GlobalTransform` の GPU row は 48 byte の affine 3x4（`vec4<f32>` 3 行）で、非一様 scale と親回転から生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行を送らないレイアウトです。`write_global_transforms_dense_views` は entity ごとの callback でこの flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。
+
+大量更新で callback 回数も避けたい場合は `write_global_transforms_dense_range_views` を使います。この API は `GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を 1 回だけ渡し、呼び出し側のロジックが連続 row 上で tight loop を実行できます。ライブラリ側は dense range の貸し出し、stride 検査、dirty range 記録、borrowed upload view への drain だけを担当します。`ecs-mass-cubes` と `ts-ecs-mass-cubes` の grid-wave 計算や y-only 更新はサンプル側 callback に置き、ライブラリには sample 固有の計算を持ち込みません。non-GC `wasm-ecs-mass-cubes` は同じ 48 byte affine row / full-span upload 条件のまま、sample 所有の `FixedArray[Float]` upload buffer を使って f32 byte packing を避けます。
 
 ## Conflict 検査
 
@@ -219,7 +227,7 @@ pub struct App {
 - typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
-- query plan cache、archetype index cache。`Query::for_each_archetype` の per-archetype column cache は導入済み。
+- archetype index cache。`Query::for_each_archetype` と `PreparedQuery::for_each` の per-archetype access cache は導入済み。
 - native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を直接 lower-level queue binding に渡すため、任意の borrowed byte view upload でも `Bytes::from_array` の compact copy は発生しません。
 - `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 

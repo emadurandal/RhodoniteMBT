@@ -1,0 +1,16 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main"
+
+// Values
+pub fn create_wasm_renderer() -> Unit
+
+pub fn ecs_mass_cubes_wasm_render_tick() -> Unit
+
+// Errors
+
+// Types and methods
+type WasmRenderer
+
+// Type aliases
+
+// Traits

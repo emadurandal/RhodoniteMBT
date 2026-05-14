@@ -1,0 +1,20 @@
+import {
+  "emadurandal/rhodonite_core/ecs" @ecs,
+  "emadurandal/rhodonite_core/ecs/components" @comp,
+  "moonbitlang/core/math" @math,
+  "moonbitlang/core/ref" @ref,
+}
+
+supported_targets = "+wasm+wasm-gc"
+
+options(
+  is_main: true,
+  link: {
+    "wasm": {
+      "exports": [ "create_wasm_renderer", "ecs_mass_cubes_wasm_render_tick" ],
+    },
+    "wasm-gc": {
+      "exports": [ "create_wasm_renderer", "ecs_mass_cubes_wasm_render_tick" ],
+    },
+  },
+)

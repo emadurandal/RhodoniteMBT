@@ -20,7 +20,7 @@ pub fn World::set_global_transform(
   match self.ensure_gpu_store_capacity(id, entity.index + 1) {
     Some(store) => {
       store.mut_entity_row(entity.index, fn(view) {
-        @comp.matrix44f_write_std140_mat4_to_gpu_row(m, view)
+        @comp.matrix44f_write_affine3x4_to_gpu_row(m, view)
       })
       self.replace_gpu_store(store)
       true
@@ -40,7 +40,7 @@ pub fn World::get_global_transform(
     return None
   }
   match self.component_bytes(entity, id) {
-    Some(bytes) => Some(@comp.matrix44f_from_std140_gpu_bytes(bytes))
+    Some(bytes) => Some(@comp.matrix44f_from_affine3x4_gpu_bytes(bytes))
     None => None
   }
 }
@@ -63,7 +63,7 @@ pub fn World::write_global_transforms_dense(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 64 {
+    if stride != 48 {
       abort(
         "World::write_global_transforms_dense: GlobalTransform stride mismatch",
       )
@@ -101,7 +101,7 @@ pub fn World::write_global_transforms_dense_views(
   let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
     let bytes = range.bytes()
     let stride = range.stride()
-    if stride != 64 {
+    if stride != 48 {
       abort(
         "World::write_global_transforms_dense_views: GlobalTransform stride mismatch",
       )
@@ -118,274 +118,117 @@ pub fn World::write_global_transforms_dense_views(
 }
 
 ///|
-#cfg(target="js")
-extern "js" fn World::write_global_transforms_dense_grid_wave_js(
-  self : World,
-  gt : ComponentTypeId,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Bool =
-  #| (world, gt, count, perSide, time, scale, spacing) => {
-  #|   const store = world.gpu_stores[gt.index];
-  #|   if (!store || store.stride !== 64) return false;
-  #|   if (!ArrayBuffer.isView(store.bytes)) {
-  #|     const converted = new Uint8Array(store.bytes.length);
-  #|     converted.set(store.bytes);
-  #|     store.bytes = converted;
-  #|   }
-  #|   const bytes = store.bytes;
-  #|   const byteLength = count * 64;
-  #|   if (bytes.length < byteLength || (bytes.byteOffset & 3) !== 0) return false;
-  #|   const m = new Float32Array(bytes.buffer, bytes.byteOffset, byteLength >> 2);
-  #|   const half = (perSide - 1) * 0.5;
-  #|   const s = Math.fround(scale);
-  #|   for (let i = 0, out = 0; i < count; i++, out += 16) {
-  #|     const ix = i % perSide;
-  #|     const iz = Math.trunc(i / perSide);
-  #|     m[out] = s;
-  #|     m[out + 1] = 0;
-  #|     m[out + 2] = 0;
-  #|     m[out + 3] = 0;
-  #|     m[out + 4] = 0;
-  #|     m[out + 5] = s;
-  #|     m[out + 6] = 0;
-  #|     m[out + 7] = 0;
-  #|     m[out + 8] = 0;
-  #|     m[out + 9] = 0;
-  #|     m[out + 10] = s;
-  #|     m[out + 11] = 0;
-  #|     m[out + 12] = Math.fround((ix - half) * spacing);
-  #|     m[out + 13] = Math.fround(Math.sin(i * 0.09 + time) * 0.12);
-  #|     m[out + 14] = Math.fround((iz - half) * spacing);
-  #|     m[out + 15] = 1;
-  #|   }
-  #|   const ranges = store.__rhodonite_dirty_ranges ||
-  #|     (store.__rhodonite_dirty_ranges = []);
-  #|   if (count > 0) ranges.push({ first: 0, last: count - 1 });
-  #|   return true;
-  #| }
-
-///|
-/// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
-#cfg(target="js")
-pub fn World::write_global_transforms_dense_grid_wave(
+/// Bulk-writes dense GlobalTransform rows `[0, count)` through one contiguous range callback.
+///
+/// This is the high-throughput variant of [`write_global_transforms_dense_views`]. The callback
+/// receives one `GpuComponentWriteRange` with the backing bytes and row stride, so user code can run
+/// its own tight loop without a callback per entity. The callback must fully update any lanes it
+/// wants to change; the dirty range is the full `[0, count)` row span.
+pub fn World::write_global_transforms_dense_range_views(
   self : World,
   count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[GpuWrite] {
-  let gt = self.global_transform_component_id
-  self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_grid_wave",
-  )
-  if count < 0 {
-    abort(
-      "World::write_global_transforms_dense_grid_wave: count must be non-negative",
-    )
-  }
-  if count == 0 {
-    return []
-  }
-  match self.ensure_gpu_store_capacity(gt, count) {
-    Some(store) => {
-      if store.stride != 64 {
-        abort(
-          "World::write_global_transforms_dense_grid_wave: GlobalTransform stride mismatch",
-        )
-      }
-      self.replace_gpu_store(store)
-    }
-    None => return []
-  }
-  if !self.write_global_transforms_dense_grid_wave_js(
-      gt, count, per_side, time, scale, spacing,
-    ) {
-    return []
-  }
-  self.drain_gpu_writes(gt)
-}
-
-///|
-/// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
-#cfg(target="js")
-pub fn World::write_global_transforms_dense_grid_wave_views(
-  self : World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
+  write : (GpuComponentWriteRange) -> Unit,
 ) -> Array[GpuWriteView] {
   let gt = self.global_transform_component_id
   self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_grid_wave_views",
+    gt, "World::write_global_transforms_dense_range_views",
   )
   if count < 0 {
     abort(
-      "World::write_global_transforms_dense_grid_wave_views: count must be non-negative",
+      "World::write_global_transforms_dense_range_views: count must be non-negative",
     )
   }
   if count == 0 {
     return []
   }
-  match self.ensure_gpu_store_capacity(gt, count) {
-    Some(store) => {
-      if store.stride != 64 {
-        abort(
-          "World::write_global_transforms_dense_grid_wave_views: GlobalTransform stride mismatch",
-        )
-      }
-      self.replace_gpu_store(store)
+  let ok = self.with_gpu_component_write_range(gt, 0, count, range => {
+    if range.stride() != 48 {
+      abort(
+        "World::write_global_transforms_dense_range_views: GlobalTransform stride mismatch",
+      )
     }
-    None => return []
-  }
-  if !self.write_global_transforms_dense_grid_wave_js(
-      gt, count, per_side, time, scale, spacing,
-    ) {
+    write(range)
+  })
+  if !ok {
     return []
   }
   self.drain_gpu_write_views(gt)
 }
 
 ///|
-/// Bulk-writes dense scaled GlobalTransform matrices for a square XZ grid with sinusoidal Y motion.
-#cfg(not(target="js"))
-pub fn World::write_global_transforms_dense_grid_wave(
+/// Bulk-writes dense GlobalTransform rows into the raw wasm backing store.
+///
+/// This non-GC wasm fast path lets a host upload the same linear-memory buffer
+/// returned by `global_transform_wasm_gpu_bytes_payload_ptr`, avoiding both
+/// `MutArrayView` wrapper traffic and host-side transform recomputation. It is
+/// intended for immediate full-buffer host upload and does not enqueue drain
+/// ranges.
+#cfg(target="wasm")
+pub fn World::write_global_transforms_dense_wasm_bytes_range(
   self : World,
   count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[GpuWrite] {
-  let half = (per_side - 1).to_double() * 0.5
-  let scale_d = scale.to_double()
-  self.write_global_transforms_dense(count, fn(i, row) {
-    let ix = i % per_side
-    let iz = i / per_side
-    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(
-      row,
-      52,
-      @math.sin(i.to_double() * 0.09 + time) * 0.12,
-    )
-    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
-  })
-}
-
-///|
-#cfg(target="native")
-#borrow(data)
-extern "C" fn write_global_transforms_dense_grid_wave_f32_native(
-  data : Bytes,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Double,
-  spacing : Double,
-) -> Unit = "rhodonite_ecs_write_global_transforms_dense_grid_wave_f32"
-
-///|
-#cfg(target="native")
-pub fn World::write_global_transforms_dense_grid_wave_views(
-  self : World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[GpuWriteView] {
+  write : (FixedArray[Byte], Int, Int) -> Unit,
+) -> Bool {
   let gt = self.global_transform_component_id
   self.assert_system_component_write(
-    gt, "World::write_global_transforms_dense_grid_wave_views",
+    gt, "World::write_global_transforms_dense_wasm_bytes_range",
   )
   if count < 0 {
     abort(
-      "World::write_global_transforms_dense_grid_wave_views: count must be non-negative",
+      "World::write_global_transforms_dense_wasm_bytes_range: count must be non-negative",
     )
   }
   if count == 0 {
-    return []
+    return true
   }
   match self.ensure_gpu_store_capacity(gt, count) {
     Some(store) => {
-      if store.stride != 64 {
+      if store.stride != 48 {
         abort(
-          "World::write_global_transforms_dense_grid_wave_views: GlobalTransform stride mismatch",
+          "World::write_global_transforms_dense_wasm_bytes_range: GlobalTransform stride mismatch",
         )
       }
-      let data = FixedArray::unsafe_reinterpret_as_bytes(store.bytes)
-      write_global_transforms_dense_grid_wave_f32_native(
-        data,
-        count,
-        per_side,
-        time,
-        scale.to_double(),
-        spacing,
-      )
-      store.mark_dirty_range(0, count - 1)
+      self.query_depth = self.query_depth + 1
+      write(store.bytes, store.stride, count)
+      self.query_depth = self.query_depth - 1
       self.replace_gpu_store(store)
-      self.drain_gpu_write_views(gt)
+      true
     }
-    None => []
+    None => false
   }
 }
 
 ///|
-/// Bulk-writes dense scaled GlobalTransform matrices and returns borrowed upload ranges.
-#cfg(not(any(target="js", target="native")))
-pub fn World::write_global_transforms_dense_grid_wave_views(
-  self : World,
-  count : Int,
-  per_side : Int,
-  time : Double,
-  scale : Float,
-  spacing : Double,
-) -> Array[GpuWriteView] {
-  let half = (per_side - 1).to_double() * 0.5
-  let scale_d = scale.to_double()
-  self.write_global_transforms_dense_views(count, fn(i, row) {
-    let ix = i % per_side
-    let iz = i / per_side
-    @comp.put_gpu_f32_mut_view(row, 0, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 4, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 8, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 12, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 16, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 20, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 24, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 28, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 32, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 36, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 40, scale_d)
-    @comp.put_gpu_f32_mut_view(row, 44, 0.0)
-    @comp.put_gpu_f32_mut_view(row, 48, (ix.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(
-      row,
-      52,
-      @math.sin(i.to_double() * 0.09 + time) * 0.12,
-    )
-    @comp.put_gpu_f32_mut_view(row, 56, (iz.to_double() - half) * spacing)
-    @comp.put_gpu_f32_mut_view(row, 60, 1.0)
-  })
+/// Returns the linear-memory payload pointer for the builtin GlobalTransform GPU store.
+///
+/// This is only available on the non-GC wasm backend, where JavaScript can create
+/// a `Uint8Array` view over the exported wasm memory and upload the ECS GPU store
+/// without recomputing the transform data on the host side. The pointer is valid
+/// until the GlobalTransform GPU store grows and reallocates.
+#cfg(target="wasm")
+pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_read(
+    gt, "World::global_transform_wasm_gpu_bytes_payload_ptr",
+  )
+  match self.gpu_store(gt) {
+    Some(store) => store.wasm_bytes_payload_ptr()
+    None => 0
+  }
+}
+
+///|
+/// Returns the byte length of the builtin GlobalTransform GPU store payload.
+#cfg(target="wasm")
+pub fn World::global_transform_wasm_gpu_bytes_len(self : World) -> Int {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_read(
+    gt, "World::global_transform_wasm_gpu_bytes_len",
+  )
+  match self.gpu_store(gt) {
+    Some(store) => store.wasm_bytes_len()
+    None => 0
+  }
 }
 
 ///|
@@ -476,7 +319,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
   gt_row : MutArrayView[Byte],
 ) -> Bool {
   if !has_child_of {
-    @comp.matrix44f_write_std140_mat4_to_gpu_row(leaf_local_matrix, gt_row)
+    @comp.matrix44f_write_affine3x4_to_gpu_row(leaf_local_matrix, gt_row)
     true
   } else {
     match self.build_child_of_ancestor_chain(entity) {
@@ -490,7 +333,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
           ) {
           None => false
           Some(world_m) => {
-            @comp.matrix44f_write_std140_mat4_to_gpu_row(world_m, gt_row)
+            @comp.matrix44f_write_affine3x4_to_gpu_row(world_m, gt_row)
             true
           }
         }
@@ -511,9 +354,10 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|   const gtIndex = gt.index;
   #|   const coIndex = co.index;
   #|   const gtStore = world.gpu_stores[gtIndex];
-  #|   if (!gtStore || gtStore.stride < 64) return false;
+  #|   if (!gtStore || gtStore.stride < 48) return false;
   #|
   #|   const archetypes = world.archetypes;
+  #|   let hasChildArchetype = false;
   #|   for (let ai = 0; ai < archetypes.length; ai++) {
   #|     const arch = archetypes[ai];
   #|     const comps = arch.components;
@@ -524,7 +368,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       else if (idx === gtIndex) hasGt = true;
   #|       else if (idx === coIndex) hasCo = true;
   #|     }
-  #|     if (hasTf && hasGt && hasCo) return false;
+  #|     if (hasTf && hasGt && hasCo) hasChildArchetype = true;
   #|   }
   #|
   #|   if (!ArrayBuffer.isView(gtStore.bytes)) {
@@ -576,6 +420,14 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|       }
   #|     }
   #|     if (!hasGt) continue;
+  #|     let hasCo = false;
+  #|     for (let ci = 0; ci < comps.length; ci++) {
+  #|       if (comps[ci].index === coIndex) {
+  #|         hasCo = true;
+  #|         break;
+  #|       }
+  #|     }
+  #|     if (hasCo) continue;
   #|
   #|     let tfBytes = tfColumn.bytes;
   #|     if (!ArrayBuffer.isView(tfBytes)) {
@@ -630,21 +482,17 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|
   #|       const out = entityIndex * gtStrideF32;
   #|       gtF32[out] = Math.fround(r00 * sx);
-  #|       gtF32[out + 1] = Math.fround(r10 * sx);
-  #|       gtF32[out + 2] = Math.fround(r20 * sx);
-  #|       gtF32[out + 3] = 0;
-  #|       gtF32[out + 4] = Math.fround(r01 * sy);
+  #|       gtF32[out + 1] = Math.fround(r01 * sy);
+  #|       gtF32[out + 2] = Math.fround(r02 * sz);
+  #|       gtF32[out + 3] = px;
+  #|       gtF32[out + 4] = Math.fround(r10 * sx);
   #|       gtF32[out + 5] = Math.fround(r11 * sy);
-  #|       gtF32[out + 6] = Math.fround(r21 * sy);
-  #|       gtF32[out + 7] = 0;
-  #|       gtF32[out + 8] = Math.fround(r02 * sz);
-  #|       gtF32[out + 9] = Math.fround(r12 * sz);
+  #|       gtF32[out + 6] = Math.fround(r12 * sz);
+  #|       gtF32[out + 7] = py;
+  #|       gtF32[out + 8] = Math.fround(r20 * sx);
+  #|       gtF32[out + 9] = Math.fround(r21 * sy);
   #|       gtF32[out + 10] = Math.fround(r22 * sz);
-  #|       gtF32[out + 11] = 0;
-  #|       gtF32[out + 12] = px;
-  #|       gtF32[out + 13] = py;
-  #|       gtF32[out + 14] = pz;
-  #|       gtF32[out + 15] = 1;
+  #|       gtF32[out + 11] = pz;
   #|
   #|       if (rangeFirst < 0) {
   #|         rangeFirst = entityIndex;
@@ -659,7 +507,7 @@ extern "js" fn World::update_global_transforms_no_child_fast_path_js(
   #|     }
   #|     pushDirtyRange(rangeFirst, rangePrev);
   #|   }
-  #|   return true;
+  #|   return !hasChildArchetype;
   #| }
 
 ///|
@@ -716,15 +564,16 @@ fn World::try_update_global_transforms_no_child_fast_path(
     Some(store) => store
     None => return false
   }
-  if gt_store.stride < 64 {
+  if gt_store.stride < 48 {
     return false
   }
+  let mut has_child_archetype = false
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
     let comps = self.archetypes[ai].components
     let has_tf = component_array_contains(comps, tf)
     let has_gt = component_array_contains(comps, gt)
     if has_tf && has_gt && component_array_contains(comps, co) {
-      return false
+      has_child_archetype = true
     }
   }
   let capacity = gt_store.capacity()
@@ -733,6 +582,9 @@ fn World::try_update_global_transforms_no_child_fast_path(
     let comps = arch.components
     if !component_array_contains(comps, tf) ||
       !component_array_contains(comps, gt) {
+      continue
+    }
+    if component_array_contains(comps, co) {
       continue
     }
     let tf_col_index = arch.column_index(tf)
@@ -785,21 +637,17 @@ fn World::try_update_global_transforms_no_child_fast_path(
 
       let out = entity_index * gt_store.stride
       put_f32_fixed_le(gt_store.bytes, out, r00 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 4, r10 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 8, r20 * sx)
-      put_f32_fixed_le(gt_store.bytes, out + 12, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 16, r01 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 4, r01 * sy)
+      put_f32_fixed_le(gt_store.bytes, out + 8, r02 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 12, px)
+      put_f32_fixed_le(gt_store.bytes, out + 16, r10 * sx)
       put_f32_fixed_le(gt_store.bytes, out + 20, r11 * sy)
-      put_f32_fixed_le(gt_store.bytes, out + 24, r21 * sy)
-      put_f32_fixed_le(gt_store.bytes, out + 28, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 32, r02 * sz)
-      put_f32_fixed_le(gt_store.bytes, out + 36, r12 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 24, r12 * sz)
+      put_f32_fixed_le(gt_store.bytes, out + 28, py)
+      put_f32_fixed_le(gt_store.bytes, out + 32, r20 * sx)
+      put_f32_fixed_le(gt_store.bytes, out + 36, r21 * sy)
       put_f32_fixed_le(gt_store.bytes, out + 40, r22 * sz)
-      put_f32_fixed_le(gt_store.bytes, out + 44, (0.0 : Float))
-      put_f32_fixed_le(gt_store.bytes, out + 48, px)
-      put_f32_fixed_le(gt_store.bytes, out + 52, py)
-      put_f32_fixed_le(gt_store.bytes, out + 56, pz)
-      put_f32_fixed_le(gt_store.bytes, out + 60, (1.0 : Float))
+      put_f32_fixed_le(gt_store.bytes, out + 44, pz)
       if dirty_first < 0 {
         dirty_first = entity_index
         dirty_prev = entity_index
@@ -814,12 +662,13 @@ fn World::try_update_global_transforms_no_child_fast_path(
     gt_store.mark_dirty_range(dirty_first, dirty_prev)
   }
   self.replace_gpu_store(gt_store)
-  true
+  !has_child_archetype
 }
 
 ///|
 /// Fallback for hierarchy-capable transform propagation that still walks archetypes directly.
-/// It avoids per-entity `QueryRow` construction, repeated `has_component`, and per-row GPU store lookup.
+/// It only handles archetypes that actually carry [`ChildOf`]; no-child archetypes are handled by
+/// the fast path above even when the world contains a mix of hierarchical and flat transforms.
 fn World::try_update_global_transforms_from_transforms_archetype_path(
   self : World,
   tf : ComponentTypeId,
@@ -832,6 +681,9 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     let comps = arch.components
     if !component_array_contains(comps, tf) ||
       !component_array_contains(comps, gt) {
+      continue
+    }
+    if !component_array_contains(comps, co) {
       continue
     }
     matched = true
@@ -851,7 +703,7 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
     Some(store) => store
     None => return false
   }
-  if gt_store.stride != 64 {
+  if gt_store.stride != 48 {
     return false
   }
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
@@ -861,7 +713,9 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
       !component_array_contains(comps, gt) {
       continue
     }
-    let has_child_of = component_array_contains(comps, co)
+    if !component_array_contains(comps, co) {
+      continue
+    }
     let tf_col = arch.columns[arch.column_index(tf)]
     let tf_bytes = tf_col.bytes
     let tf_stride = tf_col.stride
@@ -877,9 +731,9 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
       ignore(
         self.compute_global_transform_for_tf_gt_bulk_row(
           e,
-          has_child_of,
+          true,
           local_m,
-          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 64),
+          gt_store.bytes.mut_view(start=gt_base, end=gt_base + 48),
         ),
       )
       if dirty_first < 0 {

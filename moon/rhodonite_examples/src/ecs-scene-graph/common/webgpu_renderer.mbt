@@ -126,7 +126,13 @@ fn ecs_scene_shader_wgsl() -> String {
     #|  view_proj: mat4x4<f32>,
     #|}
     #|
-    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<mat4x4<f32>>;
+    #|struct WorldAffine3x4 {
+    #|  row0: vec4<f32>,
+    #|  row1: vec4<f32>,
+    #|  row2: vec4<f32>,
+    #|}
+    #|
+    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
     #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
     #|
     #|struct VertexOut {
@@ -142,7 +148,13 @@ fn ecs_scene_shader_wgsl() -> String {
     #|  let idx = u32(inst.x);
     #|  let color = vec3<f32>(inst.y, inst.z, inst.w);
     #|  let world_m = world_from_entity[idx];
-    #|  let world_pos = world_m * vec4<f32>(local_pos, 1.0);
+    #|  let local_h = vec4<f32>(local_pos, 1.0);
+    #|  let world_pos = vec4<f32>(
+    #|    dot(world_m.row0, local_h),
+    #|    dot(world_m.row1, local_h),
+    #|    dot(world_m.row2, local_h),
+    #|    1.0,
+    #|  );
     #|  let clip = camera.view_proj * world_pos;
     #|  var o: VertexOut;
     #|  o.position = clip;

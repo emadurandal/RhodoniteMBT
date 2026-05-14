@@ -1,6 +1,7 @@
 import type {
 	MoonGpuWriteCopy,
 	MoonGpuWriteView,
+	MoonSpawnBatchRow,
 	MoonWorld,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -34,11 +35,13 @@ import {
 	world_remove_component,
 	world_set_component_bytes,
 	world_set_transform_trs,
+	spawn_batch_row_entity,
+	spawn_batch_row_write_view,
+	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
 	world_transform_component,
 	world_update_global_transforms_from_transforms,
-	world_write_global_transforms_dense_grid_wave_copy,
-	world_write_global_transforms_dense_grid_wave_views,
+	world_write_global_transforms_dense_range_views,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -49,6 +52,22 @@ import {
 	RegisteredComponent,
 } from "./types.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
+
+export class SpawnBatchRow {
+	readonly inner: MoonSpawnBatchRow;
+
+	constructor(inner: MoonSpawnBatchRow) {
+		this.inner = inner;
+	}
+
+	entity(): EntityId {
+		return new EntityId(spawn_batch_row_entity(this.inner));
+	}
+
+	writeView(component: ComponentTypeId): ByteView {
+		return byteView(spawn_batch_row_write_view(this.inner, component.inner));
+	}
+}
 
 export class GpuWriteView {
 	readonly inner: MoonGpuWriteView;
@@ -267,44 +286,41 @@ export class World {
 		world_update_global_transforms_from_transforms(this.inner);
 	}
 
-	writeGlobalTransformsDenseGridWaveViews(
+	writeGlobalTransformsDenseRangeViews(
 		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
+		f: (
+			bytes: ByteView,
+			stride: number,
+			firstEntityIndex: number,
+			count: number,
+		) => void,
 	): GpuWriteView[] {
-		return world_write_global_transforms_dense_grid_wave_views(
+		return world_write_global_transforms_dense_range_views(
 			this.inner,
 			count,
-			perSide,
-			time,
-			scale,
-			spacing,
+			(bytes, stride, firstEntityIndex, rangeCount) =>
+				f(byteView(bytes), stride, firstEntityIndex, rangeCount),
 		).map((write) => new GpuWriteView(write));
-	}
-
-	writeGlobalTransformsDenseGridWaveCopy(
-		count: number,
-		perSide: number,
-		time: number,
-		scale: number,
-		spacing: number,
-	): GpuWriteCopy[] {
-		return world_write_global_transforms_dense_grid_wave_copy(
-			this.inner,
-			count,
-			perSide,
-			time,
-			scale,
-			spacing,
-		).map((write) => new GpuWriteCopy(write));
 	}
 
 	spawnTransformGlobalBatchIdentity(count: number): EntityId[] {
 		return world_spawn_transform_global_batch_identity(this.inner, count).map(
 			(entity) => new EntityId(entity),
 		);
+	}
+
+	spawnBatch(
+		components: ComponentTypeId[],
+		count: number,
+		f: (index: number, entity: EntityId, row: SpawnBatchRow) => void,
+	): EntityId[] {
+		return world_spawn_batch(
+			this.inner,
+			components.map((component) => component.inner),
+			count,
+			(index, entity, row) =>
+				f(index, new EntityId(entity), new SpawnBatchRow(row)),
+		).map((entity) => new EntityId(entity));
 	}
 }
 

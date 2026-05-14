@@ -118,6 +118,45 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(e1Bytes ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
+	it("reuses prepared row query plans", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("PreparedTsCpu", 16);
+		const prepared = Query.new([cpu]).prepare(world);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		let sum = 0;
+		prepared.forEach(world, (row) => {
+			sum += row.readView(cpu).getF32(0);
+		});
+
+		expect(sum).toBeCloseTo(4);
+	});
+
+	it("batch-spawns arbitrary CPU and GPU components", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("SpawnBatchTsCpu", 16);
+		const gpu = world.registerGpuComponent("SpawnBatchTsGpu", GpuLayout.empty(16));
+
+		const entities = world.spawnBatch([gpu, cpu], 2, (index, entity, row) => {
+			expect(row.entity().index()).toBe(entity.index());
+			row.writeView(cpu).setF32(0, index + 1);
+			row.writeView(gpu).setF32(0, index + 10);
+		});
+
+		expect(entities).toHaveLength(2);
+		expect(world.componentBytesCopy(entities[0], cpu)?.[0]).not.toBeUndefined();
+		expect(
+			getF32(world.componentBytesCopy(entities[1], cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(2);
+		const writes = world.drainGpuWriteViews(gpu);
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.bytes().getF32(0)).toBeCloseTo(10);
+		expect(writes[0]?.bytes().getF32(16)).toBeCloseTo(11);
+	});
+
 	it("supports builtin transform/global transform upload helpers", () => {
 		const world = World.new();
 		const [entity] = world.spawnTransformGlobalBatchIdentity(1);
