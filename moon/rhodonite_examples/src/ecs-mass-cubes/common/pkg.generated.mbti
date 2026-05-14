@@ -20,6 +20,10 @@ pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
 // Types and methods
 type DenseTransformLayout
 
+type GlobalTransformPrecisionMode derive(Eq)
+
+type TransformUploadRange
+
 pub(all) struct WebGPURenderer {
   context : @webgpu.GPUCanvasContext
   device : @webgpu.GPUDevice
@@ -40,6 +44,8 @@ pub(all) struct WebGPURenderer {
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
+  transform_refs : FixedArray[Byte]
+  transform_upload_range : TransformUploadRange
   dense_transform_layout : DenseTransformLayout?
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]

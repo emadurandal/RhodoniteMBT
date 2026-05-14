@@ -1,4 +1,5 @@
 import "./style.css";
+import { globalTransformHelpersDefault } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -579,14 +580,16 @@ function writeTransformBytesFromWasmMemory(
 }
 
 function shaderWgsl(): string {
-	return `
+	const prefix = `
 struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<storage, read> transform_words: array<u32>;
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
+`;
 
+	const suffix = `
 struct VertexOut {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec3<f32>,
@@ -598,47 +601,9 @@ fn vertexMain(
   @location(1) transform_ref: vec2<u32>,
   @location(2) color: vec3<f32>,
 ) -> VertexOut {
-  let format = transform_ref.x;
-  let word_offset = transform_ref.y;
-  var row0: vec4<f32>;
-  var row1: vec4<f32>;
-  var row2: vec4<f32>;
-  if (format == 1u) {
-    let r0xy = unpack2x16float(transform_words[word_offset + 0u]);
-    let r0zw = unpack2x16float(transform_words[word_offset + 1u]);
-    let r1xy = unpack2x16float(transform_words[word_offset + 2u]);
-    let r1zw = unpack2x16float(transform_words[word_offset + 3u]);
-    let r2xy = unpack2x16float(transform_words[word_offset + 4u]);
-    let r2zw = unpack2x16float(transform_words[word_offset + 5u]);
-    row0 = vec4<f32>(r0xy.x, r0xy.y, r0zw.x, r0zw.y);
-    row1 = vec4<f32>(r1xy.x, r1xy.y, r1zw.x, r1zw.y);
-    row2 = vec4<f32>(r2xy.x, r2xy.y, r2zw.x, r2zw.y);
-  } else {
-    row0 = vec4<f32>(
-      bitcast<f32>(transform_words[word_offset + 0u]),
-      bitcast<f32>(transform_words[word_offset + 1u]),
-      bitcast<f32>(transform_words[word_offset + 2u]),
-      bitcast<f32>(transform_words[word_offset + 3u]),
-    );
-    row1 = vec4<f32>(
-      bitcast<f32>(transform_words[word_offset + 4u]),
-      bitcast<f32>(transform_words[word_offset + 5u]),
-      bitcast<f32>(transform_words[word_offset + 6u]),
-      bitcast<f32>(transform_words[word_offset + 7u]),
-    );
-    row2 = vec4<f32>(
-      bitcast<f32>(transform_words[word_offset + 8u]),
-      bitcast<f32>(transform_words[word_offset + 9u]),
-      bitcast<f32>(transform_words[word_offset + 10u]),
-      bitcast<f32>(transform_words[word_offset + 11u]),
-    );
-  }
-  let local_h = vec4<f32>(local_pos, 1.0);
-  let world_pos = vec4<f32>(
-    dot(row0, local_h),
-    dot(row1, local_h),
-    dot(row2, local_h),
-    1.0,
+  let world_pos = rn_transform_point(
+    rn_load_global_transform(transform_ref),
+    local_pos,
   );
   let clip = camera.view_proj * world_pos;
   var o: VertexOut;
@@ -652,6 +617,7 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
   return vec4<f32>(color, 1.0);
 }
 `;
+	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
 async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
