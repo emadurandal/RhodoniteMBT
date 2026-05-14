@@ -1147,14 +1147,18 @@ pub(all) struct WebGPURenderer {
 
 ///|
 fn ecs_mass_shader_wgsl() -> String {
-  let prefix =
+  let prefix_camera =
     #|struct CameraUniform {
     #|  view_proj: mat4x4<f32>,
     #|}
     #|
-    #|@group(0) @binding(0) var<storage, read> transform_words: array<u32>;
+  let camera_binding =
+    #|
     #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
     #|
+  let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
+    camera_binding
+  let prefix = prefix_camera + prefix_bindings
   let suffix =
     #|
     #|struct VertexOut {
@@ -1266,22 +1270,18 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
       },
     ],
   }
-  let vertex_layout_instances : @wgpu.GPUVertexBufferLayout = {
-    array_stride: instance_stride.to_uint64(),
-    step_mode: @wgpu.GPUVertexStepMode::Instance,
-    attributes: [
-      {
-        format: @wgpu.GPUVertexFormat::Uint32x2,
-        offset: 0UL,
-        shader_location: 1U,
-      },
+  let vertex_layout_instances = @wgpu.global_transform_ref_instance_vertex_buffer_layout(
+    instance_stride.to_uint64(),
+    1U,
+    0UL,
+    [
       {
         format: @wgpu.GPUVertexFormat::Float32x3,
         offset: 8UL,
         shader_location: 2U,
       },
     ],
-  }
+  )
   let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
@@ -1350,15 +1350,9 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     0UL,
     camera_uniform_bytes(),
   )
-  let bind_transforms = device.create_bind_group({
-    layout: layout_transforms,
-    entries: [
-      {
-        binding: 0U,
-        resource: @wgpu.GPUBindingResource::Buffer(transform_storage),
-      },
-    ],
-  })
+  let bind_transforms = device.create_global_transform_words_bind_group(
+    pipeline, transform_storage, 0U, 0U,
+  )
   let bind_camera = device.create_bind_group({
     layout: layout_camera,
     entries: [

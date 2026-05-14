@@ -1,5 +1,10 @@
 import "./style.css";
-import { globalTransformHelpersDefault } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import {
+	globalTransformHelpersDefault,
+	globalTransformRefInstanceVertexBufferLayout,
+	globalTransformWordsBindGroup,
+	globalTransformWordsBindingDefault,
+} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -580,12 +585,15 @@ function writeTransformBytesFromWasmMemory(
 }
 
 function shaderWgsl(): string {
-	const prefix = `
+	const prefix =
+		`
 struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
-@group(0) @binding(0) var<storage, read> transform_words: array<u32>;
+` +
+		globalTransformWordsBindingDefault() +
+		`
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
 `;
 
@@ -647,14 +655,11 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 					stepMode: "vertex",
 					attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
 				},
-				{
-					arrayStride: INSTANCE_STRIDE,
-					stepMode: "instance",
-					attributes: [
-						{ shaderLocation: 1, offset: 0, format: "uint32x2" },
+				globalTransformRefInstanceVertexBufferLayout(INSTANCE_STRIDE, {
+					extraAttributes: [
 						{ shaderLocation: 2, offset: 8, format: "float32x3" },
 					],
-				},
+				}),
 			],
 		},
 		fragment: {
@@ -680,10 +685,11 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	});
 	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes());
 
-	const bindTransforms = device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(0),
-		entries: [{ binding: 0, resource: { buffer: transformStorage } }],
-	});
+	const bindTransforms = globalTransformWordsBindGroup(
+		device,
+		pipeline,
+		transformStorage,
+	);
 	const bindCamera = device.createBindGroup({
 		layout: pipeline.getBindGroupLayout(1),
 		entries: [{ binding: 0, resource: { buffer: cameraUniform } }],

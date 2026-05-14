@@ -81,6 +81,34 @@ pub fn GPUDevice::create_render_pipeline(
 }
 
 ///|
+/// Vertex attribute for the builtin ECS GlobalTransform ref: `vec2<u32>`
+/// containing `{ format, word_offset }`.
+pub fn global_transform_ref_vertex_attribute(
+  shader_location : UInt,
+  offset : UInt64,
+) -> GPUVertexAttribute {
+  { format: GPUVertexFormat::Uint32x2, offset, shader_location }
+}
+
+///|
+/// Instance vertex-buffer layout that starts with the builtin ECS GlobalTransform
+/// ref and appends any caller-owned per-instance attributes.
+pub fn global_transform_ref_instance_vertex_buffer_layout(
+  array_stride : UInt64,
+  shader_location : UInt,
+  offset : UInt64,
+  extra_attributes : Array[GPUVertexAttribute],
+) -> GPUVertexBufferLayout {
+  let attrs : Array[GPUVertexAttribute] = [
+    global_transform_ref_vertex_attribute(shader_location, offset),
+  ]
+  for i = 0; i < extra_attributes.length(); i = i + 1 {
+    attrs.push(extra_attributes[i])
+  }
+  { array_stride, step_mode: GPUVertexStepMode::Instance, attributes: attrs }
+}
+
+///|
 /// WebGPU `GPUTextureUsage.RENDER_ATTACHMENT`（0x10）。
 pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16UL
 
@@ -414,6 +442,21 @@ pub fn GPUDevice::create_bind_group(
       raw_entries,
     ),
   }
+}
+
+///|
+/// Creates a bind group for the builtin ECS GlobalTransform packed word storage buffer.
+pub fn GPUDevice::create_global_transform_words_bind_group(
+  self : GPUDevice,
+  pipeline : GPURenderPipeline,
+  buffer : GPUBuffer,
+  group_index : UInt,
+  binding : UInt,
+) -> GPUBindGroup {
+  self.create_bind_group({
+    layout: pipeline.get_bind_group_layout(group_index),
+    entries: [{ binding, resource: GPUBindingResource::Buffer(buffer) }],
+  })
 }
 
 ///|

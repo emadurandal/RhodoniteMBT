@@ -39,6 +39,10 @@ pub fn create_webgpu_context(GPUDevice, GPUCanvasContext, String, GPUQueue) -> G
 
 pub fn create_webgpu_instance(@webgpu_objects.GPU) -> GPUInstance
 
+pub fn global_transform_ref_instance_vertex_buffer_layout(UInt64, UInt, UInt64, Array[@webgpu_enums.GPUVertexAttribute]) -> @webgpu_enums.GPUVertexBufferLayout
+
+pub fn global_transform_ref_vertex_attribute(UInt, UInt64) -> @webgpu_enums.GPUVertexAttribute
+
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
@@ -139,6 +143,7 @@ pub(all) struct GPUDevice {
 pub fn GPUDevice::create_bind_group(Self, GPUBindGroupDescriptor) -> GPUBindGroup
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
+pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
 pub fn GPUDevice::create_texture(Self, UInt, UInt, String, UInt64) -> GPUTexture

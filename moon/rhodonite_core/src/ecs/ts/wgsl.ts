@@ -1,4 +1,69 @@
 const GLOBAL_TRANSFORM_FORMAT_F16 = 1;
+export const GLOBAL_TRANSFORM_REF_BYTE_SIZE = 8;
+
+export function globalTransformWordsBinding(
+	group = 0,
+	binding = 0,
+	varName = "transform_words",
+): string {
+	return `@group(${group}) @binding(${binding}) var<storage, read> ${varName}: array<u32>;\n`;
+}
+
+export function globalTransformWordsBindingDefault(): string {
+	return globalTransformWordsBinding();
+}
+
+export function globalTransformRefVertexAttribute(
+	shaderLocation = 1,
+	offset = 0,
+): GPUVertexAttribute {
+	return {
+		format: "uint32x2",
+		offset,
+		shaderLocation,
+	};
+}
+
+export function globalTransformRefInstanceVertexBufferLayout(
+	arrayStride: GPUSize64,
+	options: {
+		readonly shaderLocation?: number;
+		readonly offset?: GPUSize64;
+		readonly extraAttributes?: readonly GPUVertexAttribute[];
+	} = {},
+): GPUVertexBufferLayout {
+	return {
+		arrayStride,
+		stepMode: "instance",
+		attributes: [
+			globalTransformRefVertexAttribute(
+				options.shaderLocation,
+				options.offset,
+			),
+			...(options.extraAttributes ?? []),
+		],
+	};
+}
+
+export function globalTransformWordsBindGroup(
+	device: GPUDevice,
+	pipeline: GPURenderPipeline,
+	buffer: GPUBuffer,
+	options: {
+		readonly groupIndex?: number;
+		readonly binding?: number;
+	} = {},
+): GPUBindGroup {
+	return device.createBindGroup({
+		layout: pipeline.getBindGroupLayout(options.groupIndex ?? 0),
+		entries: [
+			{
+				binding: options.binding ?? 0,
+				resource: { buffer },
+			},
+		],
+	});
+}
 
 export function globalTransformHelpers(
 	transformWordsVar = "transform_words",

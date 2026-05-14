@@ -1,9 +1,32 @@
 ///|
+/// Returns the WGSL storage-buffer binding declaration expected by
+/// `global_transform_helpers`.
+pub fn global_transform_words_binding(
+  group : UInt,
+  binding : UInt,
+  var_name : String,
+) -> String {
+  "@group(" +
+  group.to_string() +
+  ") @binding(" +
+  binding.to_string() +
+  ") var<storage, read> " +
+  var_name +
+  ": array<u32>;\n"
+}
+
+///|
+/// Returns `@group(0) @binding(0) var<storage, read> transform_words: array<u32>;`.
+pub fn global_transform_words_binding_default() -> String {
+  global_transform_words_binding(0U, 0U, "transform_words")
+}
+
+///|
 /// Returns WGSL helper definitions for loading the builtin packed `GlobalTransform`
 /// blob from a storage-buffer `array<u32>`.
 ///
 /// The caller owns the storage binding declaration. For the default examples this
-/// means declaring `var<storage, read> transform_words: array<u32>;` and calling
+/// means declaring `global_transform_words_binding_default()` and calling
 /// `global_transform_helpers_default()`.
 pub fn global_transform_helpers(transform_words_var~ : String) -> String {
   let f16_code = @comp.global_transform_format_code(@comp.Affine3x4F16)
