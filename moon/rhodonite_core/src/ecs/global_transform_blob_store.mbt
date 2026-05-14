@@ -58,7 +58,12 @@ fn GlobalTransformBlobStore::mark_dirty_words(
   }
   let last = first + count - 1
   let n = self.dirty_word_first.length()
-  if n > 0 && first <= self.dirty_word_last[n - 1] + 1 {
+  if n > 0 &&
+    first <= self.dirty_word_last[n - 1] + 1 &&
+    last >= self.dirty_word_first[n - 1] - 1 {
+    if first < self.dirty_word_first[n - 1] {
+      self.dirty_word_first[n - 1] = first
+    }
     if last > self.dirty_word_last[n - 1] {
       self.dirty_word_last[n - 1] = last
     }

@@ -36,3 +36,17 @@ test "World archetype version only changes when new archetypes are created" {
   assert_true(world.destroy_entity(e2))
   assert_eq(world.archetype_version, version_after_new_archetypes)
 }
+
+///|
+test "GlobalTransformBlobStore keeps non-monotonic dirty word ranges" {
+  let store = GlobalTransformBlobStore::new()
+  store.ensure_word_capacity(30)
+  store.mark_dirty_words(24, 6)
+  store.mark_dirty_words(0, 12)
+  let writes = store.drain_write_views()
+  assert_eq(writes.length(), 2)
+  assert_eq(writes[0].byte_offset, 24 * 4)
+  assert_eq(writes[0].bytes.length(), 6 * 4)
+  assert_eq(writes[1].byte_offset, 0)
+  assert_eq(writes[1].bytes.length(), 12 * 4)
+}
