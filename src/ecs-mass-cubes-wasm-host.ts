@@ -1,9 +1,11 @@
 import "./style.css";
 import {
+	createGlobalTransformWordsBuffer,
 	globalTransformHelpersDefault,
 	globalTransformRefInstanceVertexBufferLayout,
 	globalTransformWordsBindGroup,
 	globalTransformWordsBindingDefault,
+	uploadGlobalTransformBytes,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
@@ -554,7 +556,7 @@ function writeWasmBytesToBuffer(
 		view = new Uint8Array(buffer, ptr, byteLength);
 		setCached(buffer, ptr, byteLength, view);
 	}
-	queue.writeBuffer(gpuBuffer, 0, view);
+	uploadGlobalTransformBytes(queue, gpuBuffer, view);
 }
 
 function writeTransformBytesFromWasmMemory(
@@ -675,10 +677,10 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		},
 	});
 
-	const transformStorage = device.createBuffer({
-		size: Math.max(transformLayout.wordCapacity * 4, 4),
-		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-	});
+	const transformStorage = createGlobalTransformWordsBuffer(
+		device,
+		transformLayout.wordCapacity,
+	);
 	const cameraUniform = device.createBuffer({
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -787,18 +789,20 @@ function createHostImports(
 				},
 				write_initial_global_transforms: (perSide: number, waveTime: number) => {
 					writeMassCubesFullTransformData(renderer, perSide, waveTime);
-					renderer.queue.writeBuffer(
+					uploadGlobalTransformBytes(
+						renderer.queue,
 						renderer.transformStorage,
-						renderer.transformWordUploadFirst * 4,
 						renderer.transformBytes,
+						renderer.transformWordUploadFirst * 4,
 					);
 				},
 				write_global_transform_y: (waveTime: number) => {
 					writeMassCubesYTransformData(renderer, waveTime);
-					renderer.queue.writeBuffer(
+					uploadGlobalTransformBytes(
+						renderer.queue,
 						renderer.transformStorage,
-						renderer.transformWordUploadFirst * 4,
 						renderer.transformBytes,
+						renderer.transformWordUploadFirst * 4,
 					);
 				},
 			write_initial_global_transform_bytes: (ptr: number, byteLength: number) => {

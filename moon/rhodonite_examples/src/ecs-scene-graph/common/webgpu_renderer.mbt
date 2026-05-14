@@ -202,9 +202,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   ignore(world.set_global_transform(moon, id_m))
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
-  let storage_bytes = (world.global_transform_blob_word_capacity() * 4).to_uint64()
-  let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let transform_storage = device.create_buffer(storage_bytes, s_usage)
+  let transform_storage = device.create_global_transform_words_buffer(world)
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
     @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let camera_uniform = device.create_buffer(256UL, cam_usage)
@@ -274,15 +272,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
   ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
-  let writes = world.drain_global_transform_blob_write_views()
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    queue.write_buffer_from_array_view(
-      transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  queue.drain_and_upload_global_transform_writes(transform_storage, world)
   Some({
     context: canvas_context,
     device,
@@ -390,15 +380,10 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       @ecs.SystemContext::new((0.022 : Float), renderer.frame.val),
     ),
   )
-  let writes = renderer.world.drain_global_transform_blob_write_views()
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    renderer.queue.write_buffer_from_array_view(
-      renderer.transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  renderer.queue.drain_and_upload_global_transform_writes(
+    renderer.transform_storage,
+    renderer.world,
+  )
   let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0),
   )

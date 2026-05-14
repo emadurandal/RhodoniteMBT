@@ -1,5 +1,19 @@
+import type { GpuWriteView, World } from "./world.ts";
+
 const GLOBAL_TRANSFORM_FORMAT_F16 = 1;
 export const GLOBAL_TRANSFORM_REF_BYTE_SIZE = 8;
+
+type GlobalTransformWordCapacitySource =
+	| number
+	| Pick<World, "globalTransformBlobWordCapacity">;
+
+function globalTransformWordCapacity(
+	source: GlobalTransformWordCapacitySource,
+): number {
+	return typeof source === "number"
+		? source
+		: source.globalTransformBlobWordCapacity();
+}
 
 export function globalTransformWordsBinding(
 	group = 0,
@@ -63,6 +77,59 @@ export function globalTransformWordsBindGroup(
 			},
 		],
 	});
+}
+
+export function globalTransformWordsBufferByteSize(
+	source: GlobalTransformWordCapacitySource,
+): GPUSize64 {
+	return Math.max(globalTransformWordCapacity(source) * 4, 4);
+}
+
+export function createGlobalTransformWordsBuffer(
+	device: GPUDevice,
+	source: GlobalTransformWordCapacitySource,
+): GPUBuffer {
+	return device.createBuffer({
+		size: globalTransformWordsBufferByteSize(source),
+		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+	});
+}
+
+export function uploadGlobalTransformWrites(
+	queue: GPUQueue,
+	buffer: GPUBuffer,
+	writes: readonly GpuWriteView[],
+): void {
+	for (const write of writes) {
+		const bytes = write.bytes();
+		const view = bytes.asUint8Array();
+		if (view !== null) {
+			queue.writeBuffer(buffer, write.byteOffset(), view, 0, view.byteLength);
+		} else {
+			queue.writeBuffer(buffer, write.byteOffset(), bytes.toUint8ArrayCopy());
+		}
+	}
+}
+
+export function drainAndUploadGlobalTransformWrites(
+	queue: GPUQueue,
+	buffer: GPUBuffer,
+	world: Pick<World, "drainGlobalTransformBlobWriteViews">,
+): void {
+	uploadGlobalTransformWrites(
+		queue,
+		buffer,
+		world.drainGlobalTransformBlobWriteViews(),
+	);
+}
+
+export function uploadGlobalTransformBytes(
+	queue: GPUQueue,
+	buffer: GPUBuffer,
+	bytes: Uint8Array,
+	byteOffset = 0,
+): void {
+	queue.writeBuffer(buffer, byteOffset, bytes);
 }
 
 export function globalTransformHelpers(

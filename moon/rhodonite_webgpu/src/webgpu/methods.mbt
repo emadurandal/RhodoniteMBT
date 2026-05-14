@@ -142,6 +142,32 @@ pub fn GPUDevice::create_buffer(
 }
 
 ///|
+/// Byte size for the builtin ECS GlobalTransform packed-word storage buffer.
+///
+/// WebGPU buffers cannot be zero-sized, so an empty world still reserves 4 bytes.
+pub fn global_transform_words_buffer_byte_size(word_capacity : Int) -> UInt64 {
+  if word_capacity <= 0 {
+    4UL
+  } else {
+    (word_capacity * 4).to_uint64()
+  }
+}
+
+///|
+/// Creates a storage buffer for the builtin ECS GlobalTransform packed-word blob.
+pub fn GPUDevice::create_global_transform_words_buffer(
+  self : GPUDevice,
+  world : @ecs.World,
+) -> GPUBuffer {
+  self.create_buffer(
+    global_transform_words_buffer_byte_size(
+      world.global_transform_blob_word_capacity(),
+    ),
+    GPU_BUFFER_USAGE_STORAGE | GPU_BUFFER_USAGE_COPY_DST,
+  )
+}
+
+///|
 pub fn GPUDevice::create_texture(
   self : GPUDevice,
   width : UInt,
@@ -211,6 +237,36 @@ pub fn GPUQueue::write_buffer_from_array_view(
   view : ArrayView[Byte],
 ) -> Unit {
   @raw.webgpu_queue_write_buffer_array_view(self.raw, buffer.raw, offset, view)
+}
+
+///|
+/// Uploads borrowed ECS GlobalTransform packed-blob write views into a storage buffer.
+pub fn GPUQueue::upload_global_transform_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  writes : Array[@ecs.GpuWriteView],
+) -> Unit {
+  for i = 0; i < writes.length(); i = i + 1 {
+    let write = writes[i]
+    self.write_buffer_from_array_view(
+      buffer,
+      write.byte_offset.to_uint64(),
+      write.bytes,
+    )
+  }
+}
+
+///|
+/// Drains dirty ECS GlobalTransform packed-blob views and uploads them immediately.
+pub fn GPUQueue::drain_and_upload_global_transform_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  world : @ecs.World,
+) -> Unit {
+  self.upload_global_transform_writes(
+    buffer,
+    world.drain_global_transform_blob_write_views(),
+  )
 }
 
 ///|

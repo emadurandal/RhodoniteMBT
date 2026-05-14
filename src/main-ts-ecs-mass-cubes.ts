@@ -1,10 +1,12 @@
 import "./style.css";
 import {
 	World,
+	createGlobalTransformWordsBuffer,
 	globalTransformRefInstanceVertexBufferLayout,
 	globalTransformHelpersDefault,
 	globalTransformWordsBindGroup,
 	globalTransformWordsBindingDefault,
+	uploadGlobalTransformWrites,
 	type ByteView,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
@@ -105,7 +107,6 @@ type Renderer = {
 	readonly bindCamera: GPUBindGroup;
 	readonly world: World;
 	readonly transformRefs: Uint32Array;
-	readonly transformWordCapacity: number;
 	readonly transformWordUploadFirst: number;
 	readonly transformWordUploadCount: number;
 	readonly denseTransformLayout: DenseTransformLayout | null;
@@ -417,22 +418,6 @@ function instanceBytes(entities: ReturnType<World["spawnTransformGlobalBatchIden
 		writeF32(bytes, base + 16, b);
 	});
 	return bytes;
-}
-
-function uploadGlobalTransformWrites(
-	queue: GPUQueue,
-	buffer: GPUBuffer,
-	writes: ReturnType<World["drainGpuWriteViews"]>,
-): void {
-	for (const write of writes) {
-		const bytes = write.bytes();
-		const backing = bytes.buffer;
-		if (backing instanceof Uint8Array) {
-			queue.writeBuffer(buffer, write.byteOffset(), backing, bytes.start, bytes.length);
-		} else {
-			queue.writeBuffer(buffer, write.byteOffset(), bytes.toUint8ArrayCopy());
-		}
-	}
 }
 
 function writeMassCubesTransformBlob(
@@ -829,12 +814,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformRefsBytes.byteLength >>> 2,
 	);
 	const denseTransformLayout = detectDenseTransformLayout(transformRefs);
-	const transformWordCapacity = world.globalTransformBlobWordCapacity();
 	const transformUploadRange = computeTransformUploadRange(transformRefs, denseTransformLayout);
-	const transformStorage = device.createBuffer({
-		size: Math.max(transformWordCapacity * 4, 4),
-		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-	});
+	const transformStorage = createGlobalTransformWordsBuffer(device, world);
 	const cameraUniform = device.createBuffer({
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -892,7 +873,6 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		bindCamera,
 		world,
 		transformRefs,
-		transformWordCapacity,
 		transformWordUploadFirst: transformUploadRange.firstWord,
 		transformWordUploadCount: transformUploadRange.wordCount,
 		denseTransformLayout,

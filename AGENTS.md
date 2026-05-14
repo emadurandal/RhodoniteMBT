@@ -21,7 +21,7 @@ Keep **source code and everything under [`docs/`](docs/) in sync at all times**.
 
 ## Publish (mooncakes)
 
-After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) so the facade’s publish-time `moon check` can resolve freshly published deps. If core/webgpu are already on the registry and only the facade step must be retried, use `PUBLISH_MOON_FACADE_ONLY=1 pnpm run publish:moon`.
+After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing core and webgpu so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep and the facade’s core/webgpu path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry and only the facade step must be retried, use `PUBLISH_MOON_FACADE_ONLY=1 pnpm run publish:moon`.
 
 ## Workspace development
 

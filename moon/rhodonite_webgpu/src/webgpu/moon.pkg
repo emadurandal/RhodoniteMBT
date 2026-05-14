@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_webgpu/webgpu_objects" @raw,
   "emadurandal/rhodonite_webgpu/webgpu_enums" @enums,
 }

@@ -1101,22 +1101,6 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-fn upload_global_transform_writes(
-  queue : @wgpu.GPUQueue,
-  transform_storage : @wgpu.GPUBuffer,
-  writes : Array[@ecs.GpuWriteView],
-) -> Unit {
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    queue.write_buffer_from_array_view(
-      transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
-}
-
-///|
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext
   device : @wgpu.GPUDevice
@@ -1339,9 +1323,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let transform_upload_range = compute_transform_upload_range(
     transform_refs, entity_count, dense_transform_layout,
   )
-  let storage_bytes = (world.global_transform_blob_word_capacity() * 4).to_uint64()
-  let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let transform_storage = device.create_buffer(storage_bytes, s_usage)
+  let transform_storage = device.create_global_transform_words_buffer(world)
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
     @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let camera_uniform = device.create_buffer(256UL, cam_usage)
@@ -1388,7 +1370,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     world, tf, gt, per_side, 0.0, transform_refs, transform_upload_range, dense_transform_layout,
     true,
   )
-  upload_global_transform_writes(queue, transform_storage, writes0)
+  queue.upload_global_transform_writes(transform_storage, writes0)
   Some({
     context: canvas_context,
     device,
@@ -1448,8 +1430,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     renderer.dense_transform_layout,
     false,
   )
-  upload_global_transform_writes(
-    renderer.queue,
+  renderer.queue.upload_global_transform_writes(
     renderer.transform_storage,
     writes,
   )
