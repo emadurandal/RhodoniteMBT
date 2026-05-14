@@ -14,6 +14,14 @@ export type GlobalTransformUploadRange = {
 	readonly wordCount: number;
 };
 
+export type GlobalTransformRun = {
+	readonly firstIndex: number;
+	readonly endIndex: number;
+	readonly format: GlobalTransformGpuFormatCode;
+	readonly firstWord: number;
+	readonly wordsPerEntity: GlobalTransformWordCount;
+};
+
 type Float16ArrayLike = {
 	readonly length: number;
 	[index: number]: number;
@@ -133,6 +141,38 @@ export function computeGlobalTransformUploadRange(
 	return { firstWord, wordCount: endWord - firstWord };
 }
 
+export function detectGlobalTransformRuns(
+	refs: Uint32Array,
+	count: number,
+): GlobalTransformRun[] {
+	const runs: GlobalTransformRun[] = [];
+	let i = 0;
+	while (i < count) {
+		const refBase = i * 2;
+		const rawFormat = refs[refBase] ?? GLOBAL_TRANSFORM_FORMAT_F32;
+		const format =
+			rawFormat === GLOBAL_TRANSFORM_FORMAT_F16
+				? GLOBAL_TRANSFORM_FORMAT_F16
+				: GLOBAL_TRANSFORM_FORMAT_F32;
+		const wordsPerEntity = globalTransformWordsForFormat(format);
+		const firstIndex = i;
+		const firstWord = refs[refBase + 1] ?? 0;
+		i += 1;
+		while (i < count) {
+			const nextRefBase = i * 2;
+			if (refs[nextRefBase] !== format) {
+				break;
+			}
+			if (refs[nextRefBase + 1] !== firstWord + (i - firstIndex) * wordsPerEntity) {
+				break;
+			}
+			i += 1;
+		}
+		runs.push({ firstIndex, endIndex: i, format, firstWord, wordsPerEntity });
+	}
+	return runs;
+}
+
 export class GlobalTransformBlobWriter {
 	readonly count: number;
 	private readonly floats: Float32Array;
@@ -141,6 +181,7 @@ export class GlobalTransformBlobWriter {
 	private readonly refs: Uint32Array;
 	private readonly firstWord: number;
 	private readonly denseLayout: GlobalTransformDenseLayout | null;
+	private readonly runs: GlobalTransformRun[] | null;
 	private format: GlobalTransformGpuFormatCode = GLOBAL_TRANSFORM_FORMAT_F32;
 	private wordOffset = 0;
 	setAffine3x4At: (
@@ -225,6 +266,8 @@ export class GlobalTransformBlobWriter {
 			options.denseLayout === undefined
 				? detectDenseGlobalTransformLayout(options.refs, options.count)
 				: options.denseLayout;
+		this.runs =
+			this.denseLayout === null ? detectGlobalTransformRuns(options.refs, options.count) : null;
 		if (this.denseLayout?.format === GLOBAL_TRANSFORM_FORMAT_F32) {
 			this.setAffine3x4At = this.setAffine3x4AtDenseF32;
 			this.setElementAt = this.setElementAtDenseF32;
@@ -460,6 +503,9 @@ export class GlobalTransformBlobWriter {
 				halfBits[(index * 6 - firstWord) * 2 + scalarIndex] = f32ToF16Bits(value);
 			};
 		}
+		if (this.runs !== null && this.runs.length > 0) {
+			return this.elementSetterForRuns(scalarIndex, this.runs);
+		}
 		const refs = this.refs;
 		const floats = this.floats;
 		return (index, value) => {
@@ -471,6 +517,41 @@ export class GlobalTransformBlobWriter {
 				return;
 			}
 			floats[wordOffset + scalarIndex] = value;
+		};
+	}
+
+	private elementSetterForRuns(
+		scalarIndex: number,
+		runs: readonly GlobalTransformRun[],
+	): (index: number, value: number) => void {
+		const floats = this.floats;
+		const halfFloats = this.halfFloats;
+		const halfBits = this.halfBits;
+		const uploadFirstWord = this.firstWord;
+		let runIndex = 0;
+		let run = runs[0]!;
+		return (index, value) => {
+			if (index < run.firstIndex || index >= run.endIndex) {
+				if (index < run.firstIndex) {
+					runIndex = 0;
+				}
+				while (runIndex + 1 < runs.length && index >= runs[runIndex + 1]!.firstIndex) {
+					runIndex += 1;
+				}
+				run = runs[runIndex]!;
+			}
+			const wordOffset =
+				run.firstWord + (index - run.firstIndex) * run.wordsPerEntity - uploadFirstWord;
+			if (run.format === GLOBAL_TRANSFORM_FORMAT_F32) {
+				floats[wordOffset + scalarIndex] = value;
+				return;
+			}
+			const halfOffset = wordOffset * 2 + scalarIndex;
+			if (halfFloats !== null) {
+				halfFloats[halfOffset] = value;
+			} else {
+				halfBits[halfOffset] = f32ToF16Bits(value);
+			}
 		};
 	}
 

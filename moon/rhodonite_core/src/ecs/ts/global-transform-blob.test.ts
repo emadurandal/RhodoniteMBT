@@ -3,6 +3,7 @@ import {
 	GlobalTransformBlobWriter,
 	computeGlobalTransformUploadRange,
 	detectDenseGlobalTransformLayout,
+	detectGlobalTransformRuns,
 	writeGlobalTransformBlobByRefs,
 } from "./global-transform-blob.ts";
 import { ByteView } from "./views.ts";
@@ -79,5 +80,33 @@ describe("GlobalTransform blob helpers", () => {
 		expect(new Uint16Array(bytes.buffer)[7]).toBe(0x3c00);
 		expect(new Uint16Array(bytes.buffer)[19]).toBe(0x4000);
 		expect(new Uint16Array(bytes.buffer)[31]).toBe(0x4400);
+	});
+
+	it("uses contiguous mixed precision runs for scalar setters", () => {
+		const bytes = new Uint8Array(36 * 4);
+		const refs = new Uint32Array([0, 0, 0, 12, 1, 24, 1, 30]);
+		expect(detectGlobalTransformRuns(refs, 4)).toEqual([
+			{ firstIndex: 0, endIndex: 2, format: 0, firstWord: 0, wordsPerEntity: 12 },
+			{ firstIndex: 2, endIndex: 4, format: 1, firstWord: 24, wordsPerEntity: 6 },
+		]);
+		const writer = new GlobalTransformBlobWriter(byteView(bytes), {
+			refs,
+			count: 4,
+			firstWord: 0,
+			denseLayout: null,
+		});
+
+		const setY = writer.elementSetter(1, 3);
+		setY(0, 1);
+		setY(1, 2);
+		setY(2, 4);
+		setY(3, 8);
+
+		const floats = new Float32Array(bytes.buffer);
+		const halves = new Uint16Array(bytes.buffer);
+		expect(floats[7]).toBe(1);
+		expect(floats[19]).toBe(2);
+		expect(halves[24 * 2 + 7]).toBe(0x4400);
+		expect(halves[30 * 2 + 7]).toBe(0x4800);
 	});
 });

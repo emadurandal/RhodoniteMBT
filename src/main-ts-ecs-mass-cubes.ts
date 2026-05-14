@@ -14,7 +14,7 @@ import {
 	type GlobalTransformDenseLayout,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
-const ENTITY_COUNT = 800_000;
+const ENTITY_COUNT = 1400_000;
 type GlobalTransformPrecisionMode =
 	| "all-f32"
 	| "all-f16"
