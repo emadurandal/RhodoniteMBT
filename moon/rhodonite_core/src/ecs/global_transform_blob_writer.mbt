@@ -29,41 +29,6 @@ pub struct GlobalTransformBlobWriter {
 }
 
 ///|
-fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
-  let bits = value.reinterpret_as_uint()
-  let sign = (bits >> 16) & 0x8000U
-  let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
-  let mant = bits & 0x7FFFFFU
-  if exp == 255 {
-    if mant == 0U {
-      return sign | 0x7C00U
-    }
-    return sign | 0x7E00U
-  }
-  let half_exp = exp - 127 + 15
-  if half_exp >= 31 {
-    return sign | 0x7C00U
-  }
-  if half_exp <= 0 {
-    if half_exp < -10 {
-      return sign
-    }
-    let mantissa = mant | 0x800000U
-    let shift = 14 - half_exp
-    let mut half_mant = mantissa >> shift
-    if ((mantissa >> (shift - 1)) & 1U) != 0U {
-      half_mant = half_mant + 1U
-    }
-    return sign | half_mant
-  }
-  let mut half = sign | (half_exp.reinterpret_as_uint() << 10) | (mant >> 13)
-  if ((mant >> 12) & 1U) != 0U {
-    half = half + 1U
-  }
-  half
-}
-
-///|
 fn put_global_transform_f32_word(
   bytes : MutArrayView[Byte],
   word_offset : Int,
@@ -83,8 +48,8 @@ fn put_global_transform_packed_f16x2(
   x : Float,
   y : Float,
 ) -> Unit {
-  let packed = global_transform_f32_to_f16_bits(x) |
-    (global_transform_f32_to_f16_bits(y) << 16)
+  let packed = @comp.global_transform_f32_to_f16_bits(x) |
+    (@comp.global_transform_f32_to_f16_bits(y) << 16)
   @writes.put_u32_le_mut_view(bytes, word_offset * 4, packed)
 }
 
@@ -256,7 +221,7 @@ pub fn GlobalTransformBlobWriter::set_element_at(
       let word = word_offset + row * 2 + column / 2
       let byte_offset = word * 4
       let old = @writes.get_u32_le_mut_view(self.bytes, byte_offset)
-      let half = global_transform_f32_to_f16_bits(value)
+      let half = @comp.global_transform_f32_to_f16_bits(value)
       let next = if column % 2 == 0 {
         (old & 0xFFFF0000U) | half
       } else {
@@ -569,7 +534,7 @@ pub fn GlobalTransformBlobWriter::element_setter(
               self.first_word
             let byte_offset = word * 4
             let old = @writes.get_u32_le_mut_view(self.bytes, byte_offset)
-            let half = global_transform_f32_to_f16_bits(value)
+            let half = @comp.global_transform_f32_to_f16_bits(value)
             let next = if scalar_index % 2 == 0 {
               (old & 0xFFFF0000U) | half
             } else {
@@ -603,7 +568,7 @@ pub fn GlobalTransformBlobWriter::element_setter(
             let word = word_offset + scalar_index / 2
             let byte_offset = word * 4
             let old = @writes.get_u32_le_mut_view(self.bytes, byte_offset)
-            let half = global_transform_f32_to_f16_bits(value)
+            let half = @comp.global_transform_f32_to_f16_bits(value)
             let next = if scalar_index % 2 == 0 {
               (old & 0xFFFF0000U) | half
             } else {

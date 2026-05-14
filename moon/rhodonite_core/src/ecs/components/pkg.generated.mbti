@@ -17,6 +17,8 @@ pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Float
 
 pub fn get_gpu_f32_mut_view(MutArrayView[Byte], Int) -> Float
 
+pub fn global_transform_f32_to_f16_bits(Float) -> UInt
+
 pub fn global_transform_format_code(GlobalTransformGpuFormat) -> UInt
 
 pub fn global_transform_format_from_code(UInt) -> GlobalTransformGpuFormat
