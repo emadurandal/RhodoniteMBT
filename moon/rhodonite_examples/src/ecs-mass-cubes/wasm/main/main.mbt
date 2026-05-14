@@ -2,6 +2,9 @@
 fn host_now_ms() -> Double = "rhodonite_ecs_mass_cubes_host" "now_ms"
 
 ///|
+fn host_entity_count() -> Int = "rhodonite_ecs_mass_cubes_host" "entity_count"
+
+///|
 fn host_initialize_renderer(per_side : Int, transform_stride : Int) -> Unit = "rhodonite_ecs_mass_cubes_host" "initialize_renderer"
 
 ///|
@@ -25,9 +28,6 @@ fn host_write_global_transform_bytes(ptr : Int, byte_len : Int) -> Unit = "rhodo
 
 ///|
 fn host_render_frame(fps : Double, cpu_ms : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "render_frame"
-
-///|
-let entity_count : Int = 600_000
 
 ///|
 let grid_spacing : Double = 0.14
@@ -238,10 +238,11 @@ fn write_mass_cubes_y_wasm_bytes(
 #cfg(target="wasm")
 fn write_initial_global_transforms_for_target(
   world : @ecs.World,
+  count : Int,
   per_side : Int,
 ) -> Unit {
   ignore(
-    world.write_global_transforms_dense_wasm_bytes_range(entity_count, (
+    world.write_global_transforms_dense_wasm_bytes_range(count, (
       bytes,
       stride,
       count,
@@ -253,10 +254,11 @@ fn write_initial_global_transforms_for_target(
 #cfg(target="wasm-gc")
 fn write_initial_global_transforms_for_target(
   world : @ecs.World,
+  count : Int,
   per_side : Int,
 ) -> Unit {
   ignore(
-    world.write_global_transforms_dense_range_views(entity_count, range => {
+    world.write_global_transforms_dense_range_views(count, range => {
       write_mass_cubes_full_range(range, per_side, 0.0)
     }),
   )
@@ -288,12 +290,13 @@ fn host_write_initial_global_transforms_for_target(
 #cfg(target="wasm")
 fn write_global_transform_y_for_target(
   world : @ecs.World,
+  count : Int,
   wave_time : Double,
   upload_ptr : Int,
   upload_len : Int,
 ) -> Unit {
   ignore(
-    world.write_global_transforms_dense_wasm_bytes_range(entity_count, (
+    world.write_global_transforms_dense_wasm_bytes_range(count, (
       bytes,
       stride,
       count,
@@ -306,6 +309,7 @@ fn write_global_transform_y_for_target(
 #cfg(target="wasm-gc")
 fn write_global_transform_y_for_target(
   _world : @ecs.World,
+  _count : Int,
   wave_time : Double,
   _upload_ptr : Int,
   _upload_len : Int,
@@ -316,6 +320,7 @@ fn write_global_transform_y_for_target(
 ///|
 struct WasmRenderer {
   world : @ecs.World
+  entity_count : Int
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   upload_ptr : Int
@@ -352,9 +357,10 @@ fn global_transform_upload_len_for_target(_world : @ecs.World) -> Int {
 ///|
 pub fn create_wasm_renderer() -> Unit {
   let world = @ecs.World::new()
-  let per_side = grid_side_len(entity_count)
+  let count = host_entity_count()
+  let per_side = grid_side_len(count)
   let gt = world.global_transform_component()
-  let _ = world.spawn_transform_global_batch(entity_count, fn(
+  let _ = world.spawn_transform_global_batch(count, fn(
     i,
     _entity,
     tf_row,
@@ -378,7 +384,7 @@ pub fn create_wasm_renderer() -> Unit {
   })
   ignore(world.drain_resize_events())
   let stride = @comp.global_transform_gpu_layout().stride
-  write_initial_global_transforms_for_target(world, per_side)
+  write_initial_global_transforms_for_target(world, count, per_side)
   let upload_ptr = global_transform_upload_ptr_for_target(world)
   let upload_len = global_transform_upload_len_for_target(world)
   host_initialize_renderer(per_side, stride)
@@ -388,6 +394,7 @@ pub fn create_wasm_renderer() -> Unit {
   ignore(gt)
   demo_renderer.val = Some({
     world,
+    entity_count: count,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
     upload_ptr,
@@ -417,6 +424,7 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
       let wave_time = renderer.frame.val.to_double() * 0.018 * 1.8
       write_global_transform_y_for_target(
         renderer.world,
+        renderer.entity_count,
         wave_time,
         renderer.upload_ptr,
         renderer.upload_len,

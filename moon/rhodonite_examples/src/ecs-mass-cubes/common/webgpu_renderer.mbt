@@ -21,7 +21,7 @@ fn monotonic_ms() -> Double {
 
 ///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
-let entity_count : Int = 1_000_000
+let entity_count : Int = 800_000
 
 ///|
 /// Canvas resolution (matches demo HTML).

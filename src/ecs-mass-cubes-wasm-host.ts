@@ -1,6 +1,6 @@
 import "./style.css";
 
-const ENTITY_COUNT = 1_000_000;
+const ENTITY_COUNT = 800_000;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
@@ -559,6 +559,7 @@ function createHostImports(
 	return {
 		rhodonite_ecs_mass_cubes_host: {
 			now_ms: () => performance.now(),
+			entity_count: () => ENTITY_COUNT,
 			initialize_renderer: (perSide: number, transformStride: number) => {
 				renderer.perSide = perSide;
 				renderer.transformStride = transformStride;
