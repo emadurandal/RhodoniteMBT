@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GpuLayout, Query, World, getF32, putF32 } from "./index.ts";
+import { GpuLayout, Query, RawQuery, World, getF32, putF32 } from "./index.ts";
 
 function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	const bytes = new Uint8Array(stride);
@@ -55,12 +55,13 @@ describe("ECS TypeScript wrapper", () => {
 		query.forEach(world, (row) => {
 			visited += 1;
 			expect(row.entity().index()).toBe(entity.index());
-			const bytes = row.writeView(cpu);
-			expect(bytes.length).toBe(16);
-			expect(bytes.asUint8Array()).toBeNull();
-			expect(bytes.getF32(0)).toBeCloseTo(1);
-			bytes.setF32(0, 9);
-			bytes.set(12, 7);
+			row.write(cpu, (bytes) => {
+				expect(bytes.length).toBe(16);
+				expect(bytes.asUint8Array()).toBeNull();
+				expect(bytes.getF32(0)).toBeCloseTo(1);
+				bytes.setF32(0, 9);
+				bytes.set(12, 7);
+			});
 		});
 
 		expect(visited).toBe(1);
@@ -103,7 +104,7 @@ describe("ECS TypeScript wrapper", () => {
 			true,
 		);
 
-		Query.new([cpu]).forEachArchetype(world, (archetype) => {
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
 			expect(archetype.length()).toBe(2);
 			expect(archetype.componentStride(cpu)).toBe(16);
 			const column = archetype.writeColumn(cpu);
@@ -129,7 +130,9 @@ describe("ECS TypeScript wrapper", () => {
 
 		let sum = 0;
 		prepared.forEach(world, (row) => {
-			sum += row.readView(cpu).getF32(0);
+			row.read(cpu, (bytes) => {
+				sum += bytes.getF32(0);
+			});
 		});
 
 		expect(sum).toBeCloseTo(4);
@@ -142,8 +145,8 @@ describe("ECS TypeScript wrapper", () => {
 
 		const entities = world.spawnBatch([gpu, cpu], 2, (index, entity, row) => {
 			expect(row.entity().index()).toBe(entity.index());
-			row.writeView(cpu).setF32(0, index + 1);
-			row.writeView(gpu).setF32(0, index + 10);
+			row.write(cpu, (bytes) => bytes.setF32(0, index + 1));
+			row.write(gpu, (bytes) => bytes.setF32(0, index + 10));
 		});
 
 		expect(entities).toHaveLength(2);

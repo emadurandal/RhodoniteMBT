@@ -125,8 +125,22 @@ pub struct Query {
 }
 
 ///|
-/// Cached archetype-column plan for repeated chunk iteration over the same query.
+/// Raw query descriptor for expert byte-view iteration over a fixed `required` component set.
+pub struct RawQuery {
+  priv required : Array[ComponentTypeId]
+}
+
+///|
+/// Cached row plan for repeated high-level iteration over the same query.
 pub struct PreparedQuery {
+  priv required : Array[ComponentTypeId]
+  priv archetype_version : Int
+  priv archetypes : Array[PreparedQueryArchetype]
+}
+
+///|
+/// Cached raw archetype-column plan for repeated expert iteration over the same query.
+pub struct RawPreparedQuery {
   priv required : Array[ComponentTypeId]
   priv archetype_version : Int
   priv archetypes : Array[PreparedQueryArchetype]
@@ -141,7 +155,7 @@ priv struct QueryRowComponentAccess {
 
 ///|
 /// Cached component lookup for one matched archetype chunk. This avoids repeated linear
-/// `column_index` scans inside `QueryArchetype::read_column` / `write_column` hot loops.
+/// `column_index` scans inside `RawQueryArchetype::read_column` / `write_column` hot loops.
 priv struct QueryArchetypeComponentAccess {
   component : ComponentTypeId
   kind : ComponentKind
@@ -157,8 +171,19 @@ priv struct PreparedQueryArchetype {
 
 ///|
 /// One row yielded by [`Query`], with component-id based access to the same zero-copy payload
-/// views used by the lower-level world query.
+/// views through closure-scoped high-level helpers.
 pub struct QueryRow {
+  priv world : World
+  priv entity : EntityId
+  priv components : Array[ComponentTypeId]
+  priv accesses : Array[QueryRowComponentAccess]
+  priv archetype_index : Int
+  priv row : Int
+}
+
+///|
+/// One row yielded by [`RawQuery`], exposing expert zero-copy byte views directly.
+pub struct RawQueryRow {
   priv world : World
   priv entity : EntityId
   priv components : Array[ComponentTypeId]
@@ -177,9 +202,9 @@ pub struct SpawnBatchRow {
 }
 
 ///|
-/// One archetype chunk yielded by [`Query::for_each_archetype`]. Use column views plus row
+/// One archetype chunk yielded by [`RawQuery::for_each_archetype`]. Use column views plus row
 /// strides for hot loops that should avoid constructing one [`QueryRow`] per entity.
-pub struct QueryArchetype {
+pub struct RawQueryArchetype {
   priv world : World
   priv accesses : Array[QueryArchetypeComponentAccess]
   priv archetype_index : Int

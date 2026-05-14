@@ -781,17 +781,16 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   let query = Query::new(required)
   query.for_each(self, row => {
     let e = row.entity()
-    let local_m = @comp.Transform3D::local_matrix_from_component_view(
-      row.read_view(tf),
-    )
-    let gt_row = row.write_view(gt)
-    ignore(
-      self.compute_global_transform_for_tf_gt_bulk_row(
-        e,
-        self.has_component(e, co),
-        local_m,
-        gt_row,
-      ),
-    )
+    let local_m = row.read_transform3d().local_matrix()
+    row.write(gt, gt_row => {
+      ignore(
+        self.compute_global_transform_for_tf_gt_bulk_row(
+          e,
+          self.has_component(e, co),
+          local_m,
+          gt_row,
+        ),
+      )
+    })
   })
 }

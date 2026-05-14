@@ -61,7 +61,7 @@ flowchart TB
 - Each archetype’s **signature** is a **sorted ascending** list of `ComponentTypeId`; entities with the same set share one table.
 - A new `World` starts with **archetype 0 = empty signature**; freshly spawned entities sit there until components are added ([`World::new` in `world.mbt`](../moon/rhodonite_core/src/ecs/world.mbt)).
 - Each CPU column stores packed `bytes` with fixed `stride`; row `row` starts at offset `row * stride`.
-- Column backing may have more capacity than live rows. Public `QueryArchetype::read_column` / `write_column` expose only `entities.length() * stride` logical bytes, not spare capacity.
+- Column backing may have more capacity than live rows. Public `RawQueryArchetype::read_column` / `write_column` expose only `entities.length() * stride` logical bytes, not spare capacity.
 
 ```mermaid
 flowchart LR
@@ -161,10 +161,8 @@ For arbitrary component signatures, use `World::spawn_batch(components, count, w
 
 ```moonbit
 let entities = world.spawn_batch([cpu_component, gpu_component], count, fn(i, entity, row) {
-  let cpu = row.write_view(cpu_component)
-  let gpu = row.write_view(gpu_component)
-  cpu[0] = i.to_byte()
-  gpu[0] = entity.gpu_index().to_byte()
+  row.write(cpu_component, fn(cpu) => cpu[0] = i.to_byte())
+  row.write(gpu_component, fn(gpu) => gpu[0] = entity.gpu_index().to_byte())
 })
 ```
 
@@ -202,37 +200,44 @@ flowchart TD
 
 ---
 
-## Query API
+## Query API (High-Level) and RawQuery API (Low-Level)
 
-Use `Query::new(required)` and `query.for_each(world, f)` for row iteration. Only archetypes whose signature **contains every** id in `required` are visited. If `required` is empty, the query returns immediately.
+Component identity is always `ComponentTypeId`. There is no separate `Component<T>` handle or codec object.
 
-The callback receives a `QueryRow`, so payloads are accessed by component id while preserving read/write access checks.
+High-level row iteration uses `Query::new(required)` and `query.for_each(world, f)`. `QueryRow::read(component, f)` / `write(component, f)` borrow `ArrayView[Byte]` / `MutArrayView[Byte]` only for the closure body. Callers do not need to branch on `CpuOnly` vs `GpuVisible`; writing a `GpuVisible` component marks the row dirty automatically.
 
 - `required` becomes a named value that can be reused by a system.
 - `Query::new` rejects duplicate component ids up front.
 - The input array is copied, so later changes to the caller's array cannot change query payload order.
 - During schedule execution, every required component must be declared in the active System's `reads` or `writes` set.
-- `QueryRow::read_view(component)` returns a zero-copy `ArrayView[Byte]` for the component: a SoA row for `CpuOnly`, or the flat GPU row for `GpuVisible`.
-- `QueryRow::write_view(component)` returns a zero-copy `MutArrayView[Byte]` and requires the component to be declared in the active System's `writes` set during schedule execution. For `GpuVisible` components, requesting this mutable view marks that entity row dirty immediately.
 - If a GPU store grows during iteration, a `GpuResizeEvent` may be queued (`needs_full_upload`, etc.).
-
-For hot loops over CPU-only data, prefer `Query::for_each_archetype`. It builds a small per-archetype access cache (`component`, kind, column index, stride) once per matched archetype, so `QueryArchetype::component_stride`, `read_column`, and `write_column` do not re-scan columns on every call. GPU-visible columns still cannot be read as archetype columns because their payload rows are keyed by `EntityId.index`.
-
-If a row callback is still the right shape for the system, prepare the query once and call `PreparedQuery::for_each(world, f)`. Like `PreparedQuery::for_each_archetype`, it rebuilds once when `world.archetype_version` changes, but otherwise reuses the matched archetype plan instead of scanning every archetype on each frame.
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let tf_bytes = row.read_view(tf)
-  let global_tf = @comp.GlobalTransform::view_affine3x4_gpu_row(row.write_view(gt))
-  ignore(tf_bytes)
-  ignore(global_tf)
+  row.read(tf, fn(tf_bytes) {
+    row.write(gt, fn(gt_row) {
+      let local = @comp.Transform3D::local_matrix_from_component_view(tf_bytes)
+      @comp.matrix44f_write_affine3x4_to_gpu_row(local, gt_row)
+    })
+  })
 })
 ```
 
+Built-in components also have typed convenience helpers. These are intended for sparse edits, editor/debug code, and tests; engine hot paths continue to use raw or specialized bulk APIs.
+
 ```moonbit
-let query = Query::new([tf])
-query.for_each_archetype(world, fn(chunk) {
+query.for_each(world, fn(row) {
+  let local = row.read_transform3d().local_matrix()
+  row.write_global_transform(fn(gt) => gt.write_matrix(local))
+})
+```
+
+Low-level iteration uses `RawQuery`. `RawQueryRow::read_view` / `write_view` and `RawQueryArchetype::read_column` / `write_column` return zero-copy views directly. They work for user-defined components too, but the caller owns layout, stride, view lifetime, and dirty/upload implications.
+
+```moonbit
+let raw = RawQuery::new([tf])
+raw.for_each_archetype(world, fn(chunk) {
   let stride = chunk.component_stride(tf)
   let tf_column = chunk.write_column(tf)
   for row = 0; row < chunk.length(); row = row + 1 {
@@ -243,6 +248,8 @@ query.for_each_archetype(world, fn(chunk) {
   }
 })
 ```
+
+`Query::prepare` / `RawQuery::prepare` reuse the archetype scan and access metadata while the world's archetype version is unchanged.
 
 ---
 
@@ -328,11 +335,12 @@ Dense GlobalTransform helper variants:
 
 ## TypeScript wrapper
 
-The JS target also exposes an ECS bridge and TypeScript wrappers under [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/). The wrapper currently covers the `World` + `Query` surface: entity lifecycle, component registration, built-in component ids, row/chunk query views, GPU write-view drains, resize events, and built-in transform upload helpers. `Schedule`, `System`, and `CommandBuffer` are intentionally not wrapped yet.
+The JS target also exposes an ECS bridge and TypeScript wrappers under [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/). The wrapper currently covers the `World` + `Query` / `RawQuery` surface: entity lifecycle, component registration, built-in component ids, closure-scoped query access, raw row/chunk views, GPU write-view drains, resize events, and built-in transform upload helpers. `Schedule`, `System`, and `CommandBuffer` are intentionally not wrapped yet.
 
-The wrapper keeps the ECS zero-copy policy explicit:
+The wrapper separates high-level and raw access:
 
-- `QueryRow::read_view` / `write_view`, `QueryArchetype::read_column` / `write_column`, and `GpuWriteView.bytes` are surfaced as `ByteView`.
+- `QueryRow.read(component, f)` / `write(component, f)` pass `ByteView` only inside the callback.
+- `RawQueryRow.readView` / `writeView`, `RawQueryArchetype.readColumn` / `writeColumn`, and `GpuWriteView.bytes` expose `ByteView` directly for expert paths.
 - `ByteView` stores the original MoonBit `{ buf, start, end }` view and reads/writes through that backing storage directly.
 - `ByteView.asUint8Array()` returns a zero-copy `Uint8Array.subarray(...)` only when the backing storage is already typed, which is the normal GPU-store upload path.
 - CPU SoA columns may be backed by a JS number array. Those are still zero-copy through `ByteView.get`, `set`, `getF32`, and `setF32`; converting them to a `Uint8Array` requires the explicitly named `toUint8ArrayCopy()`.
@@ -347,8 +355,9 @@ const entity = world.createEntity();
 world.addComponent(entity, material);
 
 Query.new([material]).forEach(world, (row) => {
-  const bytes = row.writeView(material);
-  bytes.setF32(0, 1.0);
+  row.write(material, (bytes) => {
+    bytes.setF32(0, 1.0);
+  });
 });
 
 for (const write of world.drainGpuWriteViews(material)) {
@@ -419,8 +428,8 @@ ignore(world.add_component_bytes(e, tag, tag_bytes))
 let required = [world.transform_component(), world.global_transform_component()]
 let query = Query::new(required)
 query.for_each(world, fn(row) {
-  let tf_row = row.read_view(world.transform_component())
-  let gt_row = row.write_view(world.global_transform_component())
+  let local = row.read_transform3d().local_matrix()
+  row.write_global_transform(fn(gt) => gt.write_matrix(local))
   ...
 })
 

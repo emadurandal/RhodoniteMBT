@@ -126,13 +126,14 @@ fn bench_query_row(count : Int) -> Unit {
   q.for_each(world, row => {
     let idx = row.entity().gpu_index()
     let (x, z) = grid_xz_for_index(idx, per_side)
-    let view = row.write_view(tf)
-    @comp.Transform3D::write_position_to_component_mut_view(
-      view,
-      x,
-      Float::from_double(idx.to_double() * 0.001),
-      z,
-    )
+    row.write(tf, view => {
+      @comp.Transform3D::write_position_to_component_mut_view(
+        view,
+        x,
+        Float::from_double(idx.to_double() * 0.001),
+        z,
+      )
+    })
     checksum = checksum + idx
   })
   report("query_row", count, started, checksum)
@@ -141,7 +142,7 @@ fn bench_query_row(count : Int) -> Unit {
 ///|
 fn bench_query_archetype(count : Int) -> Unit {
   let (world, tf, _, per_side) = make_world(count)
-  let q = @ecs.Query::new([tf])
+  let q = @ecs.RawQuery::new([tf])
   let started = monotonic_ms()
   let mut checksum = 0
   q.for_each_archetype(world, arch => {

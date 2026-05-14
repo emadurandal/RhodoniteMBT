@@ -535,8 +535,8 @@ test "Query for_each matches supersets and skips empty required" {
   let hits : Array[EntityId] = []
   Query::new([qa, qb]).for_each(world, row => {
     hits.push(row.entity())
-    ignore(row.read_view(qa))
-    ignore(row.read_view(qb))
+    row.read(qa, bytes => ignore(bytes))
+    row.read(qb, bytes => ignore(bytes))
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e_both)
@@ -563,15 +563,15 @@ test "Query for_each gives full GpuComponentStore row for GpuVisible" {
   let mut got0 = -1
   let mut got1 = -1
   Query::new([qa, gpu16]).for_each(world, row => {
-    got0 = row.read_view(qa).length()
-    got1 = row.read_view(gpu16).length()
+    row.read(qa, bytes => got0 = bytes.length())
+    row.read(gpu16, bytes => got1 = bytes.length())
   })
   assert_eq(got0, 4)
   assert_eq(got1, 16)
 }
 
 ///|
-test "Query write_view queues dirty gpu row from direct query" {
+test "Query write queues dirty gpu row from direct query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -585,7 +585,7 @@ test "Query write_view queues dirty gpu row from direct query" {
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
   Query::new([qa, gpu16]).for_each(world, row => {
-    row.write_view(gpu16)[0] = (99 : Byte)
+    row.write(gpu16, bytes => bytes[0] = (99 : Byte))
   })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
@@ -610,8 +610,8 @@ test "Query for_each wraps required row iteration" {
   let mut second_first_byte = (0 : Byte)
   query.for_each(world, row => {
     hits.push(row.entity())
-    first_len = row.read_view(qa).length()
-    second_first_byte = row.read_view(qb)[0]
+    row.read(qa, bytes => first_len = bytes.length())
+    row.read(qb, bytes => second_first_byte = bytes[0])
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -620,7 +620,7 @@ test "Query for_each wraps required row iteration" {
 }
 
 ///|
-test "Query write_view queues dirty gpu row from helper query" {
+test "Query write queues dirty gpu row from helper query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -634,7 +634,7 @@ test "Query write_view queues dirty gpu row from helper query" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write_view(gpu16)[0] = (77 : Byte))
+  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (77 : Byte)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -642,7 +642,7 @@ test "Query write_view queues dirty gpu row from helper query" {
 }
 
 ///|
-test "QueryRow view accesses payloads by component id" {
+test "QueryRow closure access uses component ids" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowA", 4)
   let qb = world.register_cpu_component("QueryRowB", 4)
@@ -661,9 +661,9 @@ test "QueryRow view accesses payloads by component id" {
     if !row.has(qb) {
       abort("expected QueryRowB")
     }
-    a_first = row.read_view(qa)[0]
-    b_first = row.read_view(qb)[0]
-    row.write_view(qb)[0] = (42 : Byte)
+    row.read(qa, bytes => a_first = bytes[0])
+    row.read(qb, bytes => b_first = bytes[0])
+    row.write(qb, bytes => bytes[0] = (42 : Byte))
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -676,11 +676,11 @@ test "QueryRow view accesses payloads by component id" {
 }
 
 ///|
-test "Query for_each_archetype exposes contiguous CPU columns" {
+test "RawQuery for_each_archetype exposes contiguous CPU columns" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchA", 4)
   let qb = world.register_cpu_component("QueryArchB", 4)
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 2, 3, 4)))
@@ -721,7 +721,7 @@ test "Query for_each_archetype exposes contiguous CPU columns" {
 }
 
 ///|
-test "QueryArchetype column views expose logical rows after column capacity growth" {
+test "RawQueryArchetype column views expose logical rows after column capacity growth" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchCapacityA", 4)
   let qb = world.register_cpu_component("QueryArchCapacityB", 4)
@@ -735,7 +735,7 @@ test "QueryArchetype column views expose logical rows after column capacity grow
   assert_true(world.add_component_bytes(e2, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e2, qb, bytes4(30, 0, 0, 0)))
   assert_true(world.destroy_entity(e1))
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let mut row_count = -1
   let mut column_len = -1
   query.for_each_archetype(world, chunk => {
@@ -747,11 +747,11 @@ test "QueryArchetype column views expose logical rows after column capacity grow
 }
 
 ///|
-test "PreparedQuery rebuilds after structural changes create matching archetype" {
+test "RawPreparedQuery rebuilds after structural changes create matching archetype" {
   let world = World::new()
   let qa = world.register_cpu_component("PreparedQueryA", 4)
   let qb = world.register_cpu_component("PreparedQueryB", 4)
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let prepared = query.prepare(world)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
@@ -777,8 +777,8 @@ test "PreparedQuery for_each rebuilds stale row plan" {
   assert_true(world.add_component_bytes(e, qb, bytes4(4, 0, 0, 0)))
   let mut sum = 0
   prepared.for_each(world, row => {
-    sum = sum + row.read_view(qa)[0].to_int()
-    sum = sum + row.read_view(qb)[0].to_int()
+    row.read(qa, bytes => sum = sum + bytes[0].to_int())
+    row.read(qb, bytes => sum = sum + bytes[0].to_int())
   })
   assert_eq(sum, 7)
 }
@@ -838,7 +838,7 @@ test "World drain_gpu_write_views returns borrowed contiguous upload" {
 }
 
 ///|
-test "QueryRow write_view marks gpu rows dirty without payload indexes" {
+test "QueryRow write marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -852,7 +852,7 @@ test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write_view(gpu16)[0] = (88 : Byte))
+  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (88 : Byte)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -860,7 +860,7 @@ test "QueryRow write_view marks gpu rows dirty without payload indexes" {
 }
 
 ///|
-test "Query write_view marks gpu row dirty even if bytes are unchanged" {
+test "Query write marks gpu row dirty even if bytes are unchanged" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -874,7 +874,7 @@ test "Query write_view marks gpu row dirty even if bytes are unchanged" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => ignore(row.write_view(gpu16)))
+  query.for_each(world, row => row.write(gpu16, bytes => ignore(bytes)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -1321,8 +1321,7 @@ test "System Query preserves read and write access separation during schedule ru
   schedule.add_system(
     System::new("query-read-write", Update, [qa], [qb], (w, _ctx, _cmds) => {
       query.for_each(w, row => {
-        let src = row.read_view(qa)
-        row.write_view(qb)[0] = src[0]
+        row.read(qa, src => row.write(qb, dst => dst[0] = src[0]))
       })
     }),
   )
@@ -1586,10 +1585,8 @@ test "spawn_batch creates arbitrary CPU and GPU components directly" {
     @comp.GpuLayout::empty(16),
   )
   let entities = world.spawn_batch([gpu, cpu], 3, fn(i, _e, row) {
-    let c = row.write_view(cpu)
-    c[0] = (10 + i).to_byte()
-    let g = row.write_view(gpu)
-    g[0] = (20 + i).to_byte()
+    row.write(cpu, c => c[0] = (10 + i).to_byte())
+    row.write(gpu, g => g[0] = (20 + i).to_byte())
   })
   assert_eq(entities.length(), 3)
   for i = 0; i < entities.length(); i = i + 1 {

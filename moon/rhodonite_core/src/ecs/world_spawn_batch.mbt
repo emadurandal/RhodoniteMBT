@@ -137,6 +137,15 @@ pub fn SpawnBatchRow::entity(self : SpawnBatchRow) -> EntityId {
 }
 
 ///|
+pub fn SpawnBatchRow::write(
+  self : SpawnBatchRow,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  f(self.write_view(component))
+}
+
+///|
 pub fn SpawnBatchRow::write_view(
   self : SpawnBatchRow,
   component : ComponentTypeId,

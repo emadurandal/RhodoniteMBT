@@ -61,7 +61,7 @@ flowchart TB
 - 各アーキタイプは **昇順ソートされた `ComponentTypeId` のリスト**をシグネチャとして持ち、同一シグネチャのエンティティが同じテーブルに並びます。
 - 新規 `World` では **アーキタイプ 0 が空シグネチャ**で、生成直後のエンティティはそこに入ります（[`world.mbt` の `World::new`](../moon/rhodonite_core/src/ecs/world.mbt)）。
 - 各 CPU コンポーネント列は `stride` バイト幅の `bytes` 配列で、行 `row` のオフセットは `row * stride` です。
-- 列の backing capacity は生存行数より大きい場合があります。公開 API の `QueryArchetype::read_column` / `write_column` は `entities.length() * stride` 分の論理バイトだけを返します。
+- 列の backing capacity は生存行数より大きい場合があります。公開 API の `RawQueryArchetype::read_column` / `write_column` は `entities.length() * stride` 分の論理バイトだけを返します。
 
 ```mermaid
 flowchart LR
@@ -163,10 +163,8 @@ callback は両方の row を完全に初期化する必要があります。そ
 
 ```moonbit
 let entities = world.spawn_batch([cpu_component, gpu_component], count, fn(i, entity, row) {
-  let cpu = row.write_view(cpu_component)
-  let gpu = row.write_view(gpu_component)
-  cpu[0] = i.to_byte()
-  gpu[0] = entity.gpu_index().to_byte()
+  row.write(cpu_component, fn(cpu) => cpu[0] = i.to_byte())
+  row.write(gpu_component, fn(gpu) => gpu[0] = entity.gpu_index().to_byte())
 })
 ```
 
@@ -204,37 +202,49 @@ flowchart TD
 
 ---
 
-## クエリ API
+## Query API（高級）と RawQuery API（低級）
 
-行イテレーションには `Query::new(required)` と `query.for_each(world, f)` を使います。引数 `required` に列挙した `ComponentTypeId` を **すべて含む**アーキタイプだけを走査します。`required` が空なら何もしません。
+component identity は常に `ComponentTypeId` です。`Component<T>` や codec object のような別の component handle はありません。
 
-callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスでき、read/write の access check も component ごとに維持されます。
-
-- `required` component set を名前付きの値として再利用できます。
-- `Query::new` の時点で重複 component id を拒否できます。
-- 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
-- schedule 実行中は、required の全 component が active System の `reads` または `writes` に含まれる必要があります。
-- `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
-- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
-- イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
-
-CPU-only のホットループでは `Query::for_each_archetype` を優先してください。マッチしたアーキタイプごとに、要求 component の kind、列 index、stride を小さな access cache として一度だけ作るため、`QueryArchetype::component_stride`、`read_column`、`write_column` は毎回 `column_index` を線形探索しません。GPU-visible component は `EntityId.index` ベースの flat storage にあるため、archetype column としては読めません。
-
-row callback の形を維持したい場合は、`Query::prepare` で得た `PreparedQuery::for_each(world, f)` を使えます。`world.archetype_version` が変わったときだけ plan を作り直し、通常フレームでは archetype scan と access metadata を再利用します。
+高級 API では `Query::new(required)` と `query.for_each(world, f)` を使います。`QueryRow::read(component, f)` / `write(component, f)` は closure の中だけ `ArrayView[Byte]` / `MutArrayView[Byte]` を貸し出します。`CpuOnly` と `GpuVisible` の違いは呼び出し側が意識せず、`GpuVisible` を `write` した場合は dirty が自動で立ちます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let tf_bytes = row.read_view(tf)
-  let global_tf = @comp.GlobalTransform::view_affine3x4_gpu_row(row.write_view(gt))
-  ignore(tf_bytes)
-  ignore(global_tf)
+  row.read(tf, fn(tf_bytes) {
+    row.write(gt, fn(gt_row) {
+      let local = @comp.Transform3D::local_matrix_from_component_view(tf_bytes)
+      @comp.matrix44f_write_affine3x4_to_gpu_row(local, gt_row)
+    })
+  })
 })
 ```
 
+標準 component には typed convenience もあります。これらは少数操作・debug/editor/test 向けで、エンジン内部の大量処理では後述の Raw / bulk path を使います。
+
 ```moonbit
-let query = Query::new([tf])
-query.for_each_archetype(world, fn(chunk) {
+query.for_each(world, fn(row) {
+  let local = row.read_transform3d().local_matrix()
+  row.write_global_transform(fn(gt) => gt.write_matrix(local))
+})
+```
+
+低級 API では `RawQuery` を使います。`RawQueryRow::read_view` / `write_view`、`RawQueryArchetype::read_column` / `write_column` はゼロコピー view を直接返します。標準 component だけでなくユーザー定義 component にも使えますが、layout、stride、view lifetime、dirty / resize の意味は呼び出し側が守ります。
+
+```moonbit
+RawQuery::new([position, velocity]).for_each_archetype(world, fn(chunk) {
+  let pos = chunk.write_column(position)
+  let vel = chunk.read_column(velocity)
+  ignore(pos)
+  ignore(vel)
+})
+```
+
+`Query::prepare` / `RawQuery::prepare` は構造変更がなければ archetype scan と access metadata を再利用します。
+
+```moonbit
+let raw = RawQuery::new([tf])
+raw.for_each_archetype(world, fn(chunk) {
   let stride = chunk.component_stride(tf)
   let tf_column = chunk.write_column(tf)
   for row = 0; row < chunk.length(); row = row + 1 {
@@ -284,10 +294,12 @@ let schedule = Schedule::new()
 schedule.add_system(System::new_with_structural_write("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
   let query = Query::new([lifetime])
   query.for_each(world, fn(row) {
-    let remaining = @comp.get_gpu_f32_byte_view(row.read_view(lifetime), 0)
-    if remaining <= ctx.delta_seconds {
-      commands.destroy_entity(row.entity())
-    }
+    row.read(lifetime, fn(bytes) {
+      let remaining = @comp.get_gpu_f32_byte_view(bytes, 0)
+      if remaining <= ctx.delta_seconds {
+        commands.destroy_entity(row.entity())
+      }
+    })
   })
 }))
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
@@ -336,11 +348,12 @@ Dense GlobalTransform helper には所有型と view 型の両方があります
 
 ## TypeScript ラッパー
 
-JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` の surface を対象にし、entity lifecycle、component 登録、builtin component id、row/chunk query view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
+JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` / `RawQuery` の surface を対象にし、entity lifecycle、component 登録、builtin component id、closure 型 query access、raw row/chunk view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
 
-wrapper では ECS の zero-copy 方針を明示しています。
+wrapper では高級 API と Raw API を分けます。
 
-- `QueryRow::read_view` / `write_view`、`QueryArchetype::read_column` / `write_column`、`GpuWriteView.bytes` は `ByteView` として公開します。
+- `QueryRow.read(component, f)` / `write(component, f)` は closure の中だけ `ByteView` を渡します。
+- `RawQueryRow.readView` / `writeView`、`RawQueryArchetype.readColumn` / `writeColumn`、`GpuWriteView.bytes` は expert 向けに `ByteView` を直接返します。
 - `ByteView` は MoonBit の `{ buf, start, end }` view を保持し、元の backing storage に直接 read/write します。
 - `ByteView.asUint8Array()` は backing storage が typed array の場合だけ `Uint8Array.subarray(...)` を返します。GPU store upload path は通常この経路です。
 - CPU SoA column は JS number array が backing になる場合があります。この場合も `ByteView.get`、`set`、`getF32`、`setF32` は zero-copy ですが、`Uint8Array` 化には明示名の `toUint8ArrayCopy()` が必要です。
@@ -355,8 +368,9 @@ const entity = world.createEntity();
 world.addComponent(entity, material);
 
 Query.new([material]).forEach(world, (row) => {
-  const bytes = row.writeView(material);
-  bytes.setF32(0, 1.0);
+  row.write(material, (bytes) => {
+    bytes.setF32(0, 1.0);
+  });
 });
 
 for (const write of world.drainGpuWriteViews(material)) {
@@ -427,8 +441,8 @@ ignore(world.add_component_bytes(e, tag, tag_bytes))
 let required = [world.transform_component(), world.global_transform_component()]
 let query = Query::new(required)
 query.for_each(world, fn(row) {
-  let tf_row = row.read_view(world.transform_component())
-  let gt_row = row.write_view(world.global_transform_component())
+  let local = row.read_transform3d().local_matrix()
+  row.write_global_transform(fn(gt) => gt.write_matrix(local))
   ...
 })
 

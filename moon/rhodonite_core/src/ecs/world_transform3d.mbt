@@ -185,7 +185,7 @@ pub fn World::update_transform3d_positions(
 ) -> Unit {
   let tf = self.transform_component_id
   self.assert_system_component_write(tf, "World::update_transform3d_positions")
-  Query::new([tf]).for_each_archetype(self, arch => {
+  RawQuery::new([tf]).for_each_archetype(self, arch => {
     let stride = arch.component_stride(tf)
     if stride != 48 {
       abort("World::update_transform3d_positions: Transform3D stride mismatch")

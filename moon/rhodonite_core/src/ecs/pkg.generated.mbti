@@ -79,34 +79,60 @@ pub struct PreparedQuery {
   // private fields
 }
 pub fn PreparedQuery::for_each(Self, World, (QueryRow) -> Unit) -> Unit
-pub fn PreparedQuery::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 
 pub struct Query {
   // private fields
 }
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
-pub fn Query::for_each_archetype(Self, World, (QueryArchetype) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::prepare(Self, World) -> PreparedQuery
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
-
-pub struct QueryArchetype {
-  // private fields
-}
-pub fn QueryArchetype::component_stride(Self, ComponentTypeId) -> Int
-pub fn QueryArchetype::entity(Self, Int) -> EntityId
-pub fn QueryArchetype::has(Self, ComponentTypeId) -> Bool
-pub fn QueryArchetype::length(Self) -> Int
-pub fn QueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
-pub fn QueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub struct QueryRow {
   // private fields
 }
 pub fn QueryRow::entity(Self) -> EntityId
 pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
-pub fn QueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
-pub fn QueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
+pub fn QueryRow::read(Self, ComponentTypeId, (ArrayView[Byte]) -> Unit) -> Unit
+pub fn QueryRow::read_child_of(Self) -> EntityId
+pub fn QueryRow::read_transform3d(Self) -> @components.Transform3DRow
+pub fn QueryRow::write(Self, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Unit
+pub fn QueryRow::write_child_of(Self, EntityId) -> Unit
+pub fn QueryRow::write_global_transform(Self, (@components.GlobalTransformGpuMutRow) -> Unit) -> Unit
+pub fn QueryRow::write_transform3d(Self, (@components.Transform3DMutRow) -> Unit) -> Unit
+
+pub struct RawPreparedQuery {
+  // private fields
+}
+pub fn RawPreparedQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
+pub fn RawPreparedQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+
+pub struct RawQuery {
+  // private fields
+}
+pub fn RawQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
+pub fn RawQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+pub fn RawQuery::new(Array[ComponentTypeId]) -> Self
+pub fn RawQuery::prepare(Self, World) -> RawPreparedQuery
+pub fn RawQuery::required_components(Self) -> Array[ComponentTypeId]
+
+pub struct RawQueryArchetype {
+  // private fields
+}
+pub fn RawQueryArchetype::component_stride(Self, ComponentTypeId) -> Int
+pub fn RawQueryArchetype::entity(Self, Int) -> EntityId
+pub fn RawQueryArchetype::has(Self, ComponentTypeId) -> Bool
+pub fn RawQueryArchetype::length(Self) -> Int
+pub fn RawQueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn RawQueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
+
+pub struct RawQueryRow {
+  // private fields
+}
+pub fn RawQueryRow::entity(Self) -> EntityId
+pub fn RawQueryRow::has(Self, ComponentTypeId) -> Bool
+pub fn RawQueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn RawQueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
@@ -129,6 +155,7 @@ pub struct SpawnBatchRow {
   // private fields
 }
 pub fn SpawnBatchRow::entity(Self) -> EntityId
+pub fn SpawnBatchRow::write(Self, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Unit
 pub fn SpawnBatchRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub struct System {

@@ -36,6 +36,7 @@ import {
 	world_set_component_bytes,
 	world_set_transform_trs,
 	spawn_batch_row_entity,
+	spawn_batch_row_write,
 	spawn_batch_row_write_view,
 	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
@@ -66,6 +67,12 @@ export class SpawnBatchRow {
 
 	writeView(component: ComponentTypeId): ByteView {
 		return byteView(spawn_batch_row_write_view(this.inner, component.inner));
+	}
+
+	write(component: ComponentTypeId, f: (bytes: ByteView) => void): void {
+		spawn_batch_row_write(this.inner, component.inner, (bytes) =>
+			f(byteView(bytes)),
+		);
 	}
 }
 

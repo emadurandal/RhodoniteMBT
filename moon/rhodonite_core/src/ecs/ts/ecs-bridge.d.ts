@@ -9,9 +9,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonEntityLocation = { archetype_index: number; row: number };
 	export type MoonWorld = object;
 	export type MoonQuery = object;
+	export type MoonRawQuery = object;
 	export type MoonPreparedQuery = object;
+	export type MoonRawPreparedQuery = object;
 	export type MoonQueryRow = object;
-	export type MoonQueryArchetype = object;
+	export type MoonRawQueryRow = object;
+	export type MoonRawQueryArchetype = object;
 	export type MoonSpawnBatchRow = object;
 	export type MoonRegisteredComponent = object;
 	export type MoonGpuLayout = { fields: MoonGpuField[]; stride: number; align: number };
@@ -167,62 +170,99 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		row: MoonSpawnBatchRow,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+	export function spawn_batch_row_write(
+		row: MoonSpawnBatchRow,
+		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): void;
 
 	export function query_new(required: MoonComponentTypeId[]): MoonQuery;
+	export function raw_query_new(required: MoonComponentTypeId[]): MoonRawQuery;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
 	export function query_for_each(
 		query: MoonQuery,
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
-	export function query_prepare(query: MoonQuery, world: MoonWorld): MoonPreparedQuery;
-	export function query_for_each_archetype(
-		query: MoonQuery,
+	export function raw_query_for_each(
+		query: MoonRawQuery,
 		world: MoonWorld,
-		f: (archetype: MoonQueryArchetype) => void,
+		f: (row: MoonRawQueryRow) => void,
 	): void;
-	export function prepared_query_for_each_archetype(
-		query: MoonPreparedQuery,
+	export function query_prepare(query: MoonQuery, world: MoonWorld): MoonPreparedQuery;
+	export function raw_query_prepare(
+		query: MoonRawQuery,
 		world: MoonWorld,
-		f: (archetype: MoonQueryArchetype) => void,
+	): MoonRawPreparedQuery;
+	export function raw_query_for_each_archetype(
+		query: MoonRawQuery,
+		world: MoonWorld,
+		f: (archetype: MoonRawQueryArchetype) => void,
+	): void;
+	export function raw_prepared_query_for_each_archetype(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+		f: (archetype: MoonRawQueryArchetype) => void,
 	): void;
 	export function prepared_query_for_each(
 		query: MoonPreparedQuery,
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
+	export function raw_prepared_query_for_each(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+		f: (row: MoonRawQueryRow) => void,
+	): void;
 	export function query_row_entity(row: MoonQueryRow): MoonEntityId;
+	export function raw_query_row_entity(row: MoonRawQueryRow): MoonEntityId;
 	export function query_row_has(
 		row: MoonQueryRow,
 		component: MoonComponentTypeId,
 	): MoonBool;
-	export function query_row_read_view(
-		row: MoonQueryRow,
-		component: MoonComponentTypeId,
-	): MoonByteView;
-	export function query_row_write_view(
-		row: MoonQueryRow,
-		component: MoonComponentTypeId,
-	): MoonByteView;
-	export function query_archetype_length(archetype: MoonQueryArchetype): number;
-	export function query_archetype_entity(
-		archetype: MoonQueryArchetype,
-		row: number,
-	): MoonEntityId;
-	export function query_archetype_has(
-		archetype: MoonQueryArchetype,
+	export function raw_query_row_has(
+		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
 	): MoonBool;
-	export function query_archetype_component_stride(
-		archetype: MoonQueryArchetype,
+	export function query_row_read(
+		row: MoonQueryRow,
 		component: MoonComponentTypeId,
-	): number;
-	export function query_archetype_read_column(
-		archetype: MoonQueryArchetype,
+		f: (bytes: MoonByteView) => void,
+	): void;
+	export function query_row_write(
+		row: MoonQueryRow,
+		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): void;
+	export function raw_query_row_read_view(
+		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
 	): MoonByteView;
-	export function query_archetype_write_column(
-		archetype: MoonQueryArchetype,
+	export function raw_query_row_write_view(
+		row: MoonRawQueryRow,
+		component: MoonComponentTypeId,
+	): MoonByteView;
+	export function raw_query_archetype_length(
+		archetype: MoonRawQueryArchetype,
+	): number;
+	export function raw_query_archetype_entity(
+		archetype: MoonRawQueryArchetype,
+		row: number,
+	): MoonEntityId;
+	export function raw_query_archetype_has(
+		archetype: MoonRawQueryArchetype,
+		component: MoonComponentTypeId,
+	): MoonBool;
+	export function raw_query_archetype_component_stride(
+		archetype: MoonRawQueryArchetype,
+		component: MoonComponentTypeId,
+	): number;
+	export function raw_query_archetype_read_column(
+		archetype: MoonRawQueryArchetype,
+		component: MoonComponentTypeId,
+	): MoonByteView;
+	export function raw_query_archetype_write_column(
+		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
 	): MoonByteView;
 

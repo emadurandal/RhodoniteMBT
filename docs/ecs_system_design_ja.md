@@ -2,7 +2,7 @@
 
 [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) の ECS は、`World` がエンティティ、アーキタイプ SoA、GPU-visible flat store を所有し、`Schedule` / `System` / `CommandBuffer` が更新順序と遅延変更を扱います。
 
-この文書は、かつての System 導入案ではなく、現行実装を正とした設計メモです。行イテレーションは公開 API としては `Query` に一本化し、アプリケーション側の更新処理は外付け `Schedule` に System を登録して実行できます。
+この文書は、かつての System 導入案ではなく、現行実装を正とした設計メモです。行イテレーションは高級 API の `Query` と低級 API の `RawQuery` に分かれ、アプリケーション側の更新処理は外付け `Schedule` に System を登録して実行できます。
 
 ## 結論
 
@@ -12,7 +12,7 @@
 - `Schedule` が phase 順、同一 phase 内は登録順で System を実行する。
 - System は `reads` / `writes` / `structural_write` を宣言する。
 - System 内の query callback 中に直接構造変更せず、必要な変更は `CommandBuffer` に積む。
-- GPU-visible component を直接書いた場合は、`QueryRow::write_view` / `set_component_bytes` / builtin bulk path が dirty を記録する。bulk path では連続 dirty range を直接記録できる。
+- GPU-visible component を直接書いた場合は、`QueryRow::write` / `RawQueryRow::write_view` / `set_component_bytes` / builtin bulk path が dirty を記録する。bulk path では連続 dirty range を直接記録できる。
 
 ## 主要な型
 
@@ -64,8 +64,8 @@ Schedule 実行中、`World` は active system の access 宣言を guard とし
 |------|------------|
 | `component_bytes` | `reads` または `writes` |
 | `Query` required component | `reads` または `writes` |
-| `QueryRow::read_view` | `reads` または `writes` |
-| `QueryRow::write_view` | `writes` |
+| `QueryRow::read` / `RawQueryRow::read_view` | `reads` または `writes` |
+| `QueryRow::write` / `RawQueryRow::write_view` | `writes` |
 | `set_component_bytes` / `clear_gpu_component` | `writes` |
 | `drain_gpu_writes` | `writes` |
 | `drain_gpu_write_views` | `writes` |
@@ -128,38 +128,41 @@ pub(all) enum WorldCommand {
 
 ## Query
 
-公開の row iteration API は `Query` です。`Query` は内部 row iterator を使いますが、外へは `QueryRow::read_view` / `QueryRow::write_view` として公開し、component ごとの access guard を維持します。
+公開の row iteration API は `Query` です。`Query` は `QueryRow::read(component, f)` / `write(component, f)` で closure の中だけ row view を貸し出し、component ごとの access guard を維持します。component identity は `ComponentTypeId` だけで、typed component handle や codec object は追加しません。
 
 `required` に同じ `ComponentTypeId` を重複指定すると `abort` します。同じ component row を複数 payload として扱う意味が曖昧なためです。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let tf_row = row.read_view(tf)
-  let gt_row = row.write_view(gt)
-  // ...
+  row.read(tf, fn(tf_row) {
+    row.write(gt, fn(gt_row) {
+      // ...
+      ignore(tf_row)
+      ignore(gt_row)
+    })
+  })
 })
 ```
 
-`QueryRow::read_view(component)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。読み取り専用経路は GPU store の capacity 拡張や dirty 記録を行いません。
+`QueryRow::read(component, f)` は、`CpuOnly` なら archetype SoA row、`GpuVisible` なら `EntityId.index` ベースの flat GPU row を `ArrayView[Byte]` として closure に渡します。Schedule 実行中は、component が active system の `reads ∪ writes` に含まれる必要があります。読み取り専用経路は GPU store の capacity 拡張や dirty 記録を行いません。
 
-`QueryRow::write_view(component)` は同じ payload を `MutArrayView[Byte]` として返します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
+`QueryRow::write(component, f)` は同じ payload を `MutArrayView[Byte]` として closure に渡します。Schedule 実行中は、component が active system の `writes` に含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
 
-CPU-only の bulk loop では `Query::for_each_archetype` を使えます。マッチした archetype ごとに required component の column index / stride を cache するため、`QueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
+CPU-only の bulk loop では `RawQuery::for_each_archetype` を使えます。マッチした archetype ごとに required component の column index / stride を cache するため、`RawQueryArchetype::read_column` / `write_column` は論理 row 範囲だけを連続 view として返し、呼び出しごとに列探索しません。GPU-visible component は flat store 上にあるため、archetype column view は提供しません。
 
-row callback の形を保ちたい hot loop では、`Query::prepare` で得た `PreparedQuery::for_each` を使えます。`PreparedQuery::for_each_archetype` と同じく `world.archetype_version` が変わった場合だけ plan を作り直し、通常フレームでは archetype scan と access metadata 構築を再利用します。
+row callback の形を保ちたい場合は、`Query::prepare` で得た `PreparedQuery::for_each` を使えます。raw row/chunk が必要な hot loop は `RawQuery::prepare` で得た `RawPreparedQuery` を使い、`world.archetype_version` が変わった場合だけ plan を作り直します。
 
 ## GPU-visible component の dirty 管理
 
-System が `QueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `read_view` を使うことで余分な dirty を避けられます。
+System が `QueryRow::write` または `RawQueryRow::write_view` で `GpuVisible` payload の mutable view を取得した場合、その row は自動で dirty になります。これは「実際に bytes が変わった row」ではなく、「mutable view を要求した row」を upload 対象にする設計です。読み取りだけなら `QueryRow::read` / `RawQueryRow::read_view` を使うことで余分な dirty を避けられます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  // row.write_view(gt) は GlobalTransform の flat GPU row。
+  // row.write(gt) は GlobalTransform の flat GPU row。
   // GpuVisible の mutable view を取得した時点で dirty になる。
-  let gt_row = row.write_view(gt)
-  ignore(gt_row)
+  row.write(gt, fn(gt_row) => ignore(gt_row))
 })
 ```
 
@@ -181,13 +184,13 @@ let ok = schedule.run(world, SystemContext::new(0.016, frame_index))
 
 この System は `Transform3D` と `ChildOf` を読み、`GlobalTransform` を書きます。`GlobalTransform` は GPU-visible component なので、内部で dirty 記録も行います。
 
-`World::update_transform3d_positions` は `Transform3D.position` 専用の bulk API です。JS では `Query::for_each_archetype` による公開 column path、非 JS では direct archetype sweep を使い、entity ごとの `QueryRow` 構築を避けます。
+`World::update_transform3d_positions` は `Transform3D.position` 専用の bulk API です。JS では `RawQuery::for_each_archetype` による column path、非 JS では direct archetype sweep を使い、entity ごとの `QueryRow` 構築を避けます。
 
 `World::update_global_transforms_from_transforms` は、`ChildOf` を持たない `[Transform3D, GlobalTransform]` archetype を fast path のまま処理し、`ChildOf` を含む archetype だけを階層対応 path に回します。これにより、scene の一部に親子関係がある場合でも、flat な大量 entity が階層 path へ巻き込まれません。階層 path の親 lookup は `ChildOf` column から直接読み、`get_child_of` 経由の component bytes copy を避けます。
 
 大量生成では `World::spawn_transform_global_batch` を使うと、entity を最初から builtin `[Transform3D, GlobalTransform]` archetype に連続 append できます。callback には `Transform3D` の CPU row と `GlobalTransform` の GPU row が `MutArrayView[Byte]` として渡されるため、`Transform3D::write_trs_to_component_mut_view` や `global_transform_write_identity_row` で temporary `FixedArray[Byte]` を作らずに初期化できます。この path は archetype migration と component-by-component add を避ける、builtin transform 専用の direct write API です。
 
-任意の component signature には `World::spawn_batch(components, count, write)` を使えます。指定 signature の archetype に直接 append し、`SpawnBatchRow::write_view(component)` から CPU row / GPU row を初期化します。`GpuVisible` component は entity index slot を active 化し、連続 index なら dirty range としてまとめて記録します。callback 中は row view を貸し出しているため、通常 query と同じく構造変更 API は拒否されます。
+任意の component signature には `World::spawn_batch(components, count, write)` を使えます。指定 signature の archetype に直接 append し、`SpawnBatchRow::write(component, f)` から CPU row / GPU row を初期化します。expert path には `write_view` もあります。`GpuVisible` component は entity index slot を active 化し、連続 index なら dirty range としてまとめて記録します。callback 中は row view を貸し出しているため、通常 query と同じく構造変更 API は拒否されます。
 
 `GlobalTransform` の dense 更新 helper には owned drain と borrowed view 向けがあります。`GlobalTransform` の GPU row は 48 byte の affine 3x4（`vec4<f32>` 3 行）で、非一様 scale と親回転から生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行を送らないレイアウトです。`write_global_transforms_dense_views` は entity ごとの callback でこの flat GPU rows を直接更新して dirty range を積み、`drain_gpu_write_views` + `GPUQueue::write_buffer_from_array_view` と組み合わせます。
 
@@ -227,7 +230,7 @@ pub struct App {
 - typed component wrapper や GPU row wrapper による、component kind / dirty 操作の型上の明確化。
 - 既存の conflict-free batch 分割を使った、実際の並列 System 実行。
 - GPU dirty tracking の thread-local 化と merge。
-- archetype index cache。`Query::for_each_archetype` と `PreparedQuery::for_each` の per-archetype access cache は導入済み。
+- archetype index cache。`RawQuery::for_each_archetype` と `PreparedQuery::for_each` / `RawPreparedQuery` の per-archetype access cache は導入済み。
 - native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を直接 lower-level queue binding に渡すため、任意の borrowed byte view upload でも `Bytes::from_array` の compact copy は発生しません。
 - `moon/rhodonite_core/src/ecs_bench` と `pnpm run bench:ecs:*` による target 別回帰測定。
 

@@ -4,11 +4,17 @@
 
 ///|
 /// ECS bulk paths use [`GlobalTransform::view_affine3x4_gpu_row`] so [`matrix`] aliases the GPU row
-/// returned by [`QueryRow::write_view`] with **no** separate float storage.
+/// returned by raw or bulk write paths with **no** separate float storage.
 /// Encode/decode owned [`@m44.Matrix44F`] values with [`matrix44f_write_affine3x4_to_gpu_row`] /
 /// [`matrix44f_from_affine3x4_gpu_bytes`].
 pub(all) struct GlobalTransform {
   matrix : @m44ref.Matrix44RefF
+}
+
+///|
+/// Mutable typed view over one flat GPU GlobalTransform row.
+pub struct GlobalTransformGpuMutRow {
+  priv view : MutArrayView[Byte]
 }
 
 ///|
@@ -22,6 +28,38 @@ pub fn GlobalTransform::view_affine3x4_gpu_row(
     abort("GlobalTransform::view_affine3x4_gpu_row: length mismatch")
   }
   { matrix: @m44ref.Matrix44RefF::view_affine3x4_le_gpu_row(row) }
+}
+
+///|
+pub fn GlobalTransformGpuMutRow::from_gpu_row(
+  row : MutArrayView[Byte],
+) -> GlobalTransformGpuMutRow {
+  if row.length() != 48 {
+    abort("GlobalTransformGpuMutRow::from_gpu_row: length mismatch")
+  }
+  { view: row }
+}
+
+///|
+pub fn GlobalTransformGpuMutRow::view(
+  self : GlobalTransformGpuMutRow,
+) -> GlobalTransform {
+  GlobalTransform::view_affine3x4_gpu_row(self.view)
+}
+
+///|
+pub fn GlobalTransformGpuMutRow::write_matrix(
+  self : GlobalTransformGpuMutRow,
+  m : @m44.Matrix44F,
+) -> Unit {
+  matrix44f_write_affine3x4_to_gpu_row(m, self.view)
+}
+
+///|
+pub fn GlobalTransformGpuMutRow::write_identity(
+  self : GlobalTransformGpuMutRow,
+) -> Unit {
+  global_transform_write_identity_row(self.view)
 }
 
 ///|

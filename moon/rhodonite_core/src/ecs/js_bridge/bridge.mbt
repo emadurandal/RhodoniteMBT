@@ -304,8 +304,22 @@ pub fn spawn_batch_row_write_view(
 }
 
 ///|
+pub fn spawn_batch_row_write(
+  row : @ecs.SpawnBatchRow,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.write(component, f)
+}
+
+///|
 pub fn query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.Query {
   @ecs.Query::new(required)
+}
+
+///|
+pub fn raw_query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.RawQuery {
+  @ecs.RawQuery::new(required)
 }
 
 ///|
@@ -325,6 +339,15 @@ pub fn query_for_each(
 }
 
 ///|
+pub fn raw_query_for_each(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
+}
+
+///|
 pub fn query_prepare(
   query : @ecs.Query,
   world : @ecs.World,
@@ -333,19 +356,27 @@ pub fn query_prepare(
 }
 
 ///|
-pub fn query_for_each_archetype(
-  query : @ecs.Query,
+pub fn raw_query_prepare(
+  query : @ecs.RawQuery,
   world : @ecs.World,
-  f : (@ecs.QueryArchetype) -> Unit,
+) -> @ecs.RawPreparedQuery {
+  query.prepare(world)
+}
+
+///|
+pub fn raw_query_for_each_archetype(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
 }
 
 ///|
-pub fn prepared_query_for_each_archetype(
-  query : @ecs.PreparedQuery,
+pub fn raw_prepared_query_for_each_archetype(
+  query : @ecs.RawPreparedQuery,
   world : @ecs.World,
-  f : (@ecs.QueryArchetype) -> Unit,
+  f : (@ecs.RawQueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
 }
@@ -360,7 +391,21 @@ pub fn prepared_query_for_each(
 }
 
 ///|
+pub fn raw_prepared_query_for_each(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
+}
+
+///|
 pub fn query_row_entity(row : @ecs.QueryRow) -> @ecs.EntityId {
+  row.entity()
+}
+
+///|
+pub fn raw_query_row_entity(row : @ecs.RawQueryRow) -> @ecs.EntityId {
   row.entity()
 }
 
@@ -373,61 +418,87 @@ pub fn query_row_has(
 }
 
 ///|
-pub fn query_row_read_view(
-  row : @ecs.QueryRow,
+pub fn raw_query_row_has(
+  row : @ecs.RawQueryRow,
+  component : @ecs.ComponentTypeId,
+) -> Bool {
+  row.has(component)
+}
+
+///|
+pub fn raw_query_row_read_view(
+  row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> ArrayView[Byte] {
   row.read_view(component)
 }
 
 ///|
-pub fn query_row_write_view(
-  row : @ecs.QueryRow,
+pub fn raw_query_row_write_view(
+  row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   row.write_view(component)
 }
 
 ///|
-pub fn query_archetype_length(arch : @ecs.QueryArchetype) -> Int {
+pub fn query_row_read(
+  row : @ecs.QueryRow,
+  component : @ecs.ComponentTypeId,
+  f : (ArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.read(component, f)
+}
+
+///|
+pub fn query_row_write(
+  row : @ecs.QueryRow,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.write(component, f)
+}
+
+///|
+pub fn raw_query_archetype_length(arch : @ecs.RawQueryArchetype) -> Int {
   arch.length()
 }
 
 ///|
-pub fn query_archetype_entity(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_entity(
+  arch : @ecs.RawQueryArchetype,
   row : Int,
 ) -> @ecs.EntityId {
   arch.entity(row)
 }
 
 ///|
-pub fn query_archetype_has(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_has(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> Bool {
   arch.has(component)
 }
 
 ///|
-pub fn query_archetype_component_stride(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_component_stride(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> Int {
   arch.component_stride(component)
 }
 
 ///|
-pub fn query_archetype_read_column(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_read_column(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> ArrayView[Byte] {
   arch.read_column(component)
 }
 
 ///|
-pub fn query_archetype_write_column(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_write_column(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   arch.write_column(component)

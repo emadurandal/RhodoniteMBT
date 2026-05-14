@@ -268,19 +268,20 @@ function initializeTransformRows(
 	Query.new([transformComponent]).forEach(world, (row) => {
 		const index = row.entity().index();
 		const [x, z] = gridXzForIndex(index, perSide);
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, 0);
-		bytes.setF32(8, z);
-		bytes.setF32(12, 0);
-		bytes.setF32(16, 0);
-		bytes.setF32(20, 0);
-		bytes.setF32(24, 1);
-		bytes.setF32(28, CUBE_SCALE);
-		bytes.setF32(32, CUBE_SCALE);
-		bytes.setF32(36, CUBE_SCALE);
-		bytes.setF32(40, 0);
-		bytes.setF32(44, 0);
+		row.write(transformComponent, (bytes) => {
+			bytes.setF32(0, x);
+			bytes.setF32(4, 0);
+			bytes.setF32(8, z);
+			bytes.setF32(12, 0);
+			bytes.setF32(16, 0);
+			bytes.setF32(20, 0);
+			bytes.setF32(24, 1);
+			bytes.setF32(28, CUBE_SCALE);
+			bytes.setF32(32, CUBE_SCALE);
+			bytes.setF32(36, CUBE_SCALE);
+			bytes.setF32(40, 0);
+			bytes.setF32(44, 0);
+		});
 	});
 }
 
@@ -294,10 +295,11 @@ function animateTransformsQuery(
 		const index = row.entity().index();
 		const [x, z] = gridXzForIndex(index, perSide);
 		const y = Math.sin(index * 0.09 + t * 1.8) * 0.12;
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, y);
-		bytes.setF32(8, z);
+		row.write(transformComponent, (bytes) => {
+			bytes.setF32(0, x);
+			bytes.setF32(4, y);
+			bytes.setF32(8, z);
+		});
 	});
 }
 
