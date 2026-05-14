@@ -60,7 +60,9 @@ fn render_webgpu_sample(
   encoder.copy_texture_to_buffer_rgba8(
     texture, readback, sample_width, sample_height,
   )
-  fixture.queue.submit(encoder.finish())
+  let command_buffer = encoder.finish()
+  fixture.queue.submit(command_buffer)
+  encoder.release()
   ignore(fixture.device.poll(wait=true))
   let width = sample_width.reinterpret_as_int()
   let height = sample_height.reinterpret_as_int()
