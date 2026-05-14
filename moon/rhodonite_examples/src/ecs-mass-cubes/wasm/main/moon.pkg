@@ -1,7 +1,6 @@
 import {
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/components" @comp,
-  "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,
 }
 

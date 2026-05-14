@@ -22,25 +22,32 @@ import {
 	world_create_entity,
 	world_destroy_entity,
 	world_drain_gpu_write_views,
+	world_drain_global_transform_blob_write_views,
+	world_write_global_transform_blob_range_views,
 	world_drain_gpu_writes_copy,
 	world_drain_resize_events,
 	world_global_transform_component,
+	world_global_transform_blob_word_capacity,
 	world_gpu_component_active_indices,
 	world_has_component,
 	world_is_alive,
 	world_location,
 	world_new,
+	world_new_with_global_transform_f16,
 	world_register_cpu_component,
 	world_register_gpu_component,
 	world_remove_component,
 	world_set_component_bytes,
+	world_set_global_transform_format,
 	world_set_transform_trs,
 	spawn_batch_row_entity,
+	spawn_batch_row_write,
 	spawn_batch_row_write_view,
 	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
 	world_transform_component,
 	world_update_global_transforms_from_transforms,
+	world_extract_global_transform_refs,
 	world_write_global_transforms_dense_range_views,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -66,6 +73,12 @@ export class SpawnBatchRow {
 
 	writeView(component: ComponentTypeId): ByteView {
 		return byteView(spawn_batch_row_write_view(this.inner, component.inner));
+	}
+
+	write(component: ComponentTypeId, f: (bytes: ByteView) => void): void {
+		spawn_batch_row_write(this.inner, component.inner, (bytes) =>
+			f(byteView(bytes)),
+		);
 	}
 }
 
@@ -111,6 +124,10 @@ export class World {
 
 	static new(): World {
 		return new World(world_new());
+	}
+
+	static newWithGlobalTransformF16(): World {
+		return new World(world_new_with_global_transform_f16());
 	}
 
 	createEntity(): EntityId {
@@ -235,6 +252,25 @@ export class World {
 		);
 	}
 
+	drainGlobalTransformBlobWriteViews(): GpuWriteView[] {
+		return world_drain_global_transform_blob_write_views(this.inner).map(
+			(write) => new GpuWriteView(write),
+		);
+	}
+
+	writeGlobalTransformBlobRangeViews(
+		firstWord: number,
+		wordCount: number,
+		f: (bytes: ByteView) => void,
+	): GpuWriteView[] {
+		return world_write_global_transform_blob_range_views(
+			this.inner,
+			firstWord,
+			wordCount,
+			(bytes) => f(byteView(bytes)),
+		).map((write) => new GpuWriteView(write));
+	}
+
 	drainGpuWritesCopy(component: ComponentTypeId): GpuWriteCopy[] {
 		return world_drain_gpu_writes_copy(this.inner, component.inner).map(
 			(write) => new GpuWriteCopy(write),
@@ -284,6 +320,24 @@ export class World {
 
 	updateGlobalTransformsFromTransforms(): void {
 		world_update_global_transforms_from_transforms(this.inner);
+	}
+
+	setGlobalTransformFormat(entity: EntityId, formatCode: 0 | 1): boolean {
+		return moonBool(
+			world_set_global_transform_format(this.inner, entity.inner, formatCode),
+		);
+	}
+
+	globalTransformBlobWordCapacity(): number {
+		return world_global_transform_blob_word_capacity(this.inner);
+	}
+
+	extractGlobalTransformRefs(entities: EntityId[]): Uint8Array {
+		const bytes = world_extract_global_transform_refs(
+			this.inner,
+			entities.map((entity) => entity.inner),
+		);
+		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
 	}
 
 	writeGlobalTransformsDenseRangeViews(

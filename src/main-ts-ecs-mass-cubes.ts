@@ -1,22 +1,35 @@
 import "./style.css";
 import {
-	Query,
 	World,
-	type ByteView,
-	type ComponentTypeId,
+	computeGlobalTransformUploadRange,
+	createGlobalTransformWordsBuffer,
+	detectDenseGlobalTransformLayout,
+	globalTransformRefInstanceVertexBufferLayout,
+	globalTransformHelpersDefault,
+	globalTransformWordsBindGroup,
+	globalTransformWordsBindingDefault,
+	uploadGlobalTransformWrites,
+	writeGlobalTransformBlobRangeByRefs,
+	type GlobalTransformBlobWriter,
+	type GlobalTransformDenseLayout,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 const ENTITY_COUNT = 800_000;
+type GlobalTransformPrecisionMode =
+	| "all-f32"
+	| "all-f16"
+	| "first-half-f32-second-half-f16"
+	| "even-id-f32-odd-id-f16";
+const GLOBAL_TRANSFORM_PRECISION_MODE: GlobalTransformPrecisionMode = "all-f16";
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const VERTEX_STRIDE_LOCAL = 12;
-const INSTANCE_STRIDE = 16;
+const INSTANCE_STRIDE = 24;
 const VERTS_PER_CUBE = 8;
 const INDEX_U16_COUNT = 36;
 const CAMERA_ELEVATION_RAD = 0.42;
 const GRID_SPACING = 0.14;
 const CUBE_SCALE = 0.055;
-
 type Mat4 = Float32Array;
 
 type Renderer = {
@@ -35,8 +48,10 @@ type Renderer = {
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
 	readonly world: World;
-	readonly transformComponent: ComponentTypeId;
-	readonly globalTransformComponent: ComponentTypeId;
+	readonly transformRefs: Uint32Array;
+	readonly transformWordUploadFirst: number;
+	readonly transformWordUploadCount: number;
+	readonly denseTransformLayout: GlobalTransformDenseLayout | null;
 	readonly perSide: number;
 	frame: number;
 	lastFrameStartMs: number;
@@ -60,6 +75,40 @@ function writeU16(bytes: Uint8Array, offset: number, value: number): void {
 		value,
 		true,
 	);
+}
+
+function globalTransformDefaultIsF16(): boolean {
+	return GLOBAL_TRANSFORM_PRECISION_MODE !== "all-f32";
+}
+
+function entityUsesF32(entityIndex: number, localIndex: number): boolean {
+	switch (GLOBAL_TRANSFORM_PRECISION_MODE) {
+		case "all-f32":
+			return true;
+		case "all-f16":
+			return false;
+		case "first-half-f32-second-half-f16":
+			return localIndex < Math.floor(ENTITY_COUNT / 2);
+		case "even-id-f32-odd-id-f16":
+			return (entityIndex & 1) === 0;
+	}
+}
+
+function applyGlobalTransformPrecisionMode(
+	world: World,
+	entities: ReturnType<World["spawnTransformGlobalBatchIdentity"]>,
+): void {
+	if (
+		GLOBAL_TRANSFORM_PRECISION_MODE === "all-f32" ||
+		GLOBAL_TRANSFORM_PRECISION_MODE === "all-f16"
+	) {
+		return;
+	}
+	entities.forEach((entity, localIndex) => {
+		if (entityUsesF32(entity.index(), localIndex)) {
+			world.setGlobalTransformFormat(entity, 0);
+		}
+	});
 }
 
 function mat4Identity(): Mat4 {
@@ -240,154 +289,75 @@ function instanceColorRgb(index: number): [number, number, number] {
 	];
 }
 
-function gridXzForIndex(index: number, perSide: number): [number, number] {
-	const ix = index % perSide;
-	const iz = Math.floor(index / perSide);
-	const half = (perSide - 1) * 0.5;
-	return [(ix - half) * GRID_SPACING, (iz - half) * GRID_SPACING];
-}
-
-function instanceBytes(indices: number[]): Uint8Array {
-	const bytes = new Uint8Array(indices.length * INSTANCE_STRIDE);
-	indices.forEach((index, i) => {
+function instanceBytes(entities: ReturnType<World["spawnTransformGlobalBatchIdentity"]>, refs: Uint8Array): Uint8Array {
+	const bytes = new Uint8Array(entities.length * INSTANCE_STRIDE);
+	entities.forEach((entity, i) => {
+		const index = entity.index();
 		const [r, g, b] = instanceColorRgb(index);
 		const base = i * INSTANCE_STRIDE;
-		writeF32(bytes, base, index);
-		writeF32(bytes, base + 4, r);
-		writeF32(bytes, base + 8, g);
-		writeF32(bytes, base + 12, b);
+		bytes.set(refs.subarray(i * 8, i * 8 + 8), base);
+		writeF32(bytes, base + 8, r);
+		writeF32(bytes, base + 12, g);
+		writeF32(bytes, base + 16, b);
 	});
 	return bytes;
 }
 
-function initializeTransformRows(
-	world: World,
-	transformComponent: ComponentTypeId,
-	perSide: number,
-): void {
-	Query.new([transformComponent]).forEach(world, (row) => {
-		const index = row.entity().index();
-		const [x, z] = gridXzForIndex(index, perSide);
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, 0);
-		bytes.setF32(8, z);
-		bytes.setF32(12, 0);
-		bytes.setF32(16, 0);
-		bytes.setF32(20, 0);
-		bytes.setF32(24, 1);
-		bytes.setF32(28, CUBE_SCALE);
-		bytes.setF32(32, CUBE_SCALE);
-		bytes.setF32(36, CUBE_SCALE);
-		bytes.setF32(40, 0);
-		bytes.setF32(44, 0);
-	});
-}
-
-function animateTransformsQuery(
-	world: World,
-	transformComponent: ComponentTypeId,
+function writeMassCubesTransformBlob(
+	writer: GlobalTransformBlobWriter,
 	perSide: number,
 	t: number,
+	fullRows: boolean,
 ): void {
-	Query.new([transformComponent]).forEach(world, (row) => {
-		const index = row.entity().index();
-		const [x, z] = gridXzForIndex(index, perSide);
-		const y = Math.sin(index * 0.09 + t * 1.8) * 0.12;
-		const bytes = row.writeView(transformComponent);
-		bytes.setF32(0, x);
-		bytes.setF32(4, y);
-		bytes.setF32(8, z);
-	});
-}
-
-function uploadGlobalTransformWrites(
-	queue: GPUQueue,
-	buffer: GPUBuffer,
-	writes: ReturnType<World["drainGpuWriteViews"]>,
-): void {
-	for (const write of writes) {
-		const bytes = write.bytes();
-		queue.writeBuffer(
-			buffer,
-			write.byteOffset(),
-			bytes.asUint8Array() ?? bytes.toUint8ArrayCopy(),
-		);
-	}
-}
-
-function rangeAsF32(bytes: ByteView): Float32Array | null {
-	const view = bytes.asUint8Array();
-	if (view === null || (view.byteOffset & 3) !== 0) {
-		return null;
-	}
-	return new Float32Array(view.buffer, view.byteOffset, view.byteLength >> 2);
-}
-
-function writeMassCubesFullRange(
-	bytes: ByteView,
-	stride: number,
-	firstEntityIndex: number,
-	count: number,
-	perSide: number,
-	waveTime: number,
-): void {
-	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 48) {
-		for (let i = 0; i < count; i += 1) {
-			const index = firstEntityIndex + i;
-			const [x, z] = gridXzForIndex(index, perSide);
-			const y = Math.sin(index * 0.09 + waveTime) * 0.12;
-			const base = i * stride;
-			bytes.setF32(base, CUBE_SCALE);
-			bytes.setF32(base + 4, 0);
-			bytes.setF32(base + 8, 0);
-			bytes.setF32(base + 12, x);
-			bytes.setF32(base + 16, 0);
-			bytes.setF32(base + 20, CUBE_SCALE);
-			bytes.setF32(base + 24, 0);
-			bytes.setF32(base + 28, y);
-			bytes.setF32(base + 32, 0);
-			bytes.setF32(base + 36, 0);
-			bytes.setF32(base + 40, CUBE_SCALE);
-			bytes.setF32(base + 44, z);
+	const waveTime = t * 1.8;
+	const sinStep = Math.sin(0.09);
+	const cosStep = Math.cos(0.09);
+	if (!fullRows) {
+		const setY = writer.elementSetter(1, 3);
+		let i = 0;
+		let waveSin = Math.sin(waveTime);
+		let waveCos = Math.cos(waveTime);
+		while (i < ENTITY_COUNT) {
+			setY(i, waveSin * 0.12);
+			const nextSin = waveSin * cosStep + waveCos * sinStep;
+			waveCos = waveCos * cosStep - waveSin * sinStep;
+			waveSin = nextSin;
+			i += 1;
 		}
 		return;
 	}
-
 	const half = (perSide - 1) * 0.5;
-	const sinStep = Math.sin(0.09);
-	const cosStep = Math.cos(0.09);
 	let localIndex = 0;
-	let row = Math.trunc(firstEntityIndex / perSide);
-	let column = firstEntityIndex % perSide;
-	let out = 0;
-	while (localIndex < count) {
-		const rowCount = Math.min(perSide - column, count - localIndex);
+	let row = 0;
+	let column = 0;
+	const setAffine3x4At = writer.setAffine3x4At;
+	while (localIndex < ENTITY_COUNT) {
+		const rowCount = Math.min(perSide - column, ENTITY_COUNT - localIndex);
 		let x = (column - half) * GRID_SPACING;
 		const z = (row - half) * GRID_SPACING;
-		const globalIndex = firstEntityIndex + localIndex;
-		let waveSin = Math.sin(globalIndex * 0.09 + waveTime);
-		let waveCos = Math.cos(globalIndex * 0.09 + waveTime);
+		let waveSin = Math.sin(localIndex * 0.09 + waveTime);
+		let waveCos = Math.cos(localIndex * 0.09 + waveTime);
 		for (let ix = 0; ix < rowCount; ix += 1) {
-			matrices[out] = CUBE_SCALE;
-			matrices[out + 1] = 0;
-			matrices[out + 2] = 0;
-			matrices[out + 3] = x;
-			matrices[out + 4] = 0;
-			matrices[out + 5] = CUBE_SCALE;
-			matrices[out + 6] = 0;
-			matrices[out + 7] = waveSin * 0.12;
-			matrices[out + 8] = 0;
-			matrices[out + 9] = 0;
-			matrices[out + 10] = CUBE_SCALE;
-			matrices[out + 11] = z;
-
+			const y = waveSin * 0.12;
+			setAffine3x4At(
+				localIndex,
+				CUBE_SCALE,
+				0,
+				0,
+				x,
+				0,
+				CUBE_SCALE,
+				0,
+				y,
+				0,
+				0,
+				CUBE_SCALE,
+				z,
+			);
 			const nextSin = waveSin * cosStep + waveCos * sinStep;
 			waveCos = waveCos * cosStep - waveSin * sinStep;
 			waveSin = nextSin;
 			localIndex += 1;
-			out += 12;
 			x += GRID_SPACING;
 		}
 		row += 1;
@@ -395,121 +365,56 @@ function writeMassCubesFullRange(
 	}
 }
 
-function writeMassCubesYRange(
-	bytes: ByteView,
-	stride: number,
-	firstEntityIndex: number,
-	count: number,
-	waveTime: number,
-): void {
-	const matrices = rangeAsF32(bytes);
-	if (matrices === null || stride !== 48) {
-		for (let i = 0; i < count; i += 1) {
-			const index = firstEntityIndex + i;
-			bytes.setF32(i * stride + 28, Math.sin(index * 0.09 + waveTime) * 0.12);
-		}
-		return;
-	}
-
-	const sinStep = Math.sin(0.09);
-	const cosStep = Math.cos(0.09);
-	let localIndex = 0;
-	let out = 0;
-	let waveSin = Math.sin(firstEntityIndex * 0.09 + waveTime);
-	let waveCos = Math.cos(firstEntityIndex * 0.09 + waveTime);
-	while (localIndex < count) {
-		matrices[out + 7] = waveSin * 0.12;
-		const nextSin = waveSin * cosStep + waveCos * sinStep;
-		waveCos = waveCos * cosStep - waveSin * sinStep;
-		waveSin = nextSin;
-		localIndex += 1;
-		out += 12;
-	}
-}
-
 function uploadInitialGlobalTransforms(renderer: Renderer): void {
 	uploadGlobalTransformWrites(
 		renderer.queue,
 		renderer.transformStorage,
-		renderer.world.writeGlobalTransformsDenseRangeViews(
-			ENTITY_COUNT,
-			(bytes, stride, firstEntityIndex, count) =>
-				writeMassCubesFullRange(
-					bytes,
-					stride,
-					firstEntityIndex,
-					count,
-					renderer.perSide,
-					0,
-				),
-		),
+		writeGlobalTransformBlobRangeByRefs(renderer.world, {
+			refs: renderer.transformRefs,
+			count: ENTITY_COUNT,
+			range: {
+				firstWord: renderer.transformWordUploadFirst,
+				wordCount: renderer.transformWordUploadCount,
+			},
+			denseLayout: renderer.denseTransformLayout,
+			write: (writer) =>
+				writeMassCubesTransformBlob(writer, renderer.perSide, 0, true),
+		}),
 	);
 }
 
 function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
-	const waveTime = t * 1.8;
-	const writes = renderer.world.writeGlobalTransformsDenseRangeViews(
-		ENTITY_COUNT,
-		(bytes, stride, firstEntityIndex, count) =>
-			writeMassCubesYRange(
-				bytes,
-				stride,
-				firstEntityIndex,
-				count,
-				waveTime,
-			),
-	);
-	if (writes.length > 0) {
-		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, writes);
-		return;
-	}
-
-	const fullWrites = renderer.world.writeGlobalTransformsDenseRangeViews(
-		ENTITY_COUNT,
-		(bytes, stride, firstEntityIndex, count) =>
-			writeMassCubesFullRange(
-				bytes,
-				stride,
-				firstEntityIndex,
-				count,
-				renderer.perSide,
-				waveTime,
-			),
-	);
-	if (fullWrites.length > 0) {
-		uploadGlobalTransformWrites(renderer.queue, renderer.transformStorage, fullWrites);
-		return;
-	}
-
-	animateTransformsQuery(
-		renderer.world,
-		renderer.transformComponent,
-		renderer.perSide,
-		t,
-	);
-	renderer.world.updateGlobalTransformsFromTransforms();
 	uploadGlobalTransformWrites(
 		renderer.queue,
 		renderer.transformStorage,
-		renderer.world.drainGpuWriteViews(renderer.globalTransformComponent),
+		writeGlobalTransformBlobRangeByRefs(renderer.world, {
+			refs: renderer.transformRefs,
+			count: ENTITY_COUNT,
+			range: {
+				firstWord: renderer.transformWordUploadFirst,
+				wordCount: renderer.transformWordUploadCount,
+			},
+			denseLayout: renderer.denseTransformLayout,
+			write: (writer) =>
+				writeMassCubesTransformBlob(writer, renderer.perSide, t, false),
+		}),
 	);
 }
 
 function shaderWgsl(): string {
-	return `
+	const prefix =
+		`
 struct CameraUniform {
   view_proj: mat4x4<f32>,
 }
 
-struct WorldAffine3x4 {
-  row0: vec4<f32>,
-  row1: vec4<f32>,
-  row2: vec4<f32>,
-}
-
-@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
+` +
+		globalTransformWordsBindingDefault() +
+		`
 @group(1) @binding(0) var<uniform> camera: CameraUniform;
+`;
 
+	const suffix = `
 struct VertexOut {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec3<f32>,
@@ -518,17 +423,12 @@ struct VertexOut {
 @vertex
 fn vertexMain(
   @location(0) local_pos: vec3<f32>,
-  @location(1) inst: vec4<f32>,
+  @location(1) transform_ref: vec2<u32>,
+  @location(2) color: vec3<f32>,
 ) -> VertexOut {
-  let idx = u32(inst.x);
-  let color = vec3<f32>(inst.y, inst.z, inst.w);
-  let world_m = world_from_entity[idx];
-  let local_h = vec4<f32>(local_pos, 1.0);
-  let world_pos = vec4<f32>(
-    dot(world_m.row0, local_h),
-    dot(world_m.row1, local_h),
-    dot(world_m.row2, local_h),
-    1.0,
+  let world_pos = rn_transform_point(
+    rn_load_global_transform(transform_ref),
+    local_pos,
   );
   let clip = camera.view_proj * world_pos;
   var o: VertexOut;
@@ -542,6 +442,7 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
   return vec4<f32>(color, 1.0);
 }
 `;
+	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
 async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
@@ -558,7 +459,9 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	const format = navigator.gpu.getPreferredCanvasFormat();
 	context.configure({ device, format, alphaMode: "opaque" });
 
-	const shader = device.createShaderModule({ code: shaderWgsl() });
+	const shader = device.createShaderModule({
+		code: shaderWgsl(),
+	});
 	const pipeline = device.createRenderPipeline({
 		layout: "auto",
 		vertex: {
@@ -570,11 +473,11 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 					stepMode: "vertex",
 					attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
 				},
-				{
-					arrayStride: INSTANCE_STRIDE,
-					stepMode: "instance",
-					attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }],
-				},
+				globalTransformRefInstanceVertexBufferLayout(INSTANCE_STRIDE, {
+					extraAttributes: [
+						{ shaderLocation: 2, offset: 8, format: "float32x3" },
+					],
+				}),
 			],
 		},
 		fragment: {
@@ -590,35 +493,39 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		},
 	});
 
-	const world = World.new();
-	const globalTransformComponent = world.globalTransformComponent();
-	const transformComponent = world.transformComponent();
+	const world = globalTransformDefaultIsF16()
+		? World.newWithGlobalTransformF16()
+		: World.new();
 	const perSide = gridSideLen(ENTITY_COUNT);
 	const entities = world.spawnTransformGlobalBatchIdentity(ENTITY_COUNT);
-	initializeTransformRows(world, transformComponent, perSide);
-	const maxIndexSlot = entities.reduce(
-		(max, entity) => Math.max(max, entity.index() + 1),
-		0,
+	applyGlobalTransformPrecisionMode(world, entities);
+	const transformRefsBytes = world.extractGlobalTransformRefs(entities);
+	const transformRefs = new Uint32Array(
+		transformRefsBytes.buffer,
+		transformRefsBytes.byteOffset,
+		transformRefsBytes.byteLength >>> 2,
 	);
-	const resizeCapacity = world
-		.drainResizeEvents()
-		.filter((event) => event.component().index() === globalTransformComponent.index())
-		.reduce((max, event) => Math.max(max, event.requiredCapacity()), 0);
-	const transformStride = world.componentGpuLayout(globalTransformComponent)?.stride() ?? 48;
-	const transformStorage = device.createBuffer({
-		size: Math.max(maxIndexSlot, resizeCapacity) * transformStride,
-		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-	});
+	const denseTransformLayout = detectDenseGlobalTransformLayout(
+		transformRefs,
+		ENTITY_COUNT,
+	);
+	const transformUploadRange = computeGlobalTransformUploadRange(
+		transformRefs,
+		ENTITY_COUNT,
+		denseTransformLayout,
+	);
+	const transformStorage = createGlobalTransformWordsBuffer(device, world);
 	const cameraUniform = device.createBuffer({
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes());
 
-	const bindTransforms = device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(0),
-		entries: [{ binding: 0, resource: { buffer: transformStorage } }],
-	});
+	const bindTransforms = globalTransformWordsBindGroup(
+		device,
+		pipeline,
+		transformStorage,
+	);
 	const bindCamera = device.createBindGroup({
 		layout: pipeline.getBindGroupLayout(1),
 		entries: [{ binding: 0, resource: { buffer: cameraUniform } }],
@@ -629,7 +536,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 	});
 	queue.writeBuffer(vertexBuffer, 0, vertexPositionBytes(0.42));
-	const instanceData = instanceBytes(entities.map((entity) => entity.index()));
+	const instanceData = instanceBytes(entities, transformRefsBytes);
 	const instanceBuffer = device.createBuffer({
 		size: instanceData.byteLength,
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -664,8 +571,10 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		bindTransforms,
 		bindCamera,
 		world,
-		transformComponent,
-		globalTransformComponent,
+		transformRefs,
+		transformWordUploadFirst: transformUploadRange.firstWord,
+		transformWordUploadCount: transformUploadRange.wordCount,
+		denseTransformLayout,
 		perSide,
 		frame: 0,
 		lastFrameStartMs: -1,

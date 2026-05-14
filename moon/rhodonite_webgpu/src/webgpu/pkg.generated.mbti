@@ -2,6 +2,7 @@
 package "emadurandal/rhodonite_webgpu/webgpu"
 
 import {
+  "emadurandal/rhodonite_core/ecs",
   "emadurandal/rhodonite_webgpu/webgpu_enums",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
 }
@@ -38,6 +39,12 @@ pub fn create_native_webgpu_instance() -> GPUInstance raise
 pub fn create_webgpu_context(GPUDevice, GPUCanvasContext, String, GPUQueue) -> GPUContext
 
 pub fn create_webgpu_instance(@webgpu_objects.GPU) -> GPUInstance
+
+pub fn global_transform_ref_instance_vertex_buffer_layout(UInt64, UInt, UInt64, Array[@webgpu_enums.GPUVertexAttribute]) -> @webgpu_enums.GPUVertexBufferLayout
+
+pub fn global_transform_ref_vertex_attribute(UInt, UInt64) -> @webgpu_enums.GPUVertexAttribute
+
+pub fn global_transform_words_buffer_byte_size(Int) -> UInt64
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
@@ -139,6 +146,8 @@ pub(all) struct GPUDevice {
 pub fn GPUDevice::create_bind_group(Self, GPUBindGroupDescriptor) -> GPUBindGroup
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
+pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
+pub fn GPUDevice::create_global_transform_words_buffer(Self, @ecs.World) -> GPUBuffer
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
 pub fn GPUDevice::create_texture(Self, UInt, UInt, String, UInt64) -> GPUTexture
@@ -163,8 +172,10 @@ pub async fn GPUInstance::request_adapter(Self) -> GPUAdapter
 pub(all) struct GPUQueue {
   raw : @webgpu_objects.WebGPUQueue
 }
+pub fn GPUQueue::drain_and_upload_global_transform_writes(Self, GPUBuffer, @ecs.World) -> Unit
 pub fn GPUQueue::release(Self) -> Unit
 pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
+pub fn GPUQueue::upload_global_transform_writes(Self, GPUBuffer, Array[@ecs.GpuWriteView]) -> Unit
 pub fn GPUQueue::write_buffer(Self, GPUBuffer, UInt64, Bytes) -> Unit
 pub fn GPUQueue::write_buffer_from_array_view(Self, GPUBuffer, UInt64, ArrayView[Byte]) -> Unit
 pub fn GPUQueue::write_buffer_from_fixed_array(Self, GPUBuffer, UInt64, FixedArray[Byte]) -> Unit

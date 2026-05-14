@@ -81,6 +81,34 @@ pub fn GPUDevice::create_render_pipeline(
 }
 
 ///|
+/// Vertex attribute for the builtin ECS GlobalTransform ref: `vec2<u32>`
+/// containing `{ format, word_offset }`.
+pub fn global_transform_ref_vertex_attribute(
+  shader_location : UInt,
+  offset : UInt64,
+) -> GPUVertexAttribute {
+  { format: GPUVertexFormat::Uint32x2, offset, shader_location }
+}
+
+///|
+/// Instance vertex-buffer layout that starts with the builtin ECS GlobalTransform
+/// ref and appends any caller-owned per-instance attributes.
+pub fn global_transform_ref_instance_vertex_buffer_layout(
+  array_stride : UInt64,
+  shader_location : UInt,
+  offset : UInt64,
+  extra_attributes : Array[GPUVertexAttribute],
+) -> GPUVertexBufferLayout {
+  let attrs : Array[GPUVertexAttribute] = [
+    global_transform_ref_vertex_attribute(shader_location, offset),
+  ]
+  for i = 0; i < extra_attributes.length(); i = i + 1 {
+    attrs.push(extra_attributes[i])
+  }
+  { array_stride, step_mode: GPUVertexStepMode::Instance, attributes: attrs }
+}
+
+///|
 /// WebGPU `GPUTextureUsage.RENDER_ATTACHMENT`（0x10）。
 pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16UL
 
@@ -111,6 +139,32 @@ pub fn GPUDevice::create_buffer(
   usage : UInt64,
 ) -> GPUBuffer {
   { raw: @raw.webgpu_device_create_buffer(self.raw, size, usage) }
+}
+
+///|
+/// Byte size for the builtin ECS GlobalTransform packed-word storage buffer.
+///
+/// WebGPU buffers cannot be zero-sized, so an empty world still reserves 4 bytes.
+pub fn global_transform_words_buffer_byte_size(word_capacity : Int) -> UInt64 {
+  if word_capacity <= 0 {
+    4UL
+  } else {
+    (word_capacity * 4).to_uint64()
+  }
+}
+
+///|
+/// Creates a storage buffer for the builtin ECS GlobalTransform packed-word blob.
+pub fn GPUDevice::create_global_transform_words_buffer(
+  self : GPUDevice,
+  world : @ecs.World,
+) -> GPUBuffer {
+  self.create_buffer(
+    global_transform_words_buffer_byte_size(
+      world.global_transform_blob_word_capacity(),
+    ),
+    GPU_BUFFER_USAGE_STORAGE | GPU_BUFFER_USAGE_COPY_DST,
+  )
 }
 
 ///|
@@ -183,6 +237,36 @@ pub fn GPUQueue::write_buffer_from_array_view(
   view : ArrayView[Byte],
 ) -> Unit {
   @raw.webgpu_queue_write_buffer_array_view(self.raw, buffer.raw, offset, view)
+}
+
+///|
+/// Uploads borrowed ECS GlobalTransform packed-blob write views into a storage buffer.
+pub fn GPUQueue::upload_global_transform_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  writes : Array[@ecs.GpuWriteView],
+) -> Unit {
+  for i = 0; i < writes.length(); i = i + 1 {
+    let write = writes[i]
+    self.write_buffer_from_array_view(
+      buffer,
+      write.byte_offset.to_uint64(),
+      write.bytes,
+    )
+  }
+}
+
+///|
+/// Drains dirty ECS GlobalTransform packed-blob views and uploads them immediately.
+pub fn GPUQueue::drain_and_upload_global_transform_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  world : @ecs.World,
+) -> Unit {
+  self.upload_global_transform_writes(
+    buffer,
+    world.drain_global_transform_blob_write_views(),
+  )
 }
 
 ///|
@@ -414,6 +498,21 @@ pub fn GPUDevice::create_bind_group(
       raw_entries,
     ),
   }
+}
+
+///|
+/// Creates a bind group for the builtin ECS GlobalTransform packed word storage buffer.
+pub fn GPUDevice::create_global_transform_words_bind_group(
+  self : GPUDevice,
+  pipeline : GPURenderPipeline,
+  buffer : GPUBuffer,
+  group_index : UInt,
+  binding : UInt,
+) -> GPUBindGroup {
+  self.create_bind_group({
+    layout: pipeline.get_bind_group_layout(group_index),
+    entries: [{ binding, resource: GPUBindingResource::Buffer(buffer) }],
+  })
 }
 
 ///|

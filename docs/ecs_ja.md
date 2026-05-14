@@ -51,6 +51,7 @@ flowchart TB
 - **`generations` / `alive` / `free_indices`**: スロットの再利用と世代管理。
 - **`locations`**: `EntityId.index` → `EntityLocation?`（アーキタイプ索引と行）。
 - **`archetypes`**: シグネチャごとの SoA テーブル（CPU コンポーネントの実体）。各列は論理行数とは別に `row_capacity` を持ち、append 時に backing を余裕を持って伸ばしても query の列 view には未使用領域を見せません。
+- **`archetype_signature_cache` / `component_archetypes`**: storage / query planning 用の内部 index。シグネチャ lookup は構造変更時の全 archetype 走査を避け、component-to-archetype list は query planning を全 archetype ではなく最も候補が少ない required component から始めます。
 - **`gpu_stores`**: `ComponentTypeId.index` に並ぶ `GpuComponentStore?`（GPU 可視のみ `Some`）。flat payload bytes、行単位 dirty flag、bulk path 用 dirty range、所有中 row の packed active index set を持ちます。
 - **`resize_events`**: フラットストア拡張時にバッファ再作成が必要な通知のキュー。
 
@@ -61,7 +62,7 @@ flowchart TB
 - 各アーキタイプは **昇順ソートされた `ComponentTypeId` のリスト**をシグネチャとして持ち、同一シグネチャのエンティティが同じテーブルに並びます。
 - 新規 `World` では **アーキタイプ 0 が空シグネチャ**で、生成直後のエンティティはそこに入ります（[`world.mbt` の `World::new`](../moon/rhodonite_core/src/ecs/world.mbt)）。
 - 各 CPU コンポーネント列は `stride` バイト幅の `bytes` 配列で、行 `row` のオフセットは `row * stride` です。
-- 列の backing capacity は生存行数より大きい場合があります。公開 API の `QueryArchetype::read_column` / `write_column` は `entities.length() * stride` 分の論理バイトだけを返します。
+- 列の backing capacity は生存行数より大きい場合があります。公開 API の `RawQueryArchetype::read_column` / `write_column` は `entities.length() * stride` 分の論理バイトだけを返します。
 
 ```mermaid
 flowchart LR
@@ -137,7 +138,7 @@ sequenceDiagram
 callback には direct row view が渡されます。
 
 ```moonbit
-let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, gt_row) {
+let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, _gt_row) {
   @comp.Transform3D::write_trs_to_component_mut_view(
     tf_row,
     px,
@@ -151,22 +152,19 @@ let entities = world.spawn_transform_global_batch(count, fn(i, entity, tf_row, g
     sy,
     sz,
   )
-  @comp.global_transform_write_identity_row(gt_row)
   ignore(i)
   ignore(entity)
 })
 ```
 
-callback は両方の row を完全に初期化する必要があります。そのために `Transform3D::write_trs_to_component_mut_view` と `global_transform_write_identity_row` があり、中間の `FixedArray[Byte]` 確保を避けます。
+callback は `Transform3D` row を直接初期化します。`GlobalTransform` は `{ format, word_offset }` を持つ 8 byte の CPU row になり、`spawn_transform_global_batch` が entity ごとの identity slot を packed transform blob に確保するため、callback 側で matrix bytes は書きません。
 
 任意の component signature を大量生成する場合は `World::spawn_batch(components, count, write)` を使えます。指定 component set のアーキタイプへ直接 append し、callback には `SpawnBatchRow` が渡ります。
 
 ```moonbit
 let entities = world.spawn_batch([cpu_component, gpu_component], count, fn(i, entity, row) {
-  let cpu = row.write_view(cpu_component)
-  let gpu = row.write_view(gpu_component)
-  cpu[0] = i.to_byte()
-  gpu[0] = entity.gpu_index().to_byte()
+  row.write(cpu_component, fn(cpu) => cpu[0] = i.to_byte())
+  row.write(gpu_component, fn(gpu) => gpu[0] = entity.gpu_index().to_byte())
 })
 ```
 
@@ -204,37 +202,49 @@ flowchart TD
 
 ---
 
-## クエリ API
+## Query API（高級）と RawQuery API（低級）
 
-行イテレーションには `Query::new(required)` と `query.for_each(world, f)` を使います。引数 `required` に列挙した `ComponentTypeId` を **すべて含む**アーキタイプだけを走査します。`required` が空なら何もしません。
+component identity は常に `ComponentTypeId` です。`Component<T>` や codec object のような別の component handle はありません。
 
-callback には `QueryRow` が渡り、payload 配列の添字ではなく component id でアクセスでき、read/write の access check も component ごとに維持されます。
-
-- `required` component set を名前付きの値として再利用できます。
-- `Query::new` の時点で重複 component id を拒否できます。
-- 入力配列をコピーするため、呼び出し側の配列を後から変更しても query の payload 順は変わりません。
-- schedule 実行中は、required の全 component が active System の `reads` または `writes` に含まれる必要があります。
-- `QueryRow::read_view(component)` は `CpuOnly` なら SoA row、`GpuVisible` なら GPU flat row のゼロコピー `ArrayView[Byte]` を返します。
-- `QueryRow::write_view(component)` はゼロコピー `MutArrayView[Byte]` を返し、schedule 実行中は active System の `writes` にその component が含まれる必要があります。`GpuVisible` component の mutable view を要求した場合、その entity row は直ちに dirty になります。
-- イテレーション中に GPU store が拡張すると `resize_events` に `GpuResizeEvent` が積まれることがあります（`needs_full_upload` 等）。
-
-CPU-only のホットループでは `Query::for_each_archetype` を優先してください。マッチしたアーキタイプごとに、要求 component の kind、列 index、stride を小さな access cache として一度だけ作るため、`QueryArchetype::component_stride`、`read_column`、`write_column` は毎回 `column_index` を線形探索しません。GPU-visible component は `EntityId.index` ベースの flat storage にあるため、archetype column としては読めません。
-
-row callback の形を維持したい場合は、`Query::prepare` で得た `PreparedQuery::for_each(world, f)` を使えます。`world.archetype_version` が変わったときだけ plan を作り直し、通常フレームでは archetype scan と access metadata を再利用します。
+高級 API では `Query::new(required)` と `query.for_each(world, f)` を使います。`QueryRow::read(component, f)` / `write(component, f)` は closure の中だけ `ArrayView[Byte]` / `MutArrayView[Byte]` を貸し出します。`CpuOnly` と `GpuVisible` の違いは呼び出し側が意識せず、`GpuVisible` を `write` した場合は dirty が自動で立ちます。
 
 ```moonbit
 let query = Query::new([tf, gt])
 query.for_each(world, fn(row) {
-  let tf_bytes = row.read_view(tf)
-  let global_tf = @comp.GlobalTransform::view_affine3x4_gpu_row(row.write_view(gt))
-  ignore(tf_bytes)
-  ignore(global_tf)
+  row.read(tf, fn(tf_bytes) {
+    row.write(gt, fn(gt_row) {
+      let local = @comp.Transform3D::local_matrix_from_component_view(tf_bytes)
+      @comp.matrix44f_write_affine3x4_to_gpu_row(local, gt_row)
+    })
+  })
 })
 ```
 
+標準 component には typed convenience もあります。これらは少数操作・debug/editor/test 向けで、エンジン内部の大量処理では後述の Raw / bulk path を使います。
+
 ```moonbit
-let query = Query::new([tf])
-query.for_each_archetype(world, fn(chunk) {
+query.for_each(world, fn(row) {
+  let local = row.read_transform3d().local_matrix()
+  row.write_global_transform(fn(gt) => gt.write_matrix(local))
+})
+```
+
+低級 API では `RawQuery` を使います。`RawQueryRow::read_view` / `write_view`、`RawQueryArchetype::read_column` / `write_column` はゼロコピー view を直接返します。標準 component だけでなくユーザー定義 component にも使えますが、layout、stride、view lifetime、dirty / resize の意味は呼び出し側が守ります。
+
+```moonbit
+RawQuery::new([position, velocity]).for_each_archetype(world, fn(chunk) {
+  let pos = chunk.write_column(position)
+  let vel = chunk.read_column(velocity)
+  ignore(pos)
+  ignore(vel)
+})
+```
+
+`Query::prepare` / `RawQuery::prepare` は world の component-to-archetype index で無関係な archetype を飛ばし、構造変更がなければマッチ済み archetype と access metadata を再利用します。非 prepared の `for_each` も同じ plan builder を通ります。
+
+```moonbit
+let raw = RawQuery::new([tf])
+raw.for_each_archetype(world, fn(chunk) {
   let stride = chunk.component_stride(tf)
   let tf_column = chunk.write_column(tf)
   for row = 0; row < chunk.length(); row = row + 1 {
@@ -284,10 +294,12 @@ let schedule = Schedule::new()
 schedule.add_system(System::new_with_structural_write("RemoveExpired", Update, [lifetime], [], fn(world, ctx, commands) {
   let query = Query::new([lifetime])
   query.for_each(world, fn(row) {
-    let remaining = @comp.get_gpu_f32_byte_view(row.read_view(lifetime), 0)
-    if remaining <= ctx.delta_seconds {
-      commands.destroy_entity(row.entity())
-    }
+    row.read(lifetime, fn(bytes) {
+      let remaining = @comp.get_gpu_f32_byte_view(bytes, 0)
+      if remaining <= ctx.delta_seconds {
+        commands.destroy_entity(row.entity())
+      }
+    })
   })
 }))
 let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
@@ -317,30 +329,39 @@ let _ = schedule.run(world, SystemContext::new(0.016, frame_index))
 WebGPU upload 側には次の API があります。
 
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
-- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では `Uint8Array.subarray` を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
+- `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では backing `Uint8Array` と source offset / size を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
+- `GPUDevice::create_global_transform_words_buffer(world)` と `GPUQueue::upload_global_transform_writes(buffer, writes)`: builtin の packed `GlobalTransform` storage-buffer 経路向け。`GPUQueue::drain_and_upload_global_transform_writes(buffer, world)` は dirty-view drain と即時 upload をまとめます。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) は所有型 drain path を使います。高負荷サンプルの [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は `spawn_transform_global_batch` を使い、`write_global_transforms_dense_range_views` にサンプル側 callback を渡して dense な `GlobalTransform` 範囲を一括更新します。初期化 callback は affine 3x4 row 全体を書き、frame ごとの callback は Y translation lane（`row1.w`）だけを更新します。GPU buffer は 48 byte の affine row を保持するため、borrowed upload range は full dense row span のままですが、従来の 64 byte mat4 row より 25% 小さくなります。ライブラリは dense range と dirty 記録だけを担当し、grid-wave の計算はサンプル側にあります。
-ブラウザ専用の [`ts-ecs-mass-cubes`](../demos/ts-ecs-mass-cubes.html) demo も TypeScript ECS wrapper から同じ dense-range callback path を使い、borrowed write view をブラウザの WebGPU API で直接 submit します。[`wasm-ecs-mass-cubes`](../demos/wasm-ecs-mass-cubes.html) demo は MoonBit `wasm` の release entrypoint で、MoonBit 所有の `FixedArray[Float]` affine upload buffer を exported wasm linear memory に保持します。TypeScript demo と同じ 48 byte row を書き、同じ full transform span を upload しますが、以前の `FixedArray[Byte]` 経由の f32 byte packing は避けます。[`wasm-gc-ecs-mass-cubes`](../demos/wasm-gc-ecs-mass-cubes.html) demo は、ブラウザ WebGPU が MoonBit wasm-gc array を `TypedArray` view として扱えないため、TypeScript upload buffer を使います。frame ごとの表示用 upload path は、同じ wave を wasm-gc と TypeScript で二重計算しないよう host 側が所有します。
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は、`array<u32>` の storage buffer を 1 本 bind します。instance buffer には 8 byte の `GlobalTransform` ref（`format`, `word_offset`）と color を持たせ、`emadurandal/rhodonite_core/ecs/wgsl` の `global_transform_words_binding_default()` と `global_transform_helpers_default()` が提供する WGSL helper で同じ blob から 12 個の f32 word または 6 個の packed-f16 word を読みます。精度差で draw を分けません。storage buffer 変数名を変える場合は custom-name variant を使います。対応する vertex layout、storage buffer、storage bind group、upload は `rhodonite_webgpu/webgpu` の `global_transform_ref_instance_vertex_buffer_layout`、`GPUDevice::create_global_transform_words_buffer`、`GPUDevice::create_global_transform_words_bind_group`、`GPUQueue::upload_global_transform_writes` で作れます。MoonBit renderer では `detect_dense_global_transform_layout()`、`compute_global_transform_upload_range()`、`World::write_global_transform_blob_range_by_refs()` と `GlobalTransformBlobWriter` を使います。TypeScript renderer では `moon/rhodonite_core/src/ecs/ts` の `globalTransformWordsBindingDefault()`、`globalTransformHelpersDefault()`、`globalTransformRefInstanceVertexBufferLayout()`、`createGlobalTransformWordsBuffer()`、`globalTransformWordsBindGroup()`、`uploadGlobalTransformWrites()`、`writeGlobalTransformBlobRangeByRefs()` を使います。
 
-Dense GlobalTransform helper には所有型と view 型の両方があります。
+MoonBit と TypeScript の bulk writer では `GlobalTransformBlobWriter` を使うと、renderer 側で fp32/fp16 の pack 形式を分岐しなくて済みます。この helper は upload callback ごとに writer を 1 個だけ作り、entity ごとの object allocation は行いません。renderer の loop は full row なら `writer.set_affine3x4_at(index, ...)` / `writer.setAffine3x4At(index, ...)`、部分更新なら `writer.set_element_at(index, row, column, value)` / `writer.setElementAt(index, row, column, value)` を呼び、writer が entity ref を解決して f32 word または packed f16 half へ書き込みます。hot scalar loop では MoonBit は `let set_y = writer.element_setter(row, column); set_y(index, value)`、TypeScript は `const setY = writer.elementSetter(row, column); setY(index, value)` を使うと、dense f32/f16 の選択を entity loop の外に出せます。native MoonBit target も同じ API 形を保ちつつ、scalar write path の内部では C-backed setter を使います。mixed refs は TypeScript path では同じ format が連続する run に事前分解されるため、前半 f32 / 後半 f16 のような pattern では run 内の entity ごとの format lookup を避けられます。
 
-- `write_global_transforms_dense(...) -> Array[GpuWrite]`
-- `write_global_transforms_dense_views(...) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_range_views(count, write) -> Array[GpuWriteView]`
-- `write_global_transforms_dense_wasm_bytes_range(count, write) -> Bool` は非 GC wasm の direct-upload helper です。raw な GlobalTransform backing `FixedArray[Byte]` を書き、drain range は積みません。
-- `global_transform_wasm_gpu_bytes_payload_ptr()` / `global_transform_wasm_gpu_bytes_len()` は、非 GC wasm の host upload 用に builtin GlobalTransform GPU store を公開します。現在の non-GC MassCubes browser demo は sample 所有の f32 upload buffer を使います。毎 frame 全 row を wave 更新する用途では、直接 f32 store の方が速いためです。
+MassCubes sample 群は、ユーザーソース冒頭の精度モード定数で all-fp32、all-fp16、前半 fp32 / 後半 fp16、偶数 entity id fp32 / 奇数 entity id fp16 を切り替えられます。mixed mode でも instance ref と draw call は共通で、renderer は選択された ref が必要とする active packed-word span だけを upload します。
 
-`write_global_transforms_dense_range_views` はユーザー定義ロジック向けの高スループット版です。`write` を 1 回だけ呼び、`GpuComponentWriteRange`（`bytes`、`stride`、`first_entity_index`、`count`）を渡します。呼び出し側は entity ごとの callback なしに、連続 row 上で tight loop を実行できます。
+renderer 側 upload 性能を重視する場合、fp32/fp16 format はできるだけ entity の連続範囲ごとに割り当てることを推奨します。all-fp32/all-fp16 の dense 配置や、同じ format が長く続く run は run ごとに最適化できます。一方、偶数 entity は fp32 / 奇数 entity は fp16 のように交互配置すると format 変更が頻発するため、主に stress-test 用 pattern と考えてください。
+
+`World::new()` は新規 `GlobalTransform` slot の default format を fp32 にします。`World::new_with_global_transform_format(Affine3x4F16)` は default allocation format だけを fp16 に変えます。個々の entity は `set_global_transform_format(entity, format)` で `Affine3x4F32` / `Affine3x4F16` を切り替えられます。format tag は instance ref に含まれるため、shader と draw call は共通です。
+
+Packed GlobalTransform upload API:
+
+- `global_transform_ref(entity)`: entity の `{ format, word_offset }` を返します。
+- `write_global_transform_refs_into(entities, dst, stride, offset)`: instance buffer へ ref を書きます。
+- `extract_global_transform_refs(entities)`: JS/TS 向けに tightly packed な ref blob を返します。
+- `global_transform_blob_word_capacity()`: WebGPU storage buffer の `u32` word capacity です。
+- `drain_global_transform_blob_write_views()`: packed blob の dirty byte range を借用 view で返します。
+- `write_global_transform_blob_range_views(first_word, word_count, write)`: renderer 側 bulk writer に mutable blob byte range を貸し、対象 word range を dirty にして借用 upload view を返します。MassCubes demo 群は transform ref が dense な場合、この hot path を使います。
+- `drain_global_transform_blob_resize_events()`: packed blob の growth 通知です。renderer は storage buffer を作り直し、必要に応じて full upload します。
 
 ---
 
 ## TypeScript ラッパー
 
-JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` の surface を対象にし、entity lifecycle、component 登録、builtin component id、row/chunk query view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
+JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` / `RawQuery` の surface を対象にし、entity lifecycle、component 登録、builtin component id、closure 型 query access、raw row/chunk view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
 
-wrapper では ECS の zero-copy 方針を明示しています。
+wrapper では高級 API と Raw API を分けます。
 
-- `QueryRow::read_view` / `write_view`、`QueryArchetype::read_column` / `write_column`、`GpuWriteView.bytes` は `ByteView` として公開します。
+- `QueryRow.read(component, f)` / `write(component, f)` は closure の中だけ `ByteView` を渡します。
+- `RawQueryRow.readView` / `writeView`、`RawQueryArchetype.readColumn` / `writeColumn`、`GpuWriteView.bytes` は expert 向けに `ByteView` を直接返します。
 - `ByteView` は MoonBit の `{ buf, start, end }` view を保持し、元の backing storage に直接 read/write します。
 - `ByteView.asUint8Array()` は backing storage が typed array の場合だけ `Uint8Array.subarray(...)` を返します。GPU store upload path は通常この経路です。
 - CPU SoA column は JS number array が backing になる場合があります。この場合も `ByteView.get`、`set`、`getF32`、`setF32` は zero-copy ですが、`Uint8Array` 化には明示名の `toUint8ArrayCopy()` が必要です。
@@ -355,8 +376,9 @@ const entity = world.createEntity();
 world.addComponent(entity, material);
 
 Query.new([material]).forEach(world, (row) => {
-  const bytes = row.writeView(material);
-  bytes.setF32(0, 1.0);
+  row.write(material, (bytes) => {
+    bytes.setF32(0, 1.0);
+  });
 });
 
 for (const write of world.drainGpuWriteViews(material)) {
@@ -375,7 +397,7 @@ for (const write of world.drainGpuWriteViews(material)) {
 | 順序 | 名前 | 種別 | 役割 |
 |------|------|------|------|
 | 0 | `Transform3D` | CpuOnly | ローカル TRS 等。SoA に保持。`set_transform` / `get_transform`。 |
-| 1 | `GlobalTransform` | GpuVisible | ワールド affine 行列（`vec4<f32>` 3 行、48 byte stride）。フラット GPU ストア。`set_global_transform` / `get_global_transform`。 |
+| 1 | `GlobalTransform` | GpuVisible | ワールド affine 行列。default は `vec4<f32>` 3 行（48 byte stride）、fp16 world は `vec4<f16>` 3 行（24 byte stride）。フラット GPU ストア。`set_global_transform` / `get_global_transform`。 |
 | 2 | `ChildOf` | CpuOnly | 親 `EntityId` の index/generation。`set_child_of` / `get_child_of`。 |
 
 階層とワールド行列:
@@ -386,12 +408,12 @@ flowchart BT
   child[Child TF plus ChildOf]
   root -->|"ChildOf parent"| child
   child -->|"compute_global_transform chain"| worldM[World matrix]
-  worldM -->|"update_global_transforms_from_transforms"| gtGpu[GlobalTransform GPU row]
+  worldM -->|"update_global_transforms_from_transforms"| gtBlob[GlobalTransform packed blob slot]
 ```
 
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
-- **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では公開 archetype column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
-- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は fast path で 48 byte affine `GlobalTransform` row を直接書き、可能な場合は連続 dirty range として記録します。`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。affine 3x4 layout は、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
+- **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では `RawQuery::for_each_archetype` による column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
+- **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は direct fast path、`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。結果は各 entity の packed blob slot に書き、dirty word range として記録します。`Affine3x4F32` slot は 12 個の `u32` word、`Affine3x4F16` slot は 6 個の packed-half word です。どちらも、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
 
 ---
 
@@ -427,8 +449,8 @@ ignore(world.add_component_bytes(e, tag, tag_bytes))
 let required = [world.transform_component(), world.global_transform_component()]
 let query = Query::new(required)
 query.for_each(world, fn(row) {
-  let tf_row = row.read_view(world.transform_component())
-  let gt_row = row.write_view(world.global_transform_component())
+  let local = row.read_transform3d().local_matrix()
+  ignore(world.set_global_transform(row.entity(), local))
   ...
 })
 
@@ -438,7 +460,7 @@ let writes = world.drain_gpu_writes(gt)
 // queue.write_buffer_from_fixed_array(buffer, w.byte_offset, w.bytes)
 
 // 即時 upload 用の借用 view path
-let views = world.drain_gpu_write_views(gt)
+let views = world.drain_global_transform_blob_write_views()
 // queue.write_buffer_from_array_view(buffer, v.byte_offset, v.bytes)
 ```
 

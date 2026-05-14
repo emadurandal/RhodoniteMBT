@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/ecs/wgsl"
+
+// Values
+pub fn global_transform_helpers(transform_words_var~ : String) -> String
+
+pub fn global_transform_helpers_default() -> String
+
+pub fn global_transform_words_binding(UInt, UInt, String) -> String
+
+pub fn global_transform_words_binding_default() -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

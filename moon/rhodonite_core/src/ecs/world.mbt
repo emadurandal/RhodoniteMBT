@@ -119,6 +119,94 @@ fn component_arrays_equal(
 }
 
 ///|
+fn component_signature_hash(components : Array[ComponentTypeId]) -> Int {
+  let mut h = components.length()
+  for i = 0; i < components.length(); i = i + 1 {
+    h = h + components[i].index + 1
+  }
+  h
+}
+
+///|
+fn World::remember_archetype_signature(
+  self : World,
+  components : Array[ComponentTypeId],
+  archetype_index : Int,
+) -> Unit {
+  let hash = component_signature_hash(components)
+  for i = 0; i < self.archetype_signature_cache.length(); i = i + 1 {
+    let entry = self.archetype_signature_cache[i]
+    if entry.hash == hash &&
+      component_arrays_equal(entry.components, components) {
+      self.archetype_signature_cache[i] = {
+        hash,
+        components: copy_component_array(components),
+        archetype_index,
+      }
+      return
+    }
+  }
+  self.archetype_signature_cache.push({
+    hash,
+    components: copy_component_array(components),
+    archetype_index,
+  })
+}
+
+///|
+fn World::ensure_component_archetype_slot(
+  self : World,
+  component : ComponentTypeId,
+) -> Unit {
+  while self.component_archetypes.length() <= component.index {
+    let archetypes : Array[Int] = []
+    self.component_archetypes.push(archetypes)
+  }
+}
+
+///|
+fn World::index_archetype_components(
+  self : World,
+  archetype_index : Int,
+) -> Unit {
+  let components = self.archetypes[archetype_index].components
+  for i = 0; i < components.length(); i = i + 1 {
+    let component = components[i]
+    self.ensure_component_archetype_slot(component)
+    self.component_archetypes[component.index].push(archetype_index)
+  }
+}
+
+///|
+fn World::query_candidate_archetypes(
+  self : World,
+  required : Array[ComponentTypeId],
+) -> Array[Int] {
+  let empty : Array[Int] = []
+  if required.length() == 0 {
+    return empty
+  }
+  let mut best_component_index = -1
+  let mut best_len = 0
+  for i = 0; i < required.length(); i = i + 1 {
+    let component = required[i]
+    if component.index < 0 ||
+      component.index >= self.component_archetypes.length() {
+      return empty
+    }
+    let candidate_len = self.component_archetypes[component.index].length()
+    if candidate_len == 0 {
+      return empty
+    }
+    if best_component_index < 0 || candidate_len < best_len {
+      best_component_index = component.index
+      best_len = candidate_len
+    }
+  }
+  self.component_archetypes[best_component_index]
+}
+
+///|
 /// Component-type ids are sorted ascending so archetype keys are canonical and comparable.
 fn sorted_with_added(
   components : Array[ComponentTypeId],
@@ -263,9 +351,12 @@ fn World::can_add_missing_component_from_setter(
 ///|
 /// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
 /// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
-/// Builtin [`GlobalTransform`] follows at index `1` with flat GPU storage only.
+/// Builtin [`GlobalTransform`] follows at index `1` with CPU ref storage only;
+/// matrix payloads live in the world's packed u32 GlobalTransform blob.
 /// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
-pub fn World::new() -> World {
+pub fn World::new_with_global_transform_format(
+  global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
+) -> World {
   let registry = ComponentRegistry::new()
   let tf_layout = @comp.transform3d_gpu_layout()
   if !tf_layout.is_valid() {
@@ -275,25 +366,21 @@ pub fn World::new() -> World {
     "Transform3D",
     tf_layout.stride,
   )
-  let gt_layout = @comp.global_transform_gpu_layout()
+  let gt_layout = @comp.global_transform_ref_cpu_layout()
   if !gt_layout.is_valid() {
     abort("builtin GlobalTransform layout invalid")
   }
-  let global_transform_component_id = registry.register_gpu(
-    "GlobalTransform", gt_layout,
+  let global_transform_component_id = registry.register_cpu(
+    "GlobalTransform",
+    gt_layout.stride,
   )
   let co_layout = @comp.child_of_cpu_layout()
   if !co_layout.is_valid() {
     abort("builtin ChildOf layout invalid")
   }
   let child_of_component_id = registry.register_cpu("ChildOf", co_layout.stride)
-  let gpu_stores : Array[GpuComponentStore?] = [
-    None,
-    Some(
-      GpuComponentStore::new(global_transform_component_id, gt_layout.stride),
-    ),
-    None,
-  ]
+  let gpu_stores : Array[GpuComponentStore?] = [None, None, None]
+  let global_transform_blob = GlobalTransformBlobStore::new()
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
   let reserved : Array[Bool] = []
@@ -304,6 +391,19 @@ pub fn World::new() -> World {
     Archetype::new(empty_components, registry),
   ]
   let archetype_version = 0
+  let archetype_signature_cache : Array[ArchetypeSignatureCacheEntry] = [
+    {
+      hash: component_signature_hash(empty_components),
+      components: copy_component_array(empty_components),
+      archetype_index: 0,
+    },
+  ]
+  let transform_archetypes : Array[Int] = []
+  let global_transform_archetypes : Array[Int] = []
+  let child_of_archetypes : Array[Int] = []
+  let component_archetypes : Array[Array[Int]] = [
+    transform_archetypes, global_transform_archetypes, child_of_archetypes,
+  ]
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
@@ -321,7 +421,10 @@ pub fn World::new() -> World {
     locations,
     archetypes,
     archetype_version,
+    archetype_signature_cache,
+    component_archetypes,
     gpu_stores,
+    global_transform_blob,
     resize_events,
     query_depth,
     component_registration_lock_depth,
@@ -332,8 +435,21 @@ pub fn World::new() -> World {
     system_access_structural_write,
     transform_component_id,
     global_transform_component_id,
+    global_transform_default_format: global_transform_gpu_format,
     child_of_component_id,
   }
+}
+
+///|
+pub fn World::new() -> World {
+  World::new_with_global_transform_format(Affine3x4F32)
+}
+
+///|
+pub fn World::global_transform_gpu_format(
+  self : World,
+) -> @comp.GlobalTransformGpuFormat {
+  self.global_transform_default_format
 }
 
 ///|
@@ -415,13 +531,22 @@ fn World::exit_system_access(
 }
 
 ///|
-/// Linear scan for an archetype whose sorted signature matches `components` (small archetype count expected).
+/// Returns an archetype whose sorted signature matches `components`.
 fn World::find_archetype(
   self : World,
   components : Array[ComponentTypeId],
 ) -> Int {
+  let hash = component_signature_hash(components)
+  for i = 0; i < self.archetype_signature_cache.length(); i = i + 1 {
+    let entry = self.archetype_signature_cache[i]
+    if entry.hash == hash &&
+      component_arrays_equal(entry.components, components) {
+      return entry.archetype_index
+    }
+  }
   for i = 0; i < self.archetypes.length(); i = i + 1 {
     if component_arrays_equal(self.archetypes[i].components, components) {
+      self.remember_archetype_signature(components, i)
       return i
     }
   }
@@ -439,6 +564,8 @@ fn World::ensure_archetype(
   } else {
     let idx = self.archetypes.length()
     self.archetypes.push(Archetype::new(components, self.registry))
+    self.remember_archetype_signature(components, idx)
+    self.index_archetype_components(idx)
     self.bump_archetype_version()
     idx
   }
@@ -549,6 +676,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
     Some(loc) => loc
     None => return false
   }
+  self.release_global_transform_ref(entity)
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.clear_gpu_slots(entity.index)
@@ -722,7 +850,15 @@ pub fn World::add_component(
     Some(rc) =>
       match rc.kind {
         CpuOnly => {
-          let bytes = FixedArray::make(rc.cpu_stride, (0 : Byte))
+          let bytes = if component == self.global_transform_component_id {
+            let gt_ref = self.alloc_global_transform_ref(
+              self.global_transform_default_format,
+              @m44.Matrix44F::identity(),
+            )
+            @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset)
+          } else {
+            FixedArray::make(rc.cpu_stride, (0 : Byte))
+          }
           self.add_component_signature(entity, component, bytes)
         }
         GpuVisible =>
@@ -825,6 +961,9 @@ pub fn World::remove_component(
   let loc = match self.locations[entity.index] {
     Some(loc) => loc
     None => return false
+  }
+  if component == self.global_transform_component_id {
+    self.release_global_transform_ref(entity)
   }
   let old_arch = self.archetypes[loc.archetype_index]
   let new_components = sorted_with_removed(old_arch.components, component)

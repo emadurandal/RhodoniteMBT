@@ -1,0 +1,3 @@
+import {
+  "emadurandal/rhodonite_core/ecs/components" @comp,
+}

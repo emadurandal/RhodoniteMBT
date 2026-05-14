@@ -17,17 +17,53 @@ pub fn get_gpu_f32_byte_view(ArrayView[Byte], Int) -> Float
 
 pub fn get_gpu_f32_mut_view(MutArrayView[Byte], Int) -> Float
 
+pub fn global_transform_f32_to_f16_bits(Float) -> UInt
+
+pub fn global_transform_format_code(GlobalTransformGpuFormat) -> UInt
+
+pub fn global_transform_format_from_code(UInt) -> GlobalTransformGpuFormat
+
 pub fn global_transform_gpu_layout() -> GpuLayout
+
+pub fn global_transform_gpu_layout_f16() -> GpuLayout
+
+pub fn global_transform_ref_bytes(GlobalTransformGpuFormat, Int) -> FixedArray[Byte]
+
+pub fn global_transform_ref_cpu_layout() -> GpuLayout
+
+pub fn global_transform_ref_from_component_bytes(FixedArray[Byte]) -> (GlobalTransformGpuFormat, Int)
+
+pub fn global_transform_ref_from_component_view(ArrayView[Byte]) -> (GlobalTransformGpuFormat, Int)
+
+pub fn global_transform_word_count(GlobalTransformGpuFormat) -> Int
 
 pub fn global_transform_write_identity_row(MutArrayView[Byte]) -> Unit
 
+pub fn global_transform_write_identity_row_f16(MutArrayView[Byte]) -> Unit
+
+pub fn global_transform_write_identity_row_format(MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
+
+pub fn global_transform_write_ref_mut_view(MutArrayView[Byte], GlobalTransformGpuFormat, Int) -> Unit
+
 pub fn gpu_component_bytes(Int) -> FixedArray[Byte]
+
+pub fn matrix44f_from_affine3x4_f16_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
 
 pub fn matrix44f_from_affine3x4_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
 
+pub fn matrix44f_from_global_transform_gpu_bytes(FixedArray[Byte], GlobalTransformGpuFormat) -> @matrix44.Matrix44[Float]
+
+pub fn matrix44f_from_global_transform_word_blob(FixedArray[Byte], Int, GlobalTransformGpuFormat) -> @matrix44.Matrix44[Float]
+
 pub fn matrix44f_from_std140_gpu_bytes(FixedArray[Byte]) -> @matrix44.Matrix44[Float]
 
+pub fn matrix44f_write_affine3x4_f16_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
+
 pub fn matrix44f_write_affine3x4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
+
+pub fn matrix44f_write_global_transform_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte], GlobalTransformGpuFormat) -> Unit
+
+pub fn matrix44f_write_global_transform_to_word_blob(@matrix44.Matrix44[Float], MutArrayView[Byte], Int, GlobalTransformGpuFormat) -> Unit
 
 pub fn matrix44f_write_std140_mat4_to_gpu_row(@matrix44.Matrix44[Float], MutArrayView[Byte]) -> Unit
 
@@ -49,14 +85,43 @@ pub(all) struct ChildOf {
   parent_generation : Int
 }
 pub fn ChildOf::from_component_bytes(FixedArray[Byte]) -> Self
+pub fn ChildOf::from_component_view(ArrayView[Byte]) -> Self
 pub fn ChildOf::new(Int, Int) -> Self
 pub fn ChildOf::to_component_bytes(Self) -> FixedArray[Byte]
+
+pub struct ChildOfMutRow {
+  // private fields
+}
+pub fn ChildOfMutRow::from_component_mut_view(MutArrayView[Byte]) -> Self
+pub fn ChildOfMutRow::write_parent(Self, Int, Int) -> Unit
+
+pub struct ChildOfRow {
+  // private fields
+}
+pub fn ChildOfRow::from_component_view(ArrayView[Byte]) -> Self
+pub fn ChildOfRow::parent_generation(Self) -> Int
+pub fn ChildOfRow::parent_index(Self) -> Int
+pub fn ChildOfRow::to_child_of(Self) -> ChildOf
 
 pub(all) struct GlobalTransform {
   matrix : @matrix44ref.Matrix44Ref[Float]
 }
 pub fn GlobalTransform::view_affine3x4_gpu_row(MutArrayView[Byte]) -> Self
 pub fn GlobalTransform::view_std140_gpu_row(MutArrayView[Byte]) -> Self
+
+pub(all) enum GlobalTransformGpuFormat {
+  Affine3x4F32
+  Affine3x4F16
+} derive(Eq)
+
+pub struct GlobalTransformGpuMutRow {
+  // private fields
+}
+pub fn GlobalTransformGpuMutRow::from_gpu_row(MutArrayView[Byte]) -> Self
+pub fn GlobalTransformGpuMutRow::from_gpu_row_format(MutArrayView[Byte], GlobalTransformGpuFormat) -> Self
+pub fn GlobalTransformGpuMutRow::view(Self) -> GlobalTransform
+pub fn GlobalTransformGpuMutRow::write_identity(Self) -> Unit
+pub fn GlobalTransformGpuMutRow::write_matrix(Self, @matrix44.Matrix44[Float]) -> Unit
 
 pub(all) struct GpuField {
   name : String
@@ -73,6 +138,7 @@ pub(all) enum GpuFieldKind {
   Vec3F32Packed
   Vec3F32
   Vec4F32
+  Vec4F16
   Mat4x4F32
 } derive(Eq)
 pub fn GpuFieldKind::align(Self) -> Int
@@ -86,6 +152,7 @@ pub(all) struct GpuLayout {
 pub fn GpuLayout::empty(Int) -> Self
 pub fn GpuLayout::is_valid(Self) -> Bool
 pub fn GpuLayout::std140(Array[(String, GpuFieldKind)]) -> Self
+pub fn GpuLayout::storage(Array[(String, GpuFieldKind)]) -> Self
 
 pub(all) struct Transform3D {
   position : @vector3.Vector3Ref[Byte]
@@ -99,6 +166,21 @@ pub fn Transform3D::to_component_bytes(Self) -> FixedArray[Byte]
 pub fn Transform3D::to_local_matrix(Self) -> @matrix44.Matrix44[Float]
 pub fn Transform3D::write_position_to_component_mut_view(MutArrayView[Byte], Float, Float, Float) -> Unit
 pub fn Transform3D::write_trs_to_component_mut_view(MutArrayView[Byte], Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Unit
+
+pub struct Transform3DMutRow {
+  // private fields
+}
+pub fn Transform3DMutRow::as_transform3d(Self) -> Transform3D
+pub fn Transform3DMutRow::from_component_mut_view(MutArrayView[Byte]) -> Self
+pub fn Transform3DMutRow::local_matrix(Self) -> @matrix44.Matrix44[Float]
+pub fn Transform3DMutRow::write_position(Self, Float, Float, Float) -> Unit
+pub fn Transform3DMutRow::write_trs(Self, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Unit
+
+pub struct Transform3DRow {
+  // private fields
+}
+pub fn Transform3DRow::from_component_view(ArrayView[Byte]) -> Self
+pub fn Transform3DRow::local_matrix(Self) -> @matrix44.Matrix44[Float]
 
 // Type aliases
 

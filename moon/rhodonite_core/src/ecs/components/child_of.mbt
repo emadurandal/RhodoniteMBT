@@ -8,6 +8,18 @@ pub(all) struct ChildOf {
 }
 
 ///|
+/// Read-only typed view over one ChildOf component row.
+pub struct ChildOfRow {
+  priv view : ArrayView[Byte]
+}
+
+///|
+/// Mutable typed view over one ChildOf component row.
+pub struct ChildOfMutRow {
+  priv view : MutArrayView[Byte]
+}
+
+///|
 pub fn ChildOf::new(parent_index : Int, parent_generation : Int) -> ChildOf {
   { parent_index, parent_generation }
 }
@@ -54,4 +66,75 @@ pub fn ChildOf::from_component_bytes(bytes : FixedArray[Byte]) -> ChildOf {
   let idx = @writes.get_u32_le(bytes, layout.fields[0].offset).reinterpret_as_int()
   let gen = @writes.get_u32_le(bytes, layout.fields[1].offset).reinterpret_as_int()
   { parent_index: idx, parent_generation: gen }
+}
+
+///|
+pub fn ChildOf::from_component_view(bytes : ArrayView[Byte]) -> ChildOf {
+  let layout = child_of_cpu_layout()
+  if bytes.length() != layout.stride {
+    abort("ChildOf::from_component_view: length mismatch")
+  }
+  if layout.fields.length() != 2 {
+    abort("child_of_cpu_layout: expected 2 fields")
+  }
+  let idx = @writes.get_u32_le_byte_view(bytes, layout.fields[0].offset).reinterpret_as_int()
+  let gen = @writes.get_u32_le_byte_view(bytes, layout.fields[1].offset).reinterpret_as_int()
+  { parent_index: idx, parent_generation: gen }
+}
+
+///|
+pub fn ChildOfRow::from_component_view(row : ArrayView[Byte]) -> ChildOfRow {
+  let layout = child_of_cpu_layout()
+  if row.length() != layout.stride {
+    abort("ChildOfRow::from_component_view: length mismatch")
+  }
+  { view: row }
+}
+
+///|
+pub fn ChildOfMutRow::from_component_mut_view(
+  row : MutArrayView[Byte],
+) -> ChildOfMutRow {
+  let layout = child_of_cpu_layout()
+  if row.length() != layout.stride {
+    abort("ChildOfMutRow::from_component_mut_view: length mismatch")
+  }
+  { view: row }
+}
+
+///|
+pub fn ChildOfRow::to_child_of(self : ChildOfRow) -> ChildOf {
+  ChildOf::from_component_view(self.view)
+}
+
+///|
+pub fn ChildOfRow::parent_index(self : ChildOfRow) -> Int {
+  self.to_child_of().parent_index
+}
+
+///|
+pub fn ChildOfRow::parent_generation(self : ChildOfRow) -> Int {
+  self.to_child_of().parent_generation
+}
+
+///|
+pub fn ChildOfMutRow::write_parent(
+  self : ChildOfMutRow,
+  parent_index : Int,
+  parent_generation : Int,
+) -> Unit {
+  let layout = child_of_cpu_layout()
+  if layout.fields.length() != 2 {
+    abort("child_of_cpu_layout: expected 2 fields")
+  }
+  @writes.put_u32_le_mut_view(
+    self.view,
+    layout.fields[0].offset,
+    parent_index.reinterpret_as_uint(),
+  )
+  @writes.put_u32_le_mut_view(
+    self.view,
+    layout.fields[1].offset,
+    parent_generation.reinterpret_as_uint(),
+  )
 }

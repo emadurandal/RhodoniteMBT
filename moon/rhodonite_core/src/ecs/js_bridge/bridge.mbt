@@ -36,6 +36,11 @@ pub fn world_new() -> @ecs.World {
 }
 
 ///|
+pub fn world_new_with_global_transform_f16() -> @ecs.World {
+  @ecs.World::new_with_global_transform_format(Affine3x4F16)
+}
+
+///|
 pub fn world_create_entity(world : @ecs.World) -> @ecs.EntityId {
   world.create_entity()
 }
@@ -257,14 +262,59 @@ pub fn world_update_global_transforms_from_transforms(
 }
 
 ///|
+pub fn world_set_global_transform_format(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  format_code : UInt,
+) -> Bool {
+  world.set_global_transform_format(
+    entity,
+    @comp.global_transform_format_from_code(format_code),
+  )
+}
+
+///|
 pub fn world_write_global_transforms_dense_range_views(
   world : @ecs.World,
   count : Int,
   f : (MutArrayView[Byte], Int, Int, Int) -> Unit,
 ) -> Array[@ecs.GpuWriteView] {
-  world.write_global_transforms_dense_range_views(count, range => {
-    f(range.bytes(), range.stride(), range.first_entity_index(), range.count())
-  })
+  ignore(world)
+  ignore(count)
+  ignore(f)
+  abort(
+    "world_write_global_transforms_dense_range_views: removed; use packed GlobalTransform blob APIs",
+  )
+}
+
+///|
+pub fn world_drain_global_transform_blob_write_views(
+  world : @ecs.World,
+) -> Array[@ecs.GpuWriteView] {
+  world.drain_global_transform_blob_write_views()
+}
+
+///|
+pub fn world_write_global_transform_blob_range_views(
+  world : @ecs.World,
+  first_word : Int,
+  word_count : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Array[@ecs.GpuWriteView] {
+  world.write_global_transform_blob_range_views(first_word, word_count, f)
+}
+
+///|
+pub fn world_global_transform_blob_word_capacity(world : @ecs.World) -> Int {
+  world.global_transform_blob_word_capacity()
+}
+
+///|
+pub fn world_extract_global_transform_refs(
+  world : @ecs.World,
+  entities : Array[@ecs.EntityId],
+) -> FixedArray[Byte] {
+  world.extract_global_transform_refs(entities)
 }
 
 ///|
@@ -272,11 +322,10 @@ pub fn world_spawn_transform_global_batch_identity(
   world : @ecs.World,
   count : Int,
 ) -> Array[@ecs.EntityId] {
-  world.spawn_transform_global_batch(count, fn(_i, _entity, tf_row, gt_row) {
+  world.spawn_transform_global_batch(count, fn(_i, _entity, tf_row, _gt_row) {
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     )
-    @comp.global_transform_write_identity_row(gt_row)
   })
 }
 
@@ -304,8 +353,22 @@ pub fn spawn_batch_row_write_view(
 }
 
 ///|
+pub fn spawn_batch_row_write(
+  row : @ecs.SpawnBatchRow,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.write(component, f)
+}
+
+///|
 pub fn query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.Query {
   @ecs.Query::new(required)
+}
+
+///|
+pub fn raw_query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.RawQuery {
+  @ecs.RawQuery::new(required)
 }
 
 ///|
@@ -325,6 +388,15 @@ pub fn query_for_each(
 }
 
 ///|
+pub fn raw_query_for_each(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
+}
+
+///|
 pub fn query_prepare(
   query : @ecs.Query,
   world : @ecs.World,
@@ -333,19 +405,27 @@ pub fn query_prepare(
 }
 
 ///|
-pub fn query_for_each_archetype(
-  query : @ecs.Query,
+pub fn raw_query_prepare(
+  query : @ecs.RawQuery,
   world : @ecs.World,
-  f : (@ecs.QueryArchetype) -> Unit,
+) -> @ecs.RawPreparedQuery {
+  query.prepare(world)
+}
+
+///|
+pub fn raw_query_for_each_archetype(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
 }
 
 ///|
-pub fn prepared_query_for_each_archetype(
-  query : @ecs.PreparedQuery,
+pub fn raw_prepared_query_for_each_archetype(
+  query : @ecs.RawPreparedQuery,
   world : @ecs.World,
-  f : (@ecs.QueryArchetype) -> Unit,
+  f : (@ecs.RawQueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
 }
@@ -360,7 +440,21 @@ pub fn prepared_query_for_each(
 }
 
 ///|
+pub fn raw_prepared_query_for_each(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+  f : (@ecs.RawQueryRow) -> Unit,
+) -> Unit {
+  query.for_each(world, f)
+}
+
+///|
 pub fn query_row_entity(row : @ecs.QueryRow) -> @ecs.EntityId {
+  row.entity()
+}
+
+///|
+pub fn raw_query_row_entity(row : @ecs.RawQueryRow) -> @ecs.EntityId {
   row.entity()
 }
 
@@ -373,61 +467,87 @@ pub fn query_row_has(
 }
 
 ///|
-pub fn query_row_read_view(
-  row : @ecs.QueryRow,
+pub fn raw_query_row_has(
+  row : @ecs.RawQueryRow,
+  component : @ecs.ComponentTypeId,
+) -> Bool {
+  row.has(component)
+}
+
+///|
+pub fn raw_query_row_read_view(
+  row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> ArrayView[Byte] {
   row.read_view(component)
 }
 
 ///|
-pub fn query_row_write_view(
-  row : @ecs.QueryRow,
+pub fn raw_query_row_write_view(
+  row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   row.write_view(component)
 }
 
 ///|
-pub fn query_archetype_length(arch : @ecs.QueryArchetype) -> Int {
+pub fn query_row_read(
+  row : @ecs.QueryRow,
+  component : @ecs.ComponentTypeId,
+  f : (ArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.read(component, f)
+}
+
+///|
+pub fn query_row_write(
+  row : @ecs.QueryRow,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.write(component, f)
+}
+
+///|
+pub fn raw_query_archetype_length(arch : @ecs.RawQueryArchetype) -> Int {
   arch.length()
 }
 
 ///|
-pub fn query_archetype_entity(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_entity(
+  arch : @ecs.RawQueryArchetype,
   row : Int,
 ) -> @ecs.EntityId {
   arch.entity(row)
 }
 
 ///|
-pub fn query_archetype_has(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_has(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> Bool {
   arch.has(component)
 }
 
 ///|
-pub fn query_archetype_component_stride(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_component_stride(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> Int {
   arch.component_stride(component)
 }
 
 ///|
-pub fn query_archetype_read_column(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_read_column(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> ArrayView[Byte] {
   arch.read_column(component)
 }
 
 ///|
-pub fn query_archetype_write_column(
-  arch : @ecs.QueryArchetype,
+pub fn raw_query_archetype_write_column(
+  arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   arch.write_column(component)
@@ -446,6 +566,11 @@ pub fn gpu_layout_transform3d() -> @comp.GpuLayout {
 ///|
 pub fn gpu_layout_global_transform() -> @comp.GpuLayout {
   @comp.global_transform_gpu_layout()
+}
+
+///|
+pub fn gpu_layout_global_transform_f16() -> @comp.GpuLayout {
+  @comp.global_transform_gpu_layout_f16()
 }
 
 ///|
@@ -487,6 +612,7 @@ pub fn gpu_field_kind_name(field : @comp.GpuField) -> String {
     Vec3F32Packed => "Vec3F32Packed"
     Vec3F32 => "Vec3F32"
     Vec4F32 => "Vec4F32"
+    Vec4F16 => "Vec4F16"
     Mat4x4F32 => "Mat4x4F32"
   }
 }

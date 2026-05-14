@@ -23,6 +23,7 @@ import {
 	gpu_layout_empty,
 	gpu_layout_fields,
 	gpu_layout_global_transform,
+	gpu_layout_global_transform_f16,
 	gpu_layout_is_valid,
 	gpu_layout_stride,
 	gpu_layout_transform3d,
@@ -43,6 +44,7 @@ export type GpuFieldKind =
 	| "Vec3F32Packed"
 	| "Vec3F32"
 	| "Vec4F32"
+	| "Vec4F16"
 	| "Mat4x4F32";
 
 export class EntityId {
@@ -135,6 +137,10 @@ export class GpuLayout {
 
 	static globalTransform(): GpuLayout {
 		return new GpuLayout(gpu_layout_global_transform());
+	}
+
+	static globalTransformF16(): GpuLayout {
+		return new GpuLayout(gpu_layout_global_transform_f16());
 	}
 
 	static childOf(): GpuLayout {

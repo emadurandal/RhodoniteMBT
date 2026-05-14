@@ -11,6 +11,11 @@ fn gpu_bytes_with_u32(value : UInt) -> FixedArray[Byte] {
 }
 
 ///|
+fn u16_le(bytes : ArrayView[Byte], offset : Int) -> UInt {
+  bytes[offset].to_uint() | (bytes[offset + 1].to_uint() << 8)
+}
+
+///|
 fn transform3d_bytes_identity() -> FixedArray[Byte] {
   let layout = @comp.transform3d_gpu_layout()
   let buf = @comp.gpu_component_bytes(layout.stride)
@@ -431,6 +436,60 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 }
 
 ///|
+test "GlobalTransform fp16 world uses 24 byte packed blob slots" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let gt_id = world.global_transform_component()
+  assert_eq(world.component_cpu_stride(gt_id), Some(8))
+  let entity = world.create_entity()
+  let m = @m44.Matrix44::new_col_major(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (2.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (0.5 : Float),
+    (0.0 : Float),
+    (4.0 : Float),
+    (0.25 : Float),
+    (-2.0 : Float),
+    (1.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, m))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, m)
+    None => abort("expected fp16 Matrix44F")
+  }
+  let writes = world.drain_gpu_writes(gt_id)
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].bytes.length(), 24)
+}
+
+///|
+test "spawn_transform_global_batch initializes fp16 GlobalTransform rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let entities = world.spawn_transform_global_batch(1, fn(
+    _i,
+    _entity,
+    tf_row,
+    _gt_row,
+  ) {
+    @comp.Transform3D::write_trs_to_component_mut_view(
+      tf_row, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+    )
+  })
+  assert_eq(entities.length(), 1)
+  match world.get_global_transform(entities[0]) {
+    Some(read) => assert_eq(read, @m44.Matrix44F::identity())
+    None => abort("expected fp16 batch GlobalTransform")
+  }
+}
+
+///|
 test "get_gpu_f32 reads put_gpu_f32" {
   let buf = @comp.gpu_component_bytes(16)
   @comp.put_gpu_f32(buf, 4, 2.5)
@@ -535,8 +594,8 @@ test "Query for_each matches supersets and skips empty required" {
   let hits : Array[EntityId] = []
   Query::new([qa, qb]).for_each(world, row => {
     hits.push(row.entity())
-    ignore(row.read_view(qa))
-    ignore(row.read_view(qb))
+    row.read(qa, bytes => ignore(bytes))
+    row.read(qb, bytes => ignore(bytes))
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e_both)
@@ -563,15 +622,15 @@ test "Query for_each gives full GpuComponentStore row for GpuVisible" {
   let mut got0 = -1
   let mut got1 = -1
   Query::new([qa, gpu16]).for_each(world, row => {
-    got0 = row.read_view(qa).length()
-    got1 = row.read_view(gpu16).length()
+    row.read(qa, bytes => got0 = bytes.length())
+    row.read(gpu16, bytes => got1 = bytes.length())
   })
   assert_eq(got0, 4)
   assert_eq(got1, 16)
 }
 
 ///|
-test "Query write_view queues dirty gpu row from direct query" {
+test "Query write queues dirty gpu row from direct query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -585,7 +644,7 @@ test "Query write_view queues dirty gpu row from direct query" {
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
   Query::new([qa, gpu16]).for_each(world, row => {
-    row.write_view(gpu16)[0] = (99 : Byte)
+    row.write(gpu16, bytes => bytes[0] = (99 : Byte))
   })
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
@@ -610,8 +669,8 @@ test "Query for_each wraps required row iteration" {
   let mut second_first_byte = (0 : Byte)
   query.for_each(world, row => {
     hits.push(row.entity())
-    first_len = row.read_view(qa).length()
-    second_first_byte = row.read_view(qb)[0]
+    row.read(qa, bytes => first_len = bytes.length())
+    row.read(qb, bytes => second_first_byte = bytes[0])
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -620,7 +679,7 @@ test "Query for_each wraps required row iteration" {
 }
 
 ///|
-test "Query write_view queues dirty gpu row from helper query" {
+test "Query write queues dirty gpu row from helper query" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -634,7 +693,7 @@ test "Query write_view queues dirty gpu row from helper query" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write_view(gpu16)[0] = (77 : Byte))
+  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (77 : Byte)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -642,7 +701,7 @@ test "Query write_view queues dirty gpu row from helper query" {
 }
 
 ///|
-test "QueryRow view accesses payloads by component id" {
+test "QueryRow closure access uses component ids" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowA", 4)
   let qb = world.register_cpu_component("QueryRowB", 4)
@@ -661,9 +720,9 @@ test "QueryRow view accesses payloads by component id" {
     if !row.has(qb) {
       abort("expected QueryRowB")
     }
-    a_first = row.read_view(qa)[0]
-    b_first = row.read_view(qb)[0]
-    row.write_view(qb)[0] = (42 : Byte)
+    row.read(qa, bytes => a_first = bytes[0])
+    row.read(qb, bytes => b_first = bytes[0])
+    row.write(qb, bytes => bytes[0] = (42 : Byte))
   })
   assert_eq(hits.length(), 1)
   assert_true(hits[0] == e)
@@ -676,11 +735,11 @@ test "QueryRow view accesses payloads by component id" {
 }
 
 ///|
-test "Query for_each_archetype exposes contiguous CPU columns" {
+test "RawQuery for_each_archetype exposes contiguous CPU columns" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchA", 4)
   let qb = world.register_cpu_component("QueryArchB", 4)
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 2, 3, 4)))
@@ -721,7 +780,7 @@ test "Query for_each_archetype exposes contiguous CPU columns" {
 }
 
 ///|
-test "QueryArchetype column views expose logical rows after column capacity growth" {
+test "RawQueryArchetype column views expose logical rows after column capacity growth" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchCapacityA", 4)
   let qb = world.register_cpu_component("QueryArchCapacityB", 4)
@@ -735,7 +794,7 @@ test "QueryArchetype column views expose logical rows after column capacity grow
   assert_true(world.add_component_bytes(e2, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e2, qb, bytes4(30, 0, 0, 0)))
   assert_true(world.destroy_entity(e1))
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let mut row_count = -1
   let mut column_len = -1
   query.for_each_archetype(world, chunk => {
@@ -747,11 +806,11 @@ test "QueryArchetype column views expose logical rows after column capacity grow
 }
 
 ///|
-test "PreparedQuery rebuilds after structural changes create matching archetype" {
+test "RawPreparedQuery rebuilds after structural changes create matching archetype" {
   let world = World::new()
   let qa = world.register_cpu_component("PreparedQueryA", 4)
   let qb = world.register_cpu_component("PreparedQueryB", 4)
-  let query = Query::new([qa, qb])
+  let query = RawQuery::new([qa, qb])
   let prepared = query.prepare(world)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
@@ -777,8 +836,8 @@ test "PreparedQuery for_each rebuilds stale row plan" {
   assert_true(world.add_component_bytes(e, qb, bytes4(4, 0, 0, 0)))
   let mut sum = 0
   prepared.for_each(world, row => {
-    sum = sum + row.read_view(qa)[0].to_int()
-    sum = sum + row.read_view(qb)[0].to_int()
+    row.read(qa, bytes => sum = sum + bytes[0].to_int())
+    row.read(qb, bytes => sum = sum + bytes[0].to_int())
   })
   assert_eq(sum, 7)
 }
@@ -838,7 +897,7 @@ test "World drain_gpu_write_views returns borrowed contiguous upload" {
 }
 
 ///|
-test "QueryRow write_view marks gpu rows dirty without payload indexes" {
+test "QueryRow write marks gpu rows dirty without payload indexes" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -852,7 +911,7 @@ test "QueryRow write_view marks gpu rows dirty without payload indexes" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write_view(gpu16)[0] = (88 : Byte))
+  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (88 : Byte)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -860,7 +919,7 @@ test "QueryRow write_view marks gpu rows dirty without payload indexes" {
 }
 
 ///|
-test "Query write_view marks gpu row dirty even if bytes are unchanged" {
+test "Query write marks gpu row dirty even if bytes are unchanged" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
   let gpu16 = world.register_gpu_component(
@@ -874,7 +933,7 @@ test "Query write_view marks gpu row dirty even if bytes are unchanged" {
   assert_true(world.add_component_bytes(e, gpu16, empty))
   let _ = world.drain_resize_events()
   let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => ignore(row.write_view(gpu16)))
+  query.for_each(world, row => row.write(gpu16, bytes => ignore(bytes)))
   let writes = world.drain_gpu_writes(gpu16)
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, e.index * 16)
@@ -1321,8 +1380,7 @@ test "System Query preserves read and write access separation during schedule ru
   schedule.add_system(
     System::new("query-read-write", Update, [qa], [qb], (w, _ctx, _cmds) => {
       query.for_each(w, row => {
-        let src = row.read_view(qa)
-        row.write_view(qb)[0] = src[0]
+        row.read(qa, src => row.write(qb, dst => dst[0] = src[0]))
       })
     }),
   )
@@ -1455,6 +1513,36 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
 }
 
 ///|
+test "update_global_transforms_from_transforms writes fp16 GlobalTransform rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let e = world.create_entity()
+  let buf = transform3d_bytes_translation(
+    (7.0 : Float),
+    (0.25 : Float),
+    (-2.0 : Float),
+  )
+  let n = buf.length()
+  let tf = @comp.Transform3D::from_component_mut_view(
+    buf.mut_view(start=0, end=n),
+  )
+  assert_true(world.set_transform(e, tf))
+  assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
+  let _ = world.drain_gpu_writes(world.global_transform_component())
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(e) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (7.0 : Float))
+      assert_eq(m.at(1, 3), (0.25 : Float))
+      assert_eq(m.at(2, 3), (-2.0 : Float))
+    }
+    None => abort("expected fp16 Matrix44F")
+  }
+  let writes = world.drain_gpu_writes(world.global_transform_component())
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].bytes.length(), 24)
+}
+
+///|
 test "update_global_transforms_from_transforms handles mixed child and root archetypes" {
   let world = World::new()
   let parent = world.create_entity()
@@ -1507,23 +1595,21 @@ test "update_global_transforms_from_transforms handles mixed child and root arch
 }
 
 ///|
-test "write_global_transforms_dense writes one contiguous upload range" {
+test "GlobalTransform refs extract packed render data" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense(2, fn(i, row) {
-    row[0] = ((10 + i) & 0xFF).to_byte()
-    row[47] = ((20 + i) & 0xFF).to_byte()
-  })
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 48)
-  assert_eq(writes[0].bytes[0], (10 : Byte))
-  assert_eq(writes[0].bytes[47], (20 : Byte))
-  assert_eq(writes[0].bytes[48], (11 : Byte))
-  assert_eq(writes[0].bytes[95], (21 : Byte))
-  assert_eq(
-    world.drain_gpu_writes(world.global_transform_component()).length(),
-    0,
-  )
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.set_global_transform(e0, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(e1, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform_format(e1, Affine3x4F16))
+  let refs = world.extract_global_transform_refs([e0, e1])
+  assert_eq(refs.length(), 16)
+  let (fmt0, off0) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  let (fmt1, off1) = @comp.global_transform_ref_from_component_view(refs[8:16])
+  assert_true(fmt0 == Affine3x4F32)
+  assert_true(fmt1 == Affine3x4F16)
+  assert_eq(off0, 0)
+  assert_eq(off1, 24)
 }
 
 ///|
@@ -1533,7 +1619,7 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
     i,
     _e,
     tf_row,
-    gt_row,
+    _gt_row,
   ) {
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row,
@@ -1548,7 +1634,6 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
       (1.0 : Float),
       (1.0 : Float),
     )
-    @comp.global_transform_write_identity_row(gt_row)
   })
   assert_eq(entities.length(), 2)
   let tf = world.transform_component()
@@ -1586,10 +1671,8 @@ test "spawn_batch creates arbitrary CPU and GPU components directly" {
     @comp.GpuLayout::empty(16),
   )
   let entities = world.spawn_batch([gpu, cpu], 3, fn(i, _e, row) {
-    let c = row.write_view(cpu)
-    c[0] = (10 + i).to_byte()
-    let g = row.write_view(gpu)
-    g[0] = (20 + i).to_byte()
+    row.write(cpu, c => c[0] = (10 + i).to_byte())
+    row.write(gpu, g => g[0] = (20 + i).to_byte())
   })
   assert_eq(entities.length(), 3)
   for i = 0; i < entities.length(); i = i + 1 {
@@ -1612,35 +1695,168 @@ test "spawn_batch creates arbitrary CPU and GPU components directly" {
 }
 
 ///|
-test "write_global_transforms_dense_range_views writes dense rows through one range callback" {
+test "spawn_batch allocates builtin GlobalTransform refs" {
   let world = World::new()
-  let writes = world.write_global_transforms_dense_range_views(2, range => {
-    if range.first_entity_index() != 0 {
-      abort("expected first range entity index to be 0")
-    }
-    if range.count() != 2 {
-      abort("expected range count to be 2")
-    }
-    if range.stride() != 48 {
-      abort("expected GlobalTransform row stride to be 48")
-    }
-    let bytes = range.bytes()
-    @comp.put_gpu_f32_mut_view(bytes, 0, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 12, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 44, (-1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48, (0.5 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48 + 12, (1.0 : Double))
-    @comp.put_gpu_f32_mut_view(bytes, 48 + 44, (-1.0 : Double))
-  })
+  let gt = world.global_transform_component()
+  let entities = world.spawn_batch([gt], 2, fn(_i, _e, _row) { () })
+  assert_eq(entities.length(), 2)
+  assert_true(world.has_component(entities[0], gt))
+  assert_true(world.has_component(entities[1], gt))
+  let refs = world.extract_global_transform_refs(entities)
+  let (fmt0, off0) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  let (fmt1, off1) = @comp.global_transform_ref_from_component_view(refs[8:16])
+  assert_true(fmt0 == Affine3x4F32)
+  assert_true(fmt1 == Affine3x4F32)
+  assert_eq(off0, 0)
+  assert_eq(off1, 12)
+  match world.get_global_transform(entities[1]) {
+    Some(m) => assert_eq(m.at(0, 0), (1.0 : Float))
+    None => abort("expected blob-backed transform")
+  }
+}
+
+///|
+test "GlobalTransform blob writes update through set_global_transform" {
+  let world = World::new()
+  let e = world.create_entity()
+  let m = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(e, m))
+  let _ = world.drain_gpu_write_views(world.global_transform_component())
+  let m2 = @m44.Matrix44::translation(
+    (4.0 : Float),
+    (5.0 : Float),
+    (6.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(e, m2))
+  match world.get_global_transform(e) {
+    Some(read) => assert_eq(read.at(0, 3), (4.0 : Float))
+    None => abort("expected blob-backed transform")
+  }
+  let writes = world.drain_gpu_write_views(world.global_transform_component())
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 2 * 48)
+  assert_eq(writes[0].bytes.length(), 48)
   let row0 = writes[0].bytes[0:48]
-  let row1 = writes[0].bytes[48:96]
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 12), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row0, 44), (-1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 0), (0.5 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 12), (1.0 : Float))
-  assert_eq(@comp.get_gpu_f32_byte_view(row1, 44), (-1.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 12), (4.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 28), (5.0 : Float))
+  assert_eq(@comp.get_gpu_f32_byte_view(row0, 44), (6.0 : Float))
+}
+
+///|
+test "GlobalTransform blob range writer writes mixed refs" {
+  let world = World::new()
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.set_global_transform(e0, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(e1, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform_format(e1, Affine3x4F16))
+  let _ = world.drain_global_transform_blob_write_views()
+  let refs = world.extract_global_transform_refs([e0, e1])
+  let dense = detect_dense_global_transform_layout(refs, 2)
+  match dense {
+    Some(_) => abort("expected mixed refs")
+    None => ()
+  }
+  let range = compute_global_transform_upload_range(refs, 2, dense)
+  let writes = world.write_global_transform_blob_range_by_refs(
+    refs,
+    2,
+    range,
+    dense,
+    fn(writer) {
+      writer.set_affine3x4_at(
+        0,
+        (1.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (4.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (0.0 : Float),
+        (5.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (6.0 : Float),
+      )
+      writer.set_affine3x4_at(
+        1,
+        (1.0 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (7.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (0.0 : Float),
+        (0.25 : Float),
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (-2.0 : Float),
+      )
+      let set_y = writer.element_setter(1, 3)
+      set_y(1, (0.5 : Float))
+    },
+  )
+  assert_eq(writes.length(), 1)
+  match world.get_global_transform(e0) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (4.0 : Float))
+      assert_eq(m.at(1, 3), (5.0 : Float))
+      assert_eq(m.at(2, 3), (6.0 : Float))
+    }
+    None => abort("expected f32 transform")
+  }
+  match world.get_global_transform(e1) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (7.0 : Float))
+      assert_eq(m.at(1, 3), (0.5 : Float))
+      assert_eq(m.at(2, 3), (-2.0 : Float))
+    }
+    None => abort("expected f16 transform")
+  }
+}
+
+///|
+test "GlobalTransform f16 scalar writer paths use same rounding" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.set_global_transform(e0, @m44.Matrix44F::identity()))
+  assert_true(world.set_global_transform(e1, @m44.Matrix44F::identity()))
+  let _ = world.drain_global_transform_blob_write_views()
+  let refs = world.extract_global_transform_refs([e0, e1])
+  let dense = detect_dense_global_transform_layout(refs, 2)
+  let words_per_entity = match dense {
+    Some(layout) => {
+      assert_true(layout.format == Affine3x4F16)
+      layout.words_per_entity
+    }
+    None => abort("expected dense f16 refs")
+  }
+  let range = compute_global_transform_upload_range(refs, 2, dense)
+  let value = (1.0006 : Float)
+  let expected = @comp.global_transform_f32_to_f16_bits(value)
+  let writes = world.write_global_transform_blob_range_by_refs(
+    refs,
+    2,
+    range,
+    dense,
+    fn(writer) {
+      writer.set_element_at(0, 0, 0, value)
+      let set_x = writer.element_setter(0, 0)
+      set_x(1, value)
+    },
+  )
+  assert_eq(writes.length(), 1)
+  assert_eq(u16_le(writes[0].bytes, 0), expected)
+  assert_eq(u16_le(writes[0].bytes, words_per_entity * 4), expected)
 }

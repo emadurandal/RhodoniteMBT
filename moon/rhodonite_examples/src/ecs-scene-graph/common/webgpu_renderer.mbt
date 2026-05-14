@@ -9,7 +9,7 @@ let canvas_height : UInt = 600U
 let vertex_stride_local : Int = 12
 
 ///|
-let instance_stride : Int = 16
+let instance_stride : Int = 24
 
 ///|
 let verts_per_cube : Int = 8
@@ -79,23 +79,6 @@ fn empty_offsets() -> Array[UInt] {
 }
 
 ///|
-fn max_gt_capacity_from_resize(
-  world : @ecs.World,
-  gt : @ecs.ComponentTypeId,
-) -> Int {
-  let mut cap = 0
-  let evs = world.drain_resize_events()
-  for i = 0; i < evs.length(); i = i + 1 {
-    if evs[i].component == gt {
-      if evs[i].required_capacity > cap {
-        cap = evs[i].required_capacity
-      }
-    }
-  }
-  cap
-}
-
-///|
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext
   device : @wgpu.GPUDevice
@@ -121,19 +104,19 @@ pub(all) struct WebGPURenderer {
 
 ///|
 fn ecs_scene_shader_wgsl() -> String {
-  let code =
+  let prefix_camera =
     #|struct CameraUniform {
     #|  view_proj: mat4x4<f32>,
     #|}
     #|
-    #|struct WorldAffine3x4 {
-    #|  row0: vec4<f32>,
-    #|  row1: vec4<f32>,
-    #|  row2: vec4<f32>,
-    #|}
+  let camera_binding =
     #|
-    #|@group(0) @binding(0) var<storage, read> world_from_entity: array<WorldAffine3x4>;
     #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
+    #|
+  let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
+    camera_binding
+  let prefix = prefix_camera + prefix_bindings
+  let suffix =
     #|
     #|struct VertexOut {
     #|  @builtin(position) position: vec4<f32>,
@@ -143,17 +126,12 @@ fn ecs_scene_shader_wgsl() -> String {
     #|@vertex
     #|fn vertexMain(
     #|  @location(0) local_pos: vec3<f32>,
-    #|  @location(1) inst: vec4<f32>,
+    #|  @location(1) transform_ref: vec2<u32>,
+    #|  @location(2) color: vec3<f32>,
     #|) -> VertexOut {
-    #|  let idx = u32(inst.x);
-    #|  let color = vec3<f32>(inst.y, inst.z, inst.w);
-    #|  let world_m = world_from_entity[idx];
-    #|  let local_h = vec4<f32>(local_pos, 1.0);
-    #|  let world_pos = vec4<f32>(
-    #|    dot(world_m.row0, local_h),
-    #|    dot(world_m.row1, local_h),
-    #|    dot(world_m.row2, local_h),
-    #|    1.0,
+    #|  let world_pos = rn_transform_point(
+    #|    rn_load_global_transform(transform_ref),
+    #|    local_pos,
     #|  );
     #|  let clip = camera.view_proj * world_pos;
     #|  var o: VertexOut;
@@ -167,6 +145,7 @@ fn ecs_scene_shader_wgsl() -> String {
     #|  return vec4<f32>(color, 1.0);
     #|}
     #|
+  let code = prefix + @ecs_wgsl.global_transform_helpers_default() + suffix
   code
 }
 
@@ -185,17 +164,18 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
       },
     ],
   }
-  let vertex_layout_instances : @wgpu.GPUVertexBufferLayout = {
-    array_stride: instance_stride.to_uint64(),
-    step_mode: @wgpu.GPUVertexStepMode::Instance,
-    attributes: [
+  let vertex_layout_instances = @wgpu.global_transform_ref_instance_vertex_buffer_layout(
+    instance_stride.to_uint64(),
+    1U,
+    0UL,
+    [
       {
-        format: @wgpu.GPUVertexFormat::Float32x4,
-        offset: 0UL,
-        shader_location: 1U,
+        format: @wgpu.GPUVertexFormat::Float32x3,
+        offset: 8UL,
+        shader_location: 2U,
       },
     ],
-  }
+  )
   let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
     vertex: shader,
     fragment: shader,
@@ -222,33 +202,13 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   ignore(world.set_global_transform(moon, id_m))
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
-  let stride = @comp.global_transform_gpu_layout().stride
-  let mut cap_entities = sun.index + 1
-  if earth.index + 1 > cap_entities {
-    cap_entities = earth.index + 1
-  }
-  if moon.index + 1 > cap_entities {
-    cap_entities = moon.index + 1
-  }
-  let ev_cap = max_gt_capacity_from_resize(world, gt)
-  if ev_cap > cap_entities {
-    cap_entities = ev_cap
-  }
-  let storage_bytes = (cap_entities * stride).to_uint64()
-  let s_usage = @wgpu.GPU_BUFFER_USAGE_STORAGE | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let transform_storage = device.create_buffer(storage_bytes, s_usage)
+  let transform_storage = device.create_global_transform_words_buffer(world)
   let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
     @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let camera_uniform = device.create_buffer(256UL, cam_usage)
-  let bind_transforms = device.create_bind_group({
-    layout: layout_transforms,
-    entries: [
-      {
-        binding: 0U,
-        resource: @wgpu.GPUBindingResource::Buffer(transform_storage),
-      },
-    ],
-  })
+  let bind_transforms = device.create_global_transform_words_bind_group(
+    pipeline, transform_storage, 0U, 0U,
+  )
   let bind_camera = device.create_bind_group({
     layout: layout_camera,
     entries: [
@@ -270,7 +230,6 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let instance_bytes = FixedArray::make(3 * instance_stride, (0 : Byte))
   for ii = 0; ii < 3; ii = ii + 1 {
     let base = ii * instance_stride
-    let idx_f = bodies[ii].index.to_double()
     let mut cr = 0.0
     let mut cg = 0.0
     let mut cb = 0.0
@@ -288,11 +247,13 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
       cg = 0.0
       cb = 1.0
     }
-    @writes.put_f32_le(instance_bytes, base + 0, idx_f)
-    @writes.put_f32_le(instance_bytes, base + 4, cr)
-    @writes.put_f32_le(instance_bytes, base + 8, cg)
-    @writes.put_f32_le(instance_bytes, base + 12, cb)
+    @writes.put_f32_le(instance_bytes, base + 8, cr)
+    @writes.put_f32_le(instance_bytes, base + 12, cg)
+    @writes.put_f32_le(instance_bytes, base + 16, cb)
   }
+  world.write_global_transform_refs_into(
+    bodies, instance_bytes, instance_stride, 0,
+  )
   let instance_buffer = device.create_buffer(
     (3 * instance_stride).to_uint64(),
     vusage,
@@ -311,15 +272,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
   ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
-  let writes = world.drain_gpu_writes(gt)
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    queue.write_buffer_from_fixed_array(
-      transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  queue.drain_and_upload_global_transform_writes(transform_storage, world)
   Some({
     context: canvas_context,
     device,
@@ -420,7 +373,6 @@ fn push_local_transforms(
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
   let t = renderer.frame.val.to_double() * 0.022
-  let gt = renderer.gt
   push_local_transforms(renderer.world, renderer.bodies, t)
   ignore(
     renderer.schedule.run(
@@ -428,15 +380,10 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
       @ecs.SystemContext::new((0.022 : Float), renderer.frame.val),
     ),
   )
-  let writes = renderer.world.drain_gpu_writes(gt)
-  for wi = 0; wi < writes.length(); wi = wi + 1 {
-    let w = writes[wi]
-    renderer.queue.write_buffer_from_fixed_array(
-      renderer.transform_storage,
-      w.byte_offset.to_uint64(),
-      w.bytes,
-    )
-  }
+  renderer.queue.drain_and_upload_global_transform_writes(
+    renderer.transform_storage,
+    renderer.world,
+  )
   let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0),
   )

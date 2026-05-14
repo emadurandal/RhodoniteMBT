@@ -20,6 +20,7 @@ pub(all) enum GPUVertexFormat {
   Float32x2
   Float32x3
   Float32x4
+  Uint32x2
 } derive(Eq)
 
 ///|
@@ -29,6 +30,7 @@ pub fn GPUVertexFormat::to_js_tag(self : GPUVertexFormat) -> Int {
     Float32x2 => 0
     Float32x3 => 1
     Float32x4 => 2
+    Uint32x2 => 3
   }
 }
 

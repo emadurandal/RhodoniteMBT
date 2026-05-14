@@ -16,7 +16,7 @@ RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitla
 Run `moon publish` **once per module** below (from each module directory). Publishing in dependency order (fewer deps first) is recommended.
 
 1. `emadurandal/rhodonite_core`
-2. `emadurandal/rhodonite_webgpu` (external: `moonbitlang/async`, `Milky2018/wgpu_mbt`, `Kaida-Amethyst/sdl3`)
+2. `emadurandal/rhodonite_webgpu` (after `rhodonite_core`; external: `moonbitlang/async`, `Milky2018/wgpu_mbt`, `Kaida-Amethyst/sdl3`)
 3. `emadurandal/rhodonite` (after replacing the path deps above with **versioned** registry deps)
 4. `emadurandal/rhodonite_examples` (optional; not required for library consumers)
 
@@ -32,6 +32,7 @@ flowchart LR
   examples["rhodonite_examples"]
   facade --> webgpu
   facade --> core
+  webgpu --> core
   examples --> webgpu
   examples --> core
 ```
@@ -49,4 +50,4 @@ During development, link workspace members with [`path` dependencies](https://do
 4. In the module you publish, update `deps` workspace members to registry versions in `moon.mod.json`.
 5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
-From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core and webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver (matching sibling module versions), publishes the facade, then restores the workspace file. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`.
+From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core, temporarily rewrites `moon/rhodonite_webgpu/moon.mod.json`'s core path dep to semver, publishes webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver (matching sibling module versions), publishes the facade, then restores the workspace files. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`.

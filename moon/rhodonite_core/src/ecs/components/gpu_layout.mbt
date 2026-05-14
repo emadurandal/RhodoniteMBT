@@ -19,6 +19,7 @@ pub fn GpuFieldKind::size(self : GpuFieldKind) -> Int {
     Vec3F32Packed => 12
     Vec3F32 => 16
     Vec4F32 => 16
+    Vec4F16 => 8
     Mat4x4F32 => 64
   }
 }
@@ -33,6 +34,7 @@ pub fn GpuFieldKind::align(self : GpuFieldKind) -> Int {
     Vec3F32Packed => 4
     Vec3F32 => 16
     Vec4F32 => 16
+    Vec4F16 => 8
     Mat4x4F32 => 16
   }
 }
@@ -58,6 +60,26 @@ pub fn GpuLayout::std140(fields : Array[(String, GpuFieldKind)]) -> GpuLayout {
 }
 
 ///|
+/// Builds a storage-buffer layout using each field's WGSL host-shareable size/alignment.
+pub fn GpuLayout::storage(fields : Array[(String, GpuFieldKind)]) -> GpuLayout {
+  let out : Array[GpuField] = []
+  let mut offset = 0
+  let mut max_align = 4
+  for i = 0; i < fields.length(); i = i + 1 {
+    let (name, kind) = fields[i]
+    let align = kind.align()
+    let size = kind.size()
+    offset = align_up(offset, align)
+    out.push({ name, kind, offset, size, align })
+    offset = offset + size
+    if align > max_align {
+      max_align = align
+    }
+  }
+  { fields: out, stride: align_up(offset, max_align), align: max_align }
+}
+
+///|
 /// Untyped blob layout: no logical fields, only a padded stride (e.g. opaque packed structs written elsewhere).
 pub fn GpuLayout::empty(stride : Int) -> GpuLayout {
   let fields : Array[GpuField] = []
@@ -65,9 +87,12 @@ pub fn GpuLayout::empty(stride : Int) -> GpuLayout {
 }
 
 ///|
-/// Validates stride multiple of 16 and that each field lies inside `[0, stride)` with correct alignment.
+/// Validates a host-shareable storage layout and that each field lies inside `[0, stride)` with correct alignment.
 pub fn GpuLayout::is_valid(self : GpuLayout) -> Bool {
-  if self.stride <= 0 || self.stride % 16 != 0 {
+  if self.stride <= 0 ||
+    self.align <= 0 ||
+    self.stride % self.align != 0 ||
+    self.stride % 4 != 0 {
     return false
   }
   for i = 0; i < self.fields.length(); i = i + 1 {

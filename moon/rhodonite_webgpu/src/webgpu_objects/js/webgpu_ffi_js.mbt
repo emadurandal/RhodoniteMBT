@@ -80,7 +80,7 @@ extern "js" fn device_createRenderPipeline(
   #|   const TOPOLOGY_NAMES = [
   #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
   #|   ];
-  #|   const VERTEX_FORMAT_NAMES = ['float32x2', 'float32x3', 'float32x4'];
+  #|   const VERTEX_FORMAT_NAMES = ['float32x2', 'float32x3', 'float32x4', 'uint32x2'];
   #|   const STEP_NAMES = ['vertex', 'instance'];
   #|   const vbuf = vertexBuffers.map((b) => ({
   #|     arrayStride: b.arrayStride,
@@ -395,7 +395,7 @@ extern "js" fn queue_writeBuffer_array_view(
   data : ArrayView[Byte],
 ) -> Unit =
   #| (queue, buffer, offset, data) =>
-  #|   queue.writeBuffer(buffer, offset, data.buf.subarray(data.start, data.end))
+  #|   queue.writeBuffer(buffer, offset, data.buf, data.start, data.end - data.start)
 
 ///|
 extern "js" fn queue_submit(

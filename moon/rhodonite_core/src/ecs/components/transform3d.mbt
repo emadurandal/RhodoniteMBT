@@ -9,6 +9,18 @@ pub(all) struct Transform3D {
 }
 
 ///|
+/// Read-only typed view over one Transform3D component row.
+pub struct Transform3DRow {
+  priv view : ArrayView[Byte]
+}
+
+///|
+/// Mutable typed view over one Transform3D component row.
+pub struct Transform3DMutRow {
+  priv view : MutArrayView[Byte]
+}
+
+///|
 /// Tight packing: `vec3 position` (12B) + `vec4 rotation` (16B) + `vec3 scale` (12B) = 40B;
 /// stride **48** (8B tail pad) so [`GpuLayout::is_valid`] holds (multiple of 16).
 pub fn transform3d_gpu_layout() -> GpuLayout {
@@ -101,6 +113,84 @@ pub fn Transform3D::from_component_mut_view(
   row : MutArrayView[Byte],
 ) -> Transform3D {
   transform3d_from_row_mut(row)
+}
+
+///|
+pub fn Transform3DRow::from_component_view(
+  row : ArrayView[Byte],
+) -> Transform3DRow {
+  if row.length() != 48 {
+    abort("Transform3DRow::from_component_view: row length mismatch")
+  }
+  { view: row }
+}
+
+///|
+pub fn Transform3DMutRow::from_component_mut_view(
+  row : MutArrayView[Byte],
+) -> Transform3DMutRow {
+  if row.length() != 48 {
+    abort("Transform3DMutRow::from_component_mut_view: row length mismatch")
+  }
+  { view: row }
+}
+
+///|
+pub fn Transform3DRow::local_matrix(self : Transform3DRow) -> @m44.Matrix44F {
+  Transform3D::local_matrix_from_component_view(self.view)
+}
+
+///|
+pub fn Transform3DMutRow::as_transform3d(
+  self : Transform3DMutRow,
+) -> Transform3D {
+  Transform3D::from_component_mut_view(self.view)
+}
+
+///|
+pub fn Transform3DMutRow::local_matrix(
+  self : Transform3DMutRow,
+) -> @m44.Matrix44F {
+  Transform3D::local_matrix_from_component_view(self.view[:])
+}
+
+///|
+pub fn Transform3DMutRow::write_position(
+  self : Transform3DMutRow,
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  Transform3D::write_position_to_component_mut_view(self.view, x, y, z)
+}
+
+///|
+pub fn Transform3DMutRow::write_trs(
+  self : Transform3DMutRow,
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> Unit {
+  Transform3D::write_trs_to_component_mut_view(
+    self.view,
+    px,
+    py,
+    pz,
+    qx,
+    qy,
+    qz,
+    qw,
+    sx,
+    sy,
+    sz,
+  )
 }
 
 ///|

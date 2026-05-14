@@ -749,6 +749,8 @@ pub fn World::register_cpu_component(
   self.assert_component_registration_open("World::register_cpu_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   self.gpu_stores.push(None)
+  let archetypes : Array[Int] = []
+  self.component_archetypes.push(archetypes)
   id
 }
 
@@ -767,6 +769,8 @@ pub fn World::register_gpu_component(
   }
   let id = self.registry.register_gpu(name, gpu_layout)
   self.gpu_stores.push(Some(GpuComponentStore::new(id, gpu_layout.stride)))
+  let archetypes : Array[Int] = []
+  self.component_archetypes.push(archetypes)
   id
 }
 
@@ -874,6 +878,9 @@ pub fn World::drain_gpu_writes(
   component : ComponentTypeId,
 ) -> Array[GpuWrite] {
   self.assert_system_component_write(component, "World::drain_gpu_writes")
+  if component == self.global_transform_component_id {
+    return self.global_transform_blob.drain_writes()
+  }
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_writes()
@@ -891,6 +898,9 @@ pub fn World::drain_gpu_write_views(
   component : ComponentTypeId,
 ) -> Array[GpuWriteView] {
   self.assert_system_component_write(component, "World::drain_gpu_write_views")
+  if component == self.global_transform_component_id {
+    return self.global_transform_blob.drain_write_views()
+  }
   match self.gpu_store(component) {
     Some(store) => {
       let writes = store.drain_write_views()
