@@ -197,7 +197,11 @@ Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/sr
 | `App` | callback-backed lifecycle。`init`、`update`、`render`、`shutdown` を呼び出す。 |
 | `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で update、scene schedule、render を実行する。 |
 
-[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `emadurandal/rhodonite/app` へ移行済みです。sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。browser/native entry point は `Engine::tick(app)` を呼び、renderer 側の `App` callback が animation input update と render を担当します。
+WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample renderer は `create_renderer_for_engine(engine)` と `create_app(renderer)` を公開し、renderer 側の `App` callback が animation input update と render を担当します。
+
+ECS sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `App::update` で animated cube vertices を更新し、`App::render` でその frame の描画だけを行います。
+
+[`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
 ### 現在の Phase 2 state
 

@@ -2,15 +2,24 @@
 package "emadurandal/rhodonite_examples/depth-test/common"
 
 import {
+  "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_webgpu/webgpu",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
   "moonbitlang/core/ref",
 }
 
 // Values
+pub fn create_app(WebGPURenderer) -> @app.App
+
 pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
 
 pub fn create_renderer_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> WebGPURenderer
+
+pub fn create_renderer_for_engine(@app.Engine) -> WebGPURenderer?
+
+pub fn render_current_frame(WebGPURenderer) -> Unit
+
+pub fn render_current_frame_to_view(WebGPURenderer, @webgpu_objects.GPUTextureView) -> Unit
 
 pub fn render_frame(WebGPURenderer) -> Unit
 
@@ -34,6 +43,7 @@ pub(all) struct WebGPURenderer {
   frame : @ref.Ref[Int]
 }
 pub fn WebGPURenderer::release(Self) -> Unit
+pub fn WebGPURenderer::update_scene(Self, @app.FrameState) -> Unit
 
 // Type aliases
 

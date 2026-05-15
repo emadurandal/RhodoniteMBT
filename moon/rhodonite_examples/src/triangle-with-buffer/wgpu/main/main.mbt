@@ -16,17 +16,20 @@ async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
     ) {
     None => ()
     Some(session) => {
-      let renderer = match @renderer.create_renderer(session.gpu_context) {
+      let engine = @app.Engine::new(session.gpu_context)
+      let renderer = match @renderer.create_renderer_for_engine(engine) {
         Some(renderer) => renderer
         None => {
           @sdl_wgpu.release_native_demo_infrastructure(session)
           return
         }
       }
+      let app = @renderer.create_app(renderer)
+      engine.initialize_app(app)
       let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
-        @renderer.render_frame(renderer)
+        engine.tick(app)
       })
-      renderer.release()
+      engine.shutdown_app(app)
       @sdl_wgpu.release_native_demo_infrastructure(session)
     }
   }

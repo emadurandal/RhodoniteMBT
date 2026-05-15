@@ -99,7 +99,14 @@ pub(all) struct WebGPURenderer {
 ///|
 /// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = context.get()
+  let engine = @app.Engine::new(context)
+  create_renderer_for_engine(engine)
+}
+
+///|
+/// Implements `create_renderer_for_engine`.
+pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+  let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
     create_renderer_for_device(
       device,
@@ -188,13 +195,44 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Renders the current scene state without advancing app time.
+pub fn render_current_frame(renderer : WebGPURenderer) -> Unit {
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_current_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_current_frame_to_view(renderer, color_view)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+/// Updates cube transforms for the current engine frame.
+pub fn WebGPURenderer::update_scene(
+  self : WebGPURenderer,
+  frame : @app.FrameState,
+) -> Unit {
+  self.frame.val = frame.frame_index()
+  update_frame_vertices(self, self.frame.val)
+}
+
+///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
-  let t = renderer.frame.val.to_double() * 0.03
+  update_frame_vertices(renderer, renderer.frame.val)
+  render_current_frame_to_view(renderer, color_view)
+}
+
+///|
+/// Uploads animated cube vertices for a frame index.
+fn update_frame_vertices(renderer : WebGPURenderer, frame_index : Int) -> Unit {
+  let t = frame_index.to_double() * 0.03
   let r = @m44.Matrix44::rotation_y(t)
   let ta = @m44.Matrix44::translation(-half_separation, 0.0, 0.0, 1.0, 0.0)
   let tb = @m44.Matrix44::translation(half_separation, 0.0, 0.0, 1.0, 0.0)
@@ -227,6 +265,14 @@ pub fn render_frame_to_view(
     0UL,
     bytes_b,
   )
+}
+
+///|
+/// Renders the already-updated scene state to a target view.
+pub fn render_current_frame_to_view(
+  renderer : WebGPURenderer,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -270,6 +316,17 @@ pub fn render_frame_to_view(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
+}
+
+///|
+/// Builds an app lifecycle that drives this renderer from an engine tick.
+pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+  @app.App::new(
+    fn(_engine) { () },
+    fn(_engine, frame) { renderer.update_scene(frame) },
+    fn(_engine, _frame) { render_current_frame(renderer) },
+    fn(_engine) { renderer.release() },
+  )
 }
 
 ///|

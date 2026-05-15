@@ -10,7 +10,14 @@ pub(all) struct WebGPURenderer {
 ///|
 /// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = context.get()
+  let engine = @app.Engine::new(context)
+  create_renderer_for_engine(engine)
+}
+
+///|
+/// Implements `create_renderer_for_engine`.
+pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+  let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
     create_renderer_for_device(
       device,
@@ -64,6 +71,12 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Renders the current sample frame without advancing app time.
+pub fn render_current_frame(renderer : WebGPURenderer) -> Unit {
+  render_frame(renderer)
+}
+
+///|
 /// Implements `render_frame_with_options`.
 fn render_frame_with_options(
   renderer : WebGPURenderer,
@@ -108,6 +121,17 @@ pub fn render_frame_to_view(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
+}
+
+///|
+/// Builds an app lifecycle that drives this renderer from an engine tick.
+pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+  @app.App::new(
+    fn(_engine) { () },
+    fn(_engine, _frame) { () },
+    fn(_engine, _frame) { render_current_frame(renderer) },
+    fn(_engine) { renderer.release() },
+  )
 }
 
 ///|

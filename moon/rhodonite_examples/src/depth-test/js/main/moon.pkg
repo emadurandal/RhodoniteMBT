@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_examples/common/browser" @html_ctx,
   "emadurandal/rhodonite_examples/depth-test/common" @renderer,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,

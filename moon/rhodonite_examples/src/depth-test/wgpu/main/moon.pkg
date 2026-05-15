@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_examples/common" @sdl_wgpu,
   "emadurandal/rhodonite_examples/depth-test/common" @renderer,
   "moonbitlang/async" @async,
