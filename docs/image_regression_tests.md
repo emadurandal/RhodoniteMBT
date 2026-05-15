@@ -32,6 +32,7 @@ pnpm run test:examples:visual:update:browser
 ```
 
 MoonBit warnings are hidden by default so the visual result lines stay readable.
+PNG filenames in visual result lines are padded so the metric columns align.
 Pass `--verbose` after `--` to show warning diagnostics and browser harness logs:
 
 ```bash

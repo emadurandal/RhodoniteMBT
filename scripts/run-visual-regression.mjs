@@ -89,8 +89,8 @@ function run(command, commandArgs, options = {}) {
 		});
 		child.on("error", reject);
 		child.on("close", (code, signal) => {
-			const filteredStdout = filterWarnings(stdout);
-			const filteredStderr = filterWarnings(stderr);
+			const filteredStdout = alignVisualResultColumns(filterWarnings(stdout));
+			const filteredStderr = alignVisualResultColumns(filterWarnings(stderr));
 			if (filteredStdout.length > 0) {
 				process.stdout.write(filteredStdout);
 			}
@@ -154,4 +154,28 @@ function filterWarnings(text) {
 		out.push(line, newline);
 	}
 	return out.join("");
+}
+
+function alignVisualResultColumns(text) {
+	const lines = text.split(/(\r?\n)/);
+	const visualResultPattern =
+		/^(visual_regression\((?:native|browser)\): (?:PASS|FAIL|SKIP|UPDATE) )(\S+\.png)(.*)$/;
+	let filenameWidth = 0;
+	for (let i = 0; i < lines.length; i += 2) {
+		const match = visualResultPattern.exec(lines[i] ?? "");
+		if (match) {
+			filenameWidth = Math.max(filenameWidth, match[2].length);
+		}
+	}
+	if (filenameWidth === 0) {
+		return text;
+	}
+	for (let i = 0; i < lines.length; i += 2) {
+		const line = lines[i] ?? "";
+		const match = visualResultPattern.exec(line);
+		if (match) {
+			lines[i] = `${match[1]}${match[2].padEnd(filenameWidth)}${match[3]}`;
+		}
+	}
+	return lines.join("");
 }
