@@ -1,0 +1,287 @@
+# Engine / Scene Architecture Plan
+
+この資料は、RhodoniteMBT に `App` / `Engine` / `Scene` の概念を導入するための初期設計案です。目的は、既存の ECS と WebGPU sample code を保ちながら、ゲームエンジンとしての実行単位、更新順序、描画責務を明確にすることです。
+
+## 目標
+
+- `World` を ECS storage として保ち、engine runtime の概念と混ぜない。
+- `Schedule` は 1 つの `World` に対応させ、cross-world 処理を通常 system に混ぜない。
+- `Scene` を runtime scene instance として導入し、`World`、`Schedule`、main camera、scene-level state をまとめる。
+- `Engine` は platform、time、renderer、scene lifecycle を扱う。
+- WebGPU resource の実体は `World` / `Scene` ではなく renderer 側で所有する。
+- 既存の browser / native sample を段階的に `App` / `Engine` API へ移行できるようにする。
+
+## 用語と責務
+
+| 型 | 責務 |
+|----|------|
+| `App` | ユーザー実装の game/application lifecycle。`init`、`update`、`render`、`shutdown` などを持つ。 |
+| `Engine` | platform context、time/frame state、renderer、scene collection を所有する実行基盤。 |
+| `Scene` | runtime scene instance。1 つの `World` と 1 つの `Schedule` を所有し、main camera や enabled/visible state を持つ。 |
+| `World` | ECS の entity/component/archetype storage。simulation data を持つ。 |
+| `Schedule` | 1 つの `World` に対する system set。access guard と command buffer の適用境界を持つ。 |
+| `Renderer` | WebGPU device/queue を使い、GPU buffer、texture、pipeline、material、mesh などを所有して描画する。 |
+
+## 基本構造
+
+```text
+Engine
+  owns Platform / WebGPU context
+  owns TimeState / FrameState
+  owns Renderer
+  owns Scene[]
+
+Scene
+  owns World
+  owns Schedule
+  stores main_camera: EntityId?
+  stores enabled / visible flags
+
+World
+  owns ECS entities and components
+  owns builtin CPU refs and packed blob stores
+
+Renderer
+  owns GPU resources
+  uploads builtin World blob changes
+  draws visible renderables from Scene
+```
+
+`World` は「何が存在するか」を表し、`Renderer` は「GPU へどう流して描くか」を扱います。`Scene` は runtime 上の実行単位であり、`World + Schedule` を直接ばらばらに扱わせないための境界です。
+
+## World と Schedule
+
+`World` と `Schedule` は 1:1 の対応にします。
+
+```text
+Scene
+  world: World
+  schedule: Schedule
+```
+
+1 つの `Schedule` が複数の `World` を扱う設計にはしません。理由は、既存 ECS の system access declaration が `World` の mutation guard と結びついているためです。
+
+- `reads` / `writes` / `structural_write` の対象が曖昧になる。
+- `ComponentTypeId` が world 間で同じ意味を持つ保証が必要になる。
+- `CommandBuffer` の flush 先が曖昧になる。
+- query 中 mutation guard を world ごとに分離する必要が出る。
+- render extraction や synchronization の責務が通常 system に混ざる。
+
+複数 scene / 複数 world 間の処理が必要になった場合は、通常の `Schedule` ではなく、`EngineTask`、`SceneTransfer`、`RenderExtract` のような engine-level 処理として扱います。
+
+## Scene
+
+`Scene` は `World` と `Schedule` をまとめる runtime scene instance です。
+
+初期版の想定 state:
+
+```text
+Scene
+  name: String
+  world: World
+  schedule: Schedule
+  main_camera: EntityId?
+  enabled: Bool
+  visible: Bool
+```
+
+初期 API の方向性:
+
+```moonbit
+let scene = Scene::new("main")
+let entity = scene.world().create_entity()
+scene.schedule().add_system(@ecs.transform_propagation_system(scene.world()))
+scene.set_main_camera(camera)
+```
+
+ただし `world()` と `schedule()` を無制限に分離して公開すると 1:1 の意図が薄れるため、最終 API では `Scene::run_schedule()` や `Scene::world_mut()` のように scene 経由の操作を優先します。
+
+## Engine
+
+`Engine` は application loop の実行基盤です。初期版では複数 scene を内部構造として想定しつつ、公開 API は main scene 中心にします。
+
+初期版の想定 state:
+
+```text
+Engine
+  renderer: Renderer
+  scenes: Array[Scene]
+  main_scene_index: Int
+  frame_state: FrameState
+  time_state: TimeState
+```
+
+初期 API の方向性:
+
+```moonbit
+let engine = Engine::new(context)
+let scene = engine.main_scene()
+engine.run_app(app)
+```
+
+frame の標準順序:
+
+```text
+Engine::tick
+  update time/frame state
+  app.update(engine, frame)
+  for each enabled scene:
+    scene.schedule.run(scene.world)
+  app.render(engine, frame)
+  renderer.begin_frame()
+  for each visible scene:
+    renderer.render_scene(scene)
+  renderer.end_frame()
+```
+
+初期実装では scene は 1 つだけでもよいです。`Engine` の内部 field や命名だけを `scenes` / `main_scene_index` にしておくと、後で複数 scene を追加しやすくなります。
+
+## App
+
+`App` はユーザーが実装する application lifecycle です。MoonBit の trait / interface 表現が扱いづらい場合は、初期段階では callbacks を保持する runner でも構いません。
+
+目標 API:
+
+```moonbit
+trait App {
+  init(Self, engine : Engine) -> Unit
+  update(Self, engine : Engine, frame : FrameState) -> Unit
+  render(Self, engine : Engine, frame : FrameState) -> Unit
+  shutdown(Self, engine : Engine) -> Unit
+}
+```
+
+最初の sample migration では、既存の `WebGPURenderer` sample を `App` 実装へ包むだけでよいです。renderer abstraction や material system を同時に入れすぎないようにします。
+
+## WebGPU Renderer との関係
+
+WebGPU context、device、queue、surface、GPU resources は `Engine` / `Renderer` 側に置きます。`Scene` / `World` は GPU resource の所有者にしません。
+
+```text
+World
+  Transform3D
+  GlobalTransform
+  Camera
+  Renderable component with handles
+
+Renderer
+  MeshHandle -> GPU vertex/index buffers
+  MaterialHandle -> shader/pipeline/bind groups
+  TextureHandle -> GPU texture/sampler
+  GlobalTransform upload buffer
+  Camera upload buffer
+```
+
+既存 ECS の `GlobalTransform` / `Camera` packed blob store は当面そのまま使います。`Renderer` は scene の world から blob resize/write events を drain し、対応する GPU buffer へ upload します。
+
+重要な境界:
+
+- `World` は `GPUDevice`、`GPUQueue`、`GPURenderPipeline` を持たない。
+- `Scene` は render source であり、GPU resource owner ではない。
+- `Renderer` は scene の ECS data を query/extract して描画する。
+- 将来の `Mesh` / `Material` / `Renderable` は ECS component 側に handle を置き、GPU 実体は renderer resource table に置く。
+
+## 実装計画
+
+### Phase 1: examples 内 prototype
+
+目的は public API を固定する前に、既存 sample の重複を減らしながら `App` / `Engine` / `Scene` の形を検証することです。
+
+- `moon/rhodonite_examples/src/common/app/` を追加する。
+- `Scene` prototype を追加し、`World` と `Schedule` を 1:1 で所有させる。
+- `FrameState` / `TimeState` を追加する。
+- browser/native の sample runner が共通の `App` lifecycle を呼べるようにする。
+- まず `basic-triangle` か `ecs-scene-graph` のどちらか 1 つだけを移行する。
+
+検証:
+
+```bash
+moon check --target all
+pnpm run dev:js:ecs-scene-graph
+pnpm run dev:native:ecs-scene-graph
+pnpm run test:examples:visual
+```
+
+### Phase 2: Scene API の整理
+
+目的は `Scene` を ECS access の自然な入口にすることです。
+
+- `Scene::world()` / `Scene::schedule()` の公開範囲を見直す。
+- `Scene::run_schedule()` を追加する。
+- `Scene::set_main_camera()` / `Scene::main_camera()` を追加する。
+- `Scene` の enabled/visible state を renderer loop に反映する。
+- `ecs-scene-graph` と `ecs-mass-cubes` を `Scene` prototype に寄せる。
+
+検証:
+
+```bash
+moon check --target all
+pnpm run test:core:mbt
+pnpm run test:examples:visual
+```
+
+### Phase 3: facade への昇格
+
+prototype の API が安定したら、runtime concept を public facade へ移します。
+
+- `moon/rhodonite/src/app/` または `moon/rhodonite/src/runtime/` を追加する。
+- `App`、`Engine`、`Scene`、`FrameState` を facade 側で公開する。
+- `rhodonite_core` は ECS と math に集中させる。
+- `rhodonite_webgpu` は WebGPU abstraction と renderer support に集中させる。
+- docs/module_boundaries.md に runtime layer の公開位置を追記する。
+
+検証:
+
+```bash
+moon info
+moon fmt
+moon check --target all
+pnpm run test:core:mbt
+pnpm run test:core:js
+pnpm run test:examples:visual
+```
+
+### Phase 4: Renderer integration
+
+目的は `Scene` を render source として扱う API を作ることです。
+
+- `Renderer::render_scene(scene)` の形を導入する。
+- `Renderer` が `GlobalTransform` / `Camera` blob events を upload する責務を持つ。
+- `Scene` の main camera を renderer が参照する。
+- 将来の `Renderable` component のために handle-based resource ownership 方針を固める。
+
+この phase ではまだ full material system は必須ではありません。既存 sample renderer を共通入口へ寄せることを優先します。
+
+### Phase 5: Mesh / Material / Renderable
+
+`Engine` / `Scene` の境界が固まってから、描画対象の高レベル abstraction を追加します。
+
+- `MeshHandle`
+- `MaterialHandle`
+- `TextureHandle`
+- `Renderable` ECS component
+- renderer resource table
+- pipeline cache
+
+この phase で初めて、sample code から直接 WebGPU buffer / pipeline を組む量を大きく減らします。
+
+## Open Questions
+
+- `App` を MoonBit trait で表現するか、callback record で表現するか。
+- `Engine` は `Scene` を値として所有するか、handle table として所有するか。
+- `Scene::world()` をどの程度公開するか。
+- browser/native の platform runner を facade に公開するか、examples/common に置くか。
+- `FrameState` に wall-clock time と fixed-step time の両方を初期から入れるか。
+- `Renderer::render_scene` が直接 ECS query するか、将来の `RenderExtract` layer を最初から薄く用意するか。
+
+## 最初の推奨 PR
+
+最初の PR は `examples/common` に閉じた prototype にします。
+
+1. `Scene` prototype を追加する。
+2. `FrameState` / `TimeState` を追加する。
+3. `App` lifecycle の最小形を追加する。
+4. `ecs-scene-graph` を 1 本だけ移行する。
+5. visual regression が変わらないことを確認する。
+
+この PR では mesh/material/resource manager は入れません。まず `Engine`、`Scene`、`World`、`Schedule`、`Renderer` の境界を実コードで検証します。
