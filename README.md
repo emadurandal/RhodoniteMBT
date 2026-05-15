@@ -1,6 +1,6 @@
 # RhodoniteMBT
 
-A monorepo of graphics-related code using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
+A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
 
 ## Modules
 
@@ -60,12 +60,38 @@ pnpm run dev:wasm-gc:ecs-mass-cubes
 
 ### Native
 
+> **Note:** SDL3 must be installed in advance for native builds.
+
+```bash
+# macOS
+$ brew install sdl3
+```
+
 ```bash
 pnpm install
 pnpm run dev:native:basic-triangle
 ```
 
-[`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh) builds release native binaries by default and runs the selected sample. Set `MOON_NATIVE_MODE=debug` to run the debug build while iterating. Under workspace builds the executable lives at `_build/native/<release|debug>/build/emadurandal/rhodonite_examples/<sample>/wgpu/main/main.exe`, **not** under `moon/rhodonite_examples/_build`.
+The native demo scripts use `moon run --target native --release` from
+[`moon/rhodonite_examples`](moon/rhodonite_examples), so no manual `_build`
+executable path is needed.
+
+If the native build cannot find SDL3 headers, source
+[`scripts/setup-sdl3-env.sh`](scripts/setup-sdl3-env.sh) in the shell before
+running native commands:
+
+```bash
+source scripts/setup-sdl3-env.sh
+pnpm run dev:native:basic-triangle
+```
+
+For a debug native build while iterating, run the package directly without
+`--release`, for example:
+
+```bash
+cd moon/rhodonite_examples
+moon run --target native src/basic-triangle/wgpu/main
+```
 
 ### Core (JS bridge / Vitest)
 
