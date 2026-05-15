@@ -18,6 +18,7 @@ fn ComponentRegistry::register_cpu(
 }
 
 ///|
+/// Implements `ComponentRegistry::get`.
 fn ComponentRegistry::get(
   self : ComponentRegistry,
   id : ComponentTypeId,
@@ -30,6 +31,7 @@ fn ComponentRegistry::get(
 }
 
 ///|
+/// Implements `ComponentRegistry::stride`.
 fn ComponentRegistry::stride(
   self : ComponentRegistry,
   id : ComponentTypeId,

@@ -1,6 +1,7 @@
 // WebGPU device implementation
 
 ///|
+/// Implements `vertex_layout_to_ffi`.
 fn vertex_layout_to_ffi(
   lb : @webgpu_enums.GPUVertexBufferLayout,
 ) -> VertexBufferLayoutFFI {
@@ -19,26 +20,31 @@ fn vertex_layout_to_ffi(
 }
 
 ///|
+/// Defines `WebGPUDevice`.
 pub struct WebGPUDevice {
   device : GPUDevice
 }
 
 ///|
+/// Implements `WebGPUDevice::new`.
 pub fn WebGPUDevice::new(device : GPUDevice) -> WebGPUDevice {
   { device, }
 }
 
 ///|
+/// Implements `webgpu_device_get`.
 pub fn webgpu_device_get(device : WebGPUDevice) -> GPUDevice {
   device.device
 }
 
 ///|
+/// Implements `webgpu_device_get_queue`.
 pub fn webgpu_device_get_queue(device : WebGPUDevice) -> WebGPUQueue {
   WebGPUQueue::new(device_getQueue(device.device))
 }
 
 ///|
+/// Implements `webgpu_device_create_shader_module`.
 pub fn webgpu_device_create_shader_module(
   device : WebGPUDevice,
   code : String,
@@ -47,6 +53,7 @@ pub fn webgpu_device_create_shader_module(
 }
 
 ///|
+/// Implements `webgpu_device_create_render_pipeline`.
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
   vertex : GPUShaderModule,
@@ -69,6 +76,7 @@ pub fn webgpu_device_create_render_pipeline(
 }
 
 ///|
+/// Implements `webgpu_device_create_texture`.
 pub fn webgpu_device_create_texture(
   device : WebGPUDevice,
   width : UInt,
@@ -88,6 +96,7 @@ pub fn webgpu_device_create_texture(
 }
 
 ///|
+/// Implements `webgpu_device_create_buffer`.
 pub fn webgpu_device_create_buffer(
   device : WebGPUDevice,
   size : UInt64,
@@ -101,6 +110,7 @@ pub fn webgpu_device_create_buffer(
 }
 
 ///|
+/// Implements `webgpu_device_create_command_encoder`.
 pub fn webgpu_device_create_command_encoder(
   device : WebGPUDevice,
 ) -> WebGPUCommandEncoder {
@@ -108,6 +118,7 @@ pub fn webgpu_device_create_command_encoder(
 }
 
 ///|
+/// Implements `webgpu_render_pipeline_get_bind_group_layout`.
 pub fn webgpu_render_pipeline_get_bind_group_layout(
   pipeline : GPURenderPipeline,
   group_index : UInt,
@@ -116,6 +127,7 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
 }
 
 ///|
+/// Implements `bind_group_entry_resolved_js`.
 fn bind_group_entry_resolved_js(
   entry : GPUBindGroupEntry,
 ) -> BindGroupEntryResolvedJs {
@@ -162,6 +174,7 @@ fn bind_group_entry_resolved_js(
 }
 
 ///|
+/// Implements `webgpu_device_create_bind_group`.
 pub fn webgpu_device_create_bind_group(
   device : WebGPUDevice,
   layout : GPUBindGroupLayout,

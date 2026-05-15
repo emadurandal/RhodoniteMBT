@@ -1,24 +1,29 @@
 ///|
+/// Defines `WebGPUInstance`.
 pub struct WebGPUInstance {
   instance : GPU
 }
 
 ///|
+/// Implements `create_native_webgpu_instance`.
 pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error {
   { instance: GPU::{ raw: @wgpu.Instance::create() } }
 }
 
 ///|
+/// Implements `WebGPUInstance::new`.
 pub fn WebGPUInstance::new(instance : GPU) -> WebGPUInstance {
   { instance, }
 }
 
 ///|
+/// Implements `create_webgpu_instance`.
 pub fn create_webgpu_instance(instance : GPU) -> WebGPUInstance {
   WebGPUInstance::new(instance)
 }
 
 ///|
+/// Implements `webgpu_instance_get_preferred_canvas_format`.
 pub fn webgpu_instance_get_preferred_canvas_format(
   instance : WebGPUInstance,
 ) -> String {
@@ -76,6 +81,7 @@ fn webgpu_instance_surface_pick_texture_format(
 }
 
 ///|
+/// Implements `webgpu_instance_get_preferred_canvas_format_for_surface`.
 pub fn webgpu_instance_get_preferred_canvas_format_for_surface(
   instance : WebGPUInstance,
   adapter : WebGPUAdapter,
@@ -96,6 +102,7 @@ pub async fn webgpu_instance_request_adapter(
 }
 
 ///|
+/// Implements `native_webgpu_instance_request_adapter`.
 pub fn native_webgpu_instance_request_adapter(
   instance : WebGPUInstance,
 ) -> WebGPUAdapter raise Error {
@@ -122,11 +129,13 @@ pub fn native_webgpu_instance_request_adapter(
 }
 
 ///|
+/// Implements `webgpu_instance_process_events`.
 pub fn webgpu_instance_process_events(instance : WebGPUInstance) -> Unit {
   instance.instance.raw.process_events()
 }
 
 ///|
+/// Implements `webgpu_instance_release`.
 pub fn webgpu_instance_release(instance : WebGPUInstance) -> Unit {
   instance.instance.raw.release()
 }

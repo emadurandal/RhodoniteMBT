@@ -2,6 +2,7 @@
 pub type WebGPUInstance
 
 ///|
+/// Implements `webgpu_instance_get_preferred_canvas_format`.
 pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
 
 ///|
@@ -16,4 +17,5 @@ pub fn webgpu_instance_get_preferred_canvas_format_for_surface(
 pub async fn webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter
 
 ///|
+/// Implements `native_webgpu_instance_request_adapter`.
 pub fn native_webgpu_instance_request_adapter(WebGPUInstance) -> WebGPUAdapter raise Error

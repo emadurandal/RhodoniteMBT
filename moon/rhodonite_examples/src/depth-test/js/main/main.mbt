@@ -14,6 +14,7 @@ async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit 
 }
 
 ///|
+/// Implements `create_webgpu_renderer`.
 pub fn create_webgpu_renderer(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
@@ -21,6 +22,7 @@ pub fn create_webgpu_renderer(
 }
 
 ///|
+/// Implements `depth_test_render_tick`.
 pub fn depth_test_render_tick() -> Unit {
   match demo_renderer.val {
     Some(renderer) => @renderer.render_frame(renderer)
@@ -29,6 +31,7 @@ pub fn depth_test_render_tick() -> Unit {
 }
 
 ///|
+/// Implements `main {`.
 fn main {
   println("depth-test js stub")
 }

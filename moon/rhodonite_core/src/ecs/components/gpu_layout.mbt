@@ -217,6 +217,8 @@ extern "js" fn get_f32_from_mut_view_js(
 
 ///|
 /// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
+///|
+/// Implements `get_gpu_f32_byte_view`.
 #cfg(target="js")
 pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
   get_f32_from_byte_view_js(buf, offset)
@@ -224,6 +226,8 @@ pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
 
 ///|
 /// Same as [`get_gpu_f32`] but reads through a zero-copy [`ArrayView`] (MoonBit `array[start:end]` view).
+///|
+/// Implements `get_gpu_f32_byte_view`.
 #cfg(not(target="js"))
 pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_byte_view(buf, offset))
@@ -231,6 +235,8 @@ pub fn get_gpu_f32_byte_view(buf : ArrayView[Byte], offset : Int) -> Float {
 
 ///|
 /// Same as [`get_gpu_f32`] but reads through a [`MutArrayView`] (e.g. SoA row slice).
+///|
+/// Implements `get_gpu_f32_mut_view`.
 #cfg(target="js")
 pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
   get_f32_from_mut_view_js(buf, offset)
@@ -238,6 +244,8 @@ pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
 
 ///|
 /// Same as [`get_gpu_f32`] but reads through a [`MutArrayView`] (e.g. SoA row slice).
+///|
+/// Implements `get_gpu_f32_mut_view`.
 #cfg(not(target="js"))
 pub fn get_gpu_f32_mut_view(buf : MutArrayView[Byte], offset : Int) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(buf, offset))

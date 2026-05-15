@@ -1,9 +1,11 @@
 ///|
+/// Implements `create_native_webgpu_instance`.
 pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error {
   abort("create_native_webgpu_instance is only available in the native backend")
 }
 
 ///|
+/// Implements `create_metal_canvas_context`.
 pub fn create_metal_canvas_context(
   _instance : WebGPUInstance,
   _layer : HTMLCanvasElement,
@@ -14,6 +16,7 @@ pub fn create_metal_canvas_context(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_get_format`.
 pub fn webgpu_canvas_context_get_format(
   _context : WebGPUCanvasContext,
 ) -> String {
@@ -23,42 +26,50 @@ pub fn webgpu_canvas_context_get_format(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_release`.
 pub fn webgpu_canvas_context_release(_context : WebGPUCanvasContext) -> Unit {
   ()
 }
 
 ///|
+/// Implements `webgpu_queue_release`.
 pub fn webgpu_queue_release(_queue : WebGPUQueue) -> Unit {
   ()
 }
 
 ///|
+/// Implements `webgpu_device_poll`.
 pub fn webgpu_device_poll(_device : WebGPUDevice, wait? : Bool = false) -> Bool {
   ignore(wait)
   true
 }
 
 ///|
+/// Implements `webgpu_device_release`.
 pub fn webgpu_device_release(_device : WebGPUDevice) -> Unit {
   ()
 }
 
 ///|
+/// Implements `webgpu_adapter_release`.
 pub fn webgpu_adapter_release(_adapter : WebGPUAdapter) -> Unit {
   ()
 }
 
 ///|
+/// Implements `webgpu_instance_process_events`.
 pub fn webgpu_instance_process_events(_instance : WebGPUInstance) -> Unit {
   ()
 }
 
 ///|
+/// Implements `webgpu_instance_release`.
 pub fn webgpu_instance_release(_instance : WebGPUInstance) -> Unit {
   ()
 }
 
 ///|
+/// Implements `native_webgpu_instance_request_adapter`.
 pub fn native_webgpu_instance_request_adapter(
   _instance : WebGPUInstance,
 ) -> WebGPUAdapter raise Error {
@@ -68,6 +79,7 @@ pub fn native_webgpu_instance_request_adapter(
 }
 
 ///|
+/// Implements `native_webgpu_adapter_request_device`.
 pub fn native_webgpu_adapter_request_device(
   _adapter : WebGPUAdapter,
 ) -> WebGPUDevice raise Error {

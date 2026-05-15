@@ -142,6 +142,7 @@ pub fn World::spawn_transform_global_batch(
 }
 
 ///|
+/// Implements `World::get_transform`.
 pub fn World::get_transform(
   self : World,
   entity : EntityId,
@@ -167,6 +168,8 @@ pub fn World::get_transform(
 ///|
 /// JS hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`.
 /// It uses the archetype column API so browser builds have the same official bulk path as native.
+///|
+/// Implements `World::update_transform3d_positions`.
 #cfg(target="js")
 pub fn World::update_transform3d_positions(
   self : World,
@@ -197,6 +200,8 @@ pub fn World::update_transform3d_positions(
 ///|
 /// Native/Wasm hot path for bulk-updating builtin `Transform3D.position` without constructing `QueryRow`
 /// or `Vector3Ref` wrappers per entity.
+///|
+/// Implements `World::update_transform3d_positions`.
 #cfg(not(target="js"))
 pub fn World::update_transform3d_positions(
   self : World,

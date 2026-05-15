@@ -1,11 +1,13 @@
 // WebGPU adapter implementation
 
 ///|
+/// Defines `WebGPUAdapter`.
 pub struct WebGPUAdapter {
   adapter : GPUAdapter
 }
 
 ///|
+/// Implements `WebGPUAdapter::new`.
 pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
   { adapter, }
 }

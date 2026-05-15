@@ -18,6 +18,8 @@ fn vertex_triangle_interleaved_bytes() -> FixedArray[Byte] {
   let n = 3
   let total = stride * n
   let buf = FixedArray::make(total, (0 : Byte))
+  ///|
+  /// Implements `put_vertex`.
   fn put_vertex(
     base : Int,
     px : Double,
@@ -49,6 +51,7 @@ fn index_triangle_u16_bytes() -> FixedArray[Byte] {
 }
 
 ///|
+/// Defines `WebGPURenderer`.
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
@@ -59,6 +62,7 @@ pub(all) struct WebGPURenderer {
 }
 
 ///|
+/// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   Some(
@@ -72,6 +76,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 }
 
 ///|
+/// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
@@ -91,6 +96,7 @@ pub fn create_renderer_for_device(
 }
 
 ///|
+/// Implements `create_pipeline`.
 fn create_pipeline(
   device : @wgpu.GPUDevice,
   format : String,
@@ -126,6 +132,7 @@ fn create_pipeline(
 }
 
 ///|
+/// Implements `render_frame`.
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   render_frame_with_options(
     renderer,
@@ -135,6 +142,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `render_frame_with_options`.
 fn render_frame_with_options(
   renderer : WebGPURenderer,
   clearColor~ : @wgpu.GPUColor,
@@ -152,6 +160,7 @@ fn render_frame_with_options(
 }
 
 ///|
+/// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   view : @wgpu.GPUTextureView,
@@ -192,6 +201,7 @@ pub fn render_frame_to_view(
 }
 
 ///|
+/// Implements `WebGPURenderer::release`.
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   self.index_buffer.release()
   self.vertex_buffer.release()
@@ -199,6 +209,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `webgpu_renderer_release`.
 pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
   renderer.release()
 }

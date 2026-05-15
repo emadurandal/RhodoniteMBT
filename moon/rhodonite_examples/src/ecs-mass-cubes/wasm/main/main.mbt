@@ -1,22 +1,28 @@
 ///|
+/// Implements `host_now_ms`.
 fn host_now_ms() -> Double = "rhodonite_ecs_mass_cubes_host" "now_ms"
 
 ///|
+/// Implements `host_entity_count`.
 fn host_entity_count() -> Int = "rhodonite_ecs_mass_cubes_host" "entity_count"
 
 ///|
+/// Implements `host_initialize_renderer`.
 fn host_initialize_renderer(per_side : Int, transform_stride : Int) -> Unit = "rhodonite_ecs_mass_cubes_host" "initialize_renderer"
 
 ///|
+/// Implements `host_write_initial_global_transforms`.
 fn host_write_initial_global_transforms(
   per_side : Int,
   wave_time : Double,
 ) -> Unit = "rhodonite_ecs_mass_cubes_host" "write_initial_global_transforms"
 
 ///|
+/// Implements `host_write_global_transform_y`.
 fn host_write_global_transform_y(wave_time : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "write_global_transform_y"
 
 ///|
+/// Implements `host_render_frame`.
 fn host_render_frame(fps : Double, cpu_ms : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "render_frame"
 
 ///|
@@ -26,6 +32,7 @@ let grid_spacing : Double = 0.14
 let cube_scale : Float = 0.055
 
 ///|
+/// Implements `grid_side_len`.
 fn grid_side_len(n : Int) -> Int {
   let mut s = 1
   while s * s < n {
@@ -35,6 +42,7 @@ fn grid_side_len(n : Int) -> Int {
 }
 
 ///|
+/// Implements `grid_xz_for_index`.
 fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
   let ix = idx % per_side
   let iz = idx / per_side
@@ -45,6 +53,7 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+/// Defines `WasmRenderer`.
 struct WasmRenderer {
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
@@ -54,6 +63,7 @@ struct WasmRenderer {
 let demo_renderer : @ref.Ref[WasmRenderer?] = @ref.new(None)
 
 ///|
+/// Implements `create_wasm_renderer`.
 pub fn create_wasm_renderer() -> Unit {
   let world = @ecs.World::new()
   let count = host_entity_count()
@@ -92,6 +102,7 @@ pub fn create_wasm_renderer() -> Unit {
 }
 
 ///|
+/// Implements `ecs_mass_cubes_wasm_render_tick`.
 pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
   match demo_renderer.val {
     None => ()
@@ -119,6 +130,7 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
 }
 
 ///|
+/// Implements `main {`.
 fn main {
   ()
 }

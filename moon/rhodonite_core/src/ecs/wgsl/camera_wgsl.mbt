@@ -1,4 +1,5 @@
 ///|
+/// Implements `camera_words_binding`.
 pub fn camera_words_binding(
   group : UInt,
   binding : UInt,
@@ -14,11 +15,13 @@ pub fn camera_words_binding(
 }
 
 ///|
+/// Implements `camera_words_binding_default`.
 pub fn camera_words_binding_default() -> String {
   camera_words_binding(1U, 0U, "camera_words")
 }
 
 ///|
+/// Implements `camera_helpers`.
 pub fn camera_helpers(camera_words_var~ : String) -> String {
   let header =
     #|struct RnCamera {
@@ -131,6 +134,7 @@ pub fn camera_helpers(camera_words_var~ : String) -> String {
 }
 
 ///|
+/// Implements `camera_helpers_default`.
 pub fn camera_helpers_default() -> String {
   camera_helpers(camera_words_var="camera_words")
 }

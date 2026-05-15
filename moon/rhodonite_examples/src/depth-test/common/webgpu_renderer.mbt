@@ -29,6 +29,7 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
+/// Implements `cube_local_corners`.
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -43,6 +44,7 @@ fn cube_local_corners() -> Array[(Double, Double, Double)] {
 }
 
 ///|
+/// Implements `index_cube_u16_bytes`.
 fn index_cube_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(72, (0 : Byte))
   let idx : Array[UInt] = [
@@ -56,6 +58,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
 }
 
 ///|
+/// Implements `write_cube_interleaved`.
 fn write_cube_interleaved(
   buf : FixedArray[Byte],
   mvp : @m44.Matrix44D,
@@ -79,6 +82,7 @@ fn write_cube_interleaved(
 }
 
 ///|
+/// Defines `WebGPURenderer`.
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
@@ -93,6 +97,7 @@ pub(all) struct WebGPURenderer {
 }
 
 ///|
+/// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   Some(
@@ -106,6 +111,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 }
 
 ///|
+/// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
@@ -168,6 +174,7 @@ pub fn create_renderer_for_device(
 }
 
 ///|
+/// Implements `render_frame`.
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let canvas_context = match renderer.context {
     Some(c) => c
@@ -181,6 +188,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
@@ -265,6 +273,7 @@ pub fn render_frame_to_view(
 }
 
 ///|
+/// Implements `WebGPURenderer::release`.
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   self.index_buffer.release()
   self.vertex_buffer_a.release()
@@ -275,6 +284,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `webgpu_renderer_release`.
 pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
   renderer.release()
 }

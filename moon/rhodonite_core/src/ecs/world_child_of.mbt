@@ -21,6 +21,7 @@ pub fn World::set_child_of(
 }
 
 ///|
+/// Implements `World::get_child_of`.
 pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
   let id = self.child_of_component_id
   self.assert_system_component_read(id, "World::get_child_of")
@@ -37,6 +38,7 @@ pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
 }
 
 ///|
+/// Implements `get_u32_array_le`.
 fn get_u32_array_le(bytes : Array[Byte], off : Int) -> UInt {
   bytes[off].to_uint() |
   (bytes[off + 1].to_uint() << 8) |
@@ -45,6 +47,7 @@ fn get_u32_array_le(bytes : Array[Byte], off : Int) -> UInt {
 }
 
 ///|
+/// Implements `World::child_of_parent_direct`.
 fn World::child_of_parent_direct(self : World, entity : EntityId) -> EntityId? {
   if !self.is_alive(entity) {
     return None

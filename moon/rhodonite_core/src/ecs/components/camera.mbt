@@ -6,16 +6,19 @@ pub fn camera_ref_cpu_layout() -> GpuLayout {
 }
 
 ///|
+/// Implements `camera_gpu_word_count`.
 pub fn camera_gpu_word_count() -> Int {
   72
 }
 
 ///|
+/// Implements `camera_gpu_byte_stride`.
 pub fn camera_gpu_byte_stride() -> Int {
   camera_gpu_word_count() * 4
 }
 
 ///|
+/// Implements `camera_ref_bytes`.
 pub fn camera_ref_bytes(word_offset : Int) -> FixedArray[Byte] {
   let bytes = FixedArray::make(4, (0 : Byte))
   @writes.put_u32_le(bytes, 0, word_offset.reinterpret_as_uint())
@@ -23,6 +26,7 @@ pub fn camera_ref_bytes(word_offset : Int) -> FixedArray[Byte] {
 }
 
 ///|
+/// Implements `camera_ref_from_component_bytes`.
 pub fn camera_ref_from_component_bytes(bytes : FixedArray[Byte]) -> Int {
   if bytes.length() != 4 {
     abort("camera_ref_from_component_bytes: length mismatch")
@@ -31,6 +35,7 @@ pub fn camera_ref_from_component_bytes(bytes : FixedArray[Byte]) -> Int {
 }
 
 ///|
+/// Implements `camera_ref_from_component_view`.
 pub fn camera_ref_from_component_view(bytes : ArrayView[Byte]) -> Int {
   if bytes.length() != 4 {
     abort("camera_ref_from_component_view: length mismatch")
@@ -39,6 +44,7 @@ pub fn camera_ref_from_component_view(bytes : ArrayView[Byte]) -> Int {
 }
 
 ///|
+/// Implements `camera_write_ref_mut_view`.
 pub fn camera_write_ref_mut_view(
   bytes : MutArrayView[Byte],
   word_offset : Int,
@@ -50,6 +56,7 @@ pub fn camera_write_ref_mut_view(
 }
 
 ///|
+/// Implements `matrix44f_write_std140_at`.
 fn matrix44f_write_std140_at(
   row : MutArrayView[Byte],
   offset : Int,
@@ -62,6 +69,7 @@ fn matrix44f_write_std140_at(
 }
 
 ///|
+/// Implements `camera_world_position_from_view`.
 fn camera_world_position_from_view(
   view : @m44.Matrix44F,
 ) -> (Float, Float, Float) {
@@ -115,6 +123,7 @@ pub fn camera_write_gpu_row(
 }
 
 ///|
+/// Implements `camera_view_proj_from_gpu_bytes`.
 pub fn camera_view_proj_from_gpu_bytes(
   bytes : FixedArray[Byte],
 ) -> @m44.Matrix44F {

@@ -1,4 +1,5 @@
 ///|
+/// Implements `PackedGpuBlobStore::new`.
 fn PackedGpuBlobStore::new() -> PackedGpuBlobStore {
   {
     bytes: FixedArray::make(0, (0 : Byte)),
@@ -12,11 +13,13 @@ fn PackedGpuBlobStore::new() -> PackedGpuBlobStore {
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::word_capacity`.
 fn PackedGpuBlobStore::word_capacity(self : PackedGpuBlobStore) -> Int {
   self.bytes.length() / 4
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::ensure_word_capacity`.
 fn PackedGpuBlobStore::ensure_word_capacity(
   self : PackedGpuBlobStore,
   required_words : Int,
@@ -46,6 +49,7 @@ fn PackedGpuBlobStore::ensure_word_capacity(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::mark_dirty_words`.
 fn PackedGpuBlobStore::mark_dirty_words(
   self : PackedGpuBlobStore,
   first : Int,
@@ -72,6 +76,7 @@ fn PackedGpuBlobStore::mark_dirty_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::alloc_words`.
 fn PackedGpuBlobStore::alloc_words(
   self : PackedGpuBlobStore,
   word_count : Int,
@@ -98,6 +103,7 @@ fn PackedGpuBlobStore::alloc_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::free_words`.
 fn PackedGpuBlobStore::free_words(
   self : PackedGpuBlobStore,
   word_offset : Int,
@@ -111,6 +117,7 @@ fn PackedGpuBlobStore::free_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::write_words`.
 fn PackedGpuBlobStore::write_words(
   self : PackedGpuBlobStore,
   word_offset : Int,
@@ -128,6 +135,7 @@ fn PackedGpuBlobStore::write_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::read_words`.
 fn PackedGpuBlobStore::read_words(
   self : PackedGpuBlobStore,
   word_offset : Int,
@@ -143,6 +151,7 @@ fn PackedGpuBlobStore::read_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::write_word_range_views`.
 fn PackedGpuBlobStore::write_word_range_views(
   self : PackedGpuBlobStore,
   first_word : Int,
@@ -154,6 +163,7 @@ fn PackedGpuBlobStore::write_word_range_views(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::drain_write_views`.
 fn PackedGpuBlobStore::drain_write_views(
   self : PackedGpuBlobStore,
 ) -> Array[GpuWriteView] {
@@ -169,6 +179,7 @@ fn PackedGpuBlobStore::drain_write_views(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::drain_resize_events`.
 fn PackedGpuBlobStore::drain_resize_events(
   self : PackedGpuBlobStore,
 ) -> Array[PackedGpuBlobResizeEvent] {

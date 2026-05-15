@@ -6,6 +6,7 @@ pub(all) struct Vector4Ref[T] {
 }
 
 ///|
+/// Implements `Vector4Ref::from_mut_view`.
 pub fn Vector4Ref::from_mut_view(data : MutArrayView[Byte]) -> Vector4Ref[Byte] {
   guard data.length() == 16 else {
     abort("Vector4Ref::from_mut_view: expected 16 bytes")
@@ -14,21 +15,25 @@ pub fn Vector4Ref::from_mut_view(data : MutArrayView[Byte]) -> Vector4Ref[Byte] 
 }
 
 ///|
+/// Implements `Vector4Ref::x`.
 pub fn Vector4Ref::x(self : Vector4Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 0))
 }
 
 ///|
+/// Implements `Vector4Ref::y`.
 pub fn Vector4Ref::y(self : Vector4Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 4))
 }
 
 ///|
+/// Implements `Vector4Ref::z`.
 pub fn Vector4Ref::z(self : Vector4Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 8))
 }
 
 ///|
+/// Implements `Vector4Ref::w`.
 pub fn Vector4Ref::w(self : Vector4Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 12))
 }
@@ -77,6 +82,8 @@ extern "js" fn write_f32x4_mut_view(
   #| }
 
 ///|
+///|
+/// Implements `write_f32x4_mut_view`.
 #cfg(not(target="js"))
 fn write_f32x4_mut_view(
   data : MutArrayView[Byte],
@@ -135,21 +142,25 @@ pub fn Vector4Ref::write_mut_view(
 }
 
 ///|
+/// Implements `Vector4Ref::set_x`.
 pub fn Vector4Ref::set_x(self : Vector4Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 0, v.to_double())
 }
 
 ///|
+/// Implements `Vector4Ref::set_y`.
 pub fn Vector4Ref::set_y(self : Vector4Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 4, v.to_double())
 }
 
 ///|
+/// Implements `Vector4Ref::set_z`.
 pub fn Vector4Ref::set_z(self : Vector4Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 8, v.to_double())
 }
 
 ///|
+/// Implements `Vector4Ref::set_w`.
 pub fn Vector4Ref::set_w(self : Vector4Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 12, v.to_double())
 }

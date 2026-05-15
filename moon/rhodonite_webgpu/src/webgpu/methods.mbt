@@ -1,9 +1,11 @@
 ///|
+/// Implements `GPUInstance::get_preferred_canvas_format`.
 pub fn GPUInstance::get_preferred_canvas_format(self : GPUInstance) -> String {
   @raw.webgpu_instance_get_preferred_canvas_format(self.raw)
 }
 
 ///|
+/// Implements `GPUInstance::get_preferred_canvas_format_for_surface`.
 pub fn GPUInstance::get_preferred_canvas_format_for_surface(
   self : GPUInstance,
   adapter : GPUAdapter,
@@ -22,6 +24,8 @@ pub async fn GPUInstance::request_adapter(self : GPUInstance) -> GPUAdapter {
 }
 
 ///|
+///|
+/// Implements `GPUInstance::request_adapter_sync`.
 #cfg(target="native")
 pub fn GPUInstance::request_adapter_sync(
   self : GPUInstance,
@@ -30,11 +34,13 @@ pub fn GPUInstance::request_adapter_sync(
 }
 
 ///|
+/// Implements `GPUInstance::process_events`.
 pub fn GPUInstance::process_events(self : GPUInstance) -> Unit {
   webgpu_instance_process_events(self)
 }
 
 ///|
+/// Implements `GPUInstance::release`.
 pub fn GPUInstance::release(self : GPUInstance) -> Unit {
   webgpu_instance_release(self)
 }
@@ -45,6 +51,8 @@ pub async fn GPUAdapter::request_device(self : GPUAdapter) -> GPUDevice {
 }
 
 ///|
+///|
+/// Implements `GPUAdapter::request_device_sync`.
 #cfg(target="native")
 pub fn GPUAdapter::request_device_sync(
   self : GPUAdapter,
@@ -53,21 +61,25 @@ pub fn GPUAdapter::request_device_sync(
 }
 
 ///|
+/// Implements `GPUAdapter::release`.
 pub fn GPUAdapter::release(self : GPUAdapter) -> Unit {
   webgpu_adapter_release(self)
 }
 
 ///|
+/// Implements `GPUDevice::get`.
 pub fn GPUDevice::get(self : GPUDevice) -> @raw.GPUDevice {
   @raw.webgpu_device_get(self.raw)
 }
 
 ///|
+/// Implements `GPUDevice::get_queue`.
 pub fn GPUDevice::get_queue(self : GPUDevice) -> GPUQueue {
   { raw: @raw.webgpu_device_get_queue(self.raw) }
 }
 
 ///|
+/// Implements `GPUDevice::create_shader_module`.
 pub fn GPUDevice::create_shader_module(
   self : GPUDevice,
   code : String,
@@ -76,6 +88,7 @@ pub fn GPUDevice::create_shader_module(
 }
 
 ///|
+/// Implements `GPUDevice::create_render_pipeline`.
 pub fn GPUDevice::create_render_pipeline(
   self : GPUDevice,
   descriptor : GPURenderPipelineDescriptor,
@@ -165,6 +178,7 @@ pub const GPU_BUFFER_USAGE_STORAGE : UInt64 = 128UL
 pub const GPU_BUFFER_USAGE_UNIFORM : UInt64 = 64UL
 
 ///|
+/// Implements `GPUDevice::create_buffer`.
 pub fn GPUDevice::create_buffer(
   self : GPUDevice,
   size : UInt64,
@@ -222,6 +236,7 @@ pub fn GPUDevice::create_camera_words_buffer(
 }
 
 ///|
+/// Implements `GPUDevice::create_texture`.
 pub fn GPUDevice::create_texture(
   self : GPUDevice,
   width : UInt,
@@ -241,6 +256,7 @@ pub fn GPUDevice::create_texture(
 }
 
 ///|
+/// Implements `rgba8_copy_bytes_per_row`.
 pub fn rgba8_copy_bytes_per_row(width : UInt) -> UInt64 {
   let unpadded = width.to_uint64() * 4UL
   let align = 256UL
@@ -253,11 +269,13 @@ pub fn rgba8_copy_bytes_per_row(width : UInt) -> UInt64 {
 }
 
 ///|
+/// Implements `rgba8_copy_padded_byte_length`.
 pub fn rgba8_copy_padded_byte_length(width : UInt, height : UInt) -> UInt64 {
   rgba8_copy_bytes_per_row(width) * height.to_uint64()
 }
 
 ///|
+/// Implements `GPUDevice::create_rgba8_render_texture`.
 pub fn GPUDevice::create_rgba8_render_texture(
   self : GPUDevice,
   width : UInt,
@@ -272,6 +290,7 @@ pub fn GPUDevice::create_rgba8_render_texture(
 }
 
 ///|
+/// Implements `GPUQueue::write_buffer`.
 pub fn GPUQueue::write_buffer(
   self : GPUQueue,
   buffer : GPUBuffer,
@@ -383,6 +402,8 @@ pub fn GPUQueue::drain_and_upload_camera_writes(
 
 ///|
 /// Writes a borrowed subrange of `Bytes` to a GPU buffer without compacting the payload.
+///|
+/// Implements `GPUQueue::write_buffer_from_bytes_range`.
 #cfg(target="native")
 pub fn GPUQueue::write_buffer_from_bytes_range(
   self : GPUQueue,
@@ -403,6 +424,7 @@ pub fn GPUQueue::write_buffer_from_bytes_range(
 }
 
 ///|
+/// Implements `GPUBuffer::release`.
 pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
   buffer_release(self)
 }
@@ -413,6 +435,8 @@ pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
 /// WebGPU native mapping requires aligned offset/size. This helper reads the aligned range into a
 /// staging `Bytes`, then returns the requested subrange as `BytesView` without compacting it into a
 /// second `Bytes`. Use `BytesView::to_owned` only when an owned, exact-length `Bytes` is required.
+///|
+/// Implements `GPUBuffer::readback_view`.
 #cfg(target="native")
 pub fn GPUBuffer::readback_view(
   self : GPUBuffer,
@@ -425,6 +449,8 @@ pub fn GPUBuffer::readback_view(
 
 ///|
 /// Reads a native GPU buffer range into an owned `Bytes`.
+///|
+/// Implements `GPUBuffer::readback`.
 #cfg(target="native")
 pub fn GPUBuffer::readback(
   self : GPUBuffer,
@@ -447,6 +473,7 @@ pub async fn GPUBuffer::readback_async(
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::set_vertex_buffer`.
 pub fn GPURenderPassEncoder::set_vertex_buffer(
   self : GPURenderPassEncoder,
   slot : Int,
@@ -464,6 +491,7 @@ pub fn GPURenderPassEncoder::set_vertex_buffer(
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::set_index_buffer`.
 pub fn GPURenderPassEncoder::set_index_buffer(
   self : GPURenderPassEncoder,
   buffer : GPUBuffer,
@@ -481,21 +509,25 @@ pub fn GPURenderPassEncoder::set_index_buffer(
 }
 
 ///|
+/// Implements `GPUDevice::create_command_encoder`.
 pub fn GPUDevice::create_command_encoder(self : GPUDevice) -> GPUCommandEncoder {
   { raw: @raw.webgpu_device_create_command_encoder(self.raw) }
 }
 
 ///|
+/// Implements `GPUDevice::poll`.
 pub fn GPUDevice::poll(self : GPUDevice, wait? : Bool = false) -> Bool {
   webgpu_device_poll(self, wait~)
 }
 
 ///|
+/// Implements `GPUDevice::release`.
 pub fn GPUDevice::release(self : GPUDevice) -> Unit {
   webgpu_device_release(self)
 }
 
 ///|
+/// Implements `GPUCanvasContext::configure`.
 pub fn GPUCanvasContext::configure(
   self : GPUCanvasContext,
   device : GPUDevice,
@@ -509,11 +541,13 @@ pub fn GPUCanvasContext::configure(
 }
 
 ///|
+/// Implements `GPUCanvasContext::get_format`.
 pub fn GPUCanvasContext::get_format(self : GPUCanvasContext) -> String {
   webgpu_canvas_context_get_format(self)
 }
 
 ///|
+/// Implements `GPUCanvasContext::get_current_texture`.
 pub fn GPUCanvasContext::get_current_texture(
   self : GPUCanvasContext,
 ) -> GPUTexture {
@@ -521,16 +555,19 @@ pub fn GPUCanvasContext::get_current_texture(
 }
 
 ///|
+/// Implements `GPUCanvasContext::present`.
 pub fn GPUCanvasContext::present(self : GPUCanvasContext) -> Unit {
   @raw.webgpu_canvas_context_present(self.raw)
 }
 
 ///|
+/// Implements `GPUCanvasContext::release`.
 pub fn GPUCanvasContext::release(self : GPUCanvasContext) -> Unit {
   webgpu_canvas_context_release(self)
 }
 
 ///|
+/// Implements `GPUContext::get`.
 pub fn GPUContext::get(
   self : GPUContext,
 ) -> (GPUDevice, GPUCanvasContext, String, GPUQueue) {
@@ -539,16 +576,19 @@ pub fn GPUContext::get(
 }
 
 ///|
+/// Implements `GPUTexture::create_view`.
 pub fn GPUTexture::create_view(self : GPUTexture) -> GPUTextureView {
   @raw.webgpu_texture_create_view(self.raw)
 }
 
 ///|
+/// Implements `GPUTexture::release`.
 pub fn GPUTexture::release(self : GPUTexture) -> Unit {
   @raw.webgpu_texture_release(self.raw)
 }
 
 ///|
+/// Implements `GPUCommandEncoder::begin_render_pass`.
 pub fn GPUCommandEncoder::begin_render_pass(
   self : GPUCommandEncoder,
   descriptor : GPURenderPassDescriptor,
@@ -558,6 +598,7 @@ pub fn GPUCommandEncoder::begin_render_pass(
 }
 
 ///|
+/// Implements `GPUCommandEncoder::finish`.
 pub fn GPUCommandEncoder::finish(self : GPUCommandEncoder) -> GPUCommandBuffer {
   @raw.webgpu_command_encoder_finish(self.raw)
 }
@@ -566,6 +607,8 @@ pub fn GPUCommandEncoder::finish(self : GPUCommandEncoder) -> GPUCommandBuffer {
 /// Copies an RGBA8 texture into a buffer using WebGPU's padded row layout.
 ///
 /// The destination buffer must be at least `rgba8_copy_padded_byte_length(width, height)` bytes.
+///|
+/// Implements `GPUCommandEncoder::copy_texture_to_buffer_rgba8`.
 #cfg(any(target="js", target="native"))
 pub fn GPUCommandEncoder::copy_texture_to_buffer_rgba8(
   self : GPUCommandEncoder,
@@ -584,11 +627,13 @@ pub fn GPUCommandEncoder::copy_texture_to_buffer_rgba8(
 }
 
 ///|
+/// Implements `GPUCommandEncoder::release`.
 pub fn GPUCommandEncoder::release(self : GPUCommandEncoder) -> Unit {
   @raw.webgpu_command_encoder_release(self.raw)
 }
 
 ///|
+/// Implements `GPUQueue::submit`.
 pub fn GPUQueue::submit(
   self : GPUQueue,
   command_buffer : GPUCommandBuffer,
@@ -597,11 +642,13 @@ pub fn GPUQueue::submit(
 }
 
 ///|
+/// Implements `GPUQueue::release`.
 pub fn GPUQueue::release(self : GPUQueue) -> Unit {
   webgpu_queue_release(self)
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::set_pipeline`.
 pub fn GPURenderPassEncoder::set_pipeline(
   self : GPURenderPassEncoder,
   pipeline : GPURenderPipeline,
@@ -610,6 +657,7 @@ pub fn GPURenderPassEncoder::set_pipeline(
 }
 
 ///|
+/// Implements `GPURenderPipeline::get_bind_group_layout`.
 pub fn GPURenderPipeline::get_bind_group_layout(
   self : GPURenderPipeline,
   group_index : UInt,
@@ -623,6 +671,7 @@ pub fn GPURenderPipeline::get_bind_group_layout(
 }
 
 ///|
+/// Implements `GPUDevice::create_bind_group`.
 pub fn GPUDevice::create_bind_group(
   self : GPUDevice,
   descriptor : GPUBindGroupDescriptor,
@@ -687,11 +736,13 @@ pub fn GPUDevice::create_camera_words_bind_group(
 }
 
 ///|
+/// Implements `GPURenderPipeline::release`.
 pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
   renderPipeline_release(self)
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::draw`.
 pub fn GPURenderPassEncoder::draw(
   self : GPURenderPassEncoder,
   vertex_count : Int,
@@ -700,6 +751,7 @@ pub fn GPURenderPassEncoder::draw(
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::draw_indexed`.
 pub fn GPURenderPassEncoder::draw_indexed(
   self : GPURenderPassEncoder,
   index_count : Int,
@@ -719,6 +771,7 @@ pub fn GPURenderPassEncoder::draw_indexed(
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::set_bind_group`.
 pub fn GPURenderPassEncoder::set_bind_group(
   self : GPURenderPassEncoder,
   index : UInt,
@@ -734,11 +787,13 @@ pub fn GPURenderPassEncoder::set_bind_group(
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::end`.
 pub fn GPURenderPassEncoder::end(self : GPURenderPassEncoder) -> Unit {
   @raw.webgpu_render_pass_encoder_end(self.raw)
 }
 
 ///|
+/// Implements `GPURenderPassEncoder::release`.
 pub fn GPURenderPassEncoder::release(self : GPURenderPassEncoder) -> Unit {
   @raw.webgpu_render_pass_encoder_release(self.raw)
 }

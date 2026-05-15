@@ -1,16 +1,19 @@
 // WebGPU queue implementation
 
 ///|
+/// Defines `WebGPUQueue`.
 pub struct WebGPUQueue {
   queue : GPUQueue
 }
 
 ///|
+/// Implements `WebGPUQueue::new`.
 pub fn WebGPUQueue::new(queue : GPUQueue) -> WebGPUQueue {
   { queue, }
 }
 
 ///|
+/// Implements `webgpu_queue_submit`.
 pub fn webgpu_queue_submit(
   queue : WebGPUQueue,
   commandBuffer : GPUCommandBuffer,
@@ -19,6 +22,7 @@ pub fn webgpu_queue_submit(
 }
 
 ///|
+/// Implements `webgpu_queue_write_buffer`.
 pub fn webgpu_queue_write_buffer(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
@@ -29,6 +33,7 @@ pub fn webgpu_queue_write_buffer(
 }
 
 ///|
+/// Implements `webgpu_queue_write_buffer_array_view`.
 pub fn webgpu_queue_write_buffer_array_view(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
@@ -57,6 +62,7 @@ extern "js" fn queue_writeBuffer_bytes_range(
   #| }
 
 ///|
+/// Implements `webgpu_queue_write_buffer_bytes_range`.
 pub fn webgpu_queue_write_buffer_bytes_range(
   queue : WebGPUQueue,
   buffer : GPUBuffer,

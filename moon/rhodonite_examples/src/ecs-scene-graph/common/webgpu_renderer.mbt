@@ -24,6 +24,7 @@ let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 let camera_elevation_rad : Double = 0.38
 
 ///|
+/// Implements `cube_local_corners`.
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -38,6 +39,7 @@ fn cube_local_corners() -> Array[(Double, Double, Double)] {
 }
 
 ///|
+/// Implements `index_cube_u16_bytes`.
 fn index_cube_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(72, (0 : Byte))
   let idx : Array[UInt] = [
@@ -51,6 +53,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
 }
 
 ///|
+/// Implements `write_vertex_positions_only`.
 fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
   let corners = cube_local_corners()
   for vi = 0; vi < verts_per_cube; vi = vi + 1 {
@@ -63,11 +66,13 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
+/// Implements `empty_offsets`.
 fn empty_offsets() -> Array[UInt] {
   []
 }
 
 ///|
+/// Defines `WebGPURenderer`.
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
@@ -93,6 +98,7 @@ pub(all) struct WebGPURenderer {
 }
 
 ///|
+/// Implements `ecs_scene_shader_wgsl`.
 fn ecs_scene_shader_wgsl() -> String {
   let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
     @ecs_wgsl.camera_words_binding_default()
@@ -135,6 +141,7 @@ fn ecs_scene_shader_wgsl() -> String {
 }
 
 ///|
+/// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   Some(
@@ -148,6 +155,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 }
 
 ///|
+/// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
@@ -296,6 +304,7 @@ pub fn create_renderer_for_device(
 }
 
 ///|
+/// Implements `push_camera_matrices`.
 fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
   let view = @m44.Matrix44::rotation_x(camera_elevation_rad)
     .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
@@ -316,6 +325,7 @@ fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
 }
 
 ///|
+/// Implements `quat_y`.
 fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
   let half = angle * 0.5
   let s = @math.sin(half)
@@ -324,6 +334,7 @@ fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
 }
 
 ///|
+/// Implements `push_local_transforms`.
 fn push_local_transforms(
   world : @ecs.World,
   bodies : Array[@ecs.EntityId],
@@ -388,6 +399,7 @@ fn push_local_transforms(
 }
 
 ///|
+/// Implements `render_frame`.
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let canvas_context = match renderer.context {
     Some(c) => c
@@ -401,6 +413,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
@@ -470,6 +483,7 @@ pub fn render_frame_to_view(
 }
 
 ///|
+/// Implements `WebGPURenderer::release`.
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   @wgpu.bindGroup_release(self.bind_transforms)
   @wgpu.bindGroup_release(self.bind_camera)
@@ -486,6 +500,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `webgpu_renderer_release`.
 pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
   renderer.release()
 }

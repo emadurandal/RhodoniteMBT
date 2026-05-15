@@ -1,4 +1,5 @@
 ///|
+/// Implements `sorted_component_signature`.
 fn sorted_component_signature(
   components : Array[ComponentTypeId],
 ) -> Array[ComponentTypeId] {
@@ -10,6 +11,7 @@ fn sorted_component_signature(
 }
 
 ///|
+/// Implements `World::allocate_entity_slot_for_batch`.
 fn World::allocate_entity_slot_for_batch(self : World) -> EntityId {
   if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
@@ -95,11 +97,13 @@ pub fn World::spawn_batch(
 }
 
 ///|
+/// Implements `SpawnBatchRow::entity`.
 pub fn SpawnBatchRow::entity(self : SpawnBatchRow) -> EntityId {
   self.entity
 }
 
 ///|
+/// Implements `SpawnBatchRow::write`.
 pub fn SpawnBatchRow::write(
   self : SpawnBatchRow,
   component : ComponentTypeId,
@@ -109,6 +113,7 @@ pub fn SpawnBatchRow::write(
 }
 
 ///|
+/// Implements `SpawnBatchRow::write_view`.
 pub fn SpawnBatchRow::write_view(
   self : SpawnBatchRow,
   component : ComponentTypeId,

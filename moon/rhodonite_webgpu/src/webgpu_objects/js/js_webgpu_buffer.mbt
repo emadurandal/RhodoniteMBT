@@ -1,4 +1,5 @@
 ///|
+/// Implements `webgpu_buffer_readback_view`.
 pub fn webgpu_buffer_readback_view(
   _buffer : GPUBuffer,
   _instance : WebGPUInstance,
@@ -11,6 +12,7 @@ pub fn webgpu_buffer_readback_view(
 }
 
 ///|
+/// Implements `webgpu_buffer_readback`.
 pub fn webgpu_buffer_readback(
   _buffer : GPUBuffer,
   _instance : WebGPUInstance,

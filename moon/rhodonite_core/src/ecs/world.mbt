@@ -1,9 +1,11 @@
 ///|
+/// Implements `component_less`.
 fn component_less(a : ComponentTypeId, b : ComponentTypeId) -> Bool {
   a.index < b.index
 }
 
 ///|
+/// Implements `component_array_contains`.
 fn component_array_contains(
   components : Array[ComponentTypeId],
   c : ComponentTypeId,
@@ -17,6 +19,7 @@ fn component_array_contains(
 }
 
 ///|
+/// Implements `component_array_contains_all`.
 fn component_array_contains_all(
   haystack : Array[ComponentTypeId],
   needles : Array[ComponentTypeId],
@@ -30,6 +33,7 @@ fn component_array_contains_all(
 }
 
 ///|
+/// Implements `copy_component_array`.
 fn copy_component_array(src : Array[ComponentTypeId]) -> Array[ComponentTypeId] {
   let out : Array[ComponentTypeId] = []
   for i = 0; i < src.length(); i = i + 1 {
@@ -48,6 +52,7 @@ priv struct SystemAccessSnapshot {
 }
 
 ///|
+/// Implements `World::system_access_snapshot`.
 fn World::system_access_snapshot(self : World) -> SystemAccessSnapshot {
   {
     depth: self.system_access_depth,
@@ -59,6 +64,7 @@ fn World::system_access_snapshot(self : World) -> SystemAccessSnapshot {
 }
 
 ///|
+/// Implements `World::restore_system_access`.
 fn World::restore_system_access(
   self : World,
   snapshot : SystemAccessSnapshot,
@@ -71,16 +77,19 @@ fn World::restore_system_access(
 }
 
 ///|
+/// Implements `World::bump_archetype_version`.
 fn World::bump_archetype_version(self : World) -> Unit {
   self.archetype_version = self.archetype_version + 1
 }
 
 ///|
+/// Implements `component_id_text`.
 fn component_id_text(component : ComponentTypeId) -> String {
   "component id " + component.index.to_string()
 }
 
 ///|
+/// Implements `World::active_system_text`.
 fn World::active_system_text(self : World) -> String {
   if self.system_access_active() {
     "System '" + self.system_access_name + "'"
@@ -103,6 +112,7 @@ fn component_array_has_duplicates(components : Array[ComponentTypeId]) -> Bool {
 }
 
 ///|
+/// Implements `component_arrays_equal`.
 fn component_arrays_equal(
   a : Array[ComponentTypeId],
   b : Array[ComponentTypeId],
@@ -119,6 +129,7 @@ fn component_arrays_equal(
 }
 
 ///|
+/// Implements `component_signature_hash`.
 fn component_signature_hash(components : Array[ComponentTypeId]) -> Int {
   let mut h = components.length()
   for i = 0; i < components.length(); i = i + 1 {
@@ -128,6 +139,7 @@ fn component_signature_hash(components : Array[ComponentTypeId]) -> Int {
 }
 
 ///|
+/// Implements `World::remember_archetype_signature`.
 fn World::remember_archetype_signature(
   self : World,
   components : Array[ComponentTypeId],
@@ -154,6 +166,7 @@ fn World::remember_archetype_signature(
 }
 
 ///|
+/// Implements `World::ensure_component_archetype_slot`.
 fn World::ensure_component_archetype_slot(
   self : World,
   component : ComponentTypeId,
@@ -165,6 +178,7 @@ fn World::ensure_component_archetype_slot(
 }
 
 ///|
+/// Implements `World::index_archetype_components`.
 fn World::index_archetype_components(
   self : World,
   archetype_index : Int,
@@ -178,6 +192,7 @@ fn World::index_archetype_components(
 }
 
 ///|
+/// Implements `World::query_candidate_archetypes`.
 fn World::query_candidate_archetypes(
   self : World,
   required : Array[ComponentTypeId],
@@ -230,6 +245,7 @@ fn sorted_with_added(
 }
 
 ///|
+/// Implements `sorted_with_removed`.
 fn sorted_with_removed(
   components : Array[ComponentTypeId],
   removed : ComponentTypeId,
@@ -269,11 +285,13 @@ fn World::assert_component_registration_open(
 }
 
 ///|
+/// Implements `World::system_access_active`.
 fn World::system_access_active(self : World) -> Bool {
   self.system_access_depth > 0
 }
 
 ///|
+/// Implements `World::assert_system_component_read`.
 fn World::assert_system_component_read(
   self : World,
   component : ComponentTypeId,
@@ -294,6 +312,7 @@ fn World::assert_system_component_read(
 }
 
 ///|
+/// Implements `World::assert_system_component_write`.
 fn World::assert_system_component_write(
   self : World,
   component : ComponentTypeId,
@@ -313,6 +332,7 @@ fn World::assert_system_component_write(
 }
 
 ///|
+/// Implements `World::assert_system_components_read`.
 fn World::assert_system_components_read(
   self : World,
   components : Array[ComponentTypeId],
@@ -324,6 +344,7 @@ fn World::assert_system_components_read(
 }
 
 ///|
+/// Implements `World::assert_system_structural_write`.
 fn World::assert_system_structural_write(
   self : World,
   operation : String,
@@ -339,6 +360,7 @@ fn World::assert_system_structural_write(
 }
 
 ///|
+/// Implements `World::can_add_missing_component_from_setter`.
 fn World::can_add_missing_component_from_setter(
   self : World,
   component : ComponentTypeId,
@@ -448,11 +470,13 @@ pub fn World::new_with_global_transform_format(
 }
 
 ///|
+/// Implements `World::new`.
 pub fn World::new() -> World {
   World::new_with_global_transform_format(Affine3x4F32)
 }
 
 ///|
+/// Implements `World::global_transform_gpu_format`.
 pub fn World::global_transform_gpu_format(
   self : World,
 ) -> @comp.GlobalTransformGpuFormat {
@@ -497,11 +521,13 @@ fn World::unlock_component_registration(self : World) -> Unit {
 }
 
 ///|
+/// Implements `World::component_registration_locked`.
 pub fn World::component_registration_locked(self : World) -> Bool {
   self.component_registration_lock_depth > 0
 }
 
 ///|
+/// Implements `World::enter_system_access`.
 fn World::enter_system_access(
   self : World,
   name : String,
@@ -519,6 +545,7 @@ fn World::enter_system_access(
 }
 
 ///|
+/// Implements `World::exit_system_access`.
 fn World::exit_system_access(
   self : World,
   snapshot : SystemAccessSnapshot,
@@ -550,6 +577,7 @@ fn World::find_archetype(
 }
 
 ///|
+/// Implements `World::ensure_archetype`.
 fn World::ensure_archetype(
   self : World,
   components : Array[ComponentTypeId],
@@ -583,6 +611,7 @@ fn World::update_moved_location(
 }
 
 ///|
+/// Implements `World::is_alive`.
 pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
   entity.index >= 0 &&
   entity.index < self.alive.length() &&
@@ -591,6 +620,7 @@ pub fn World::is_alive(self : World, entity : EntityId) -> Bool {
 }
 
 ///|
+/// Implements `World::is_reserved_entity`.
 fn World::is_reserved_entity(self : World, entity : EntityId) -> Bool {
   entity.index >= 0 &&
   entity.index < self.reserved.length() &&
@@ -683,6 +713,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
 }
 
 ///|
+/// Implements `World::location`.
 pub fn World::location(self : World, entity : EntityId) -> EntityLocation? {
   if self.is_alive(entity) {
     self.locations[entity.index]
@@ -692,6 +723,7 @@ pub fn World::location(self : World, entity : EntityId) -> EntityLocation? {
 }
 
 ///|
+/// Implements `World::has_component`.
 pub fn World::has_component(
   self : World,
   entity : EntityId,
@@ -787,6 +819,7 @@ fn World::add_component_signature(
 }
 
 ///|
+/// Implements `component_accepts_add_bytes`.
 fn component_accepts_add_bytes(
   component : RegisteredComponent,
   bytes : FixedArray[Byte],
@@ -932,21 +965,25 @@ pub fn World::component_bytes(
 }
 
 ///|
+/// Implements `World::transform_component`.
 pub fn World::transform_component(self : World) -> ComponentTypeId {
   self.transform_component_id
 }
 
 ///|
+/// Implements `World::global_transform_component`.
 pub fn World::global_transform_component(self : World) -> ComponentTypeId {
   self.global_transform_component_id
 }
 
 ///|
+/// Implements `World::child_of_component`.
 pub fn World::child_of_component(self : World) -> ComponentTypeId {
   self.child_of_component_id
 }
 
 ///|
+/// Implements `World::camera_component`.
 pub fn World::camera_component(self : World) -> ComponentTypeId {
   self.camera_component_id
 }

@@ -1,9 +1,11 @@
 ///|
+/// Implements `GlobalTransformBlobStore::new`.
 fn GlobalTransformBlobStore::new() -> GlobalTransformBlobStore {
   { store: PackedGpuBlobStore::new() }
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::word_capacity`.
 fn GlobalTransformBlobStore::word_capacity(
   self : GlobalTransformBlobStore,
 ) -> Int {
@@ -11,6 +13,7 @@ fn GlobalTransformBlobStore::word_capacity(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::alloc`.
 fn GlobalTransformBlobStore::alloc(
   self : GlobalTransformBlobStore,
   format : @comp.GlobalTransformGpuFormat,
@@ -19,6 +22,7 @@ fn GlobalTransformBlobStore::alloc(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::free`.
 fn GlobalTransformBlobStore::free(
   self : GlobalTransformBlobStore,
   format : @comp.GlobalTransformGpuFormat,
@@ -28,6 +32,7 @@ fn GlobalTransformBlobStore::free(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::write_matrix`.
 fn GlobalTransformBlobStore::write_matrix(
   self : GlobalTransformBlobStore,
   format : @comp.GlobalTransformGpuFormat,
@@ -41,6 +46,7 @@ fn GlobalTransformBlobStore::write_matrix(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::read_matrix`.
 fn GlobalTransformBlobStore::read_matrix(
   self : GlobalTransformBlobStore,
   format : @comp.GlobalTransformGpuFormat,
@@ -58,6 +64,7 @@ fn GlobalTransformBlobStore::read_matrix(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::write_word_range_views`.
 fn GlobalTransformBlobStore::write_word_range_views(
   self : GlobalTransformBlobStore,
   first_word : Int,
@@ -68,6 +75,7 @@ fn GlobalTransformBlobStore::write_word_range_views(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::drain_write_views`.
 fn GlobalTransformBlobStore::drain_write_views(
   self : GlobalTransformBlobStore,
 ) -> Array[GpuWriteView] {
@@ -75,6 +83,7 @@ fn GlobalTransformBlobStore::drain_write_views(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::drain_resize_events`.
 fn GlobalTransformBlobStore::drain_resize_events(
   self : GlobalTransformBlobStore,
 ) -> Array[GlobalTransformBlobResizeEvent] {

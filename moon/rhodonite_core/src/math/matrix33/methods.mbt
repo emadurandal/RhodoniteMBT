@@ -1,4 +1,5 @@
 ///|
+/// Implements `Matrix33::new_col_major`.
 pub fn[T] Matrix33::new_col_major(
   m00 : T,
   m10 : T,
@@ -16,6 +17,7 @@ pub fn[T] Matrix33::new_col_major(
 }
 
 ///|
+/// Implements `Matrix33::from_cols`.
 pub fn[T] Matrix33::from_cols(
   c0 : @v3.Vector3[T],
   c1 : @v3.Vector3[T],
@@ -35,22 +37,26 @@ pub fn[T] Matrix33::from_cols(
 }
 
 ///|
+/// Implements `Matrix33::zero`.
 pub fn[T : Default] Matrix33::zero() -> Matrix33[T] {
   let z = T::default()
   Matrix33::new_col_major(z, z, z, z, z, z, z, z, z)
 }
 
 ///|
+/// Implements `Matrix33::identity_with`.
 pub fn[T] Matrix33::identity_with(one : T, zero : T) -> Matrix33[T] {
   Matrix33::new_col_major(one, zero, zero, zero, one, zero, zero, zero, one)
 }
 
 ///|
+/// Implements `Matrix33F::identity`.
 pub fn Matrix33F::identity() -> Matrix33F {
   Matrix33::identity_with((1.0 : Float), (0.0 : Float))
 }
 
 ///|
+/// Implements `Matrix33::at`.
 pub fn[T] Matrix33::at(self : Matrix33[T], row : Int, col : Int) -> T {
   self.data[col * 3 + row]
 }
@@ -62,6 +68,7 @@ pub fn[T] Matrix33::data(self : Matrix33[T]) -> FixedArray[T] {
 }
 
 ///|
+/// Implements `Matrix33::scale`.
 pub fn[T : Mul] Matrix33::scale(self : Matrix33[T], s : T) -> Matrix33[T] {
   Matrix33::{
     data: (
@@ -80,6 +87,7 @@ pub fn[T : Mul] Matrix33::scale(self : Matrix33[T], s : T) -> Matrix33[T] {
 }
 
 ///|
+/// Implements `Matrix33::div_scalar`.
 pub fn[T : Div] Matrix33::div_scalar(self : Matrix33[T], s : T) -> Matrix33[T] {
   Matrix33::{
     data: (
@@ -98,6 +106,7 @@ pub fn[T : Div] Matrix33::div_scalar(self : Matrix33[T], s : T) -> Matrix33[T] {
 }
 
 ///|
+/// Implements `Matrix33::transpose`.
 pub fn[T] Matrix33::transpose(self : Matrix33[T]) -> Matrix33[T] {
   Matrix33::from_cols(
     @v3.Vector3::new(self.at(0, 0), self.at(0, 1), self.at(0, 2)),
@@ -142,6 +151,7 @@ pub fn[T : Mul + Add] Matrix33::mul_vec(
 }
 
 ///|
+/// Implements `Matrix33::determinant`.
 pub fn[T : Mul + Add + Sub] Matrix33::determinant(self : Matrix33[T]) -> T {
   let a = self.at(0, 0)
   let b = self.at(0, 1)

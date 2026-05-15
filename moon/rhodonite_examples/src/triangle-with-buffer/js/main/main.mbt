@@ -11,6 +11,7 @@ async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit 
 }
 
 ///|
+/// Implements `create_webgpu_renderer`.
 pub fn create_webgpu_renderer(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
@@ -18,6 +19,7 @@ pub fn create_webgpu_renderer(
 }
 
 ///|
+/// Implements `main {`.
 fn main {
   println("Hello")
 }

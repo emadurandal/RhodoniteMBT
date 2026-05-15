@@ -26,6 +26,7 @@ pub fn global_transform_ref_cpu_layout() -> GpuLayout {
 }
 
 ///|
+/// Implements `global_transform_word_count`.
 pub fn global_transform_word_count(format : GlobalTransformGpuFormat) -> Int {
   match format {
     Affine3x4F32 => 12
@@ -34,6 +35,7 @@ pub fn global_transform_word_count(format : GlobalTransformGpuFormat) -> Int {
 }
 
 ///|
+/// Implements `global_transform_format_code`.
 pub fn global_transform_format_code(format : GlobalTransformGpuFormat) -> UInt {
   match format {
     Affine3x4F32 => 0U
@@ -42,6 +44,7 @@ pub fn global_transform_format_code(format : GlobalTransformGpuFormat) -> UInt {
 }
 
 ///|
+/// Implements `global_transform_format_from_code`.
 pub fn global_transform_format_from_code(
   code : UInt,
 ) -> GlobalTransformGpuFormat {
@@ -53,6 +56,7 @@ pub fn global_transform_format_from_code(
 }
 
 ///|
+/// Implements `global_transform_ref_bytes`.
 pub fn global_transform_ref_bytes(
   format : GlobalTransformGpuFormat,
   word_offset : Int,
@@ -64,6 +68,7 @@ pub fn global_transform_ref_bytes(
 }
 
 ///|
+/// Implements `global_transform_ref_from_component_bytes`.
 pub fn global_transform_ref_from_component_bytes(
   bytes : FixedArray[Byte],
 ) -> (GlobalTransformGpuFormat, Int) {
@@ -77,6 +82,7 @@ pub fn global_transform_ref_from_component_bytes(
 }
 
 ///|
+/// Implements `global_transform_ref_from_component_view`.
 pub fn global_transform_ref_from_component_view(
   bytes : ArrayView[Byte],
 ) -> (GlobalTransformGpuFormat, Int) {
@@ -90,6 +96,7 @@ pub fn global_transform_ref_from_component_view(
 }
 
 ///|
+/// Implements `global_transform_write_ref_mut_view`.
 pub fn global_transform_write_ref_mut_view(
   bytes : MutArrayView[Byte],
   format : GlobalTransformGpuFormat,
@@ -123,6 +130,7 @@ pub fn GlobalTransform::view_affine3x4_gpu_row(
 }
 
 ///|
+/// Implements `GlobalTransformGpuMutRow::from_gpu_row`.
 pub fn GlobalTransformGpuMutRow::from_gpu_row(
   row : MutArrayView[Byte],
 ) -> GlobalTransformGpuMutRow {
@@ -133,6 +141,7 @@ pub fn GlobalTransformGpuMutRow::from_gpu_row(
 }
 
 ///|
+/// Implements `GlobalTransformGpuMutRow::from_gpu_row_format`.
 pub fn GlobalTransformGpuMutRow::from_gpu_row_format(
   row : MutArrayView[Byte],
   format : GlobalTransformGpuFormat,
@@ -148,6 +157,7 @@ pub fn GlobalTransformGpuMutRow::from_gpu_row_format(
 }
 
 ///|
+/// Implements `GlobalTransformGpuMutRow::view`.
 pub fn GlobalTransformGpuMutRow::view(
   self : GlobalTransformGpuMutRow,
 ) -> GlobalTransform {
@@ -160,6 +170,7 @@ pub fn GlobalTransformGpuMutRow::view(
 }
 
 ///|
+/// Implements `GlobalTransformGpuMutRow::write_matrix`.
 pub fn GlobalTransformGpuMutRow::write_matrix(
   self : GlobalTransformGpuMutRow,
   m : @m44.Matrix44F,
@@ -168,6 +179,7 @@ pub fn GlobalTransformGpuMutRow::write_matrix(
 }
 
 ///|
+/// Implements `GlobalTransformGpuMutRow::write_identity`.
 pub fn GlobalTransformGpuMutRow::write_identity(
   self : GlobalTransformGpuMutRow,
 ) -> Unit {
@@ -248,11 +260,13 @@ pub fn matrix44f_from_affine3x4_gpu_bytes(
 }
 
 ///|
+/// Implements `get_gpu_u16`.
 fn get_gpu_u16(buf : FixedArray[Byte], offset : Int) -> UInt {
   buf[offset].to_uint() | (buf[offset + 1].to_uint() << 8)
 }
 
 ///|
+/// Implements `put_gpu_u16_mut_view`.
 fn put_gpu_u16_mut_view(
   buf : MutArrayView[Byte],
   offset : Int,
@@ -263,6 +277,7 @@ fn put_gpu_u16_mut_view(
 }
 
 ///|
+/// Implements `global_transform_f32_to_f16_bits`.
 pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
   let bits = value.reinterpret_as_uint()
   let sign = (bits >> 16) & 0x8000U
@@ -298,6 +313,7 @@ pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
 }
 
 ///|
+/// Implements `f16_bits_to_f32`.
 fn f16_bits_to_f32(bits16 : UInt) -> Float {
   let sign = (bits16 & 0x8000U) << 16
   let exp = (bits16 >> 10) & 0x1FU
@@ -359,6 +375,7 @@ pub fn matrix44f_from_affine3x4_f16_gpu_bytes(
 }
 
 ///|
+/// Implements `matrix44f_from_global_transform_gpu_bytes`.
 pub fn matrix44f_from_global_transform_gpu_bytes(
   bytes : FixedArray[Byte],
   format : GlobalTransformGpuFormat,
@@ -432,6 +449,8 @@ extern "js" fn write_affine3x4_to_gpu_row_js(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+///|
+/// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(target="js")
 pub fn matrix44f_write_affine3x4_to_gpu_row(
   m : @m44.Matrix44F,
@@ -487,6 +506,7 @@ pub fn global_transform_write_identity_row_f16(
 }
 
 ///|
+/// Implements `global_transform_write_identity_row_format`.
 pub fn global_transform_write_identity_row_format(
   buf : MutArrayView[Byte],
   format : GlobalTransformGpuFormat,
@@ -499,6 +519,8 @@ pub fn global_transform_write_identity_row_format(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+///|
+/// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(not(target="js"))
 pub fn matrix44f_write_affine3x4_to_gpu_row(
   m : @m44.Matrix44F,
@@ -549,6 +571,7 @@ pub fn matrix44f_write_affine3x4_f16_to_gpu_row(
 }
 
 ///|
+/// Implements `matrix44f_write_global_transform_to_gpu_row`.
 pub fn matrix44f_write_global_transform_to_gpu_row(
   m : @m44.Matrix44F,
   buf : MutArrayView[Byte],
@@ -561,6 +584,7 @@ pub fn matrix44f_write_global_transform_to_gpu_row(
 }
 
 ///|
+/// Implements `put_packed_f16x2_mut_view`.
 fn put_packed_f16x2_mut_view(
   buf : MutArrayView[Byte],
   byte_offset : Int,
@@ -573,11 +597,13 @@ fn put_packed_f16x2_mut_view(
 }
 
 ///|
+/// Implements `get_packed_f16x2_low`.
 fn get_packed_f16x2_low(bits : UInt) -> Float {
   f16_bits_to_f32(bits & 0xFFFFU)
 }
 
 ///|
+/// Implements `get_packed_f16x2_high`.
 fn get_packed_f16x2_high(bits : UInt) -> Float {
   f16_bits_to_f32((bits >> 16) & 0xFFFFU)
 }

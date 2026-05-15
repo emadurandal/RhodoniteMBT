@@ -1,4 +1,5 @@
 ///|
+/// Defines `WebGPURenderPassColorAttachment`.
 pub struct WebGPURenderPassColorAttachment {
   view : GPUTextureView
   clearValue : @webgpu_enums.GPUColor?
@@ -7,6 +8,7 @@ pub struct WebGPURenderPassColorAttachment {
 }
 
 ///|
+/// Implements `WebGPURenderPassColorAttachment::new`.
 pub fn WebGPURenderPassColorAttachment::new(
   view~ : GPUTextureView,
   clearValue? : @webgpu_enums.GPUColor,
@@ -17,6 +19,7 @@ pub fn WebGPURenderPassColorAttachment::new(
 }
 
 ///|
+/// Implements `create_render_pass_color_attachment`.
 pub fn create_render_pass_color_attachment(
   view~ : GPUTextureView,
   clearValue? : @webgpu_enums.GPUColor,
@@ -27,6 +30,7 @@ pub fn create_render_pass_color_attachment(
 }
 
 ///|
+/// Implements `WebGPURenderPassColorAttachment::get`.
 pub fn WebGPURenderPassColorAttachment::get(
   self : WebGPURenderPassColorAttachment,
 ) -> (

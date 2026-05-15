@@ -1,4 +1,5 @@
 ///|
+/// Implements `webgpu_buffer_readback_view`.
 pub fn webgpu_buffer_readback_view(
   GPUBuffer,
   WebGPUInstance,
@@ -7,6 +8,8 @@ pub fn webgpu_buffer_readback_view(
 ) -> BytesView
 
 ///|
+///|
+/// Implements `webgpu_buffer_readback`.
 #cfg(target="native")
 pub fn webgpu_buffer_readback(
   GPUBuffer,

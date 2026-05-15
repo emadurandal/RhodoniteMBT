@@ -21,21 +21,25 @@ pub using @raw {
 }
 
 ///|
+/// Defines `GPUBuffer`.
 pub(all) struct GPUBuffer {
   raw : @raw.GPUBuffer
 }
 
 ///|
+/// Defines `GPUTexture`.
 pub(all) struct GPUTexture {
   raw : @raw.WebGPUTexture
 }
 
 ///|
+/// Defines `GPUBindGroupLayout`.
 pub(all) struct GPUBindGroupLayout {
   raw : @raw.GPUBindGroupLayout
 }
 
 ///|
+/// Defines `GPUBindGroup`.
 pub(all) struct GPUBindGroup {
   raw : @raw.GPUBindGroup
 }
@@ -78,16 +82,19 @@ pub(all) struct GPUBindGroupDescriptor {
 }
 
 ///|
+/// Defines `GPUSampler`.
 pub(all) struct GPUSampler {
   raw : @raw.GPUSampler
 }
 
 ///|
+/// Defines `GPUExternalTexture`.
 pub(all) struct GPUExternalTexture {
   raw : @raw.GPUExternalTexture
 }
 
 ///|
+/// Defines `GPURenderPassColorAttachment`.
 pub(all) struct GPURenderPassColorAttachment {
   view : GPUTextureView
   clear_value : GPUColor?
@@ -96,6 +103,7 @@ pub(all) struct GPURenderPassColorAttachment {
 }
 
 ///|
+/// Defines `GPURenderPassDepthStencilAttachment`.
 pub(all) struct GPURenderPassDepthStencilAttachment {
   view : GPUTextureView
   depth_clear_value : Double?
@@ -104,37 +112,44 @@ pub(all) struct GPURenderPassDepthStencilAttachment {
 }
 
 ///|
+/// Defines `GPURenderPassDescriptor`.
 pub(all) struct GPURenderPassDescriptor {
   color_attachments : Array[GPURenderPassColorAttachment?]
   depth_stencil_attachment : GPURenderPassDepthStencilAttachment?
 }
 
 ///|
+/// Defines `GPUInstance`.
 pub(all) struct GPUInstance {
   raw : @raw.WebGPUInstance
 }
 
 ///|
+/// Defines `GPUAdapter`.
 pub(all) struct GPUAdapter {
   raw : @raw.WebGPUAdapter
 }
 
 ///|
+/// Defines `GPUDevice`.
 pub(all) struct GPUDevice {
   raw : @raw.WebGPUDevice
 }
 
 ///|
+/// Defines `GPUQueue`.
 pub(all) struct GPUQueue {
   raw : @raw.WebGPUQueue
 }
 
 ///|
+/// Defines `GPUCanvasContext`.
 pub(all) struct GPUCanvasContext {
   raw : @raw.WebGPUCanvasContext
 }
 
 ///|
+/// Defines `GPURenderPipelineDescriptor`.
 pub(all) struct GPURenderPipelineDescriptor {
   vertex : GPUShaderModule
   fragment : GPUShaderModule
@@ -146,21 +161,25 @@ pub(all) struct GPURenderPipelineDescriptor {
 }
 
 ///|
+/// Defines `GPURenderPipeline`.
 pub(all) struct GPURenderPipeline {
   raw : @raw.GPURenderPipeline
 }
 
 ///|
+/// Defines `GPUCommandEncoder`.
 pub(all) struct GPUCommandEncoder {
   raw : @raw.WebGPUCommandEncoder
 }
 
 ///|
+/// Defines `GPURenderPassEncoder`.
 pub(all) struct GPURenderPassEncoder {
   raw : @raw.WebGPURenderPassEncoder
 }
 
 ///|
+/// Defines `GPUContext`.
 pub(all) struct GPUContext {
   raw : @raw.WebGPUContext
 }

@@ -1,9 +1,11 @@
 ///|
+/// Defines `WebGPURenderPassDepthStencilAttachment`.
 pub struct WebGPURenderPassDepthStencilAttachment {
   view : GPUTextureView
 }
 
 ///|
+/// Implements `WebGPURenderPassDepthStencilAttachment::new`.
 pub fn WebGPURenderPassDepthStencilAttachment::new(
   view~ : GPUTextureView,
 ) -> WebGPURenderPassDepthStencilAttachment {
@@ -11,6 +13,7 @@ pub fn WebGPURenderPassDepthStencilAttachment::new(
 }
 
 ///|
+/// Implements `create_render_pass_depth_stencil_attachment`.
 pub fn create_render_pass_depth_stencil_attachment(
   view~ : GPUTextureView,
   depthClearValue~ : Double?,

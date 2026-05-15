@@ -2,6 +2,7 @@
 /// Library-local transform: TRS as views over one tightly packed `f32` row in archetype SoA.
 
 ///|
+/// Defines `Transform3D`.
 pub(all) struct Transform3D {
   position : @v3.Vector3Ref[Byte]
   rotation : @v4.Vector4Ref[Byte]
@@ -36,6 +37,7 @@ pub fn transform3d_gpu_layout() -> GpuLayout {
 }
 
 ///|
+/// Implements `transform3d_from_row_mut`.
 fn transform3d_from_row_mut(row : MutArrayView[Byte]) -> Transform3D {
   // Hot path: fixed offsets (must match transform3d_gpu_layout).
   let stride = 48
@@ -116,6 +118,7 @@ pub fn Transform3D::from_component_mut_view(
 }
 
 ///|
+/// Implements `Transform3DRow::from_component_view`.
 pub fn Transform3DRow::from_component_view(
   row : ArrayView[Byte],
 ) -> Transform3DRow {
@@ -126,6 +129,7 @@ pub fn Transform3DRow::from_component_view(
 }
 
 ///|
+/// Implements `Transform3DMutRow::from_component_mut_view`.
 pub fn Transform3DMutRow::from_component_mut_view(
   row : MutArrayView[Byte],
 ) -> Transform3DMutRow {
@@ -136,11 +140,13 @@ pub fn Transform3DMutRow::from_component_mut_view(
 }
 
 ///|
+/// Implements `Transform3DRow::local_matrix`.
 pub fn Transform3DRow::local_matrix(self : Transform3DRow) -> @m44.Matrix44F {
   Transform3D::local_matrix_from_component_view(self.view)
 }
 
 ///|
+/// Implements `Transform3DMutRow::as_transform3d`.
 pub fn Transform3DMutRow::as_transform3d(
   self : Transform3DMutRow,
 ) -> Transform3D {
@@ -148,6 +154,7 @@ pub fn Transform3DMutRow::as_transform3d(
 }
 
 ///|
+/// Implements `Transform3DMutRow::local_matrix`.
 pub fn Transform3DMutRow::local_matrix(
   self : Transform3DMutRow,
 ) -> @m44.Matrix44F {
@@ -155,6 +162,7 @@ pub fn Transform3DMutRow::local_matrix(
 }
 
 ///|
+/// Implements `Transform3DMutRow::write_position`.
 pub fn Transform3DMutRow::write_position(
   self : Transform3DMutRow,
   x : Float,
@@ -165,6 +173,7 @@ pub fn Transform3DMutRow::write_position(
 }
 
 ///|
+/// Implements `Transform3DMutRow::write_trs`.
 pub fn Transform3DMutRow::write_trs(
   self : Transform3DMutRow,
   px : Float,
@@ -309,6 +318,8 @@ extern "js" fn transform3d_local_matrix_data_from_component_view_js(
 
 ///|
 /// Decodes a read-only component row and returns its local model matrix.
+///|
+/// Implements `Transform3D::local_matrix_from_component_view`.
 #cfg(target="js")
 pub fn Transform3D::local_matrix_from_component_view(
   row : ArrayView[Byte],
@@ -323,6 +334,8 @@ pub fn Transform3D::local_matrix_from_component_view(
 
 ///|
 /// Decodes a read-only component row and returns its local model matrix.
+///|
+/// Implements `Transform3D::local_matrix_from_component_view`.
 #cfg(not(target="js"))
 pub fn Transform3D::local_matrix_from_component_view(
   row : ArrayView[Byte],
@@ -345,6 +358,7 @@ pub fn Transform3D::local_matrix_from_component_view(
 }
 
 ///|
+/// Implements `transform3d_local_matrix_from_trs`.
 fn transform3d_local_matrix_from_trs(
   px : Float,
   py : Float,

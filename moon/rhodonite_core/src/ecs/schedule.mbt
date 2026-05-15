@@ -1,4 +1,5 @@
 ///|
+/// Implements `system_phase_rank`.
 fn system_phase_rank(phase : SystemPhase) -> Int {
   match phase {
     PreUpdate => 0
@@ -10,11 +11,13 @@ fn system_phase_rank(phase : SystemPhase) -> Int {
 }
 
 ///|
+/// Implements `system_phase_count`.
 fn system_phase_count() -> Int {
   5
 }
 
 ///|
+/// Implements `component_array_intersects`.
 fn component_array_intersects(
   a : Array[ComponentTypeId],
   b : Array[ComponentTypeId],
@@ -28,6 +31,7 @@ fn component_array_intersects(
 }
 
 ///|
+/// Implements `system_access_conflicts`.
 fn system_access_conflicts(a : System, b : System) -> Bool {
   a.structural_write ||
   b.structural_write ||
@@ -37,6 +41,7 @@ fn system_access_conflicts(a : System, b : System) -> Bool {
 }
 
 ///|
+/// Implements `system_batch_conflicts_with`.
 fn system_batch_conflicts_with(batch : Array[System], system : System) -> Bool {
   for i = 0; i < batch.length(); i = i + 1 {
     if batch[i].conflicts_with(system) {
@@ -47,6 +52,7 @@ fn system_batch_conflicts_with(batch : Array[System], system : System) -> Bool {
 }
 
 ///|
+/// Implements `run_system_batch`.
 fn run_system_batch(
   batch : Array[System],
   world : World,
@@ -89,6 +95,7 @@ fn run_system_batch(
 }
 
 ///|
+/// Implements `SystemContext::new`.
 pub fn SystemContext::new(
   delta_seconds : Float,
   frame_index : Int,
@@ -97,6 +104,7 @@ pub fn SystemContext::new(
 }
 
 ///|
+/// Implements `build_system`.
 fn build_system(
   constructor_name : String,
   name : String,
@@ -141,6 +149,7 @@ fn build_system(
 }
 
 ///|
+/// Implements `System::new`.
 pub fn System::new(
   name : String,
   phase : SystemPhase,
@@ -166,26 +175,31 @@ pub fn System::new_with_structural_write(
 }
 
 ///|
+/// Implements `System::name`.
 pub fn System::name(self : System) -> String {
   self.name
 }
 
 ///|
+/// Implements `System::phase`.
 pub fn System::phase(self : System) -> SystemPhase {
   self.phase
 }
 
 ///|
+/// Implements `System::reads`.
 pub fn System::reads(self : System) -> Array[ComponentTypeId] {
   copy_component_array(self.reads)
 }
 
 ///|
+/// Implements `System::writes`.
 pub fn System::writes(self : System) -> Array[ComponentTypeId] {
   copy_component_array(self.writes)
 }
 
 ///|
+/// Implements `System::structural_write`.
 pub fn System::structural_write(self : System) -> Bool {
   self.structural_write
 }
@@ -197,17 +211,20 @@ pub fn System::conflicts_with(self : System, other : System) -> Bool {
 }
 
 ///|
+/// Implements `Schedule::new`.
 pub fn Schedule::new() -> Schedule {
   let systems : Array[System] = []
   { systems, }
 }
 
 ///|
+/// Implements `Schedule::len`.
 pub fn Schedule::len(self : Schedule) -> Int {
   self.systems.length()
 }
 
 ///|
+/// Implements `Schedule::add_system`.
 pub fn Schedule::add_system(self : Schedule, system : System) -> Unit {
   self.systems.push(system)
 }

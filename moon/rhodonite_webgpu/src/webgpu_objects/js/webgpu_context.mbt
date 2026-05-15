@@ -1,4 +1,5 @@
 ///|
+/// Defines `WebGPUContext`.
 pub struct WebGPUContext {
   device : WebGPUDevice
   context : WebGPUCanvasContext
@@ -7,6 +8,7 @@ pub struct WebGPUContext {
 }
 
 ///|
+/// Implements `WebGPUContext::new`.
 pub fn WebGPUContext::new(
   device : WebGPUDevice,
   context : WebGPUCanvasContext,
@@ -17,6 +19,7 @@ pub fn WebGPUContext::new(
 }
 
 ///|
+/// Implements `create_webgpu_context`.
 pub fn create_webgpu_context(
   device : WebGPUDevice,
   context : WebGPUCanvasContext,
@@ -27,6 +30,7 @@ pub fn create_webgpu_context(
 }
 
 ///|
+/// Implements `webgpu_context_get`.
 pub fn webgpu_context_get(
   context : WebGPUContext,
 ) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) {

@@ -8,18 +8,23 @@ extern "js" fn monotonic_ms() -> Double =
 extern "C" fn c_clock() -> Int = "clock"
 
 ///|
+///|
+/// Implements `monotonic_ms`.
 #cfg(target="native")
 fn monotonic_ms() -> Double {
   c_clock().to_double() / 1000.0
 }
 
 ///|
+///|
+/// Implements `monotonic_ms`.
 #cfg(not(any(target="js", target="native")))
 fn monotonic_ms() -> Double {
   0.0
 }
 
 ///|
+/// Implements `grid_side_len`.
 fn grid_side_len(n : Int) -> Int {
   let mut s = 1
   while s * s < n {
@@ -29,6 +34,7 @@ fn grid_side_len(n : Int) -> Int {
 }
 
 ///|
+/// Implements `grid_xz_for_index`.
 fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
   let ix = idx % per_side
   let iz = idx / per_side
@@ -40,6 +46,7 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+/// Implements `make_world`.
 fn make_world(
   count : Int,
 ) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
@@ -73,6 +80,7 @@ fn make_world(
 }
 
 ///|
+/// Implements `make_world_batch`.
 fn make_world_batch(
   count : Int,
 ) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
@@ -101,6 +109,7 @@ fn make_world_batch(
 }
 
 ///|
+/// Implements `report`.
 fn report(name : String, count : Int, started : Double, checksum : Int) -> Unit {
   let elapsed = monotonic_ms() - started
   println(
@@ -115,6 +124,7 @@ fn report(name : String, count : Int, started : Double, checksum : Int) -> Unit 
 }
 
 ///|
+/// Implements `bench_query_row`.
 fn bench_query_row(count : Int) -> Unit {
   let (world, tf, _, per_side) = make_world(count)
   let q = @ecs.Query::new([tf])
@@ -137,6 +147,7 @@ fn bench_query_row(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_query_archetype`.
 fn bench_query_archetype(count : Int) -> Unit {
   let (world, tf, _, per_side) = make_world(count)
   let q = @ecs.RawQuery::new([tf])
@@ -162,6 +173,7 @@ fn bench_query_archetype(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_builtin_positions`.
 fn bench_builtin_positions(count : Int) -> Unit {
   let (world, _, _, per_side) = make_world(count)
   let started = monotonic_ms()
@@ -176,6 +188,7 @@ fn bench_builtin_positions(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_global_and_drain`.
 fn bench_global_and_drain(count : Int) -> Unit {
   let (world, _, _gt, _) = make_world(count)
   let started = monotonic_ms()
@@ -189,6 +202,7 @@ fn bench_global_and_drain(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_global_and_drain_views`.
 fn bench_global_and_drain_views(count : Int) -> Unit {
   let (world, _, _gt, _) = make_world_batch(count)
   let started = monotonic_ms()
@@ -202,6 +216,7 @@ fn bench_global_and_drain_views(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_make_world_batch`.
 fn bench_make_world_batch(count : Int) -> Unit {
   let started = monotonic_ms()
   let (_, _, _, _) = make_world_batch(count)
@@ -209,6 +224,7 @@ fn bench_make_world_batch(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `run_suite`.
 fn run_suite(count : Int) -> Unit {
   bench_query_row(count)
   bench_query_archetype(count)
@@ -219,6 +235,7 @@ fn run_suite(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `main {`.
 fn main {
   println("ecs_bench: QueryRow vs archetype vs builtin transform paths")
   run_suite(1000)

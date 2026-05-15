@@ -1,6 +1,7 @@
 ///| Shared SDL3 + Metal (`CAMetalLayer`) + native wgpu bootstrap and render loop.
 
 ///|
+/// Defines `SdlMetalWebGpuNativeSession`.
 pub(all) struct SdlMetalWebGpuNativeSession {
   ctx : @sdl3.Context
   sdl_win : @lib.SDL_Window
@@ -89,6 +90,7 @@ pub async fn init_sdl_metal_webgpu_native(
 }
 
 ///|
+/// Implements `release_native_demo_infrastructure`.
 pub fn release_native_demo_infrastructure(
   session : SdlMetalWebGpuNativeSession,
 ) -> Unit {
@@ -103,6 +105,7 @@ pub fn release_native_demo_infrastructure(
 }
 
 ///|
+/// Implements `run_sdl_metal_webgpu_render_loop`.
 pub fn run_sdl_metal_webgpu_render_loop(
   session : SdlMetalWebGpuNativeSession,
   render_frame : () -> Unit,

@@ -1,4 +1,5 @@
 ///|
+/// Defines `VisualSample`.
 pub(all) struct VisualSample {
   target : String
   id : String
@@ -9,6 +10,7 @@ pub(all) struct VisualSample {
 }
 
 ///|
+/// Implements `visual_samples_for_target`.
 pub fn visual_samples_for_target(target : String) -> Array[VisualSample] raise {
   let manifest = read_text_file(visual_manifest_path())
   if manifest.length() == 0 {
@@ -20,6 +22,7 @@ pub fn visual_samples_for_target(target : String) -> Array[VisualSample] raise {
 }
 
 ///|
+/// Implements `visual_sample_for_target_id`.
 pub fn visual_sample_for_target_id(
   target : String,
   id : String,
@@ -34,11 +37,13 @@ pub fn visual_sample_for_target_id(
 }
 
 ///|
+/// Implements `visual_manifest_path`.
 fn visual_manifest_path() -> String {
   "moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"
 }
 
 ///|
+/// Implements `parse_visual_manifest`.
 fn parse_visual_manifest(
   manifest : String,
   target : String,
@@ -84,6 +89,7 @@ fn parse_visual_manifest(
 }
 
 ///|
+/// Implements `split_ascii`.
 fn split_ascii(s : String, delimiter : Char) -> Array[String] {
   let out : Array[String] = []
   let buf = StringBuilder::new(size_hint=0)
@@ -102,6 +108,7 @@ fn split_ascii(s : String, delimiter : Char) -> Array[String] {
 }
 
 ///|
+/// Implements `trim_ascii`.
 fn trim_ascii(s : String) -> String {
   let mut start = 0
   let mut end = s.length()
@@ -115,6 +122,7 @@ fn trim_ascii(s : String) -> String {
 }
 
 ///|
+/// Implements `is_ascii_space`.
 fn is_ascii_space(code_unit : UInt16) -> Bool {
   code_unit == 9U.to_uint16() ||
   code_unit == 10U.to_uint16() ||
@@ -123,6 +131,7 @@ fn is_ascii_space(code_unit : UInt16) -> Bool {
 }
 
 ///|
+/// Implements `substring_ascii`.
 fn substring_ascii(s : String, start : Int, end : Int) -> String {
   let buf = StringBuilder::new(size_hint=end - start)
   for i = start; i < end; i = i + 1 {
@@ -132,6 +141,7 @@ fn substring_ascii(s : String, start : Int, end : Int) -> String {
 }
 
 ///|
+/// Implements `parse_decimal`.
 fn parse_decimal(s : String, field~ : String) -> Double raise {
   if s.length() == 0 {
     @test.fail("visual regression manifest \{field} is empty")

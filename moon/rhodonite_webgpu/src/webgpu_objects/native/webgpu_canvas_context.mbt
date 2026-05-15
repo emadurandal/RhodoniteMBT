@@ -1,9 +1,11 @@
 ///|
+/// Defines `WebGPUCanvasContext`.
 pub struct WebGPUCanvasContext {
   context : GPUCanvasContext
 }
 
 ///|
+/// Implements `WebGPUCanvasContext::new`.
 pub fn WebGPUCanvasContext::new(
   context : GPUCanvasContext,
 ) -> WebGPUCanvasContext {
@@ -11,6 +13,7 @@ pub fn WebGPUCanvasContext::new(
 }
 
 ///|
+/// Implements `create_canvas_context`.
 pub fn create_canvas_context(context : GPUCanvasContext) -> WebGPUCanvasContext {
   WebGPUCanvasContext::new(context)
 }
@@ -22,6 +25,7 @@ extern "C" fn surface_descriptor_metal_layer_new_html(
 ) -> @c.WGPUSurfaceDescriptorPtr = "mbt_wgpu_surface_descriptor_metal_layer_new"
 
 ///|
+/// Implements `create_metal_canvas_context`.
 pub fn create_metal_canvas_context(
   instance : WebGPUInstance,
   layer : HTMLCanvasElement,
@@ -41,6 +45,7 @@ pub fn create_metal_canvas_context(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_configure`.
 pub fn webgpu_canvas_context_configure(
   context : WebGPUCanvasContext,
   device : GPUDevice,
@@ -79,6 +84,7 @@ pub fn webgpu_canvas_context_configure(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_get_format`.
 pub fn webgpu_canvas_context_get_format(
   context : WebGPUCanvasContext,
 ) -> String {
@@ -86,6 +92,7 @@ pub fn webgpu_canvas_context_get_format(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_get_current_texture`.
 pub fn webgpu_canvas_context_get_current_texture(
   context : WebGPUCanvasContext,
 ) -> WebGPUTexture {
@@ -99,6 +106,7 @@ pub fn webgpu_canvas_context_get_current_texture(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_present`.
 pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
   context.context.surface.present_or_raise() catch {
     _ => ()
@@ -113,6 +121,7 @@ pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
 }
 
 ///|
+/// Implements `webgpu_canvas_context_release`.
 pub fn webgpu_canvas_context_release(context : WebGPUCanvasContext) -> Unit {
   context.context.surface.unconfigure()
   context.context.surface.release()

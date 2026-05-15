@@ -1,4 +1,5 @@
 ///|
+/// Implements `mat4_minor_ref`.
 fn[T : Mul + Add + Sub + Matrix44RefElem] mat4_minor_ref(
   m : Matrix44Ref[T],
   skip_r : Int,
@@ -20,6 +21,7 @@ fn[T : Mul + Add + Sub + Matrix44RefElem] mat4_minor_ref(
 }
 
 ///|
+/// Implements `matrix4_cofactor_ref`.
 fn[T : Mul + Add + Sub + Neg + Matrix44RefElem] matrix4_cofactor_ref(
   m : Matrix44Ref[T],
   r : Int,
@@ -34,6 +36,7 @@ fn[T : Mul + Add + Sub + Neg + Matrix44RefElem] matrix4_cofactor_ref(
 }
 
 ///|
+/// Implements `Matrix44Ref::at`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::at(
   self : Matrix44Ref[T],
   row : Int,
@@ -50,6 +53,7 @@ pub fn[T : Matrix44RefElem] Matrix44Ref::at(
 }
 
 ///|
+/// Implements `Matrix44Ref::set_at`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::set_at(
   self : Matrix44Ref[T],
   row : Int,
@@ -83,6 +87,7 @@ pub fn[T] Matrix44Ref::data(self : Matrix44Ref[T]) -> MutArrayView[T] {
 }
 
 ///|
+/// Implements `Matrix44Ref::write_col_major`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::write_col_major(
   self : Matrix44Ref[T],
   m00 : T,
@@ -121,6 +126,7 @@ pub fn[T : Matrix44RefElem] Matrix44Ref::write_col_major(
 }
 
 ///|
+/// Implements `Matrix44Ref::write_from_cols`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::write_from_cols(
   self : Matrix44Ref[T],
   c0 : @v4.Vector4[T],
@@ -149,6 +155,7 @@ pub fn[T : Matrix44RefElem] Matrix44Ref::write_from_cols(
 }
 
 ///|
+/// Implements `Matrix44Ref::write_zero`.
 pub fn[T : Default + Matrix44RefElem] Matrix44Ref::write_zero(
   self : Matrix44Ref[T],
 ) -> Unit {
@@ -157,6 +164,7 @@ pub fn[T : Default + Matrix44RefElem] Matrix44Ref::write_zero(
 }
 
 ///|
+/// Implements `Matrix44Ref::write_identity_with`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::write_identity_with(
   self : Matrix44Ref[T],
   one : T,
@@ -169,11 +177,13 @@ pub fn[T : Matrix44RefElem] Matrix44Ref::write_identity_with(
 }
 
 ///|
+/// Implements `Matrix44RefF::write_identity`.
 pub fn Matrix44RefF::write_identity(self : Matrix44RefF) -> Unit {
   self.write_identity_with((1.0 : Float), (0.0 : Float))
 }
 
 ///|
+/// Implements `Matrix44Ref::scale`.
 pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::scale(
   self : Matrix44Ref[T],
   s : T,
@@ -199,6 +209,7 @@ pub fn[T : Mul + Matrix44RefElem] Matrix44Ref::scale(
 }
 
 ///|
+/// Implements `Matrix44Ref::div_scalar`.
 pub fn[T : Div + Matrix44RefElem] Matrix44Ref::div_scalar(
   self : Matrix44Ref[T],
   s : T,
@@ -224,6 +235,7 @@ pub fn[T : Div + Matrix44RefElem] Matrix44Ref::div_scalar(
 }
 
 ///|
+/// Implements `Matrix44Ref::transpose`.
 pub fn[T : Matrix44RefElem] Matrix44Ref::transpose(
   self : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
@@ -365,6 +377,7 @@ pub fn Matrix44RefF::transform_point(
 }
 
 ///|
+/// Implements `Matrix44Ref::determinant`.
 pub fn[T : Mul + Add + Sub + Matrix44RefElem] Matrix44Ref::determinant(
   self : Matrix44Ref[T],
 ) -> T {
@@ -429,6 +442,7 @@ pub fn[T : Add + Matrix44RefElem] Matrix44Ref::add_matrix(
 }
 
 ///|
+/// Implements `Matrix44Ref::sub_matrix`.
 pub fn[T : Sub + Matrix44RefElem] Matrix44Ref::sub_matrix(
   self : Matrix44Ref[T],
   other : Matrix44Ref[T],
@@ -437,6 +451,7 @@ pub fn[T : Sub + Matrix44RefElem] Matrix44Ref::sub_matrix(
 }
 
 ///|
+/// Implements `Matrix44Ref::neg_matrix`.
 pub fn[T : Neg + Matrix44RefElem] Matrix44Ref::neg_matrix(
   self : Matrix44Ref[T],
 ) -> @m44.Matrix44[T] {
