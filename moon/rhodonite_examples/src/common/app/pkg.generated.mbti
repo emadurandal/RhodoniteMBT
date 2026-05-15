@@ -27,6 +27,7 @@ pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize_app(Self, App) -> Unit
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
+pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
 pub fn Engine::shutdown_app(Self, App) -> Unit
 pub fn Engine::tick(Self, App) -> Unit
 
@@ -44,10 +45,12 @@ pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 pub struct Scene {
   // private fields
 }
+pub fn Scene::add_system(Self, @ecs.System) -> Unit
 pub fn Scene::enabled(Self) -> Bool
 pub fn Scene::main_camera(Self) -> @ecs.EntityId?
 pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
+pub fn Scene::new_with_world(String, @ecs.World) -> Self
 pub fn Scene::run_schedule(Self, FrameState) -> Bool
 pub fn Scene::run_schedule_with_context(Self, @ecs.SystemContext) -> Bool
 pub fn Scene::schedule(Self) -> @ecs.Schedule

@@ -419,7 +419,7 @@ pub(all) struct WebGPURenderer {
   bind_camera : @wgpu.GPUBindGroup
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
-  world : @ecs.World
+  scene : @app.Scene
   camera : @ecs.EntityId
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
@@ -547,11 +547,36 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+/// Builds the ECS scene used by the mass-cubes sample.
+fn create_scene() -> @app.Scene {
+  @app.Scene::new_with_world(
+    "ecs-mass-cubes",
+    @ecs.World::new_with_global_transform_format(
+      global_transform_default_format(),
+    ),
+  )
+}
+
+///|
+/// Implements `create_engine`.
+pub fn create_engine(context : @wgpu.GPUContext) -> @app.Engine {
+  @app.Engine::new_with_main_scene(context, create_scene())
+}
+
+///|
 /// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = context.get()
+  let engine = create_engine(context)
+  create_renderer_for_engine(engine)
+}
+
+///|
+/// Implements `create_renderer_for_engine`.
+pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+  let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
-    create_renderer_for_device(
+    create_renderer_for_scene(
+      engine.main_scene(),
       device,
       queue,
       format,
@@ -563,6 +588,18 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 ///|
 /// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
+  create_renderer_for_scene(create_scene(), device, queue, format, context~)
+}
+
+///|
+/// Implements `create_renderer_for_scene`.
+pub fn create_renderer_for_scene(
+  scene : @app.Scene,
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
@@ -604,9 +641,7 @@ pub fn create_renderer_for_device(
   @wgpu.shaderModule_release(shader)
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
-  let world = @ecs.World::new_with_global_transform_format(
-    global_transform_default_format(),
-  )
+  let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
   let per_side = grid_side_len(entity_count)
@@ -663,6 +698,7 @@ pub fn create_renderer_for_device(
       (0.0 : Float),
     ),
   )
+  scene.set_main_camera(Some(camera))
   let transform_storage = device.create_global_transform_words_buffer(world)
   let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
@@ -715,7 +751,7 @@ pub fn create_renderer_for_device(
     bind_camera,
     layout_transforms,
     layout_camera,
-    world,
+    scene,
     camera,
     gt,
     tf,
@@ -744,8 +780,66 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Renders the current scene state without advancing app time.
+pub fn render_current_frame(
+  renderer : WebGPURenderer,
+  record_perf? : Bool = false,
+) -> Unit {
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_current_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_current_frame_to_view(renderer, color_view, record_perf~)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+/// Updates the wave animation and transform upload data for one app frame.
+pub fn WebGPURenderer::update_scene(
+  self : WebGPURenderer,
+  frame : @app.FrameState,
+) -> Unit {
+  self.frame.val = frame.frame_index()
+  let t = frame.frame_index().to_double() * 0.018
+  let world = self.scene.world()
+  let writes = update_and_drain_global_transforms(
+    world,
+    self.tf,
+    self.gt,
+    self.per_side,
+    t,
+    self.transform_refs,
+    self.transform_upload_range,
+    self.dense_transform_layout,
+    false,
+  )
+  self.queue.upload_global_transform_writes(self.transform_storage, writes)
+}
+
+///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
+  renderer : WebGPURenderer,
+  color_view : @wgpu.GPUTextureView,
+  record_perf? : Bool = false,
+) -> Unit {
+  renderer.frame.val = renderer.frame.val + 1
+  renderer.update_scene(
+    @app.FrameState::new(
+      (0.022 : Float),
+      renderer.frame.val,
+      renderer.frame.val.to_double() * 0.022,
+    ),
+  )
+  render_current_frame_to_view(renderer, color_view, record_perf~)
+}
+
+///|
+/// Renders the current scene state to a target view without advancing the scene.
+pub fn render_current_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
@@ -763,25 +857,6 @@ pub fn render_frame_to_view(
     0.0
   }
   renderer.perf_last_frame_start_ms.val = t_frame_start
-  renderer.frame.val = renderer.frame.val + 1
-  let t = renderer.frame.val.to_double() * 0.018
-  let gt = renderer.gt
-  let tf = renderer.tf
-  let writes = update_and_drain_global_transforms(
-    renderer.world,
-    tf,
-    gt,
-    renderer.per_side,
-    t,
-    renderer.transform_refs,
-    renderer.transform_upload_range,
-    renderer.dense_transform_layout,
-    false,
-  )
-  renderer.queue.upload_global_transform_writes(
-    renderer.transform_storage,
-    writes,
-  )
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -839,6 +914,21 @@ pub fn render_frame_to_view(
     ecs_mass_cubes_perf_overlay(fps, cpu_ms)
     ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
   }
+}
+
+///|
+/// Builds an app lifecycle that drives this renderer from an engine tick.
+pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+  @app.App::new(
+    fn(_engine) { () },
+    fn(_engine, frame) { renderer.update_scene(frame) },
+    fn(_engine, _frame) {
+      if renderer.scene.visible() {
+        render_current_frame(renderer, record_perf=true)
+      }
+    },
+    fn(_engine) { renderer.release() },
+  )
 }
 
 ///|

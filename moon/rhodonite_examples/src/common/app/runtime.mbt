@@ -99,9 +99,15 @@ pub fn TimeState::next_frame(self : TimeState) -> FrameState {
 ///|
 /// Implements `Scene::new`.
 pub fn Scene::new(name : String) -> Scene {
+  Scene::new_with_world(name, @ecs.World::new())
+}
+
+///|
+/// Builds a scene around an already configured ECS world.
+pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
   {
     name,
-    world: @ecs.World::new(),
+    world,
     schedule: @ecs.Schedule::new(),
     main_camera: None,
     enabled: true,
@@ -125,6 +131,12 @@ pub fn Scene::world(self : Scene) -> @ecs.World {
 /// Implements `Scene::schedule`.
 pub fn Scene::schedule(self : Scene) -> @ecs.Schedule {
   self.schedule
+}
+
+///|
+/// Adds a system to this scene's schedule.
+pub fn Scene::add_system(self : Scene, system : @ecs.System) -> Unit {
+  self.schedule.add_system(system)
 }
 
 ///|
@@ -216,8 +228,17 @@ pub fn App::shutdown(self : App, engine : Engine) -> Unit {
 ///|
 /// Implements `Engine::new`.
 pub fn Engine::new(gpu_context : @wgpu.GPUContext) -> Engine {
+  Engine::new_with_main_scene(gpu_context, Scene::new("main"))
+}
+
+///|
+/// Builds an engine with an explicitly configured main scene.
+pub fn Engine::new_with_main_scene(
+  gpu_context : @wgpu.GPUContext,
+  main_scene : Scene,
+) -> Engine {
   let scenes : Array[Scene] = []
-  scenes.push(Scene::new("main"))
+  scenes.push(main_scene)
   {
     gpu_context,
     scenes,

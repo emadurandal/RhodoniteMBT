@@ -199,6 +199,18 @@ Phase 1 の prototype は [`moon/rhodonite_examples/src/common/app/`](../moon/rh
 
 [`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) はこの prototype へ移行済みです。sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。browser/native entry point は `Engine::tick(app)` を呼び、renderer 側の `App` callback が animation input update と render を担当します。
 
+### 現在の Phase 2 prototype
+
+Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) も prototype runtime に寄せます。
+
+- `Scene::new_with_world(name, world)` を追加し、sample ごとの特殊な `World` 初期化を `Scene` に束ねられるようにする。
+- `Scene::add_system(system)` を追加し、`scene.schedule().add_system(...)` より scene 経由の操作を優先する。
+- `Engine::new_with_main_scene(context, scene)` を追加し、main scene を明示的に指定できるようにする。
+- `ecs-scene-graph` は `Scene::add_system` と `Scene::visible` を使う形に寄せる。
+- `ecs-mass-cubes` は fp16 global transform 用の `World` を `Scene::new_with_world` で包み、browser/native entry point を `Engine::tick(app)` 経由へ移行する。
+
+この段階でも `Scene::world()` と `Scene::schedule()` は残します。ECS component の登録や sample 固有の setup ではまだ直接 access が必要なためです。ただし system 登録や schedule 実行のように scene の境界を強く出せる操作は `Scene` method へ寄せます。
+
 ### Phase 1: examples 内 prototype
 
 目的は public API を固定する前に、既存 sample の重複を減らしながら `App` / `Engine` / `Scene` の形を検証することです。

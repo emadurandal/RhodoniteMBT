@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite_examples/common/app" @app,
   "emadurandal/rhodonite_core/binary/writes" @writes,
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/wgsl" @ecs_wgsl,

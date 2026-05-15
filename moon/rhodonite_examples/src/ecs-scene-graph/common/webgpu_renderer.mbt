@@ -228,8 +228,7 @@ pub fn create_renderer_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  let schedule = scene.schedule()
-  schedule.add_system(@ecs.transform_propagation_system(world))
+  scene.add_system(@ecs.transform_propagation_system(world))
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -548,7 +547,11 @@ pub fn create_app(renderer : WebGPURenderer) -> @app.App {
   @app.App::new(
     fn(_engine) { () },
     fn(_engine, frame) { renderer.update_scene(frame) },
-    fn(_engine, _frame) { render_current_frame(renderer) },
+    fn(_engine, _frame) {
+      if renderer.scene.visible() {
+        render_current_frame(renderer)
+      }
+    },
     fn(_engine) { renderer.release() },
   )
 }
