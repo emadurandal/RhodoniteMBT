@@ -124,7 +124,7 @@ pub fn put_gpu_f32(
 }
 
 ///|
-/// Same as [`put_gpu_f32`] but writes into a [`MutArrayView`] (flat GPU store rows).
+/// Same as [`put_gpu_f32`] but writes into a [`MutArrayView`] for packed GPU rows.
 pub fn put_gpu_f32_mut_view(
   buf : MutArrayView[Byte],
   offset : Int,

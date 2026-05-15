@@ -3,7 +3,6 @@ import type {
 	MoonEntityId,
 	MoonGpuField,
 	MoonGpuLayout,
-	MoonGpuResizeEvent,
 	MoonRegisteredComponent,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -28,16 +27,11 @@ import {
 	gpu_layout_is_valid,
 	gpu_layout_stride,
 	gpu_layout_transform3d,
-	gpu_resize_event_component,
-	gpu_resize_event_needs_full_upload,
-	gpu_resize_event_required_capacity,
 	world_component_info_cpu_stride,
-	world_component_info_kind,
 	world_component_info_name,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { moonBool } from "./views.ts";
 
-export type ComponentKind = "CpuOnly" | "GpuVisible";
 export type GpuFieldKind =
 	| "F32"
 	| "U32"
@@ -180,31 +174,7 @@ export class RegisteredComponent {
 		return world_component_info_name(this.inner);
 	}
 
-	kind(): ComponentKind {
-		return world_component_info_kind(this.inner) as ComponentKind;
-	}
-
 	cpuStride(): number {
 		return world_component_info_cpu_stride(this.inner);
-	}
-}
-
-export class GpuResizeEvent {
-	readonly inner: MoonGpuResizeEvent;
-
-	constructor(inner: MoonGpuResizeEvent) {
-		this.inner = inner;
-	}
-
-	component(): ComponentTypeId {
-		return new ComponentTypeId(gpu_resize_event_component(this.inner));
-	}
-
-	requiredCapacity(): number {
-		return gpu_resize_event_required_capacity(this.inner);
-	}
-
-	needsFullUpload(): boolean {
-		return moonBool(gpu_resize_event_needs_full_upload(this.inner));
 	}
 }

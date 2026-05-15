@@ -95,15 +95,6 @@ pub fn world_register_cpu_component(
 }
 
 ///|
-pub fn world_register_gpu_component(
-  world : @ecs.World,
-  name : String,
-  gpu_layout : @comp.GpuLayout,
-) -> @ecs.ComponentTypeId {
-  world.register_gpu_component(name, gpu_layout)
-}
-
-///|
 pub fn world_component_cpu_stride(
   world : @ecs.World,
   component : @ecs.ComponentTypeId,
@@ -112,27 +103,11 @@ pub fn world_component_cpu_stride(
 }
 
 ///|
-pub fn world_component_gpu_layout(
-  world : @ecs.World,
-  component : @ecs.ComponentTypeId,
-) -> @comp.GpuLayout? {
-  world.component_gpu_layout(component)
-}
-
-///|
 pub fn world_component_info(
   world : @ecs.World,
   component : @ecs.ComponentTypeId,
 ) -> @ecs.RegisteredComponent? {
   world.component_info(component)
-}
-
-///|
-pub fn world_component_info_kind(info : @ecs.RegisteredComponent) -> String {
-  match info.kind {
-    CpuOnly => "CpuOnly"
-    GpuVisible => "GpuVisible"
-  }
 }
 
 ///|
@@ -193,52 +168,12 @@ pub fn world_remove_component(
 }
 
 ///|
-pub fn world_clear_gpu_component(
-  world : @ecs.World,
-  entity : @ecs.EntityId,
-  component : @ecs.ComponentTypeId,
-) -> Bool {
-  world.clear_gpu_component(entity, component)
-}
-
-///|
 pub fn world_component_bytes_copy(
   world : @ecs.World,
   entity : @ecs.EntityId,
   component : @ecs.ComponentTypeId,
 ) -> FixedArray[Byte]? {
   world.component_bytes(entity, component)
-}
-
-///|
-pub fn world_drain_gpu_write_views(
-  world : @ecs.World,
-  component : @ecs.ComponentTypeId,
-) -> Array[@ecs.GpuWriteView] {
-  world.drain_gpu_write_views(component)
-}
-
-///|
-pub fn world_drain_gpu_writes_copy(
-  world : @ecs.World,
-  component : @ecs.ComponentTypeId,
-) -> Array[@ecs.GpuWrite] {
-  world.drain_gpu_writes(component)
-}
-
-///|
-pub fn world_drain_resize_events(
-  world : @ecs.World,
-) -> Array[@ecs.GpuResizeEvent] {
-  world.drain_resize_events()
-}
-
-///|
-pub fn world_gpu_component_active_indices(
-  world : @ecs.World,
-  component : @ecs.ComponentTypeId,
-) -> Array[Int] {
-  world.gpu_component_active_indices(component)
 }
 
 ///|
@@ -672,23 +607,6 @@ pub fn gpu_write_copy_byte_offset(write : @ecs.GpuWrite) -> Int {
 ///|
 pub fn gpu_write_copy_bytes(write : @ecs.GpuWrite) -> FixedArray[Byte] {
   write.bytes
-}
-
-///|
-pub fn gpu_resize_event_component(
-  event : @ecs.GpuResizeEvent,
-) -> @ecs.ComponentTypeId {
-  event.component
-}
-
-///|
-pub fn gpu_resize_event_required_capacity(event : @ecs.GpuResizeEvent) -> Int {
-  event.required_capacity
-}
-
-///|
-pub fn gpu_resize_event_needs_full_upload(event : @ecs.GpuResizeEvent) -> Bool {
-  event.needs_full_upload
 }
 
 ///|

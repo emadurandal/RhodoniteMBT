@@ -85,39 +85,17 @@ fn query_archetype_accesses(
   for k = 0; k < required.length(); k = k + 1 {
     let component = required[k]
     match world.registry.get(component) {
-      Some(rc) =>
-        match rc.kind {
-          CpuOnly => {
-            let ci = arch.column_index(component)
-            if ci < 0 {
-              abort(operation + ": matched archetype is missing CPU column")
-            }
-            accesses.push({
-              component,
-              kind: CpuOnly,
-              column_index: ci,
-              stride: arch.columns[ci].stride,
-            })
-          }
-          GpuVisible => {
-            let stride = match world.gpu_store(component) {
-              Some(store) => store.stride
-              None =>
-                abort(
-                  operation +
-                  ": GpuVisible " +
-                  component_id_text(component) +
-                  " has no GPU store.",
-                )
-            }
-            accesses.push({
-              component,
-              kind: GpuVisible,
-              column_index: -1,
-              stride,
-            })
-          }
+      Some(_) => {
+        let ci = arch.column_index(component)
+        if ci < 0 {
+          abort(operation + ": matched archetype is missing CPU column")
         }
+        accesses.push({
+          component,
+          column_index: ci,
+          stride: arch.columns[ci].stride,
+        })
+      }
       None => abort(operation + ": unknown component")
     }
   }
@@ -241,11 +219,7 @@ fn query_row_accesses_from_archetype_accesses(
   let out : Array[QueryRowComponentAccess] = []
   for i = 0; i < accesses.length(); i = i + 1 {
     let access = accesses[i]
-    out.push({
-      kind: access.kind,
-      column_index: access.column_index,
-      stride: access.stride,
-    })
+    out.push({ column_index: access.column_index, stride: access.stride })
   }
   out
 }
@@ -424,34 +398,9 @@ fn QueryRow::component_view(
 ) -> ArrayView[Byte] {
   let payload_index = self.component_payload_index(component, operation)
   let access = self.accesses[payload_index]
-  match access.kind {
-    CpuOnly => {
-      let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
-      let base = self.row * access.stride
-      col.bytes[base:base + access.stride]
-    }
-    GpuVisible =>
-      match self.world.gpu_store(component) {
-        Some(store) =>
-          match store.entity_row_view(self.entity.index) {
-            Some(v) => v
-            None =>
-              abort(
-                operation +
-                ": GpuVisible " +
-                component_id_text(component) +
-                " row is outside the current GPU store capacity. Hint: GPU-visible ownership should be initialized through add_component/add_component_bytes before querying.",
-              )
-          }
-        None =>
-          abort(
-            operation +
-            ": GpuVisible " +
-            component_id_text(component) +
-            " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
-          )
-      }
-  }
+  let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
+  let base = self.row * access.stride
+  col.bytes[base:base + access.stride]
 }
 
 ///|
@@ -460,43 +409,19 @@ fn QueryRow::component_mut_view(
   self : QueryRow,
   component : ComponentTypeId,
   operation : String,
-  mark_gpu_dirty : Bool,
 ) -> MutArrayView[Byte] {
+  ignore(operation)
   let payload_index = self.component_payload_index(component, operation)
   let access = self.accesses[payload_index]
-  match access.kind {
-    CpuOnly => {
-      let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
-      let base = self.row * access.stride
-      col.bytes.mut_view(start=base, end=base + access.stride)
-    }
-    GpuVisible =>
-      match
-        self.world.ensure_gpu_store_capacity(component, self.entity.index + 1) {
-        Some(store) => {
-          if mark_gpu_dirty {
-            store.mark_dirty(self.entity.index)
-            self.world.replace_gpu_store(store)
-          }
-          let base = self.entity.index * store.stride
-          store.bytes.mut_view(start=base, end=base + store.stride)
-        }
-        None =>
-          abort(
-            operation +
-            ": GpuVisible " +
-            component_id_text(component) +
-            " has no GPU store. Hint: register GPU-visible components through World::register_gpu_component; CPU components should use World::register_cpu_component.",
-          )
-      }
-  }
+  let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
+  let base = self.row * access.stride
+  col.bytes.mut_view(start=base, end=base + access.stride)
 }
 
 ///|
 /// Runs `f` with a closure-scoped read-only payload view for `component`.
 ///
-/// CpuOnly components return their archetype SoA row; GpuVisible components return the flat GPU
-/// store row for this entity. The component must be part of the query's required set.
+/// Components return their archetype SoA row. The component must be part of the query's required set.
 pub fn QueryRow::read(
   self : QueryRow,
   component : ComponentTypeId,
@@ -510,14 +435,13 @@ pub fn QueryRow::read(
 /// Runs `f` with a closure-scoped mutable payload view for `component`.
 ///
 /// Schedule execution requires `component` to be declared in the active System's `writes` set.
-/// Requesting a mutable view for a GpuVisible component marks that entity row dirty immediately.
 pub fn QueryRow::write(
   self : QueryRow,
   component : ComponentTypeId,
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Unit {
   self.world.assert_system_component_write(component, "QueryRow::write")
-  f(self.component_mut_view(component, "QueryRow::write", true))
+  f(self.component_mut_view(component, "QueryRow::write"))
 }
 
 ///|
@@ -537,7 +461,7 @@ pub fn RawQueryRow::write_view(
 ) -> MutArrayView[Byte] {
   let row = self.as_query_row()
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
-  row.component_mut_view(component, "RawQueryRow::write_view", true)
+  row.component_mut_view(component, "RawQueryRow::write_view")
 }
 
 ///|
@@ -562,7 +486,7 @@ pub fn QueryRow::write_transform3d(
   )
   f(
     @comp.Transform3DMutRow::from_component_mut_view(
-      self.component_mut_view(component, "QueryRow::write_transform3d", true),
+      self.component_mut_view(component, "QueryRow::write_transform3d"),
     ),
   )
 }
@@ -584,7 +508,7 @@ pub fn QueryRow::write_child_of(self : QueryRow, parent : EntityId) -> Unit {
     component, "QueryRow::write_child_of",
   )
   let row = @comp.ChildOfMutRow::from_component_mut_view(
-    self.component_mut_view(component, "QueryRow::write_child_of", true),
+    self.component_mut_view(component, "QueryRow::write_child_of"),
   )
   row.write_parent(parent.index, parent.generation)
 }
@@ -689,8 +613,7 @@ fn RawQueryArchetype::component_payload_index(
 }
 
 ///|
-/// Returns the contiguous CPU SoA column for `component`. GPU-visible components are flat by
-/// `EntityId.index` instead of archetype row, so use row views or component-specific APIs for them.
+/// Returns the contiguous CPU SoA column for `component`.
 pub fn RawQueryArchetype::read_column(
   self : RawQueryArchetype,
   component : ComponentTypeId,
@@ -702,18 +625,10 @@ pub fn RawQueryArchetype::read_column(
     component, "RawQueryArchetype::read_column",
   )
   let access = self.accesses[access_index]
-  match access.kind {
-    CpuOnly => {
-      let arch = self.world.archetypes[self.archetype_index]
-      let col = arch.columns[access.column_index]
-      let logical_end = arch.entities.length() * col.stride
-      col.bytes[0:logical_end]
-    }
-    GpuVisible =>
-      abort(
-        "RawQueryArchetype::read_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
-      )
-  }
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let logical_end = arch.entities.length() * col.stride
+  col.bytes[0:logical_end]
 }
 
 ///|
@@ -729,16 +644,8 @@ pub fn RawQueryArchetype::write_column(
     component, "RawQueryArchetype::write_column",
   )
   let access = self.accesses[access_index]
-  match access.kind {
-    CpuOnly => {
-      let arch = self.world.archetypes[self.archetype_index]
-      let col = arch.columns[access.column_index]
-      let logical_end = arch.entities.length() * col.stride
-      col.bytes.mut_view(start=0, end=logical_end)
-    }
-    GpuVisible =>
-      abort(
-        "RawQueryArchetype::write_column: GpuVisible columns are flat by EntityId.index, not archetype row.",
-      )
-  }
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let logical_end = arch.entities.length() * col.stride
+  col.bytes.mut_view(start=0, end=logical_end)
 }

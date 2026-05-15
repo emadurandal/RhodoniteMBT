@@ -27,11 +27,6 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	};
 	export type MoonGpuWriteView = { byte_offset: number; bytes: MoonByteView };
 	export type MoonGpuWriteCopy = { byte_offset: number; bytes: Uint8Array | number[] };
-	export type MoonGpuResizeEvent = {
-		component: MoonComponentTypeId;
-		required_capacity: number;
-		needs_full_upload: MoonBool;
-	};
 
 	export function entity_id_new(index: number, generation: number): MoonEntityId;
 	export function entity_id_index(entity: MoonEntityId): number;
@@ -60,24 +55,14 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		name: string,
 		cpuStride: number,
 	): MoonComponentTypeId;
-	export function world_register_gpu_component(
-		world: MoonWorld,
-		name: string,
-		gpuLayout: MoonGpuLayout,
-	): MoonComponentTypeId;
 	export function world_component_cpu_stride(
 		world: MoonWorld,
 		component: MoonComponentTypeId,
 	): number | undefined;
-	export function world_component_gpu_layout(
-		world: MoonWorld,
-		component: MoonComponentTypeId,
-	): MoonGpuLayout | undefined;
 	export function world_component_info(
 		world: MoonWorld,
 		component: MoonComponentTypeId,
 	): MoonRegisteredComponent | undefined;
-	export function world_component_info_kind(info: MoonRegisteredComponent): string;
 	export function world_component_info_name(info: MoonRegisteredComponent): string;
 	export function world_component_info_cpu_stride(info: MoonRegisteredComponent): number;
 	export function world_has_component(
@@ -107,20 +92,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		entity: MoonEntityId,
 		component: MoonComponentTypeId,
 	): MoonBool;
-	export function world_clear_gpu_component(
-		world: MoonWorld,
-		entity: MoonEntityId,
-		component: MoonComponentTypeId,
-	): MoonBool;
 	export function world_component_bytes_copy(
 		world: MoonWorld,
 		entity: MoonEntityId,
 		component: MoonComponentTypeId,
 	): Uint8Array | number[] | undefined;
-	export function world_drain_gpu_write_views(
-		world: MoonWorld,
-		component: MoonComponentTypeId,
-	): MoonGpuWriteView[];
 	export function world_drain_global_transform_blob_write_views(
 		world: MoonWorld,
 	): MoonGpuWriteView[];
@@ -130,15 +106,6 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		wordCount: number,
 		f: (bytes: MoonByteView) => void,
 	): MoonGpuWriteView[];
-	export function world_drain_gpu_writes_copy(
-		world: MoonWorld,
-		component: MoonComponentTypeId,
-	): MoonGpuWriteCopy[];
-	export function world_drain_resize_events(world: MoonWorld): MoonGpuResizeEvent[];
-	export function world_gpu_component_active_indices(
-		world: MoonWorld,
-		component: MoonComponentTypeId,
-	): number[];
 	export function world_set_transform_trs(
 		world: MoonWorld,
 		entity: MoonEntityId,
@@ -313,15 +280,6 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function gpu_write_view_bytes(write: MoonGpuWriteView): MoonByteView;
 	export function gpu_write_copy_byte_offset(write: MoonGpuWriteCopy): number;
 	export function gpu_write_copy_bytes(write: MoonGpuWriteCopy): Uint8Array | number[];
-	export function gpu_resize_event_component(
-		event: MoonGpuResizeEvent,
-	): MoonComponentTypeId;
-	export function gpu_resize_event_required_capacity(
-		event: MoonGpuResizeEvent,
-	): number;
-	export function gpu_resize_event_needs_full_upload(
-		event: MoonGpuResizeEvent,
-	): MoonBool;
 
 	export function bytes_get_f32(bytes: Uint8Array | number[], offset: number): number;
 	export function bytes_put_f32(

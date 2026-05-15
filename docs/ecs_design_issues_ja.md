@@ -1,297 +1,47 @@
-# Rhodonite Core ECS 設計課題メモ
+# ECS Design Notes
 
-このメモは [`ecs_ja.md`](ecs_ja.md) と [`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) の現行実装を読んだ上で、設計上の問題点と今後の課題を整理したものです。
+この文書は現行 ECS の設計上の注意点をまとめます。現在の ECS component storage は CPU-only の archetype SoA に統一されています。renderer upload 用の bytes は arbitrary component storage ではなく、builtin `GlobalTransform` / `Camera` の packed blob store が扱います。
 
-特に、かつて公開していた低レベル row iterator が内部 payload を `MutArrayView[Byte]` として返していた設計について、利点、欠点、マルチスレッド化への影響を中心に扱います。現行の row iteration API は高級 `Query` と低級 `RawQuery` に分かれます。
+## 残っている設計上の論点
 
-## 結論
+### Query view の lifetime
 
-現行 ECS は、単一スレッドで低レベルに高速な SoA / GPU flat storage を操作する実装としては筋が通っています。一方で、内部の可変バイト列を直接触らせる API は、将来の System 化やマルチスレッド実行ではそのまま障害になります。そのため現行実装では、通常の row iteration を closure 型の `Query` にし、直接 view を返す API は `RawQuery` に明示的に分けています。
+`QueryRow::read` / `write` と `RawQueryRow::read_view` / `write_view` は closure-scoped view を返します。view を外へ逃がさない API 形状にしているため、将来の System 実行順や並列化に向けて最低限の境界は保っています。
 
-最も大きい課題は次の 4 点です。
+ただし `RawQueryArchetype::write_column` は archetype column 全体を mutable view として貸し出す expert API です。callback 中の構造変更は `World::assert_not_querying` で拒否されますが、利用側は同じ component の別 mutable view を同時に作らないように query required set の duplicate check に依存します。
 
-- `MutArrayView[Byte]` が内部 storage の可変参照を直接公開しており、借用範囲や排他性を型としては表現できていない。
-- `Query::for_each` の callback 中の構造変更は `query_depth` guard で実行時に禁止している。現行実装では最小の `CommandBuffer` を追加済みで、query / system 後に遅延適用できる。
-- `GpuVisible` component の dirty は `QueryRow::write` / `RawQueryRow::write_view` 取得時に自動記録されるが、実際に bytes が変わったかまでは見ないため、最小 dirty ではない。bulk path では dirty range を直接積め、即時 upload では JS / native とも `drain_gpu_write_views` で payload copy なしの borrowed span を返せるが、row view 経由の最小 dirty 問題は残る。
-- `World` 全体が `Array` ベースの可変所有物で、query borrow を型で表す境界はまだない。現行実装では、まず `System::reads` / `writes`、`structural_write` と同一 phase 内の conflict 検査 API を追加済み。
+### Schedule access declaration
 
-したがって、`MutArrayView[Byte]` 自体は「低レベル backend API」として残せますが、将来の並列 System API の主インターフェースにするのは避けた方がよいです。
+現行実装は single-thread 実行ですが、`System` は `reads` / `writes` / `structural_write` を宣言します。この宣言は schedule 実行中の API guard と conflict detection に使います。
 
-## 現行設計の良い点
+- `writes` は同じ component の read も許可します。
+- entity/archetype 構造を変える API は `structural_write` を要求します。
+- `CommandBuffer` は queue 時点で component write と structural write を検証します。
+- component 登録は schedule 実行中に lock されます。
 
-### CPU SoA と GPU flat storage の分離
+### Builtin packed blob
 
-`CpuOnly` component は archetype ごとの SoA column に置かれ、`GpuVisible` component は `EntityId.index * stride` で引ける flat `GpuComponentStore` に置かれます。この分離は WebGPU 向けには有効です。
+`GlobalTransform` と `Camera` は CPU ref component と packed GPU blob の二層構造です。SoA row は renderer extraction 用の小さな ref だけを持ち、実 matrix payload は blob 側で resize/write event を管理します。
 
-利点:
+`GpuWriteView` は blob backing storage を借用するため、同じ blob を次に mutate / resize する前に upload する前提です。owned copy が必要な経路を増やす場合は、copy API を明示的な名前で追加してください。
 
-- archetype 移行で CPU row が swap-remove されても、GPU 側の論理 index が変わらない。
-- shader / storage buffer 側で `EntityId.index` を配列添字として使える。
-- CPU 走査と GPU upload の責務が分かれている。
-- `drain_gpu_writes` が dirty entity index を連続 range にまとめられる。
-- bulk 更新では dirty index を 1 件ずつ積まず、dirty range として記録できる。
-- `drain_gpu_write_views` により、renderer がすぐ upload する path では `GpuComponentStore` の backing bytes を JS / native 共通の借用 view として渡せる。
-- native の汎用 `GPUQueue::write_buffer_from_array_view` は `ArrayView[Byte]` を直接 `wgpuQueueWriteBuffer` に渡し、`GPUBuffer::readback_view` は readback 後の部分範囲を `BytesView` として返すため、write/read の compact 用追加 copy を避けられる。
-- `GpuVisible` の ownership は packed active index set でも追跡され、renderer / extract 側が全 slot を走査しない入口を持てる。
+### API cleanup status
 
-この構造自体は維持する価値があります。
+汎用 GPU component storage は削除済みです。以下の責務は残していません。
 
-### `MutArrayView[Byte]` によるゼロコピー row access
+- arbitrary component の GPU upload queue
+- entity index 固定の component payload storage
+- component kind 分岐
+- component ごとの active index set
 
-`QueryRow::read` / `QueryRow::write` は `ComponentColumn::bytes` の row 範囲を closure に貸し出します。`GpuVisible` の場合も `GpuComponentStore.bytes` の entity slot を view にします。CPU-only のホットループでは `RawQuery::for_each_archetype` が列 view を返し、マッチした archetype ごとに component column index / stride を cache します。
+今後 GPU 向けデータを追加する場合は、まず builtin blob と同じ dedicated store にするか、CPU SoA から renderer extraction で明示的に pack する方針を検討してください。
 
-利点:
+## Test Focus
 
-- `FixedArray[Byte]` へのコピーなしで component row を読める、書ける。
-- `Transform3D::from_component_mut_view` や `GlobalTransform::view_affine3x4_gpu_row` のように、バイト列の上に typed view を被せられる。
-- CPU SoA と GPU row を同じ callback payload として扱える。
-- component 型ごとの generic / reflection が薄い MoonBit 環境でも、低レベル API を少ない型で表現できる。
+継続して確認するポイント:
 
-現在の `update_global_transforms_from_transforms` はこの利点を活かして、`Transform3D` の SoA row を読み、`GlobalTransform` の packed blob slot へ直接書いています。`ChildOf` を持たない archetype は fast path に残し、`ChildOf` を含む archetype だけを階層 path で処理するため、scene の一部に親子関係があっても flat な大量 entity は巻き込まれません。`update_transform3d_positions` も正式な bulk API として追加され、JS では公開 archetype-column API、非 JS では direct archetype sweep で position だけを更新します。
-
-大量生成向けには `World::spawn_transform_global_batch` が追加されています。これは builtin `[Transform3D, GlobalTransform]` archetype に entity を直接 append し、callback に `Transform3D` CPU row と `GlobalTransform` ref row の mutable view を渡します。任意 signature 向けには `World::spawn_batch` があり、`SpawnBatchRow::write` から CPU/GPU row を直接初期化できます。これらにより、component 追加時の temporary bytes と archetype migration を避けられます。
-
-## `MutArrayView[Byte]` 公開の問題点
-
-### 1. 型安全性が弱い
-
-payload は `Array[MutArrayView[Byte]]` で、どの view がどの component かは `required` の順序に依存します。
-
-問題:
-
-- `payloads[0]` / `payloads[1]` の取り違えを型で防げない。
-- stride や layout の意味を callback 側が知っている必要がある。
-- `CpuOnly` と `GpuVisible` が同じ `MutArrayView[Byte]` で見えるため、dirty 必要性や storage の違いが型に出ない。
-- `Transform3D` などの typed view がバイト列に別解釈を与えるだけなので、不正な component id との組み合わせを防ぎにくい。
-
-低レベル API としては許容できますが、アプリケーション System が常用する API としては事故の余地が大きいです。
-
-### 2. 内部 storage の可変参照が callback 外へ逃げる可能性
-
-低レベル row iterator は view を作って callback に渡しますが、API 上は callback が view を保存しない保証を表現できません。現行実装では通常 API を `QueryRow::read` / `QueryRow::write` の closure 型にし、直接 view を返す API は `RawQueryRow::read_view` / `write_view` として明示的な低級 API に寄せています。
-
-`MutArrayView` が実際にどこまでコンパイラに制約されるかに依存しますが、設計上は少なくとも次の前提を利用者に要求しています。
-
-- callback 中だけ使う。
-- `World` の構造変更後に古い view を使わない。
-- 同じ storage に対する別 view と同時に競合書き込みしない。
-
-このようなライフタイム制約は、ドキュメントだけでは将来の大規模利用時に破れやすいです。
-
-### 3. Query 中の構造変更は guard 済みで、最小の遅延変更 API も追加済み
-
-内部 row iterator は `self.archetypes` と `arch.entities` を直接走査します。以前は公開 callback に `World` を閉じ込めることで、callback 内から次のような操作を呼べました。
-
-- `add_component` / `add_component_bytes`
-- `remove_component`
-- `destroy_entity`
-- `create_entity`
-- `register_cpu_component` / `register_gpu_component`
-- `set_component_bytes` / `clear_gpu_component`
-
-これらは archetype の追加、row の追加、swap-remove、location 更新、GPU store resize を起こします。走査中に同じ archetype を変更すると、次の問題が起こりえます。
-
-- 現在の row view が指す byte range と entity location がずれる。
-- swap-remove により未走査 entity が移動し、スキップまたは重複処理される。
-- `arch.entities.length()` が走査中に変わる。
-- 新 archetype が追加され、同じ query 実行中に対象集合が変わる。
-- view 作成後に backing array が伸び、view の妥当性が不明になる。
-
-現行実装では、`World` に `query_depth` を持たせ、query 実行中に構造変更系 API が呼ばれた場合は `abort` します。これにより、低レベル query API のままでも row view と entity location の破壊は実行時に防げます。
-
-ただし、これは「禁止」の仕組みであり、System から構造変更を安全に要求する仕組みではありませんでした。現行実装では `CommandBuffer` を追加済みで、entity 作成・破棄、component 追加、`remove component`、`set/clear GPU component` を query / system 後に適用できます。entity 作成は queue 時点で予約 `EntityId` を返し、同じ command buffer の後続 command で component を追加できます。
-
-### 4. GPU dirty 管理は write view 取得時に自動化済み
-
-`GpuComponentStore::set_bytes` や `mut_entity_row` は `mark_dirty` します。現行実装では、`QueryRow::write` と `RawQueryRow::write_view` が `GpuVisible` の `MutArrayView[Byte]` を取得する時点でも dirty を記録します。
-
-これにより、GPU-visible row を変更したのに dirty を立て忘れる問題は縮小しています。さらに `update_global_transforms_from_transforms` などの bulk path は、連続した `EntityId.index` 群を dirty range として直接記録し、`drain_gpu_writes` が個別 dirty index と range を統合して upload span を作ります。
-
-即時 upload する renderer では `drain_gpu_write_views` を使うと、`GpuWrite` の owned payload ではなく `GpuWriteView` の `ArrayView[Byte]` として dirty span を取得できます。JS backend では `GPUQueue::write_buffer_from_array_view` が backing `Uint8Array` と source offset / size を `GPUQueue.writeBuffer` に渡します。native backend でも同 helper が `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡すため、ECS drain から WebGPU upload までの追加 payload copy を避けられます。
-
-残る注意点:
-
-- 自動 dirty は「実際に bytes が変わった row」ではなく、「GpuVisible の mutable view を要求した row」に立つ。
-- `write` / `write_view` で mutable view を取得して実際には書かなかった場合も upload 対象になる。
-- 読み取りだけなら `read` / `read_view` を使う規律が必要。
-- dirty range は bulk path には有効だが、散在した row write では従来通り個別 dirty index が必要。
-- `GpuWriteView` は GPU component store の backing bytes を借用するため、同じ store を resize / mutate する前に upload まで終える必要がある。
-- native backend の汎用 `write_buffer_from_array_view` は `ArrayView[Byte]` を lower-level queue binding に渡すため、任意の `ArrayView[Byte]` upload でも `Bytes::from_array` の compact copy は発生しない。
-- native readback は WebGPU の map alignment に合わせた staging `Bytes` へのコピー自体は必要だが、`GPUBuffer::readback_view` を使えば aligned staging から要求範囲だけを `Bytes` に compact する追加 copy は発生しない。
-
-より厳密な最小 dirty が必要になった場合は、`GpuRowMut` の setter 経由で書き込みを記録する wrapper、または callback 前後の bytes 比較 helper を別途検討できます。
-
-### 5. 大量生成の direct write path は builtin transform に限定済み
-
-`spawn_transform_global_batch` は、多数の transform entity を作る sample で特に効く path として追加されています。通常の `create_entity` + `add_component_bytes` を繰り返す代わりに、entity と location を確保し、既知の builtin archetype の行へ直接書き込みます。
-
-利点:
-
-- `Transform3D` と `GlobalTransform` の追加で archetype migration を挟まない。
-- 初期値を `MutArrayView[Byte]` へ直接書くため、`FixedArray[Byte]` payload の一時生成を避けられる。
-- entity index が連続しやすく、後続の dense global transform 更新や dirty range と相性が良い。
-
-注意点:
-
-- 現時点では builtin transform 専用 API であり、任意 component set の汎用 bulk spawn ではない。
-- callback が渡された row を必ず初期化する前提で、型安全な component builder ではない。
-- 汎用化する場合は component layout、CPU/GPU storage kind、dirty 記録、archetype key の cache をまとめて扱う設計が必要。
-
-### 6. CPU column の backing capacity と論理行数は分離済み
-
-現行実装では `ComponentColumn` が `row_capacity` を持ちます。`push_empty_row` は capacity を幾何級数的に伸ばし、削除時に backing bytes を毎回 shrink しません。`RawQueryArchetype::read_column` / `write_column` は `entities.length() * stride` の論理長だけを返すため、未使用 capacity は公開 view に出ません。
-
-利点:
-
-- append / swap-remove のたびに byte array を細かく伸縮しない。
-- hot loop は論理 row 範囲だけを走査できる。
-- JS の typed backing や非 JS の capacity growth 改善と衝突しにくい。
-
-注意点:
-
-- `ComponentColumn.bytes.length()` は必ずしも論理バイト長ではない。内部実装で列全体を走査する場合は `arch.entities.length() * stride` を使う必要があります。
-
-## マルチスレッド化への影響
-
-### 現状のままでは並列 System 実行は難しい
-
-現在の `World` は内部に複数の可変 `Array` を持つ単一の mutable object です。内部 row iterator は `self : World` を受け取り、内部 storage の `MutArrayView[Byte]` を callback に渡します。
-
-この形では、複数 System を別スレッドで同時に走らせると次の競合が起こります。
-
-- 同じ component column への同時書き込み。
-- 片方が query 走査中に、もう片方が entity / archetype を構造変更する。
-- GPU store bytes / dirty_flags / dirty_indices への同時書き込み。
-- `resize_events` への同時 push。
-- `generations` / `alive` / `locations` / `free_indices` の同時更新。
-
-`MutArrayView[Byte]` は「ここを書ける」という能力を直接渡すため、スケジューラが排他制御を行う前提がないと data race を防げません。
-
-### 障害になるのは `MutArrayView` そのものより、借用境界がないこと
-
-`MutArrayView[Byte]` は、単一 archetype の disjoint row range を worker に分けるような用途では有効です。例えば同じ component column でも、row 0..999 と row 1000..1999 のように非重複 range に分割できれば、並列処理の実装材料にはなります。
-
-問題は、現行 API がその分割と排他性を表現していないことです。
-
-必要な境界:
-
-- Query 実行中は構造変更しない。現行実装では `query_depth` guard で単一スレッド内の誤用を検出する。
-- System ごとに read component / write component を宣言する。現行実装では `System::reads` / `writes` を追加済み。`writes` は「書き込み専用」ではなく「読み書き可能アクセス」を意味し、`writes` に含めた component は読むこともできる。したがって同じ component を `reads` と `writes` の両方に入れる必要はなく、現行実装では重複を `abort` する。
-- entity 作成・破棄のような World 構造変更は component payload 書き込みとは別の権限として扱う。現行実装では `System::new_with_structural_write` で `structural_write` を立てた system だけが `create_entity` / `destroy_entity` を実行できる。
-- 同じ component への write が重なる System は同時実行しない。現行実装では `System::conflicts_with` と `Schedule::has_parallel_access_conflicts` で、同一 phase 内の write/write、write/read、read/write 衝突を検査できる。`structural_write` を持つ system は entity/archetype の集合や配置を変える可能性があるため、同一 phase の他 system とは衝突扱いにする。
-- `GpuVisible` dirty tracking は thread-local に集めて後で merge する。
-- archetype ごと、または row chunk ごとに disjoint な mutable slice を切って worker に渡す。
-
-これらを導入すれば、内部実装で `MutArrayView[Byte]` を使うこと自体は可能です。ただし公開 System API で生の `MutArrayView[Byte]` を広く露出すると、スケジューラの保証を利用者コードが簡単に破れてしまいます。
-
-### 推奨する並列化の段階
-
-1. まず単一スレッドの `Schedule` と `CommandBuffer` を導入する。
-2. System に `reads` / `writes` component set を持たせる。現行実装では追加済み。`writes` は読み書き可能アクセスで、`reads` と `writes` の交差は許さない。
-3. Query callback 中の構造変更禁止は現行の `query_depth` guard を前提にし、System では `CommandBuffer` 経由に寄せる。
-4. 公開 row iteration は closure-scoped な高級 `Query` を標準 path にし、直接 view を返す expert path は `RawQuery` として明示的に分離する。現行実装では対応済み。
-5. `query_depth` guard では表現できない read/write 排他性を System 側の宣言で検査する。現行実装では同一 phase 内の conflict helper、schedule 実行中の World API access guard、conflict-free な greedy batch 分割を追加済み。
-6. dirty tracking を per-thread buffer に分離し、System 終了時に `GpuComponentStore` へ merge する。
-7. 最後に read/write set が衝突しない System だけ並列実行する。
-
-この順序なら、現行設計を壊しすぎずに安全性を足せます。
-
-## その他の設計課題
-
-### Component 登録後の既存 archetype 対応
-
-`register_cpu_component` / `register_gpu_component` は registry と `gpu_stores` に slot を追加します。既存 archetype は新 component を含まないため即時問題にはなりませんが、実行中に登録できる設計は System スケジューリングと相性が悪いです。
-
-現行実装では `World::component_registration_locked` を追加済みです。`Schedule::run` は system 実行中だけ world の component 登録を内部的にロックし、その間の `register_cpu_component` / `register_gpu_component` は abort します。run が戻る前に登録ロックは解除されるため、schedule 実行と実行の間では新しい component type を登録できます。
-
-残る推奨:
-
-- component 登録は active な schedule 実行の外で行う。
-- 既存 system が新 component を読む/書く必要がある場合は、その component 登録後に該当 system を追加または作り直す。
-
-### Archetype 検索と component 検索
-
-現行実装では、構造変更時の archetype lookup 用に signature cache を持ちます。また query planning は component-to-archetype index を使い、required component のうち候補 archetype が最も少ない component から走査を始めます。`RawQuery::for_each_archetype` と `PreparedQuery::for_each` / `RawPreparedQuery` は、マッチした archetype ごとに required component の column index / stride を cache し、hot loop 側の繰り返し探索は避けています。
-
-将来候補:
-
-- component id の sorted list に対する二分探索。
-- query pattern ごとの長寿命 archetype match cache。
-- 並列 chunk 分割と一体化した query plan cache。
-
-ただし、現時点では安全性・構造変更ルールの整理と、実測に基づく hot path 選定の方が優先度は高いです。
-
-### `required` の重複・順序の扱い
-
-`required` は `Array[ComponentTypeId]` のため、未ソートを許します。未ソートは payload 順序として意味があります。
-
-重複 component については、現行実装の `Query::new` が duplicate required を検出して `abort` します。同じ component row を同一 callback に複数渡す意味が曖昧なためです。
-
-残る推奨:
-
-- System 用 Query builder では重複を作れないようにする。
-
-### `GpuVisible` component の archetype 上の存在表現
-
-`GpuVisible` は archetype signature には含まれますが、archetype column stride は `0` です。このため、「component を持つかどうか」と「payload はどこにあるか」が分離しています。現行実装では、所有追加は `add_component` / `add_component_bytes` が CPU-only / GPU-visible の両方を registry kind に応じて扱い、既存 payload の読み書きは `component_bytes` / `set_component_bytes` が registry kind に応じて扱います。
-
-現行実装では、`component_bytes` / `set_component_bytes` が CPU-only / GPU-visible の両方を registry kind に応じて扱います。GPU-visible component の場合でも、entity が対象 component を archetype signature 上で持っていることを要求します。GPU store 自体は `EntityId.index` で任意 slot を表現できますが、component 所有の正しさは archetype signature に寄せています。
-
-`GpuVisible` component を `remove_component` で外す場合は、archetype signature から ownership を外すだけでなく、対象 entity の flat GPU slot を zero clear して dirty にします。これは `destroy_entity` が GPU slot を scrub する方針と揃え、renderer 側の draw list 更新が遅れた場合でも stale GPU payload が残りにくいようにするためです。
-
-現行実装では、`add_component` / `add_component_bytes` で GPU slot を active set に追加し、`remove_component` / `destroy_entity` で active set から外します。`World::gpu_component_active_indices` はこの packed set のコピーを返します。
-
-これは GPU index 安定性のためには良い設計ですが、「component を持つかどうか」と「payload はどこにあるか」が分かれている点は利用者には分かりにくいです。
-
-推奨:
-
-- Query payload wrapper に `CpuRow` / `GpuRow` の区別を持たせる。
-- renderer / extract 側では `gpu_component_active_indices` を使い、`locations.length()` 全体を走査する実装を避ける。
-
-### EntityId.index の安定利用と世代再利用
-
-`EntityId.index` を GPU index として使うため、destroy 時に GPU slot を zero clear して dirty にしています。この方針は妥当ですが、index 再利用により外部システムが古い index だけを保持していると別 entity を参照します。
-
-推奨:
-
-- 外部 API では `EntityId` 全体を保持し、index 単体の保持を避ける。
-- shader 側に index だけを渡す場合は、CPU 側で alive / generation を検証済みの draw list を作る。
-
-## 推奨方針
-
-### 短期
-
-- 公開 row iteration は closure-scoped な高級 `Query` を標準 path にし、direct view が必要な expert path は `RawQuery` に分離する。現行実装では `World::for_each_entity_with_components*` を公開 API から削除済みで、`Query` / `RawQuery` に整理済み。
-- Query callback 中の `add/remove/destroy/register` などを禁止事項として docs に追記する。現行実装では `create_entity`、`destroy_entity`、`add_component_bytes`、`remove_component`、component 登録、`set_component_bytes`、`clear_gpu_component` を guard 済み。
-- `GpuVisible` view の dirty 漏れを防ぐ。現行実装では `QueryRow::write` / `RawQueryRow::write_view` が `GpuVisible` component の mutable view を取得する時点で dirty を立てる。
-- `required` の重複検査を追加する。現行実装では duplicate required を `abort` 済み。
-
-### 中期
-
-- `Schedule` / `System` / `CommandBuffer` を導入する。現行実装では、単一スレッドで phase 順に実行する最小の `Schedule` / `System` を追加済み。
-- 現行実装では、`CommandBuffer` を追加済み。query 中に積んだ `create/destroy entity`、`add/remove component`、`set component bytes`、`clear GPU component` を query 後に適用できる。
-- System は read/write component set を宣言する。`reads` は読み取り専用、`writes` は読み書き可能 access を意味する。現行実装では、schedule 実行中の `component_bytes` / `Query` required component / `QueryRow::read` / `RawQueryRow::read_view` は `reads ∪ writes`、`QueryRow::write` / `RawQueryRow::write_view` / `set_component_bytes` / GPU write / dirty / drain は `writes` に含まれる component だけを許す。
-- entity 作成・破棄は component `writes` では表現しきれないため、別の `structural_write` 権限として扱う。現行実装では `System::new_with_structural_write` がこの権限を持つ system を作り、`create_entity` / `destroy_entity` は schedule 実行中にこの権限を要求する。
-- `add_component` / `add_component_bytes` / `remove_component` は archetype 移動を起こす構造変更なので、対象 component の `writes` に加えて `structural_write` も要求する。既存 payload 更新は CPU-only / GPU-visible ともに `set_component_bytes` で扱い、これは archetype 構造を変えないため `writes` のみでよい。
-- Schedule 実行中だけ component 登録をロックする。現行実装では `Schedule::run` が内部ロックを開始・解除する。
-- System 用 Query wrapper を作り、通常は typed wrapper または role 付き payload を使う。現行実装では、`QueryRow::read` / `write` が closure-scoped view を貸し出し、direct view が必要な expert path は `RawQuery` に分離済み。schedule 実行中、write 系 API は active system の `writes` 宣言を要求する。
-- `query_depth` guard を前提に、構造変更を `CommandBuffer` へ集約する。
-- ECS-to-GPU upload の hot path では JS / native とも `drain_gpu_write_views` と `GPUQueue::write_buffer_from_array_view` を使い、owned bytes が必要な path だけ `drain_gpu_writes` を使う。
-- 大量 entity 作成では builtin 専用の `spawn_transform_global_batch` または汎用 `spawn_batch` と direct row writer を使い、通常の component 追加 path は逐次 mutation が必要な場合に残す。
-
-### 長期
-
-- read/write set に基づく System conflict 検査と、同一 phase 内の greedy batch 分割は追加済み。次の課題は、batch 内 System の実際の並列実行。
-- archetype / row chunk 単位の並列 query を設計する。
-- GPU dirty tracking を thread-local に分けて merge する。
-- component-to-archetype index と signature cache は導入済み。次の課題は、query pattern ごとの長寿命 cache や、並列 chunk 分割と一体化した plan cache。
-- native backend の汎用 `write_buffer_from_array_view` は lower-level queue binding に寄せ済み。任意の `ArrayView[Byte]` から upload までの fallback copy は発生しない。
-- ECS microbench（`pnpm run bench:ecs:*`）で `QueryRow`、`for_each_archetype`、builtin bulk path、`drain_gpu_writes` / `drain_gpu_write_views` を継続測定する。
-
-## まとめ
-
-内部 row iterator が `MutArrayView[Byte]` を扱う設計は、現行の ECS が目指す低レベル・ゼロコピー・WebGPU 連携には合っています。特に `Transform3D` から `GlobalTransform` を更新するような内部処理では、余計なコピーや型階層なしに効率よく動きます。
-
-一方で、この形を公開 API にすると、System の安全な実行順序、構造変更の遅延、GPU dirty 管理、並列実行の排他制御をすべて利用者側の規律に依存します。現行実装では公開 API を `Query` に寄せ、この問題を縮小しています。
-
-将来マルチスレッド対応を考えるなら、`MutArrayView[Byte]` を廃止する必要はありません。ただし、公開の高レベル System API では生の view を直接渡す範囲を狭め、`Schedule`、`CommandBuffer`、read/write 宣言、query guard、dirty merge のような実行境界を先に設計する必要があります。
+- archetype move 時の CPU column copy
+- query / raw query の row and column view
+- schedule access guard と `CommandBuffer`
+- `GlobalTransform` / `Camera` blob の allocation、resize event、write drain
+- TypeScript wrapper の ByteView と builtin blob upload helper

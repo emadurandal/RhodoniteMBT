@@ -349,12 +349,12 @@ fn World::can_add_missing_component_from_setter(
 }
 
 ///|
-/// New worlds start with archetype 0 = empty signature (no CPU components); entities land there until components are added.
-/// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as [`CpuOnly`] SoA storage.
+/// New worlds start with archetype 0 = empty signature (no components); entities land there until components are added.
+/// Builtin [`Transform3D`] is registered first (`ComponentTypeId.index == 0`) as SoA storage.
 /// Builtin [`GlobalTransform`] follows at index `1` with CPU ref storage only;
 /// matrix payloads live in the world's packed u32 GlobalTransform blob.
-/// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
-/// Builtin [`Camera`] is registered at index `3` as [`CpuOnly`] ref storage;
+/// Builtin [`ChildOf`] is registered at index `2` as parent entity index/generation.
+/// Builtin [`Camera`] is registered at index `3` as CPU ref storage;
 /// matrix payloads live in the world's packed u32 Camera blob.
 pub fn World::new_with_global_transform_format(
   global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
@@ -386,7 +386,6 @@ pub fn World::new_with_global_transform_format(
     abort("builtin Camera layout invalid")
   }
   let camera_component_id = registry.register_cpu("Camera", cam_layout.stride)
-  let gpu_stores : Array[GpuComponentStore?] = [None, None, None, None]
   let global_transform_blob = GlobalTransformBlobStore::new()
   let camera_blob = CameraBlobStore::new()
   let generations : Array[Int] = []
@@ -413,7 +412,6 @@ pub fn World::new_with_global_transform_format(
   let component_archetypes : Array[Array[Int]] = [
     transform_archetypes, global_transform_archetypes, child_of_archetypes, camera_archetypes,
   ]
-  let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
   let system_access_depth = 0
@@ -432,10 +430,8 @@ pub fn World::new_with_global_transform_format(
     archetype_version,
     archetype_signature_cache,
     component_archetypes,
-    gpu_stores,
     global_transform_blob,
     camera_blob,
-    resize_events,
     query_depth,
     component_registration_lock_depth,
     system_access_depth,
@@ -474,8 +470,6 @@ pub fn World::component_info(
 
 ///|
 /// Returns the CPU SoA stride for a registered component, or `None` for an unknown id.
-///
-/// GpuVisible components report `0` because their payload lives in flat GPU storage.
 pub fn World::component_cpu_stride(
   self : World,
   component : ComponentTypeId,
@@ -484,15 +478,6 @@ pub fn World::component_cpu_stride(
     Some(rc) => Some(rc.cpu_stride)
     None => None
   }
-}
-
-///|
-/// Returns the GPU layout for a GpuVisible component, or `None` for CPU-only/unknown ids.
-pub fn World::component_gpu_layout(
-  self : World,
-  component : ComponentTypeId,
-) -> @comp.GpuLayout? {
-  self.registry.gpu_layout(component)
 }
 
 ///|
@@ -645,12 +630,11 @@ fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
   self.alive[entity.index] = true
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
-  self.ensure_gpu_capacity(entity.index + 1)
   true
 }
 
 ///|
-/// Allocates or recycles a slot; bumps GPU backing capacity so flat stores can address `entity.index`.
+/// Allocates or recycles a slot.
 pub fn World::create_entity(self : World) -> EntityId {
   self.assert_not_querying("World::create_entity")
   self.assert_system_structural_write("World::create_entity")
@@ -671,12 +655,11 @@ pub fn World::create_entity(self : World) -> EntityId {
   }
   let row = self.archetypes[0].push_empty_row(entity)
   self.locations[entity.index] = Some({ archetype_index: 0, row })
-  self.ensure_gpu_capacity(entity.index + 1)
   entity
 }
 
 ///|
-/// Removes the entity from its archetype (swap-remove), clears GPU slots at `entity.index`, frees the slot for reuse.
+/// Removes the entity from its archetype (swap-remove) and frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.assert_not_querying("World::destroy_entity")
   self.assert_system_structural_write("World::destroy_entity")
@@ -691,7 +674,6 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   self.release_camera_ref(entity)
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
-  self.clear_gpu_slots(entity.index)
   self.alive[entity.index] = false
   self.reserved[entity.index] = false
   self.generations[entity.index] = self.generations[entity.index] + 1
@@ -732,8 +714,7 @@ pub fn World::has_component(
 ///|
 /// Updates an existing component payload without changing archetype ownership.
 ///
-/// CpuOnly components update the archetype SoA row. GpuVisible components update the flat GPU row
-/// and mark it dirty. Returns false for dead entities, missing ownership, unknown components, or
+/// Components update the archetype SoA row. Returns false for dead entities, missing ownership, unknown components, or
 /// byte lengths that do not match the registered payload stride.
 pub fn World::set_component_bytes(
   self : World,
@@ -760,36 +741,15 @@ pub fn World::set_component_bytes(
     ) {
     return false
   }
-  match rc.kind {
-    CpuOnly => {
-      if bytes.length() != rc.cpu_stride {
-        return false
-      }
-      self.archetypes[loc.archetype_index].set_component_bytes(
-        loc.row,
-        component,
-        bytes,
-      )
-      true
-    }
-    GpuVisible => {
-      let expected_stride = match rc.gpu_layout {
-        Some(layout) => layout.stride
-        None => return false
-      }
-      if bytes.length() != expected_stride {
-        return false
-      }
-      match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-        Some(store) => {
-          store.set_bytes(entity.index, bytes)
-          self.replace_gpu_store(store)
-          true
-        }
-        None => false
-      }
-    }
+  if bytes.length() != rc.cpu_stride {
+    return false
   }
+  self.archetypes[loc.archetype_index].set_component_bytes(
+    loc.row,
+    component,
+    bytes,
+  )
+  true
 }
 
 ///|
@@ -831,22 +791,11 @@ fn component_accepts_add_bytes(
   component : RegisteredComponent,
   bytes : FixedArray[Byte],
 ) -> Bool {
-  match component.kind {
-    CpuOnly => bytes.length() == component.cpu_stride
-    GpuVisible =>
-      if bytes.length() == 0 {
-        true
-      } else {
-        match component.gpu_layout {
-          Some(layout) => bytes.length() == layout.stride
-          None => false
-        }
-      }
-  }
+  bytes.length() == component.cpu_stride
 }
 
 ///|
-/// Adds a component with a kind-appropriate zero/default payload.
+/// Adds a component with a zero/default payload.
 pub fn World::add_component(
   self : World,
   entity : EntityId,
@@ -859,47 +808,29 @@ pub fn World::add_component(
     return false
   }
   match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => {
-          let bytes = if component == self.global_transform_component_id {
-            let gt_ref = self.alloc_global_transform_ref(
-              self.global_transform_default_format,
-              @m44.Matrix44F::identity(),
-            )
-            @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset)
-          } else if component == self.camera_component_id {
-            let camera_ref = self.alloc_camera_ref(
-              @m44.Matrix44F::identity(),
-              @m44.Matrix44F::identity(),
-              (0.1 : Float),
-              (1000.0 : Float),
-              (1.0 : Float),
-              (0.0 : Float),
-              (0.0 : Float),
-            )
-            @comp.camera_ref_bytes(camera_ref.word_offset)
-          } else {
-            FixedArray::make(rc.cpu_stride, (0 : Byte))
-          }
-          self.add_component_signature(entity, component, bytes)
-        }
-        GpuVisible =>
-          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-            Some(store) => {
-              let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-              if !self.add_component_signature(entity, component, empty) {
-                false
-              } else {
-                store.activate_slot(entity.index)
-                store.clear_slot(entity.index)
-                self.replace_gpu_store(store)
-                true
-              }
-            }
-            None => false
-          }
+    Some(rc) => {
+      let bytes = if component == self.global_transform_component_id {
+        let gt_ref = self.alloc_global_transform_ref(
+          self.global_transform_default_format,
+          @m44.Matrix44F::identity(),
+        )
+        @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset)
+      } else if component == self.camera_component_id {
+        let camera_ref = self.alloc_camera_ref(
+          @m44.Matrix44F::identity(),
+          @m44.Matrix44F::identity(),
+          (0.1 : Float),
+          (1000.0 : Float),
+          (1.0 : Float),
+          (0.0 : Float),
+          (0.0 : Float),
+        )
+        @comp.camera_ref_bytes(camera_ref.word_offset)
+      } else {
+        FixedArray::make(rc.cpu_stride, (0 : Byte))
       }
+      self.add_component_signature(entity, component, bytes)
+    }
     None => false
   }
 }
@@ -907,8 +838,7 @@ pub fn World::add_component(
 ///|
 /// Adds a component and initializes its payload bytes.
 ///
-/// CpuOnly bytes initialize the archetype SoA row. GpuVisible bytes initialize the flat GPU row;
-/// pass an empty byte array to use the same zero/default behavior as `add_component`.
+/// Bytes initialize the archetype SoA row.
 pub fn World::add_component_bytes(
   self : World,
   entity : EntityId,
@@ -926,28 +856,7 @@ pub fn World::add_component_bytes(
       if !component_accepts_add_bytes(rc, bytes) {
         return false
       }
-      match rc.kind {
-        CpuOnly => self.add_component_signature(entity, component, bytes)
-        GpuVisible =>
-          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-            Some(store) => {
-              let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-              if !self.add_component_signature(entity, component, empty) {
-                false
-              } else {
-                store.activate_slot(entity.index)
-                if bytes.length() == 0 {
-                  store.clear_slot(entity.index)
-                } else {
-                  store.set_bytes(entity.index, bytes)
-                }
-                self.replace_gpu_store(store)
-                true
-              }
-            }
-            None => false
-          }
-      }
+      self.add_component_signature(entity, component, bytes)
     }
     None => false
   }
@@ -955,9 +864,6 @@ pub fn World::add_component_bytes(
 
 ///|
 /// Removes a component: migrates to a smaller archetype (signature loses one id).
-///
-/// Removing a GpuVisible component also zero-clears that entity's flat GPU slot and marks it
-/// dirty so stale payload bytes are not visible after ownership is dropped.
 pub fn World::remove_component(
   self : World,
   entity : EntityId,
@@ -969,16 +875,8 @@ pub fn World::remove_component(
   if !self.is_alive(entity) || !self.has_component(entity, component) {
     return false
   }
-  let gpu_store_to_clear = match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly => None
-        GpuVisible =>
-          match self.ensure_gpu_store_capacity(component, entity.index + 1) {
-            Some(store) => Some(store)
-            None => return false
-          }
-      }
+  match self.registry.get(component) {
+    Some(_) => ()
     None => return false
   }
   let loc = match self.locations[entity.index] {
@@ -1002,22 +900,11 @@ pub fn World::remove_component(
   })
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
-  match gpu_store_to_clear {
-    Some(store) => {
-      store.clear_slot(entity.index)
-      store.deactivate_slot(entity.index)
-      self.replace_gpu_store(store)
-    }
-    None => ()
-  }
   true
 }
 
 ///|
 /// Looks up component bytes for a living entity that owns `component`.
-///
-/// CpuOnly components return their archetype SoA row. GpuVisible components return their flat GPU
-/// row at `EntityId.index`.
 pub fn World::component_bytes(
   self : World,
   entity : EntityId,
@@ -1038,30 +925,8 @@ pub fn World::component_bytes(
     return None
   }
   match self.registry.get(component) {
-    Some(rc) =>
-      match rc.kind {
-        CpuOnly =>
-          self.archetypes[loc.archetype_index].component_bytes(
-            loc.row,
-            component,
-          )
-        GpuVisible =>
-          match self.gpu_store(component) {
-            Some(store) => {
-              if entity.index >= store.capacity() {
-                return None
-              }
-              Some(
-                copy_fixed_range_to_fixed(
-                  store.bytes,
-                  entity.index * store.stride,
-                  store.stride,
-                ),
-              )
-            }
-            None => None
-          }
-      }
+    Some(_) =>
+      self.archetypes[loc.archetype_index].component_bytes(loc.row, component)
     None => None
   }
 }

@@ -16,29 +16,22 @@ import {
 	world_camera_blob_word_capacity,
 	world_camera_component,
 	world_child_of_component,
-	world_clear_gpu_component,
 	world_component_bytes_copy,
 	world_component_cpu_stride,
-	world_component_gpu_layout,
 	world_component_info,
 	world_create_entity,
 	world_destroy_entity,
-	world_drain_gpu_write_views,
 	world_drain_global_transform_blob_write_views,
 	world_drain_camera_blob_write_views,
 	world_write_global_transform_blob_range_views,
-	world_drain_gpu_writes_copy,
-	world_drain_resize_events,
 	world_global_transform_component,
 	world_global_transform_blob_word_capacity,
-	world_gpu_component_active_indices,
 	world_has_component,
 	world_is_alive,
 	world_location,
 	world_new,
 	world_new_with_global_transform_f16,
 	world_register_cpu_component,
-	world_register_gpu_component,
 	world_remove_component,
 	world_set_component_bytes,
 	world_set_global_transform_format,
@@ -57,8 +50,6 @@ import {
 	ComponentTypeId,
 	EntityId,
 	type EntityLocation,
-	GpuLayout,
-	GpuResizeEvent,
 	RegisteredComponent,
 } from "./types.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
@@ -174,19 +165,8 @@ export class World {
 		);
 	}
 
-	registerGpuComponent(name: string, gpuLayout: GpuLayout): ComponentTypeId {
-		return new ComponentTypeId(
-			world_register_gpu_component(this.inner, name, gpuLayout.inner),
-		);
-	}
-
 	componentCpuStride(component: ComponentTypeId): number | null {
 		return world_component_cpu_stride(this.inner, component.inner) ?? null;
-	}
-
-	componentGpuLayout(component: ComponentTypeId): GpuLayout | null {
-		const layout = world_component_gpu_layout(this.inner, component.inner);
-		return layout === undefined || layout === null ? null : new GpuLayout(layout);
 	}
 
 	componentInfo(component: ComponentTypeId): RegisteredComponent | null {
@@ -236,12 +216,6 @@ export class World {
 		return moonBool(world_remove_component(this.inner, entity.inner, component.inner));
 	}
 
-	clearGpuComponent(entity: EntityId, component: ComponentTypeId): boolean {
-		return moonBool(
-			world_clear_gpu_component(this.inner, entity.inner, component.inner),
-		);
-	}
-
 	componentBytesCopy(
 		entity: EntityId,
 		component: ComponentTypeId,
@@ -251,12 +225,6 @@ export class World {
 			return null;
 		}
 		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
-	}
-
-	drainGpuWriteViews(component: ComponentTypeId): GpuWriteView[] {
-		return world_drain_gpu_write_views(this.inner, component.inner).map(
-			(write) => new GpuWriteView(write),
-		);
 	}
 
 	drainGlobalTransformBlobWriteViews(): GpuWriteView[] {
@@ -282,22 +250,6 @@ export class World {
 			wordCount,
 			(bytes) => f(byteView(bytes)),
 		).map((write) => new GpuWriteView(write));
-	}
-
-	drainGpuWritesCopy(component: ComponentTypeId): GpuWriteCopy[] {
-		return world_drain_gpu_writes_copy(this.inner, component.inner).map(
-			(write) => new GpuWriteCopy(write),
-		);
-	}
-
-	drainResizeEvents(): GpuResizeEvent[] {
-		return world_drain_resize_events(this.inner).map(
-			(event) => new GpuResizeEvent(event),
-		);
-	}
-
-	gpuComponentActiveIndices(component: ComponentTypeId): number[] {
-		return world_gpu_component_active_indices(this.inner, component.inner);
 	}
 
 	setTransformTrs(

@@ -103,7 +103,7 @@ pub fn global_transform_write_ref_mut_view(
 }
 
 ///|
-/// Mutable typed view over one flat GPU GlobalTransform row.
+/// Mutable typed view over one packed GPU GlobalTransform row.
 pub struct GlobalTransformGpuMutRow {
   priv view : MutArrayView[Byte]
   priv format : GlobalTransformGpuFormat

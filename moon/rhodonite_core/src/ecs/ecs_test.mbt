@@ -4,13 +4,6 @@ fn bytes4(a : Byte, b : Byte, c : Byte, d : Byte) -> FixedArray[Byte] {
 }
 
 ///|
-fn gpu_bytes_with_u32(value : UInt) -> FixedArray[Byte] {
-  let bytes = @comp.gpu_component_bytes(16)
-  @comp.put_gpu_u32(bytes, 0, value)
-  bytes
-}
-
-///|
 fn u16_le(bytes : ArrayView[Byte], offset : Int) -> UInt {
   bytes[offset].to_uint() | (bytes[offset + 1].to_uint() << 8)
 }
@@ -80,36 +73,14 @@ test "EntityId generation invalidates stale handles and reuses gpu index" {
 test "World exposes component metadata without exposing registry mutation" {
   let world = World::new()
   let cpu = world.register_cpu_component("MetadataCPU", 4)
-  let gpu_layout = @comp.global_transform_gpu_layout()
-  let gpu = world.register_gpu_component("MetadataGPU", gpu_layout)
   match world.component_info(cpu) {
     Some(info) => {
       assert_eq(info.name, "MetadataCPU")
-      assert_true(info.kind == CpuOnly)
       assert_eq(info.cpu_stride, 4)
-      assert_true(info.gpu_layout is None)
     }
-    None => abort("expected CPU component metadata")
-  }
-  match world.component_info(gpu) {
-    Some(info) => {
-      assert_eq(info.name, "MetadataGPU")
-      assert_true(info.kind == GpuVisible)
-      assert_eq(info.cpu_stride, 0)
-      match info.gpu_layout {
-        Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
-        None => abort("expected GPU layout")
-      }
-    }
-    None => abort("expected GPU component metadata")
+    None => abort("expected component metadata")
   }
   assert_eq(world.component_cpu_stride(cpu), Some(4))
-  assert_eq(world.component_cpu_stride(gpu), Some(0))
-  match world.component_gpu_layout(gpu) {
-    Some(layout) => assert_eq(layout.stride, gpu_layout.stride)
-    None => abort("expected GPU layout")
-  }
-  assert_true(world.component_gpu_layout(cpu) is None)
   assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
 }
 
@@ -153,140 +124,16 @@ test "std140-compatible layout pads vec3 fields to 16 bytes" {
 }
 
 ///|
-test "GPU visible components stay flat by EntityId index and drain only dirty ranges" {
-  let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuMaterial",
-    @comp.GpuLayout::empty(16),
-  )
-  let e0 = world.create_entity()
-  let e1 = world.create_entity()
-  let _ = world.create_entity()
-  let e3 = world.create_entity()
-  assert_true(world.add_component(e0, gpu))
-  assert_true(world.add_component(e1, gpu))
-  assert_true(world.add_component(e3, gpu))
-  let _ = world.drain_resize_events()
-  assert_true(world.set_component_bytes(e0, gpu, gpu_bytes_with_u32(10U)))
-  assert_true(world.set_component_bytes(e1, gpu, gpu_bytes_with_u32(11U)))
-  assert_true(world.set_component_bytes(e3, gpu, gpu_bytes_with_u32(13U)))
-  let writes = world.drain_gpu_writes(gpu)
-  assert_eq(writes.length(), 2)
-  assert_eq(writes[0].byte_offset, e0.index * 16)
-  assert_eq(writes[0].bytes.length(), 32)
-  assert_eq(writes[0].bytes[0], (10U & 0xFFU).to_byte())
-  assert_eq(writes[0].bytes[16], (11U & 0xFFU).to_byte())
-  assert_eq(writes[1].byte_offset, e3.index * 16)
-  assert_eq(writes[1].bytes.length(), 16)
-  assert_eq(writes[1].bytes[0], (13U & 0xFFU).to_byte())
-  assert_eq(world.drain_gpu_writes(gpu).length(), 0)
-}
-
-///|
-test "GPU visible active indices stay packed across removal and destroy" {
-  let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuActivePacked",
-    @comp.GpuLayout::empty(16),
-  )
-  let e0 = world.create_entity()
-  let e1 = world.create_entity()
-  let e2 = world.create_entity()
-  assert_true(world.add_component(e0, gpu))
-  assert_true(world.add_component(e1, gpu))
-  assert_true(world.add_component(e2, gpu))
-  assert_eq(world.gpu_component_active_indices(gpu).length(), 3)
-  assert_true(world.remove_component(e1, gpu))
-  let after_remove = world.gpu_component_active_indices(gpu)
-  assert_eq(after_remove.length(), 2)
-  assert_true(after_remove[0] == e0.index || after_remove[1] == e0.index)
-  assert_true(after_remove[0] == e2.index || after_remove[1] == e2.index)
-  assert_true(world.destroy_entity(e0))
-  let after_destroy = world.gpu_component_active_indices(gpu)
-  assert_eq(after_destroy.length(), 1)
-  assert_eq(after_destroy[0], e2.index)
-}
-
-///|
-test "GPU dirty list deduplicates repeated entity writes and keeps latest bytes" {
-  let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuTransform",
-    @comp.GpuLayout::empty(16),
-  )
-  let entity = world.create_entity()
-  assert_true(world.add_component(entity, gpu))
-  let _ = world.drain_resize_events()
-  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(1U)))
-  assert_true(world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(2U)))
-  let writes = world.drain_gpu_writes(gpu)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, entity.index * 16)
-  assert_eq(writes[0].bytes.length(), 16)
-  assert_eq(writes[0].bytes[0], (2U & 0xFFU).to_byte())
-}
-
-///|
-test "GPU visible public APIs require entity component ownership" {
-  let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuOwnership",
-    @comp.GpuLayout::empty(16),
-  )
-  let entity = world.create_entity()
-  assert_true(!world.set_component_bytes(entity, gpu, gpu_bytes_with_u32(7U)))
-  assert_true(!world.clear_gpu_component(entity, gpu))
-  assert_true(world.component_bytes(entity, gpu) is None)
-  assert_eq(world.drain_gpu_writes(gpu).length(), 0)
-}
-
-///|
-test "removing GPU visible component clears and dirties flat slot" {
-  let world = World::new()
-  let gpu = world.register_gpu_component(
-    "GpuRemoveClears",
-    @comp.GpuLayout::empty(16),
-  )
-  let entity = world.create_entity()
-  assert_true(world.add_component_bytes(entity, gpu, gpu_bytes_with_u32(77U)))
-  let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gpu)
-  assert_true(world.remove_component(entity, gpu))
-  assert_true(!world.has_component(entity, gpu))
-  assert_true(world.component_bytes(entity, gpu) is None)
-  let writes = world.drain_gpu_writes(gpu)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, entity.index * 16)
-  assert_eq(writes[0].bytes.length(), 16)
-  for i = 0; i < writes[0].bytes.length(); i = i + 1 {
-    assert_eq(writes[0].bytes[i], (0 : Byte))
-  }
-}
-
-///|
-test "add_component and add_component_bytes support CPU and GPU visible components" {
+test "add_component and add_component_bytes support CPU components" {
   let world = World::new()
   let cpu = world.register_cpu_component("AddComponentCpu", 4)
-  let gpu = world.register_gpu_component(
-    "AddComponentGpu",
-    @comp.GpuLayout::empty(16),
-  )
   let cpu_entity = world.create_entity()
-  let gpu_entity = world.create_entity()
   assert_true(world.add_component(cpu_entity, cpu))
   match world.component_bytes(cpu_entity, cpu) {
     Some(bytes) => assert_eq(bytes, bytes4(0, 0, 0, 0))
     None => abort("expected AddComponentCpu bytes")
   }
-  assert_true(
-    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(44U)),
-  )
-  match world.component_bytes(gpu_entity, gpu) {
-    Some(bytes) => assert_eq(bytes[0], (44U & 0xFFU).to_byte())
-    None => abort("expected AddComponentGpu bytes")
-  }
   assert_true(!world.add_component(cpu_entity, cpu))
-  assert_true(!world.set_component_bytes(gpu_entity, gpu, bytes4(1, 2, 3, 4)))
 }
 
 ///|
@@ -303,39 +150,6 @@ test "add_component_bytes rejects invalid byte lengths before mutating ownership
     Some(bytes) => assert_eq(bytes, bytes4(1, 2, 3, 4))
     None => abort("expected AddComponentBytesCpuStride bytes")
   }
-  let gpu_entity = world.create_entity()
-  let _ = world.drain_resize_events()
-  let gpu = world.register_gpu_component(
-    "AddComponentBytesGpuStride",
-    @comp.GpuLayout::empty(16),
-  )
-  assert_true(!world.add_component_bytes(gpu_entity, gpu, bytes4(5, 6, 7, 8)))
-  assert_true(!world.has_component(gpu_entity, gpu))
-  assert_eq(world.drain_resize_events().length(), 0)
-  assert_true(
-    world.add_component_bytes(gpu_entity, gpu, gpu_bytes_with_u32(55U)),
-  )
-  match world.component_bytes(gpu_entity, gpu) {
-    Some(bytes) => assert_eq(bytes[0], (55U & 0xFFU).to_byte())
-    None => abort("expected AddComponentBytesGpuStride bytes")
-  }
-}
-
-///|
-test "add_component emits resize events through centralized GPU capacity path" {
-  let world = World::new()
-  let entity = world.create_entity()
-  let _ = world.drain_resize_events()
-  let gpu = world.register_gpu_component(
-    "GpuResizeAfterEntity",
-    @comp.GpuLayout::empty(16),
-  )
-  assert_true(world.add_component(entity, gpu))
-  let events = world.drain_resize_events()
-  assert_eq(events.length(), 1)
-  assert_true(events[0].component == gpu)
-  assert_eq(events[0].required_capacity, entity.index + 1)
-  assert_true(events[0].needs_full_upload)
 }
 
 ///|
@@ -418,9 +232,7 @@ test "ChildOf roundtrips parent EntityId" {
 ///|
 test "Transform3D identity roundtrip bytes and World set/get" {
   let world = World::new()
-  let tf = world.transform_component()
   let entity = world.create_entity()
-  let _ = world.drain_resize_events()
   let buf = transform3d_bytes_identity()
   let n = buf.length()
   let t = @comp.Transform3D::from_component_mut_view(
@@ -435,11 +247,7 @@ test "Transform3D identity roundtrip bytes and World set/get" {
     }
     None => abort("expected Transform3D")
   }
-  assert_eq(world.drain_gpu_writes(tf).length(), 0)
-  assert_eq(
-    world.drain_gpu_writes(world.global_transform_component()).length(),
-    0,
-  )
+  assert_eq(world.drain_global_transform_blob_write_views().length(), 0)
 }
 
 ///|
@@ -466,16 +274,14 @@ test "Transform3D writes position through zero-copy component view" {
 ///|
 test "GlobalTransform identity roundtrip and GPU drain" {
   let world = World::new()
-  let gt_id = world.global_transform_component()
   let entity = world.create_entity()
-  let _ = world.drain_resize_events()
   let expected = @m44.Matrix44F::identity()
   assert_true(world.set_global_transform(entity, expected))
   match world.get_global_transform(entity) {
     Some(read) => assert_eq(read, expected)
     None => abort("expected Matrix44F")
   }
-  let writes = world.drain_gpu_writes(gt_id)
+  let writes = world.drain_global_transform_blob_write_views()
   assert_eq(writes.length(), 1)
 }
 
@@ -508,7 +314,7 @@ test "GlobalTransform fp16 world uses 24 byte packed blob slots" {
     Some(read) => assert_eq(read, m)
     None => abort("expected fp16 Matrix44F")
   }
-  let writes = world.drain_gpu_writes(gt_id)
+  let writes = world.drain_global_transform_blob_write_views()
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].bytes.length(), 24)
 }
@@ -654,50 +460,6 @@ test "Query for_each matches supersets and skips empty required" {
 }
 
 ///|
-test "Query for_each gives full GpuComponentStore row for GpuVisible" {
-  let world = World::new()
-  let qa = world.register_cpu_component("QueryA", 4)
-  let gpu16 = world.register_gpu_component("Gpu16", @comp.GpuLayout::empty(16))
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
-  let _ = world.drain_resize_events()
-  let mut got0 = -1
-  let mut got1 = -1
-  Query::new([qa, gpu16]).for_each(world, row => {
-    row.read(qa, bytes => got0 = bytes.length())
-    row.read(gpu16, bytes => got1 = bytes.length())
-  })
-  assert_eq(got0, 4)
-  assert_eq(got1, 16)
-}
-
-///|
-test "Query write queues dirty gpu row from direct query" {
-  let world = World::new()
-  let qa = world.register_cpu_component("QueryDirtyA", 4)
-  let gpu16 = world.register_gpu_component(
-    "QueryDirtyGpu16",
-    @comp.GpuLayout::empty(16),
-  )
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
-  let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gpu16)
-  Query::new([qa, gpu16]).for_each(world, row => {
-    row.write(gpu16, bytes => bytes[0] = (99 : Byte))
-  })
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes.length(), 16)
-  assert_eq(writes[0].bytes[0], (99 : Byte))
-}
-
-///|
 test "Query for_each wraps required row iteration" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperA", 4)
@@ -720,28 +482,6 @@ test "Query for_each wraps required row iteration" {
   assert_true(hits[0] == e)
   assert_eq(first_len, 4)
   assert_eq(second_first_byte, (5 : Byte))
-}
-
-///|
-test "Query write queues dirty gpu row from helper query" {
-  let world = World::new()
-  let qa = world.register_cpu_component("QueryHelperDirtyA", 4)
-  let gpu16 = world.register_gpu_component(
-    "QueryHelperDirtyGpu16",
-    @comp.GpuLayout::empty(16),
-  )
-  let query = Query::new([qa, gpu16])
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
-  let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (77 : Byte)))
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (77 : Byte))
 }
 
 ///|
@@ -887,104 +627,6 @@ test "PreparedQuery for_each rebuilds stale row plan" {
 }
 
 ///|
-test "World with_gpu_component_write_range marks one contiguous upload" {
-  let world = World::new()
-  let gpu16 = world.register_gpu_component(
-    "GpuBulkRange16",
-    @comp.GpuLayout::empty(16),
-  )
-  let ok = world.with_gpu_component_write_range(gpu16, 2, 3, range => {
-    if range.first_entity_index() != 2 {
-      abort("expected first entity index 2")
-    }
-    if range.count() != 3 {
-      abort("expected range count 3")
-    }
-    if range.stride() != 16 {
-      abort("expected stride 16")
-    }
-    let bytes = range.bytes()
-    bytes[0] = (11 : Byte)
-    bytes[16] = (22 : Byte)
-    bytes[32] = (33 : Byte)
-  })
-  assert_true(ok)
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 2 * 16)
-  assert_eq(writes[0].bytes.length(), 3 * 16)
-  assert_eq(writes[0].bytes[0], (11 : Byte))
-  assert_eq(writes[0].bytes[16], (22 : Byte))
-  assert_eq(writes[0].bytes[32], (33 : Byte))
-}
-
-///|
-test "World drain_gpu_write_views returns borrowed contiguous upload" {
-  let world = World::new()
-  let gpu16 = world.register_gpu_component(
-    "GpuBulkView16",
-    @comp.GpuLayout::empty(16),
-  )
-  let ok = world.with_gpu_component_write_range(gpu16, 1, 2, range => {
-    let bytes = range.bytes()
-    bytes[0] = (44 : Byte)
-    bytes[16] = (55 : Byte)
-  })
-  assert_true(ok)
-  let writes = world.drain_gpu_write_views(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 16)
-  assert_eq(writes[0].bytes.length(), 32)
-  assert_eq(writes[0].bytes[0], (44 : Byte))
-  assert_eq(writes[0].bytes[16], (55 : Byte))
-  assert_eq(world.drain_gpu_write_views(gpu16).length(), 0)
-}
-
-///|
-test "QueryRow write marks gpu rows dirty without payload indexes" {
-  let world = World::new()
-  let qa = world.register_cpu_component("QueryRowDirtyA", 4)
-  let gpu16 = world.register_gpu_component(
-    "QueryRowDirtyGpu16",
-    @comp.GpuLayout::empty(16),
-  )
-  let query = Query::new([qa, gpu16])
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
-  let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write(gpu16, bytes => bytes[0] = (88 : Byte)))
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (88 : Byte))
-}
-
-///|
-test "Query write marks gpu row dirty even if bytes are unchanged" {
-  let world = World::new()
-  let qa = world.register_cpu_component("QueryRowAutoDirtyA", 4)
-  let gpu16 = world.register_gpu_component(
-    "QueryRowAutoDirtyGpu16",
-    @comp.GpuLayout::empty(16),
-  )
-  let query = Query::new([qa, gpu16])
-  let e = world.create_entity()
-  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
-  let _ = world.drain_resize_events()
-  let _ = world.drain_gpu_writes(gpu16)
-  query.for_each(world, row => row.write(gpu16, bytes => ignore(bytes)))
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (0 : Byte))
-}
-
-///|
 test "CommandBuffer applies queued structural changes after query" {
   let world = World::new()
   let qa = world.register_cpu_component("CommandBufferA", 4)
@@ -1048,26 +690,22 @@ test "set_component_bytes updates existing component without archetype migration
 }
 
 ///|
-test "CommandBuffer applies queued gpu writes and reports failed commands" {
+test "CommandBuffer applies queued component writes and reports failed commands" {
   let world = World::new()
-  let gpu16 = world.register_gpu_component(
-    "CommandBufferGpu16",
-    @comp.GpuLayout::empty(16),
-  )
+  let qa = world.register_cpu_component("CommandBufferWriteA", 4)
   let e = world.create_entity()
-  let empty : FixedArray[Byte] = FixedArray::make(0, (0 : Byte))
-  assert_true(world.add_component_bytes(e, gpu16, empty))
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let missing = EntityId::new(e.index + 100, 0)
   let mut queued_count = 0
   let schedule = Schedule::new()
   schedule.add_system(
     System::new_with_structural_write(
-      "queue-gpu-write-and-failed-destroy",
+      "queue-component-write-and-failed-destroy",
       Update,
       [],
-      [gpu16],
+      [qa],
       (_w, _ctx, commands) => {
-        commands.set_component_bytes(e, gpu16, gpu_bytes_with_u32(33U))
+        commands.set_component_bytes(e, qa, bytes4(3, 3, 3, 3))
         commands.destroy_entity(missing)
         queued_count = commands.len()
       },
@@ -1075,10 +713,10 @@ test "CommandBuffer applies queued gpu writes and reports failed commands" {
   )
   assert_true(!schedule.run(world, SystemContext::new((0.016 : Float), 1)))
   assert_eq(queued_count, 2)
-  let writes = world.drain_gpu_writes(gpu16)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, e.index * 16)
-  assert_eq(writes[0].bytes[0], (33U & 0xFFU).to_byte())
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
+    None => abort("expected CommandBufferWriteA bytes")
+  }
 }
 
 ///|
@@ -1106,7 +744,7 @@ test "Schedule permits set_global_transform update with GlobalTransform write" {
   let gt = world.global_transform_component()
   let e = world.create_entity()
   assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
-  let _ = world.drain_gpu_writes(gt)
+  let _ = world.drain_global_transform_blob_write_views()
   let schedule = Schedule::new()
   schedule.add_system(
     System::new("set-gt", Update, [], [gt], (w, _ctx, _commands) => {
@@ -1259,36 +897,6 @@ test "Schedule run temporarily locks component registration" {
 }
 
 ///|
-test "drain_resize_events is allowed outside schedule and structural systems" {
-  let world = World::new()
-  let e0 = world.create_entity()
-  let _ = world.drain_resize_events()
-  let gpu = world.register_gpu_component(
-    "ResizeDrainAccessGpu",
-    @comp.global_transform_gpu_layout(),
-  )
-  assert_true(world.add_component(e0, gpu))
-  let outside_events = world.drain_resize_events()
-  assert_true(outside_events.length() > 0)
-  let e1 = world.create_entity()
-  assert_true(world.add_component(e1, gpu))
-  let mut drained_in_system = 0
-  let schedule = Schedule::new()
-  schedule.add_system(
-    System::new_with_structural_write(
-      "drain-resize-events",
-      RenderExtract,
-      [],
-      [],
-      (w, _ctx, _cmds) => drained_in_system = w.drain_resize_events().length(),
-    ),
-  )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
-  assert_true(drained_in_system > 0)
-  assert_eq(world.drain_resize_events().length(), 0)
-}
-
-///|
 test "transform_propagation_system updates GlobalTransform in a schedule" {
   let world = World::new()
   let e = world.create_entity()
@@ -1303,7 +911,7 @@ test "transform_propagation_system updates GlobalTransform in a schedule" {
   )
   assert_true(world.set_transform(e, tf))
   assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
-  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   let schedule = Schedule::new()
   schedule.add_system(transform_propagation_system(world))
   assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
@@ -1521,7 +1129,7 @@ test "update_global_transforms_from_transforms writes hierarchy to GlobalTransfo
   let g0 = @m44.Matrix44F::identity()
   assert_true(world.set_global_transform(parent, g0))
   assert_true(world.set_global_transform(child, g0))
-  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(child) {
     Some(m) => {
@@ -1548,7 +1156,7 @@ test "update_global_transforms_from_transforms applies root Transform3D only" {
   )
   assert_true(world.set_transform(e, tf))
   assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
-  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(e) {
     Some(m) => assert_eq(m.at(0, 3), (7.0 : Float))
@@ -1571,7 +1179,7 @@ test "update_global_transforms_from_transforms writes fp16 GlobalTransform rows"
   )
   assert_true(world.set_transform(e, tf))
   assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
-  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(e) {
     Some(m) => {
@@ -1581,7 +1189,7 @@ test "update_global_transforms_from_transforms writes fp16 GlobalTransform rows"
     }
     None => abort("expected fp16 Matrix44F")
   }
-  let writes = world.drain_gpu_writes(world.global_transform_component())
+  let writes = world.drain_global_transform_blob_write_views()
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].bytes.length(), 24)
 }
@@ -1626,7 +1234,7 @@ test "update_global_transforms_from_transforms handles mixed child and root arch
   assert_true(world.set_global_transform(parent, @m44.Matrix44F::identity()))
   assert_true(world.set_global_transform(child, @m44.Matrix44F::identity()))
   assert_true(world.set_global_transform(root, @m44.Matrix44F::identity()))
-  let _ = world.drain_gpu_writes(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   world.update_global_transforms_from_transforms()
   match world.get_global_transform(child) {
     Some(m) => assert_eq(m.at(0, 3), (15.0 : Float))
@@ -1692,7 +1300,7 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
     }
     None => abort("expected Transform3D")
   }
-  let writes = world.drain_gpu_write_views(gt)
+  let writes = world.drain_global_transform_blob_write_views()
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
   assert_eq(writes[0].bytes.length(), 2 * 48)
@@ -1707,35 +1315,27 @@ test "spawn_transform_global_batch creates builtin transform rows directly" {
 }
 
 ///|
-test "spawn_batch creates arbitrary CPU and GPU components directly" {
+test "spawn_batch creates arbitrary CPU components directly" {
   let world = World::new()
-  let cpu = world.register_cpu_component("SpawnBatchCpu", 4)
-  let gpu = world.register_gpu_component(
-    "SpawnBatchGpu",
-    @comp.GpuLayout::empty(16),
-  )
-  let entities = world.spawn_batch([gpu, cpu], 3, fn(i, _e, row) {
-    row.write(cpu, c => c[0] = (10 + i).to_byte())
-    row.write(gpu, g => g[0] = (20 + i).to_byte())
+  let cpu_a = world.register_cpu_component("SpawnBatchCpuA", 4)
+  let cpu_b = world.register_cpu_component("SpawnBatchCpuB", 4)
+  let entities = world.spawn_batch([cpu_b, cpu_a], 3, fn(i, _e, row) {
+    row.write(cpu_a, c => c[0] = (10 + i).to_byte())
+    row.write(cpu_b, c => c[0] = (20 + i).to_byte())
   })
   assert_eq(entities.length(), 3)
   for i = 0; i < entities.length(); i = i + 1 {
-    assert_true(world.has_component(entities[i], cpu))
-    assert_true(world.has_component(entities[i], gpu))
-    match world.component_bytes(entities[i], cpu) {
+    assert_true(world.has_component(entities[i], cpu_a))
+    assert_true(world.has_component(entities[i], cpu_b))
+    match world.component_bytes(entities[i], cpu_a) {
       Some(bytes) => assert_eq(bytes[0], (10 + i).to_byte())
-      None => abort("expected cpu bytes")
+      None => abort("expected cpu_a bytes")
+    }
+    match world.component_bytes(entities[i], cpu_b) {
+      Some(bytes) => assert_eq(bytes[0], (20 + i).to_byte())
+      None => abort("expected cpu_b bytes")
     }
   }
-  let active = world.gpu_component_active_indices(gpu)
-  assert_eq(active.length(), 3)
-  let writes = world.drain_gpu_write_views(gpu)
-  assert_eq(writes.length(), 1)
-  assert_eq(writes[0].byte_offset, 0)
-  assert_eq(writes[0].bytes.length(), 3 * 16)
-  assert_eq(writes[0].bytes[0], (20 : Byte))
-  assert_eq(writes[0].bytes[16], (21 : Byte))
-  assert_eq(writes[0].bytes[32], (22 : Byte))
 }
 
 ///|
@@ -1771,7 +1371,7 @@ test "GlobalTransform blob writes update through set_global_transform" {
     (0.0 : Float),
   )
   assert_true(world.set_global_transform(e, m))
-  let _ = world.drain_gpu_write_views(world.global_transform_component())
+  let _ = world.drain_global_transform_blob_write_views()
   let m2 = @m44.Matrix44::translation(
     (4.0 : Float),
     (5.0 : Float),
@@ -1784,7 +1384,7 @@ test "GlobalTransform blob writes update through set_global_transform" {
     Some(read) => assert_eq(read.at(0, 3), (4.0 : Float))
     None => abort("expected blob-backed transform")
   }
-  let writes = world.drain_gpu_write_views(world.global_transform_component())
+  let writes = world.drain_global_transform_blob_write_views()
   assert_eq(writes.length(), 1)
   assert_eq(writes[0].byte_offset, 0)
   assert_eq(writes[0].bytes.length(), 48)

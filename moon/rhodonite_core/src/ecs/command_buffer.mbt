@@ -121,16 +121,6 @@ pub fn CommandBuffer::remove_component(
 }
 
 ///|
-pub fn CommandBuffer::clear_gpu_component(
-  self : CommandBuffer,
-  entity : EntityId,
-  component : ComponentTypeId,
-) -> Unit {
-  self.assert_component_write(component, "CommandBuffer::clear_gpu_component")
-  self.commands.push(ClearGpuComponent(entity, component))
-}
-
-///|
 /// Applies commands in insertion order, then clears the buffer.
 ///
 /// Returns `false` if any command could not be applied, for example because the target entity was
@@ -149,8 +139,6 @@ fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
         self.world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>
         self.world.remove_component(entity, component)
-      ClearGpuComponent(entity, component) =>
-        self.world.clear_gpu_component(entity, component)
     }
     if !command_ok {
       ok = false

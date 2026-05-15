@@ -1,5 +1,5 @@
 ///|
-/// Library-local transform: TRS as views over one tightly packed `f32` row in archetype SoA (`CpuOnly`).
+/// Library-local transform: TRS as views over one tightly packed `f32` row in archetype SoA.
 
 ///|
 pub(all) struct Transform3D {
