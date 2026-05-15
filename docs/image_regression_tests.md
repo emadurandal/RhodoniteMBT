@@ -31,6 +31,14 @@ pnpm run test:examples:visual:update:native
 pnpm run test:examples:visual:update:browser
 ```
 
+MoonBit warnings are hidden by default so the visual result lines stay readable.
+Pass `--verbose` after `--` to show warning diagnostics and browser harness logs:
+
+```bash
+pnpm run test:examples:visual -- --verbose
+pnpm run test:examples:visual:browser -- --verbose
+```
+
 Equivalent `just` recipes are available:
 
 ```bash
@@ -141,6 +149,9 @@ then sends comparison results or updated PNG bytes back to the Node runner.
   as
   `visual_regression(<target>): PASS <filename> mismatch_rate=<rate> mismatches=<count>/<pixels> max=<rate> threshold=<threshold>`,
   with `UPDATE`, `SKIP`, or `FAIL` used for non-pass outcomes.
+- Visual test commands are routed through `scripts/run-visual-regression.mjs`,
+  which suppresses MoonBit warning diagnostics unless `--verbose` or
+  `RHODONITE_VISUAL_VERBOSE=1` is set.
 - Browser visual tests are driven by `scripts/run-browser-visual-regression.mjs`,
   which starts Vite and a separate local result server, opens a headless
   Chrome/Chromium page, and waits for the page to POST its result. Browser
