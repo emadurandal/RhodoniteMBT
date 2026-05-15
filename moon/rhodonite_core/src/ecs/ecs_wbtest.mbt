@@ -38,8 +38,8 @@ test "World archetype version only changes when new archetypes are created" {
 }
 
 ///|
-test "GlobalTransformBlobStore keeps non-monotonic dirty word ranges" {
-  let store = GlobalTransformBlobStore::new()
+test "PackedGpuBlobStore keeps non-monotonic dirty word ranges" {
+  let store = PackedGpuBlobStore::new()
   store.ensure_word_capacity(30)
   store.mark_dirty_words(24, 6)
   store.mark_dirty_words(0, 12)

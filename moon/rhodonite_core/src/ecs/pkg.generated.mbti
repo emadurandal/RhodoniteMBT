@@ -22,6 +22,12 @@ pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte],
 // Types and methods
 type Archetype
 
+type CameraBlobStore
+
+pub(all) struct CameraRef {
+  word_offset : Int
+}
+
 pub struct CommandBuffer {
   // private fields
 }
@@ -55,11 +61,6 @@ pub fn EntityId::new(Int, Int) -> Self
 pub(all) struct EntityLocation {
   archetype_index : Int
   row : Int
-}
-
-pub(all) struct GlobalTransformBlobResizeEvent {
-  required_word_capacity : Int
-  needs_full_upload : Bool
 }
 
 type GlobalTransformBlobStore
@@ -118,6 +119,12 @@ pub(all) struct GpuWrite {
 pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]
+}
+
+#alias(GlobalTransformBlobResizeEvent)
+pub(all) struct PackedGpuBlobResizeEvent {
+  required_word_capacity : Int
+  needs_full_upload : Bool
 }
 
 pub struct PreparedQuery {
@@ -234,6 +241,10 @@ pub struct World {
 }
 pub fn World::add_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn World::camera_blob_word_capacity(Self) -> Int
+pub fn World::camera_component(Self) -> ComponentTypeId
+pub fn World::camera_gpu_row(Self, EntityId) -> FixedArray[Byte]?
+pub fn World::camera_ref(Self, EntityId) -> CameraRef?
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
@@ -244,7 +255,9 @@ pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
-pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[GlobalTransformBlobResizeEvent]
+pub fn World::drain_camera_blob_resize_events(Self) -> Array[PackedGpuBlobResizeEvent]
+pub fn World::drain_camera_blob_write_views(Self) -> Array[GpuWriteView]
+pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[PackedGpuBlobResizeEvent]
 pub fn World::drain_global_transform_blob_write_views(Self) -> Array[GpuWriteView]
 pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
@@ -266,6 +279,7 @@ pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFor
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
+pub fn World::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn World::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Bool
@@ -275,6 +289,7 @@ pub fn World::set_transform_trs(Self, EntityId, Float, Float, Float, Double, Dou
 pub fn World::spawn_batch(Self, Array[ComponentTypeId], Int, (Int, EntityId, SpawnBatchRow) -> Unit) -> Array[EntityId]
 pub fn World::spawn_transform_global_batch(Self, Int, (Int, EntityId, MutArrayView[Byte], MutArrayView[Byte]) -> Unit) -> Array[EntityId]
 pub fn World::transform_component(Self) -> ComponentTypeId
+pub fn World::update_camera_views_from_global_transforms(Self) -> Unit
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
 pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool

@@ -354,6 +354,8 @@ fn World::can_add_missing_component_from_setter(
 /// Builtin [`GlobalTransform`] follows at index `1` with CPU ref storage only;
 /// matrix payloads live in the world's packed u32 GlobalTransform blob.
 /// Builtin [`ChildOf`] is registered at index `2` as [`CpuOnly`] (parent entity index/generation).
+/// Builtin [`Camera`] is registered at index `3` as [`CpuOnly`] ref storage;
+/// matrix payloads live in the world's packed u32 Camera blob.
 pub fn World::new_with_global_transform_format(
   global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
 ) -> World {
@@ -379,8 +381,14 @@ pub fn World::new_with_global_transform_format(
     abort("builtin ChildOf layout invalid")
   }
   let child_of_component_id = registry.register_cpu("ChildOf", co_layout.stride)
-  let gpu_stores : Array[GpuComponentStore?] = [None, None, None]
+  let cam_layout = @comp.camera_ref_cpu_layout()
+  if !cam_layout.is_valid() {
+    abort("builtin Camera layout invalid")
+  }
+  let camera_component_id = registry.register_cpu("Camera", cam_layout.stride)
+  let gpu_stores : Array[GpuComponentStore?] = [None, None, None, None]
   let global_transform_blob = GlobalTransformBlobStore::new()
+  let camera_blob = CameraBlobStore::new()
   let generations : Array[Int] = []
   let alive : Array[Bool] = []
   let reserved : Array[Bool] = []
@@ -401,8 +409,9 @@ pub fn World::new_with_global_transform_format(
   let transform_archetypes : Array[Int] = []
   let global_transform_archetypes : Array[Int] = []
   let child_of_archetypes : Array[Int] = []
+  let camera_archetypes : Array[Int] = []
   let component_archetypes : Array[Array[Int]] = [
-    transform_archetypes, global_transform_archetypes, child_of_archetypes,
+    transform_archetypes, global_transform_archetypes, child_of_archetypes, camera_archetypes,
   ]
   let resize_events : Array[GpuResizeEvent] = []
   let query_depth = 0
@@ -425,6 +434,7 @@ pub fn World::new_with_global_transform_format(
     component_archetypes,
     gpu_stores,
     global_transform_blob,
+    camera_blob,
     resize_events,
     query_depth,
     component_registration_lock_depth,
@@ -437,6 +447,7 @@ pub fn World::new_with_global_transform_format(
     global_transform_component_id,
     global_transform_default_format: global_transform_gpu_format,
     child_of_component_id,
+    camera_component_id,
   }
 }
 
@@ -677,6 +688,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
     None => return false
   }
   self.release_global_transform_ref(entity)
+  self.release_camera_ref(entity)
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.clear_gpu_slots(entity.index)
@@ -856,6 +868,17 @@ pub fn World::add_component(
               @m44.Matrix44F::identity(),
             )
             @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset)
+          } else if component == self.camera_component_id {
+            let camera_ref = self.alloc_camera_ref(
+              @m44.Matrix44F::identity(),
+              @m44.Matrix44F::identity(),
+              (0.1 : Float),
+              (1000.0 : Float),
+              (1.0 : Float),
+              (0.0 : Float),
+              (0.0 : Float),
+            )
+            @comp.camera_ref_bytes(camera_ref.word_offset)
           } else {
             FixedArray::make(rc.cpu_stride, (0 : Byte))
           }
@@ -964,6 +987,8 @@ pub fn World::remove_component(
   }
   if component == self.global_transform_component_id {
     self.release_global_transform_ref(entity)
+  } else if component == self.camera_component_id {
+    self.release_camera_ref(entity)
   }
   let old_arch = self.archetypes[loc.archetype_index]
   let new_components = sorted_with_removed(old_arch.components, component)
@@ -1054,4 +1079,9 @@ pub fn World::global_transform_component(self : World) -> ComponentTypeId {
 ///|
 pub fn World::child_of_component(self : World) -> ComponentTypeId {
   self.child_of_component_id
+}
+
+///|
+pub fn World::camera_component(self : World) -> ComponentTypeId {
+  self.camera_component_id
 }

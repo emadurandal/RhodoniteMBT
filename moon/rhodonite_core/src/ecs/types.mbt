@@ -119,11 +119,15 @@ pub(all) struct GpuResizeEvent {
 }
 
 ///|
-/// Emitted when the packed builtin GlobalTransform word blob grows.
-pub(all) struct GlobalTransformBlobResizeEvent {
+/// Emitted when a packed builtin GPU word blob grows.
+pub(all) struct PackedGpuBlobResizeEvent {
   required_word_capacity : Int
   needs_full_upload : Bool
 }
+
+///|
+/// Backward-compatible name for GlobalTransform blob resize events.
+pub type GlobalTransformBlobResizeEvent = PackedGpuBlobResizeEvent
 
 ///|
 /// Thin query descriptor for system-style iteration over a fixed `required` component set.
@@ -241,15 +245,33 @@ pub(all) struct GlobalTransformRef {
 }
 
 ///|
-/// Packed `u32` backing store for builtin GlobalTransform affine rows.
-struct GlobalTransformBlobStore {
+/// CPU-side handle stored in the builtin Camera component.
+pub(all) struct CameraRef {
+  word_offset : Int
+}
+
+///|
+/// Packed `u32` backing store with variable-size word span allocation and upload tracking.
+priv struct PackedGpuBlobStore {
   mut bytes : FixedArray[Byte]
   mut next_word_offset : Int
-  free_f16_offsets : Array[Int]
-  free_f32_offsets : Array[Int]
+  free_word_offsets : Array[Int]
+  free_word_counts : Array[Int]
   dirty_word_first : Array[Int]
   dirty_word_last : Array[Int]
-  resize_events : Array[GlobalTransformBlobResizeEvent]
+  resize_events : Array[PackedGpuBlobResizeEvent]
+}
+
+///|
+/// Packed `u32` backing store for builtin GlobalTransform affine rows.
+struct GlobalTransformBlobStore {
+  store : PackedGpuBlobStore
+}
+
+///|
+/// Packed `u32` backing store for builtin Camera GPU rows.
+struct CameraBlobStore {
+  store : PackedGpuBlobStore
 }
 
 ///|
@@ -323,6 +345,7 @@ pub struct World {
   priv component_archetypes : Array[Array[Int]]
   priv gpu_stores : Array[GpuComponentStore?]
   priv global_transform_blob : GlobalTransformBlobStore
+  priv camera_blob : CameraBlobStore
   priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
@@ -338,4 +361,5 @@ pub struct World {
   priv global_transform_component_id : ComponentTypeId
   priv global_transform_default_format : @comp.GlobalTransformGpuFormat
   priv child_of_component_id : ComponentTypeId
+  priv camera_component_id : ComponentTypeId
 }

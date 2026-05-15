@@ -331,8 +331,11 @@ WebGPU upload 側には次の API があります。
 - `GPUQueue::write_buffer_from_fixed_array`: 所有型 `GpuWrite` payload 向け。
 - `GPUQueue::write_buffer_from_array_view`: 借用型 `GpuWriteView` payload 向け。JS では backing `Uint8Array` と source offset / size を `GPUQueue.writeBuffer` に渡します。native では `ArrayView[Byte]` の backing bytes と source offset を `wgpuQueueWriteBuffer` に渡し、view を新しい `Bytes` に compact しません。
 - `GPUDevice::create_global_transform_words_buffer(world)` と `GPUQueue::upload_global_transform_writes(buffer, writes)`: builtin の packed `GlobalTransform` storage-buffer 経路向け。`GPUQueue::drain_and_upload_global_transform_writes(buffer, world)` は dirty-view drain と即時 upload をまとめます。
+- `GPUDevice::create_camera_words_buffer(world)` と `GPUQueue::upload_camera_writes(buffer, writes)`: builtin の packed `Camera` storage-buffer 経路向け。`GPUQueue::drain_and_upload_camera_writes(buffer, world)` は dirty-view drain と即時 upload をまとめます。
 
-実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は、`array<u32>` の storage buffer を 1 本 bind します。instance buffer には 8 byte の `GlobalTransform` ref（`format`, `word_offset`）と color を持たせ、`emadurandal/rhodonite_core/ecs/wgsl` の `global_transform_words_binding_default()` と `global_transform_helpers_default()` が提供する WGSL helper で同じ blob から 12 個の f32 word または 6 個の packed-f16 word を読みます。精度差で draw を分けません。storage buffer 変数名を変える場合は custom-name variant を使います。対応する vertex layout、storage buffer、storage bind group、upload は `rhodonite_webgpu/webgpu` の `global_transform_ref_instance_vertex_buffer_layout`、`GPUDevice::create_global_transform_words_buffer`、`GPUDevice::create_global_transform_words_bind_group`、`GPUQueue::upload_global_transform_writes` で作れます。MoonBit renderer では `detect_dense_global_transform_layout()`、`compute_global_transform_upload_range()`、`World::write_global_transform_blob_range_by_refs()` と `GlobalTransformBlobWriter` を使います。TypeScript renderer では `moon/rhodonite_core/src/ecs/ts` の `globalTransformWordsBindingDefault()`、`globalTransformHelpersDefault()`、`globalTransformRefInstanceVertexBufferLayout()`、`createGlobalTransformWordsBuffer()`、`globalTransformWordsBindGroup()`、`uploadGlobalTransformWrites()`、`writeGlobalTransformBlobRangeByRefs()` を使います。
+実サンプル: [`ecs-scene-graph` の `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) は、transform と camera matrix の packed `array<u32>` storage buffer を bind します。instance buffer には 8 byte の `GlobalTransform` ref（`format`, `word_offset`）と color を持たせ、`emadurandal/rhodonite_core/ecs/wgsl` の `global_transform_words_binding_default()` / `global_transform_helpers_default()` / `camera_words_binding_default()` / `camera_helpers_default()` が提供する WGSL helper で packed blob から transform row と `Camera` row を読みます。Camera row は `view_proj`、`view`、`proj`、`inv_view_proj`、world position/near、parameter data を持ちます。将来の VR / instanced stereo では、左目・右目などの camera word offset を小さな dense view list に並べ、`instance_index` からその list を引く想定です。ECS の `Camera` component は sparse な CPU 側 owner のままなので、entity index 全体に Camera GPU row を確保しません。
+
+内部的には、`GlobalTransform` と `Camera` は同じ packed blob allocator、free-list、resize event queue、dirty word range tracker を共有します。一方で、各 builtin store は component 固有の word 数と row encoder/decoder を持ち続けるため、共通機構を使っていても GPU layout や論理 index の種類を揃える必要はありません。
 
 MoonBit と TypeScript の bulk writer では `GlobalTransformBlobWriter` を使うと、renderer 側で fp32/fp16 の pack 形式を分岐しなくて済みます。この helper は upload callback ごとに writer を 1 個だけ作り、entity ごとの object allocation は行いません。renderer の loop は full row なら `writer.set_affine3x4_at(index, ...)` / `writer.setAffine3x4At(index, ...)`、部分更新なら `writer.set_element_at(index, row, column, value)` / `writer.setElementAt(index, row, column, value)` を呼び、writer が entity ref を解決して f32 word または packed f16 half へ書き込みます。hot scalar loop では MoonBit は `let set_y = writer.element_setter(row, column); set_y(index, value)`、TypeScript は `const setY = writer.elementSetter(row, column); setY(index, value)` を使うと、dense f32/f16 の選択を entity loop の外に出せます。native MoonBit target も同じ API 形を保ちつつ、scalar write path の内部では C-backed setter を使います。mixed refs は TypeScript path では同じ format が連続する run に事前分解されるため、前半 f32 / 後半 f16 のような pattern では run 内の entity ごとの format lookup を避けられます。
 
@@ -352,11 +355,20 @@ Packed GlobalTransform upload API:
 - `write_global_transform_blob_range_views(first_word, word_count, write)`: renderer 側 bulk writer に mutable blob byte range を貸し、対象 word range を dirty にして借用 upload view を返します。MassCubes demo 群は transform ref が dense な場合、この hot path を使います。
 - `drain_global_transform_blob_resize_events()`: packed blob の growth 通知です。renderer は storage buffer を作り直し、必要に応じて full upload します。
 
+Packed Camera upload API:
+
+- `set_camera_matrices(entity, view, proj, near, far, aspect, projection_kind, flags)`: builtin `Camera` component を作成または更新し、packed camera row を書きます。
+- `camera_ref(entity)`: entity の `{ word_offset }` を返します。
+- `camera_gpu_row(entity)`: debug/test 用に packed row のコピーを返します。
+- `camera_blob_word_capacity()`: WebGPU storage buffer の `u32` word capacity です。
+- `drain_camera_blob_write_views()`: packed blob の dirty byte range を借用 view で返します。
+- `drain_camera_blob_resize_events()`: packed blob の growth 通知です。renderer は storage buffer を作り直し、必要に応じて full upload します。
+
 ---
 
 ## TypeScript ラッパー
 
-JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` / `RawQuery` の surface を対象にし、entity lifecycle、component 登録、builtin component id、closure 型 query access、raw row/chunk view、GPU write-view drain、resize event、builtin transform upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
+JS target では ECS bridge と TypeScript wrapper も [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/) にあります。現時点の wrapper は `World` + `Query` / `RawQuery` の surface を対象にし、entity lifecycle、component 登録、builtin component id、closure 型 query access、raw row/chunk view、GPU write-view drain、resize event、builtin transform/camera upload helper を扱います。`Schedule`、`System`、`CommandBuffer` はまだ wrapper 対象外です。
 
 wrapper では高級 API と Raw API を分けます。
 
@@ -390,15 +402,16 @@ for (const write of world.drainGpuWriteViews(material)) {
 
 ---
 
-## ビルトインの 3 コンポーネント
+## ビルトインの 4 コンポーネント
 
-`World::new` 時に次の順で登録されます（`ComponentTypeId.index` は 0, 1, 2）。
+`World::new` 時に次の順で登録されます（`ComponentTypeId.index` は 0, 1, 2, 3）。
 
 | 順序 | 名前 | 種別 | 役割 |
 |------|------|------|------|
 | 0 | `Transform3D` | CpuOnly | ローカル TRS 等。SoA に保持。`set_transform` / `get_transform`。 |
-| 1 | `GlobalTransform` | GpuVisible | ワールド affine 行列。default は `vec4<f32>` 3 行（48 byte stride）、fp16 world は `vec4<f16>` 3 行（24 byte stride）。フラット GPU ストア。`set_global_transform` / `get_global_transform`。 |
+| 1 | `GlobalTransform` | CpuOnly ref | CPU row は `{ format, word_offset }`。ワールド affine 行列は packed GlobalTransform blob に保持。 |
 | 2 | `ChildOf` | CpuOnly | 親 `EntityId` の index/generation。`set_child_of` / `get_child_of`。 |
+| 3 | `Camera` | CpuOnly ref | CPU row は `{ word_offset }`。camera matrix は packed Camera blob に保持。`set_camera_matrices` / `camera_ref`。 |
 
 階層とワールド行列:
 
@@ -414,6 +427,7 @@ flowchart BT
 - **`compute_global_transform`**: `ChildOf` を親方向に辿り（サイクル・死んだ親は失敗）、各 `Transform3D` を掛け合わせたワールド行列を返します。
 - **`update_transform3d_positions`**: ビルトイン `Transform3D` の position field だけを、entity ごとの `QueryRow` を作らずに一括更新します。JS では `RawQuery::for_each_archetype` による column path、非 JS では固定 offset の f32 write を使う direct archetype sweep です。
 - **`update_global_transforms_from_transforms`**: **両方**のビルトイン変換を持つ全エンティティを一括走査します。`ChildOf` なし archetype は direct fast path、`ChildOf` あり archetype は階層対応 path だけで処理し、親 lookup は `ChildOf` column から直接読みます。結果は各 entity の packed blob slot に書き、dirty word range として記録します。`Affine3x4F32` slot は 12 個の `u32` word、`Affine3x4F16` slot は 6 個の packed-half word です。どちらも、非一様 scale と親回転の組み合わせで生じる shear を維持しつつ、暗黙の `[0,0,0,1]` 行の upload を省きます。
+- **`Camera` packed row**: `set_camera_matrices` は `view_proj`、`view`、`proj`、`inv_view_proj`、world position/near、parameter data を packed `u32` blob に書きます。shader は `camera_words_binding_*` と `camera_helpers_*` で読みます。複数 camera は word offset で指定するため、VR 用 view list を dense に保ちつつ、全 entity index に Camera row を確保せずに済みます。
 
 ---
 

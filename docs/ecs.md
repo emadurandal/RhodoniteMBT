@@ -318,8 +318,11 @@ For WebGPU uploads, `rhodonite_webgpu/webgpu` provides:
 - `GPUQueue::write_buffer_from_fixed_array` for owned `GpuWrite` payloads.
 - `GPUQueue::write_buffer_from_array_view` for borrowed `GpuWriteView` payloads. JS forwards the backing `Uint8Array` plus source offset/size to `GPUQueue.writeBuffer`; native forwards the `ArrayView[Byte]` backing bytes plus source offset to `wgpuQueueWriteBuffer` without compacting the view into a new `Bytes`.
 - `GPUDevice::create_global_transform_words_buffer(world)` and `GPUQueue::upload_global_transform_writes(buffer, writes)` for the built-in packed `GlobalTransform` storage-buffer path. `GPUQueue::drain_and_upload_global_transform_writes(buffer, world)` combines the dirty-view drain with immediate upload.
+- `GPUDevice::create_camera_words_buffer(world)` and `GPUQueue::upload_camera_writes(buffer, writes)` for the built-in packed `Camera` storage-buffer path. `GPUQueue::drain_and_upload_camera_writes(buffer, world)` combines the dirty-view drain with immediate upload.
 
-Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) and [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) now bind one storage buffer as `array<u32>`. Their instance buffers carry an 8-byte `GlobalTransform` ref (`format`, `word_offset`) plus color, and the WGSL helpers from `emadurandal/rhodonite_core/ecs/wgsl` (`global_transform_words_binding_default()`, `global_transform_helpers_default()`, or the custom-name variants) load either 12 f32 words or 6 packed-f16 words from the same blob in one draw. `rhodonite_webgpu/webgpu` also provides `global_transform_ref_instance_vertex_buffer_layout`, `GPUDevice::create_global_transform_words_buffer`, `GPUDevice::create_global_transform_words_bind_group`, and `GPUQueue::upload_global_transform_writes` for the matching vertex layout, storage buffer, bind group, and upload path. MoonBit renderers can use `detect_dense_global_transform_layout()`, `compute_global_transform_upload_range()`, and `World::write_global_transform_blob_range_by_refs()` with `GlobalTransformBlobWriter`. TypeScript renderers use the matching `globalTransformWordsBindingDefault()`, `globalTransformHelpersDefault()`, `globalTransformRefInstanceVertexBufferLayout()`, `createGlobalTransformWordsBuffer()`, `globalTransformWordsBindGroup()`, `uploadGlobalTransformWrites()`, and `writeGlobalTransformBlobRangeByRefs()` exports from `moon/rhodonite_core/src/ecs/ts`.
+Example: [`ecs-scene-graph` `render_frame`](../moon/rhodonite_examples/src/ecs-scene-graph/common/webgpu_renderer.mbt) and [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/common/webgpu_renderer.mbt) bind packed `array<u32>` storage buffers for both transforms and camera matrices. Their instance buffers carry an 8-byte `GlobalTransform` ref (`format`, `word_offset`) plus color, and the WGSL helpers from `emadurandal/rhodonite_core/ecs/wgsl` (`global_transform_words_binding_default()`, `global_transform_helpers_default()`, `camera_words_binding_default()`, `camera_helpers_default()`, or the custom-name variants) load transform rows and `Camera` rows from packed blobs in one draw. A camera row contains `view_proj`, `view`, `proj`, `inv_view_proj`, world position/near, and parameter data. Future VR / instanced-stereo paths should pass a small dense view list of camera word offsets (left eye, right eye, etc.) and index that list from `instance_index`, while the ECS `Camera` component remains a sparse CPU-side owner of packed camera slots. `rhodonite_webgpu/webgpu` provides the matching transform and camera storage buffer, bind group, and upload helpers.
+
+Internally, `GlobalTransform` and `Camera` share the same packed blob allocator, free-list, resize event queue, and dirty word-range tracker. Each built-in store still owns its component-specific word count and row encoder/decoder, so the shared mechanism does not require both blobs to use the same GPU layout or the same kind of logical index.
 
 MoonBit and TypeScript bulk writers can use `GlobalTransformBlobWriter` to keep fp32/fp16 packing out of renderer code. The helper builds one reusable writer per upload callback, not one object per entity. Renderer loops call `writer.set_affine3x4_at(index, ...)` / `writer.setAffine3x4At(index, ...)` for full rows or `writer.set_element_at(index, row, column, value)` / `writer.setElementAt(index, row, column, value)` for partial updates; the writer resolves each entity ref and writes either f32 words or packed f16 halves. For hot scalar loops, use `let set_y = writer.element_setter(row, column); set_y(index, value)` on MoonBit or `const setY = writer.elementSetter(row, column); setY(index, value)` on TypeScript so dense f32/f16 selection is done once outside the entity loop. The native MoonBit target keeps this same API shape while using a C-backed setter internally for the scalar write path. Mixed refs are scanned into contiguous same-format runs on the TypeScript path, so patterns such as first-half f32 / second-half f16 avoid a per-entity format lookup inside each run.
 
@@ -339,11 +342,20 @@ Packed GlobalTransform upload APIs:
 - `write_global_transform_blob_range_views(first_word, word_count, write)` lends a mutable blob byte range for renderer-owned bulk writers, marks that word range dirty, and returns borrowed upload views. This is the hot path used by the MassCubes demos when their transform refs are dense.
 - `drain_global_transform_blob_resize_events()` reports packed blob growth; renderers should recreate the storage buffer and full-upload when needed.
 
+Packed Camera upload APIs:
+
+- `set_camera_matrices(entity, view, proj, near, far, aspect, projection_kind, flags)` creates or updates the built-in `Camera` component and writes a packed camera row.
+- `camera_ref(entity)` returns the entity's `{ word_offset }`.
+- `camera_gpu_row(entity)` returns a copy of the packed row for debug/tests.
+- `camera_blob_word_capacity()` sizes the WebGPU storage buffer in `u32` words.
+- `drain_camera_blob_write_views()` returns borrowed dirty byte ranges for immediate upload.
+- `drain_camera_blob_resize_events()` reports packed blob growth; renderers should recreate the storage buffer and full-upload when needed.
+
 ---
 
 ## TypeScript wrapper
 
-The JS target also exposes an ECS bridge and TypeScript wrappers under [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/). The wrapper currently covers the `World` + `Query` / `RawQuery` surface: entity lifecycle, component registration, built-in component ids, closure-scoped query access, raw row/chunk views, GPU write-view drains, resize events, and built-in transform upload helpers. `Schedule`, `System`, and `CommandBuffer` are intentionally not wrapped yet.
+The JS target also exposes an ECS bridge and TypeScript wrappers under [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_core/src/ecs/ts/). The wrapper currently covers the `World` + `Query` / `RawQuery` surface: entity lifecycle, component registration, built-in component ids, closure-scoped query access, raw row/chunk views, GPU write-view drains, resize events, and built-in transform/camera upload helpers. `Schedule`, `System`, and `CommandBuffer` are intentionally not wrapped yet.
 
 The wrapper separates high-level and raw access:
 
@@ -377,15 +389,16 @@ for (const write of world.drainGpuWriteViews(material)) {
 
 ---
 
-## Built-in components (three)
+## Built-in components (four)
 
-Registered in `World::new` in this order (`ComponentTypeId.index` 0, 1, 2):
+Registered in `World::new` in this order (`ComponentTypeId.index` 0, 1, 2, 3):
 
 | Order | Name | Kind | Role |
 |-------|------|------|------|
 | 0 | `Transform3D` | CpuOnly | Local TRS, etc., in SoA. `set_transform` / `get_transform`. |
-| 1 | `GlobalTransform` | GpuVisible | World affine matrix in flat GPU store. Default is three `vec4<f32>` rows (48-byte stride); fp16 worlds use three `vec4<f16>` rows (24-byte stride). `set_global_transform` / `get_global_transform`. |
+| 1 | `GlobalTransform` | CpuOnly ref | CPU row stores `{ format, word_offset }`; world affine matrices live in the packed GlobalTransform blob. |
 | 2 | `ChildOf` | CpuOnly | Parent `EntityId` index/generation. `set_child_of` / `get_child_of`. |
+| 3 | `Camera` | CpuOnly ref | CPU row stores `{ word_offset }`; camera matrices live in the packed Camera blob. `set_camera_matrices` / `camera_ref`. |
 
 Hierarchy and world matrix:
 
@@ -401,6 +414,7 @@ flowchart BT
 - **`compute_global_transform`**: Walks `ChildOf` toward the root (fails on cycles or dead parents), multiplies `Transform3D` matrices into a world matrix.
 - **`update_transform3d_positions`**: Bulk-updates only the position field of built-in `Transform3D` without constructing a `QueryRow` per entity. JS uses the public archetype-column path; non-JS uses a direct archetype sweep with fixed-offset f32 writes.
 - **`update_global_transforms_from_transforms`**: Bulk-updates every entity that has **both** built-in transforms. Archetypes without `ChildOf` stay on the direct fast path; archetypes with `ChildOf` use the hierarchy-aware path and read parent links directly from the `ChildOf` column. The result is written to each entity's packed blob slot and marked dirty as a word range. `Affine3x4F32` slots use 12 `u32` words; `Affine3x4F16` slots use 6 packed-half words. Both preserve shear from non-uniform scale combined with parent rotation while avoiding the implicit `[0,0,0,1]` row upload.
+- **`Camera` packed rows**: `set_camera_matrices` writes `view_proj`, `view`, `proj`, `inv_view_proj`, world position/near, and parameter data into a packed `u32` blob. Shaders read rows with `camera_words_binding_*` and `camera_helpers_*`. Multiple cameras are addressed by word offset, which keeps VR view lists dense without allocating a Camera row for every entity index.
 
 ---
 

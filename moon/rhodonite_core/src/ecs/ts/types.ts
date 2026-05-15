@@ -19,6 +19,7 @@ import {
 	gpu_field_offset,
 	gpu_field_size,
 	gpu_layout_align,
+	gpu_layout_camera,
 	gpu_layout_child_of,
 	gpu_layout_empty,
 	gpu_layout_fields,
@@ -145,6 +146,10 @@ export class GpuLayout {
 
 	static childOf(): GpuLayout {
 		return new GpuLayout(gpu_layout_child_of());
+	}
+
+	static camera(): GpuLayout {
+		return new GpuLayout(gpu_layout_camera());
 	}
 
 	stride(): number {

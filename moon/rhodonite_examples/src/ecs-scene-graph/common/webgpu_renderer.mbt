@@ -63,17 +63,6 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
-fn put_mat4_col_major_f64_to_bytes(
-  out : FixedArray[Byte],
-  m : @m44.Matrix44D,
-) -> Unit {
-  let d = m.data()
-  for i = 0; i < 16; i = i + 1 {
-    @writes.put_f32_le(out, i * 4, d[i])
-  }
-}
-
-///|
 fn empty_offsets() -> Array[UInt] {
   []
 }
@@ -90,13 +79,14 @@ pub(all) struct WebGPURenderer {
   instance_buffer : @wgpu.GPUBuffer
   index_buffer : @wgpu.GPUBuffer
   transform_storage : @wgpu.GPUBuffer
-  camera_uniform : @wgpu.GPUBuffer
+  camera_storage : @wgpu.GPUBuffer
   bind_transforms : @wgpu.GPUBindGroup
   bind_camera : @wgpu.GPUBindGroup
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
   world : @ecs.World
   schedule : @ecs.Schedule
+  camera : @ecs.EntityId
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
@@ -104,18 +94,9 @@ pub(all) struct WebGPURenderer {
 
 ///|
 fn ecs_scene_shader_wgsl() -> String {
-  let prefix_camera =
-    #|struct CameraUniform {
-    #|  view_proj: mat4x4<f32>,
-    #|}
-    #|
-  let camera_binding =
-    #|
-    #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
-    #|
   let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
-    camera_binding
-  let prefix = prefix_camera + prefix_bindings
+    @ecs_wgsl.camera_words_binding_default()
+  let prefix = prefix_bindings
   let suffix =
     #|
     #|struct VertexOut {
@@ -133,6 +114,7 @@ fn ecs_scene_shader_wgsl() -> String {
     #|    rn_load_global_transform(transform_ref),
     #|    local_pos,
     #|  );
+    #|  let camera = rn_load_camera(0u);
     #|  let clip = camera.view_proj * world_pos;
     #|  var o: VertexOut;
     #|  o.position = clip;
@@ -145,7 +127,10 @@ fn ecs_scene_shader_wgsl() -> String {
     #|  return vec4<f32>(color, 1.0);
     #|}
     #|
-  let code = prefix + @ecs_wgsl.global_transform_helpers_default() + suffix
+  let code = prefix +
+    @ecs_wgsl.global_transform_helpers_default() +
+    @ecs_wgsl.camera_helpers_default() +
+    suffix
   code
 }
 
@@ -206,6 +191,7 @@ pub fn create_renderer_for_device(
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
   let world = @ecs.World::new()
+  let camera = world.create_entity()
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
@@ -219,22 +205,15 @@ pub fn create_renderer_for_device(
   ignore(world.set_global_transform(moon, id_m))
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
+  push_camera_matrices(world, camera)
   let transform_storage = device.create_global_transform_words_buffer(world)
-  let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
-    @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let camera_uniform = device.create_buffer(256UL, cam_usage)
+  let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
     pipeline, transform_storage, 0U, 0U,
   )
-  let bind_camera = device.create_bind_group({
-    layout: layout_camera,
-    entries: [
-      {
-        binding: 0U,
-        resource: @wgpu.GPUBindingResource::Buffer(camera_uniform),
-      },
-    ],
-  })
+  let bind_camera = device.create_camera_words_bind_group(
+    pipeline, camera_storage, 1U, 0U,
+  )
   let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vertex_byte_len = (verts_per_cube * vertex_stride_local).to_uint64()
   let vertex_buffer = device.create_buffer(vertex_byte_len, vusage)
@@ -290,6 +269,7 @@ pub fn create_renderer_for_device(
   push_local_transforms(world, bodies, 0.0)
   ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
   queue.drain_and_upload_global_transform_writes(transform_storage, world)
+  queue.drain_and_upload_camera_writes(camera_storage, world)
   {
     context,
     device,
@@ -301,17 +281,38 @@ pub fn create_renderer_for_device(
     instance_buffer,
     index_buffer,
     transform_storage,
-    camera_uniform,
+    camera_storage,
     bind_transforms,
     bind_camera,
     layout_transforms,
     layout_camera,
     world,
     schedule,
+    camera,
     bodies,
     gt,
     frame: @ref.new(0),
   }
+}
+
+///|
+fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
+  let view = @m44.Matrix44::rotation_x(camera_elevation_rad)
+    .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
+    .to_float()
+  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0).to_float()
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (50.0 : Float),
+      Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
 }
 
 ///|
@@ -417,17 +418,10 @@ pub fn render_frame_to_view(
     renderer.transform_storage,
     renderer.world,
   )
-  let view = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
-    @m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0),
-  )
-  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0)
-  let vp = proj.mat_mul(view)
-  let cam_bytes = FixedArray::make(256, (0 : Byte))
-  put_mat4_col_major_f64_to_bytes(cam_bytes, vp)
-  renderer.queue.write_buffer_from_fixed_array(
-    renderer.camera_uniform,
-    0UL,
-    cam_bytes,
+  push_camera_matrices(renderer.world, renderer.camera)
+  renderer.queue.drain_and_upload_camera_writes(
+    renderer.camera_storage,
+    renderer.world,
   )
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -485,7 +479,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   self.instance_buffer.release()
   self.vertex_buffer.release()
   self.transform_storage.release()
-  self.camera_uniform.release()
+  self.camera_storage.release()
   @wgpu.textureView_release(self.depth_view)
   self.depth_texture.release()
   self.pipeline.release()

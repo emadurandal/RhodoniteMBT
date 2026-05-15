@@ -200,6 +200,28 @@ pub fn GPUDevice::create_global_transform_words_buffer(
 }
 
 ///|
+/// Byte size for the builtin ECS Camera packed-word storage buffer.
+pub fn camera_words_buffer_byte_size(word_capacity : Int) -> UInt64 {
+  if word_capacity <= 0 {
+    4UL
+  } else {
+    (word_capacity * 4).to_uint64()
+  }
+}
+
+///|
+/// Creates a storage buffer for the builtin ECS Camera packed-word blob.
+pub fn GPUDevice::create_camera_words_buffer(
+  self : GPUDevice,
+  world : @ecs.World,
+) -> GPUBuffer {
+  self.create_buffer(
+    camera_words_buffer_byte_size(world.camera_blob_word_capacity()),
+    GPU_BUFFER_USAGE_STORAGE | GPU_BUFFER_USAGE_COPY_DST,
+  )
+}
+
+///|
 pub fn GPUDevice::create_texture(
   self : GPUDevice,
   width : UInt,
@@ -330,6 +352,33 @@ pub fn GPUQueue::drain_and_upload_global_transform_writes(
     buffer,
     world.drain_global_transform_blob_write_views(),
   )
+}
+
+///|
+/// Uploads borrowed ECS Camera packed-blob write views into a storage buffer.
+pub fn GPUQueue::upload_camera_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  writes : Array[@ecs.GpuWriteView],
+) -> Unit {
+  for i = 0; i < writes.length(); i = i + 1 {
+    let write = writes[i]
+    self.write_buffer_from_array_view(
+      buffer,
+      write.byte_offset.to_uint64(),
+      write.bytes,
+    )
+  }
+}
+
+///|
+/// Drains dirty ECS Camera packed-blob views and uploads them immediately.
+pub fn GPUQueue::drain_and_upload_camera_writes(
+  self : GPUQueue,
+  buffer : GPUBuffer,
+  world : @ecs.World,
+) -> Unit {
+  self.upload_camera_writes(buffer, world.drain_camera_blob_write_views())
 }
 
 ///|
@@ -610,6 +659,21 @@ pub fn GPUDevice::create_bind_group(
 ///|
 /// Creates a bind group for the builtin ECS GlobalTransform packed word storage buffer.
 pub fn GPUDevice::create_global_transform_words_bind_group(
+  self : GPUDevice,
+  pipeline : GPURenderPipeline,
+  buffer : GPUBuffer,
+  group_index : UInt,
+  binding : UInt,
+) -> GPUBindGroup {
+  self.create_bind_group({
+    layout: pipeline.get_bind_group_layout(group_index),
+    entries: [{ binding, resource: GPUBindingResource::Buffer(buffer) }],
+  })
+}
+
+///|
+/// Creates a bind group for the builtin ECS Camera packed word storage buffer.
+pub fn GPUDevice::create_camera_words_bind_group(
   self : GPUDevice,
   pipeline : GPURenderPipeline,
   buffer : GPUBuffer,

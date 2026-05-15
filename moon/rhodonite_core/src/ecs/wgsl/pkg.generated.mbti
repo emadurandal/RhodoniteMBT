@@ -2,6 +2,14 @@
 package "emadurandal/rhodonite_core/ecs/wgsl"
 
 // Values
+pub fn camera_helpers(camera_words_var~ : String) -> String
+
+pub fn camera_helpers_default() -> String
+
+pub fn camera_words_binding(UInt, UInt, String) -> String
+
+pub fn camera_words_binding_default() -> String
+
 pub fn global_transform_helpers(transform_words_var~ : String) -> String
 
 pub fn global_transform_helpers_default() -> String

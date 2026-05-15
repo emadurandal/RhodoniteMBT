@@ -33,13 +33,14 @@ pub(all) struct WebGPURenderer {
   instance_buffer : @webgpu.GPUBuffer
   index_buffer : @webgpu.GPUBuffer
   transform_storage : @webgpu.GPUBuffer
-  camera_uniform : @webgpu.GPUBuffer
+  camera_storage : @webgpu.GPUBuffer
   bind_transforms : @webgpu.GPUBindGroup
   bind_camera : @webgpu.GPUBindGroup
   layout_transforms : @webgpu.GPUBindGroupLayout
   layout_camera : @webgpu.GPUBindGroupLayout
   world : @ecs.World
   schedule : @ecs.Schedule
+  camera : @ecs.EntityId
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]

@@ -187,7 +187,7 @@ try {
 	if (browserProcess && !browserProcess.killed) {
 		browserProcess.kill("SIGTERM");
 	}
-	await vite.close();
+	await closeMaybeRunning(vite);
 	if (resultServer) {
 		await closeServer(resultServer);
 	}
@@ -256,13 +256,25 @@ function listen(server) {
 function closeServer(server) {
 	return new Promise((resolve, reject) => {
 		server.close((error) => {
-			if (error) {
+			if (error?.code === "ERR_SERVER_NOT_RUNNING") {
+				resolve();
+			} else if (error) {
 				reject(error);
 			} else {
 				resolve();
 			}
 		});
 	});
+}
+
+async function closeMaybeRunning(serverLike) {
+	try {
+		await serverLike.close();
+	} catch (error) {
+		if (error?.code !== "ERR_SERVER_NOT_RUNNING") {
+			throw error;
+		}
+	}
 }
 
 async function writeUpdatedSnapshots(updates) {

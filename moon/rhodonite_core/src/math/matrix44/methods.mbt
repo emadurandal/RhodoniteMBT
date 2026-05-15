@@ -141,6 +141,16 @@ pub fn Matrix44F::identity() -> Matrix44F {
 }
 
 ///|
+pub fn Matrix44D::to_float(self : Matrix44D) -> Matrix44F {
+  let src = self.data()
+  let dst : FixedArray[Float] = FixedArray::make(16, (0.0 : Float))
+  for i = 0; i < 16; i = i + 1 {
+    dst[i] = Float::from_double(src[i])
+  }
+  Matrix44::{ data: dst }
+}
+
+///|
 pub fn[T] Matrix44::at(self : Matrix44[T], row : Int, col : Int) -> T {
   self.data[col * 4 + row]
 }

@@ -54,6 +54,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 	): MoonComponentTypeId;
 	export function world_child_of_component(world: MoonWorld): MoonComponentTypeId;
+	export function world_camera_component(world: MoonWorld): MoonComponentTypeId;
 	export function world_register_cpu_component(
 		world: MoonWorld,
 		name: string,
@@ -163,6 +164,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_global_transform_blob_word_capacity(
 		world: MoonWorld,
 	): number;
+	export function world_drain_camera_blob_write_views(
+		world: MoonWorld,
+	): MoonGpuWriteView[];
+	export function world_camera_blob_word_capacity(world: MoonWorld): number;
 	export function world_extract_global_transform_refs(
 		world: MoonWorld,
 		entities: MoonEntityId[],
@@ -293,6 +298,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function gpu_layout_global_transform(): MoonGpuLayout;
 	export function gpu_layout_global_transform_f16(): MoonGpuLayout;
 	export function gpu_layout_child_of(): MoonGpuLayout;
+	export function gpu_layout_camera(): MoonGpuLayout;
 	export function gpu_layout_stride(layout: MoonGpuLayout): number;
 	export function gpu_layout_align(layout: MoonGpuLayout): number;
 	export function gpu_layout_is_valid(layout: MoonGpuLayout): MoonBool;
