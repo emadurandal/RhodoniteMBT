@@ -1,0 +1,69 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/common/app"
+
+import {
+  "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_webgpu/webgpu",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct App {
+  // private fields
+}
+pub fn App::init(Self, Engine) -> Unit
+pub fn App::new((Engine) -> Unit, (Engine, FrameState) -> Unit, (Engine, FrameState) -> Unit, (Engine) -> Unit) -> Self
+pub fn App::render(Self, Engine, FrameState) -> Unit
+pub fn App::shutdown(Self, Engine) -> Unit
+pub fn App::update(Self, Engine, FrameState) -> Unit
+
+pub struct Engine {
+  // private fields
+}
+pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
+pub fn Engine::initialize_app(Self, App) -> Unit
+pub fn Engine::main_scene(Self) -> Scene
+pub fn Engine::new(@webgpu.GPUContext) -> Self
+pub fn Engine::shutdown_app(Self, App) -> Unit
+pub fn Engine::tick(Self, App) -> Unit
+
+pub(all) struct FrameState {
+  delta_seconds : Float
+  frame_index : Int
+  elapsed_seconds : Double
+}
+pub fn FrameState::delta_seconds(Self) -> Float
+pub fn FrameState::elapsed_seconds(Self) -> Double
+pub fn FrameState::frame_index(Self) -> Int
+pub fn FrameState::new(Float, Int, Double) -> Self
+pub fn FrameState::system_context(Self) -> @ecs.SystemContext
+
+pub struct Scene {
+  // private fields
+}
+pub fn Scene::enabled(Self) -> Bool
+pub fn Scene::main_camera(Self) -> @ecs.EntityId?
+pub fn Scene::name(Self) -> String
+pub fn Scene::new(String) -> Self
+pub fn Scene::run_schedule(Self, FrameState) -> Bool
+pub fn Scene::run_schedule_with_context(Self, @ecs.SystemContext) -> Bool
+pub fn Scene::schedule(Self) -> @ecs.Schedule
+pub fn Scene::set_enabled(Self, Bool) -> Unit
+pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
+pub fn Scene::set_visible(Self, Bool) -> Unit
+pub fn Scene::visible(Self) -> Bool
+pub fn Scene::world(Self) -> @ecs.World
+
+pub struct TimeState {
+  // private fields
+}
+pub fn TimeState::new(Float) -> Self
+pub fn TimeState::next_frame(Self) -> FrameState
+
+// Type aliases
+
+// Traits
+

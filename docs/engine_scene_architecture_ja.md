@@ -183,6 +183,22 @@ Renderer
 
 ## 実装計画
 
+### 現在の Phase 1 prototype
+
+Phase 1 の prototype は [`moon/rhodonite_examples/src/common/app/`](../moon/rhodonite_examples/src/common/app/) に置きます。この package は public facade ではなく、examples 内で `App` / `Engine` / `Scene` の実コード上の境界を検証するためのものです。
+
+現在の prototype は次の型を持ちます。
+
+| 型 | 現在の内容 |
+|----|------------|
+| `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
+| `TimeState` | 固定 delta の frame counter。初期値は既存 `ecs-scene-graph` sample に合わせて 0.022 秒。 |
+| `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
+| `App` | callback-backed lifecycle。`init`、`update`、`render`、`shutdown` を呼び出す。 |
+| `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で update、scene schedule、render を実行する。 |
+
+[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) はこの prototype へ移行済みです。sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。browser/native entry point は `Engine::tick(app)` を呼び、renderer 側の `App` callback が animation input update と render を担当します。
+
 ### Phase 1: examples 内 prototype
 
 目的は public API を固定する前に、既存 sample の重複を減らしながら `App` / `Engine` / `Scene` の形を検証することです。

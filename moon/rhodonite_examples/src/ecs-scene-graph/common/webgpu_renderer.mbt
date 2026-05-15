@@ -89,8 +89,7 @@ pub(all) struct WebGPURenderer {
   bind_camera : @wgpu.GPUBindGroup
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
-  world : @ecs.World
-  schedule : @ecs.Schedule
+  scene : @app.Scene
   camera : @ecs.EntityId
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
@@ -143,9 +142,17 @@ fn ecs_scene_shader_wgsl() -> String {
 ///|
 /// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = context.get()
+  let engine = @app.Engine::new(context)
+  create_renderer_for_engine(engine)
+}
+
+///|
+/// Implements `create_renderer_for_engine`.
+pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+  let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
-    create_renderer_for_device(
+    create_renderer_for_scene(
+      engine.main_scene(),
       device,
       queue,
       format,
@@ -157,6 +164,24 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 ///|
 /// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
+  create_renderer_for_scene(
+    @app.Scene::new("ecs-scene-graph"),
+    device,
+    queue,
+    format,
+    context~,
+  )
+}
+
+///|
+/// Implements `create_renderer_for_scene`.
+pub fn create_renderer_for_scene(
+  scene : @app.Scene,
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
@@ -198,12 +223,12 @@ pub fn create_renderer_for_device(
   @wgpu.shaderModule_release(shader)
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
-  let world = @ecs.World::new()
+  let world = scene.world()
   let camera = world.create_entity()
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  let schedule = @ecs.Schedule::new()
+  let schedule = scene.schedule()
   schedule.add_system(@ecs.transform_propagation_system(world))
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
@@ -213,6 +238,7 @@ pub fn create_renderer_for_device(
   ignore(world.set_global_transform(moon, id_m))
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
+  scene.set_main_camera(Some(camera))
   push_camera_matrices(world, camera)
   let transform_storage = device.create_global_transform_words_buffer(world)
   let camera_storage = device.create_camera_words_buffer(world)
@@ -275,7 +301,9 @@ pub fn create_renderer_for_device(
   )
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
-  ignore(schedule.run(world, @ecs.SystemContext::new((0.0 : Float), 0)))
+  ignore(
+    scene.run_schedule_with_context(@ecs.SystemContext::new((0.0 : Float), 0)),
+  )
   queue.drain_and_upload_global_transform_writes(transform_storage, world)
   queue.drain_and_upload_camera_writes(camera_storage, world)
   {
@@ -294,8 +322,7 @@ pub fn create_renderer_for_device(
     bind_camera,
     layout_transforms,
     layout_camera,
-    world,
-    schedule,
+    scene,
     camera,
     bodies,
     gt,
@@ -413,29 +440,62 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Renders the current scene state without advancing app time or running schedules.
+pub fn render_current_frame(renderer : WebGPURenderer) -> Unit {
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_current_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_current_frame_to_view(renderer, color_view)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+/// Updates sample animation inputs before the owning engine runs the scene schedule.
+pub fn WebGPURenderer::update_scene(
+  self : WebGPURenderer,
+  frame : @app.FrameState,
+) -> Unit {
+  push_local_transforms(
+    self.scene.world(),
+    self.bodies,
+    frame.elapsed_seconds(),
+  )
+}
+
+///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   renderer.frame.val = renderer.frame.val + 1
-  let t = renderer.frame.val.to_double() * 0.022
-  push_local_transforms(renderer.world, renderer.bodies, t)
-  ignore(
-    renderer.schedule.run(
-      renderer.world,
-      @ecs.SystemContext::new((0.022 : Float), renderer.frame.val),
-    ),
+  let frame = @app.FrameState::new(
+    (0.022 : Float),
+    renderer.frame.val,
+    renderer.frame.val.to_double() * 0.022,
   )
+  renderer.update_scene(frame)
+  ignore(renderer.scene.run_schedule(frame))
+  render_current_frame_to_view(renderer, color_view)
+}
+
+///|
+/// Renders the current scene state to a target view without advancing the scene.
+pub fn render_current_frame_to_view(
+  renderer : WebGPURenderer,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  let world = renderer.scene.world()
   renderer.queue.drain_and_upload_global_transform_writes(
     renderer.transform_storage,
-    renderer.world,
+    world,
   )
-  push_camera_matrices(renderer.world, renderer.camera)
-  renderer.queue.drain_and_upload_camera_writes(
-    renderer.camera_storage,
-    renderer.world,
-  )
+  push_camera_matrices(world, renderer.camera)
+  renderer.queue.drain_and_upload_camera_writes(renderer.camera_storage, world)
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -480,6 +540,17 @@ pub fn render_frame_to_view(
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
+}
+
+///|
+/// Builds an app lifecycle that drives this renderer from an engine tick.
+pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+  @app.App::new(
+    fn(_engine) { () },
+    fn(_engine, frame) { renderer.update_scene(frame) },
+    fn(_engine, _frame) { render_current_frame(renderer) },
+    fn(_engine) { renderer.release() },
+  )
 }
 
 ///|

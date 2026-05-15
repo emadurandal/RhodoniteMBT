@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite_examples/common/app" @app,
   "emadurandal/rhodonite_examples/common" @sdl_wgpu,
   "emadurandal/rhodonite_examples/ecs-scene-graph/common" @renderer,
   "moonbitlang/async" @async,
