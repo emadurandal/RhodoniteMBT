@@ -422,7 +422,6 @@ pub(all) struct WebGPURenderer {
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
   scene : @app.Scene
-  camera : @ecs.EntityId
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
@@ -758,7 +757,6 @@ pub fn create_renderer_for_scene(
     layout_transforms,
     layout_camera,
     scene,
-    camera,
     gt,
     tf,
     per_side,
@@ -768,6 +766,15 @@ pub fn create_renderer_for_scene(
     bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
+  }
+}
+
+///|
+/// Returns the scene main camera or aborts because this renderer requires one.
+fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
+  match scene.main_camera() {
+    Some(camera) => camera
+    None => abort("render_scene requires Scene.main_camera")
   }
 }
 
@@ -863,7 +870,38 @@ pub fn render_current_frame_to_view(
     0.0
   }
   renderer.perf_last_frame_start_ms.val = t_frame_start
-  let encoder = renderer.device.create_command_encoder()
+  renderer.render_scene(renderer.scene, color_view)
+  if record_perf {
+    let cpu_ms = monotonic_ms() - t_frame_start
+    ecs_mass_cubes_perf_overlay(fps, cpu_ms)
+    ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
+  }
+}
+
+///|
+/// Renders a scene by uploading scene-owned camera data and issuing draw commands.
+pub fn WebGPURenderer::render_scene(
+  self : WebGPURenderer,
+  scene : @app.Scene,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  let world = scene.world()
+  let camera = scene_main_camera_or_abort(scene)
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      camera_view,
+      camera_proj,
+      camera_near,
+      camera_far,
+      camera_aspect,
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
+  let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
       Some({
@@ -874,38 +912,30 @@ pub fn render_current_frame_to_view(
       }),
     ],
     depth_stencil_attachment: Some({
-      view: renderer.depth_view,
+      view: self.depth_view,
       depth_clear_value: Some(1.0),
       depth_load_op: @wgpu.GPULoadOp::Clear,
       depth_store_op: @wgpu.GPUStoreOp::Store,
     }),
   })
-  render_pass.set_pipeline(renderer.pipeline)
-  render_pass.set_bind_group(
-    0U,
-    renderer.bind_transforms,
-    renderer.bind_group_offsets,
-  )
-  render_pass.set_bind_group(
-    1U,
-    renderer.bind_camera,
-    renderer.bind_group_offsets,
-  )
+  render_pass.set_pipeline(self.pipeline)
+  render_pass.set_bind_group(0U, self.bind_transforms, self.bind_group_offsets)
+  render_pass.set_bind_group(1U, self.bind_camera, self.bind_group_offsets)
   render_pass.set_index_buffer(
-    renderer.index_buffer,
+    self.index_buffer,
     @wgpu.GPUIndexFormat::Uint16,
     0UL,
     index_buffer_byte_length,
   )
   render_pass.set_vertex_buffer(
     0,
-    renderer.vertex_buffer,
+    self.vertex_buffer,
     0UL,
     (verts_per_cube * vertex_stride_local).to_uint64(),
   )
   render_pass.set_vertex_buffer(
     1,
-    renderer.instance_buffer,
+    self.instance_buffer,
     0UL,
     (entity_count * instance_stride).to_uint64(),
   )
@@ -913,13 +943,8 @@ pub fn render_current_frame_to_view(
   render_pass.end()
   render_pass.release()
   let command_buffer = encoder.finish()
-  renderer.queue.submit(command_buffer)
+  self.queue.submit(command_buffer)
   encoder.release()
-  if record_perf {
-    let cpu_ms = monotonic_ms() - t_frame_start
-    ecs_mass_cubes_perf_overlay(fps, cpu_ms)
-    ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
-  }
 }
 
 ///|

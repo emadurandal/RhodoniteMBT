@@ -54,7 +54,6 @@ pub(all) struct WebGPURenderer {
   layout_transforms : @webgpu.GPUBindGroupLayout
   layout_camera : @webgpu.GPUBindGroupLayout
   scene : @app.Scene
-  camera : @ecs.EntityId
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
@@ -66,6 +65,7 @@ pub(all) struct WebGPURenderer {
   perf_last_frame_start_ms : @ref.Ref[Double]
 }
 pub fn WebGPURenderer::release(Self) -> Unit
+pub fn WebGPURenderer::render_scene(Self, @app.Scene, @webgpu_objects.GPUTextureView) -> Unit
 pub fn WebGPURenderer::update_scene(Self, @app.FrameState) -> Unit
 
 // Type aliases

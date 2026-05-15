@@ -201,7 +201,7 @@ WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ
 
 ECS sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `App::update` で animated cube vertices を更新し、`App::render` でその frame の描画だけを行います。
 
-TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createRendererForEngine(engine)`、`createApp(renderer)`、`engine.tick(app)` の順に書きます。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と lifecycle callback は同じです。
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createRendererForEngine(engine)`、`createApp(renderer)`、`engine.tick(app)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、renderer は `renderScene(renderer, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と lifecycle callback は同じです。
 
 [`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
@@ -275,16 +275,17 @@ pnpm run test:core:js
 pnpm run test:examples:visual
 ```
 
-### Phase 4: Renderer integration
+### Phase 4: Renderer integration（完了済み）
 
 目的は `Scene` を render source として扱う API を作ることです。
 
-- `Renderer::render_scene(scene)` の形を導入する。
+- `Renderer::render_scene(scene, color_view)` の形を導入する。
 - `Renderer` が `GlobalTransform` / `Camera` blob events を upload する責務を持つ。
 - `Scene` の main camera を renderer が参照する。
+- TypeScript wrapper でも `Scene.mainCamera()` と `renderScene(renderer, scene, colorView)` の流れに揃える。
 - 将来の `Renderable` component のために handle-based resource ownership 方針を固める。
 
-この phase ではまだ full material system は必須ではありません。既存 sample renderer を共通入口へ寄せることを優先します。
+この phase ではまだ full material system は入れていません。既存 sample renderer を共通入口へ寄せることを優先し、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `scene.main_camera()` を primary camera source として `render_scene` から描画します。TypeScript-only sample も同じく `Scene` を render source として渡します。
 
 ### Phase 5: Mesh / Material / Renderable
 

@@ -39,16 +39,36 @@ export class TimeState {
 	}
 }
 
-export class Scene<TWorld = unknown> {
+export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	readonly name: string;
-	readonly world: TWorld | null;
+	private worldValue: TWorld | null;
+	private mainCameraValue: TMainCamera | null = null;
 	private scheduleCallback: SceneScheduleCallback<TWorld> | null = null;
 	private enabledValue = true;
 	private visibleValue = true;
 
 	constructor(name: string, world: TWorld | null = null) {
 		this.name = name;
-		this.world = world;
+		this.worldValue = world;
+	}
+
+	setWorld(world: TWorld): void {
+		this.worldValue = world;
+	}
+
+	world(): TWorld {
+		if (this.worldValue === null) {
+			throw new Error(`Scene '${this.name}' does not have a world.`);
+		}
+		return this.worldValue;
+	}
+
+	setMainCamera(camera: TMainCamera | null): void {
+		this.mainCameraValue = camera;
+	}
+
+	mainCamera(): TMainCamera | null {
+		return this.mainCameraValue;
 	}
 
 	setSchedule(schedule: SceneScheduleCallback<TWorld>): void {
@@ -72,10 +92,10 @@ export class Scene<TWorld = unknown> {
 	}
 
 	runSchedule(frame: FrameState): boolean {
-		if (this.world === null || this.scheduleCallback === null) {
+		if (this.worldValue === null || this.scheduleCallback === null) {
 			return true;
 		}
-		this.scheduleCallback(this.world, frame);
+		this.scheduleCallback(this.worldValue, frame);
 		return true;
 	}
 }
@@ -115,6 +135,11 @@ export class App {
 	}
 }
 
+type RuntimeScene = {
+	enabled: () => boolean;
+	runSchedule: (frame: FrameState) => boolean;
+};
+
 export class Engine {
 	readonly canvas: HTMLCanvasElement;
 	readonly adapter: GPUAdapter;
@@ -122,7 +147,7 @@ export class Engine {
 	readonly queue: GPUQueue;
 	readonly context: GPUCanvasContext;
 	readonly format: GPUTextureFormat;
-	private readonly scenes: Scene[];
+	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
 	private mainSceneIndex = 0;
 
@@ -132,7 +157,7 @@ export class Engine {
 		device: GPUDevice,
 		context: GPUCanvasContext,
 		format: GPUTextureFormat,
-		mainScene: Scene,
+		mainScene: RuntimeScene,
 	) {
 		this.canvas = canvas;
 		this.adapter = adapter;
@@ -146,7 +171,7 @@ export class Engine {
 
 	static async create(
 		canvas: HTMLCanvasElement,
-		options: { mainScene?: Scene } = {},
+		options: { mainScene?: RuntimeScene } = {},
 	): Promise<Engine> {
 		const adapter = await navigator.gpu.requestAdapter();
 		if (adapter === null) {
@@ -169,8 +194,11 @@ export class Engine {
 		);
 	}
 
-	mainScene(): Scene {
-		return this.scenes[this.mainSceneIndex];
+	mainScene<TWorld = unknown, TMainCamera = unknown>(): Scene<
+		TWorld,
+		TMainCamera
+	> {
+		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
 	}
 
 	initializeApp(app: App): void {
