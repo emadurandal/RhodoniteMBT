@@ -99,10 +99,26 @@ pub async fn webgpu_instance_request_adapter(
 pub fn native_webgpu_instance_request_adapter(
   instance : WebGPUInstance,
 ) -> WebGPUAdapter raise Error {
-  WebGPUAdapter::new(GPUAdapter::{
-    raw: instance.instance.raw.request_adapter_sync(),
-    instance: instance.instance.raw,
-  })
+  let raw = instance.instance.raw.request_adapter_sync() catch {
+    _ => {
+      let backend = if @wgpu.platform_is_macos() {
+        @wgpu.BACKEND_TYPE_METAL
+      } else if @wgpu.platform_is_linux() {
+        @wgpu.BACKEND_TYPE_VULKAN
+      } else if @wgpu.platform_is_windows() {
+        @wgpu.BACKEND_TYPE_D3_D12
+      } else {
+        @wgpu.BACKEND_TYPE_UNDEFINED
+      }
+      instance.instance.raw.request_adapter_sync_options_u32(
+        feature_level_u32=@wgpu.FEATURE_LEVEL_CORE,
+        power_preference_u32=@wgpu.POWER_PREFERENCE_HIGH_PERFORMANCE,
+        force_fallback_adapter=false,
+        backend_type_u32=backend,
+      )
+    }
+  }
+  WebGPUAdapter::new(GPUAdapter::{ raw, instance: instance.instance.raw })
 }
 
 ///|

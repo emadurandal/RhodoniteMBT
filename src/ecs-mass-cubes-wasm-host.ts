@@ -7,6 +7,11 @@ import {
 	globalTransformWordsBindingDefault,
 	uploadGlobalTransformBytes,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import {
+	createRgba8ReadbackTarget,
+	destroyReadbackTarget,
+	readRgba8Texture,
+} from "./visual-regression/webgpu-readback";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -79,6 +84,8 @@ type Renderer = {
 	readonly transformWordUploadCount: number;
 	perSide: number;
 	transformStride: number;
+	snapshotColorView?: GPUTextureView;
+	snapshotDepthView?: GPUTextureView;
 	wasmTransformUploadBuffer?: ArrayBufferLike;
 	wasmTransformUploadPtr?: number;
 	wasmTransformUploadByteLength?: number;
@@ -630,7 +637,10 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
+async function createRenderer(
+	canvas: HTMLCanvasElement,
+	renderFormat?: GPUTextureFormat,
+): Promise<Renderer> {
 	const adapter = await navigator.gpu.requestAdapter();
 	if (adapter === null) {
 		throw new Error("WebGPU adapter is not available.");
@@ -643,6 +653,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	}
 	const format = navigator.gpu.getPreferredCanvasFormat();
 	context.configure({ device, format, alphaMode: "opaque" });
+	const targetFormat = renderFormat ?? format;
 
 	const shader = device.createShaderModule({ code: shaderWgsl() });
 	const transformLayout = createTransformLayout();
@@ -667,7 +678,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		fragment: {
 			module: shader,
 			entryPoint: "fragmentMain",
-			targets: [{ format }],
+			targets: [{ format: targetFormat }],
 		},
 		primitive: { topology: "triangle-list" },
 		depthStencil: {
@@ -763,6 +774,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformWordUploadCount: transformLayout.uploadWordCount,
 		perSide: gridSideLen(ENTITY_COUNT),
 		transformStride: 0,
+		snapshotColorView: undefined,
+		snapshotDepthView: undefined,
 	};
 }
 
@@ -812,7 +825,10 @@ function createHostImports(
 				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
 			},
 			render_frame: (fps: number, cpuMs: number) => {
-				const colorView = renderer.context.getCurrentTexture().createView();
+				const colorView =
+					renderer.snapshotColorView ??
+					renderer.context.getCurrentTexture().createView();
+				const depthView = renderer.snapshotDepthView ?? renderer.depthView;
 				const encoder = renderer.device.createCommandEncoder();
 				const pass = encoder.beginRenderPass({
 					colorAttachments: [
@@ -824,7 +840,7 @@ function createHostImports(
 						},
 					],
 					depthStencilAttachment: {
-						view: renderer.depthView,
+						view: depthView,
 						depthClearValue: 1,
 						depthLoadOp: "clear",
 						depthStoreOp: "store",
@@ -905,4 +921,39 @@ export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
 					"<h1>Failed to initialize WebGPU/WASM. Check the console for errors.</h1>";
 			});
 	});
+}
+
+export async function renderEcsMassCubesWasmSnapshot(
+	wasmUrl: string,
+	label: string,
+): Promise<Uint8Array> {
+	if (!navigator.gpu) {
+		throw new Error("WebGPU is not supported in this browser.");
+	}
+	const canvas = document.createElement("canvas");
+	canvas.width = CANVAS_WIDTH;
+	canvas.height = CANVAS_HEIGHT;
+	const renderer = await createRenderer(canvas, "rgba8unorm");
+	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	try {
+		const wasm = await instantiateWasm(renderer, wasmUrl, label);
+		wasm._start?.();
+		wasm.create_wasm_renderer();
+		renderer.snapshotColorView = target.view;
+		renderer.snapshotDepthView = target.depthView;
+		wasm.ecs_mass_cubes_wasm_render_tick();
+		renderer.snapshotColorView = undefined;
+		renderer.snapshotDepthView = undefined;
+		return await readRgba8Texture(
+			renderer.device,
+			renderer.queue,
+			target.texture,
+			CANVAS_WIDTH,
+			CANVAS_HEIGHT,
+		);
+	} finally {
+		renderer.snapshotColorView = undefined;
+		renderer.snapshotDepthView = undefined;
+		destroyReadbackTarget(target);
+	}
 }

@@ -395,7 +395,7 @@ fn update_and_drain_global_transforms(
 
 ///|
 pub(all) struct WebGPURenderer {
-  context : @wgpu.GPUCanvasContext
+  context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
@@ -535,6 +535,23 @@ fn ecs_mass_cubes_perf_console_log(
 ///|
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
+  Some(
+    create_renderer_for_device(
+      device,
+      queue,
+      format,
+      context=Some(canvas_context),
+    ),
+  )
+}
+
+///|
+pub fn create_renderer_for_device(
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> WebGPURenderer {
   let shader = device.create_shader_module(ecs_mass_shader_wgsl())
   let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
     array_stride: vertex_stride_local.to_uint64(),
@@ -664,8 +681,8 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     true,
   )
   queue.upload_global_transform_writes(transform_storage, writes0)
-  Some({
-    context: canvas_context,
+  {
+    context,
     device,
     queue,
     pipeline,
@@ -690,11 +707,28 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
     bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
-  })
+  }
 }
 
 ///|
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
+  let canvas_context = match renderer.context {
+    Some(c) => c
+    None => abort("render_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_frame_to_view(renderer, color_view, record_perf=true)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+pub fn render_frame_to_view(
+  renderer : WebGPURenderer,
+  color_view : @wgpu.GPUTextureView,
+  record_perf? : Bool = false,
+) -> Unit {
   let t_frame_start = monotonic_ms()
   let last_start = renderer.perf_last_frame_start_ms.val
   let fps = if last_start >= 0.0 {
@@ -727,8 +761,6 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
     renderer.transform_storage,
     writes,
   )
-  let texture = renderer.context.get_current_texture()
-  let color_view = texture.create_view()
   let encoder = renderer.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
@@ -781,11 +813,11 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let command_buffer = encoder.finish()
   renderer.queue.submit(command_buffer)
   encoder.release()
-  let cpu_ms = monotonic_ms() - t_frame_start
-  ecs_mass_cubes_perf_overlay(fps, cpu_ms)
-  ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
-  @wgpu.textureView_release(color_view)
-  renderer.context.present()
+  if record_perf {
+    let cpu_ms = monotonic_ms() - t_frame_start
+    ecs_mass_cubes_perf_overlay(fps, cpu_ms)
+    ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
+  }
 }
 
 ///|

@@ -147,11 +147,21 @@ pub fn webgpu_device_create_texture(
   format : String,
   usage : UInt64,
 ) -> WebGPUTexture {
-  ignore(usage)
-  if format != "depth24plus" {
-    abort("native WebGPU: create_texture supports only depth24plus")
+  if format == "depth24plus" {
+    let tex = device.device.raw.create_texture_depth24plus_2d(width, height)
+    return WebGPUTexture::new(GPUTexture::{ raw: tex })
   }
-  let tex = device.device.raw.create_texture_depth24plus_2d(width, height)
+  let fmt = texture_format_from_string(format)
+  if fmt.to_u32() != @wgpu.TEXTURE_FORMAT_RGBA8_UNORM {
+    abort(
+      "native WebGPU: create_texture currently supports rgba8unorm and depth24plus",
+    )
+  }
+  let tex = device.device.raw.create_texture_rgba8_2d_with_usage(
+    width,
+    height,
+    @wgpu.TextureUsage::from_u64(usage),
+  )
   WebGPUTexture::new(GPUTexture::{ raw: tex })
 }
 

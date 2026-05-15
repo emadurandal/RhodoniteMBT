@@ -12,13 +12,21 @@ pub const GPU_BUFFER_BINDING_WHOLE_SIZE : UInt64 = 0xFFFFFFFFFFFFFFFF
 
 pub const GPU_BUFFER_USAGE_COPY_DST : UInt64 = 8
 
+pub const GPU_BUFFER_USAGE_COPY_SRC : UInt64 = 4
+
 pub const GPU_BUFFER_USAGE_INDEX : UInt64 = 16
+
+pub const GPU_BUFFER_USAGE_MAP_READ : UInt64 = 1
 
 pub const GPU_BUFFER_USAGE_STORAGE : UInt64 = 128
 
 pub const GPU_BUFFER_USAGE_UNIFORM : UInt64 = 64
 
 pub const GPU_BUFFER_USAGE_VERTEX : UInt64 = 32
+
+pub const GPU_TEXTURE_USAGE_COPY_DST : UInt64 = 2
+
+pub const GPU_TEXTURE_USAGE_COPY_SRC : UInt64 = 1
 
 pub const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT : UInt64 = 16
 
@@ -49,6 +57,10 @@ pub fn global_transform_words_buffer_byte_size(Int) -> UInt64
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
+
+pub fn rgba8_copy_bytes_per_row(UInt) -> UInt64
+
+pub fn rgba8_copy_padded_byte_length(UInt, UInt) -> UInt64
 
 pub fn shaderModule_release(@webgpu_objects.GPUShaderModule) -> Unit
 
@@ -149,6 +161,7 @@ pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
 pub fn GPUDevice::create_global_transform_words_buffer(Self, @ecs.World) -> GPUBuffer
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
+pub fn GPUDevice::create_rgba8_render_texture(Self, UInt, UInt) -> GPUTexture
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
 pub fn GPUDevice::create_texture(Self, UInt, UInt, String, UInt64) -> GPUTexture
 pub fn GPUDevice::get(Self) -> @webgpu_objects.GPUDevice

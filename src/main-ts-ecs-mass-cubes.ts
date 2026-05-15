@@ -13,6 +13,11 @@ import {
 	type GlobalTransformBlobWriter,
 	type GlobalTransformDenseLayout,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import {
+	createRgba8ReadbackTarget,
+	destroyReadbackTarget,
+	readRgba8Texture,
+} from "./visual-regression/webgpu-readback";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -53,6 +58,8 @@ type Renderer = {
 	readonly transformWordUploadCount: number;
 	readonly denseTransformLayout: GlobalTransformDenseLayout | null;
 	readonly perSide: number;
+	snapshotColorView?: GPUTextureView;
+	snapshotDepthView?: GPUTextureView;
 	frame: number;
 	lastFrameStartMs: number;
 };
@@ -445,7 +452,10 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
+async function createRenderer(
+	canvas: HTMLCanvasElement,
+	renderFormat?: GPUTextureFormat,
+): Promise<Renderer> {
 	const adapter = await navigator.gpu.requestAdapter();
 	if (adapter === null) {
 		throw new Error("WebGPU adapter is not available.");
@@ -458,6 +468,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 	}
 	const format = navigator.gpu.getPreferredCanvasFormat();
 	context.configure({ device, format, alphaMode: "opaque" });
+	const targetFormat = renderFormat ?? format;
 
 	const shader = device.createShaderModule({
 		code: shaderWgsl(),
@@ -483,7 +494,7 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		fragment: {
 			module: shader,
 			entryPoint: "fragmentMain",
-			targets: [{ format }],
+			targets: [{ format: targetFormat }],
 		},
 		primitive: { topology: "triangle-list" },
 		depthStencil: {
@@ -576,6 +587,8 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<Renderer> {
 		transformWordUploadCount: transformUploadRange.wordCount,
 		denseTransformLayout,
 		perSide,
+		snapshotColorView: undefined,
+		snapshotDepthView: undefined,
 		frame: 0,
 		lastFrameStartMs: -1,
 	};
@@ -601,7 +614,9 @@ function renderFrame(renderer: Renderer): void {
 	renderer.frame += 1;
 	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
 
-	const colorView = renderer.context.getCurrentTexture().createView();
+	const colorView =
+		renderer.snapshotColorView ?? renderer.context.getCurrentTexture().createView();
+	const depthView = renderer.snapshotDepthView ?? renderer.depthView;
 	const encoder = renderer.device.createCommandEncoder();
 	const pass = encoder.beginRenderPass({
 		colorAttachments: [
@@ -613,7 +628,7 @@ function renderFrame(renderer: Renderer): void {
 			},
 		],
 		depthStencilAttachment: {
-			view: renderer.depthView,
+			view: depthView,
 			depthClearValue: 1,
 			depthLoadOp: "clear",
 			depthStoreOp: "store",
@@ -629,6 +644,32 @@ function renderFrame(renderer: Renderer): void {
 	pass.end();
 	renderer.queue.submit([encoder.finish()]);
 	updatePerfOverlay(fps, performance.now() - frameStart);
+}
+
+export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
+	const canvas = document.createElement("canvas");
+	canvas.width = CANVAS_WIDTH;
+	canvas.height = CANVAS_HEIGHT;
+	const renderer = await createRenderer(canvas, "rgba8unorm");
+	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	try {
+		renderer.snapshotColorView = target.view;
+		renderer.snapshotDepthView = target.depthView;
+		renderFrame(renderer);
+		renderer.snapshotColorView = undefined;
+		renderer.snapshotDepthView = undefined;
+		return await readRgba8Texture(
+			renderer.device,
+			renderer.queue,
+			target.texture,
+			CANVAS_WIDTH,
+			CANVAS_HEIGHT,
+		);
+	} finally {
+		renderer.snapshotColorView = undefined;
+		renderer.snapshotDepthView = undefined;
+		destroyReadbackTarget(target);
+	}
 }
 
 if (!navigator.gpu) {

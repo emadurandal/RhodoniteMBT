@@ -1,0 +1,23 @@
+import {
+  "emadurandal/rhodonite_examples/basic-triangle/common" @basic_triangle,
+  "emadurandal/rhodonite_examples/depth-test/common" @depth_test,
+  "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @ecs_mass_cubes,
+  "emadurandal/rhodonite_examples/ecs-scene-graph/common" @ecs_scene_graph,
+  "emadurandal/rhodonite_examples/triangle-with-buffer/common" @triangle_with_buffer,
+  "mizchi/image" @image,
+  "mizchi/pixelmatch" @pixelmatch,
+  "moonbitlang/core/test" @test,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+}
+
+supported_targets = "native"
+
+options(
+  "native-stub": [ "visual_file_io_native.c" ],
+  link: {
+    "native": {
+      "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3 -lz",
+    },
+  },
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
+)

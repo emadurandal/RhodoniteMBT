@@ -15,6 +15,24 @@ fmt:
 info:
 	moon info
 
+test-visual:
+	pnpm run test:examples:visual
+
+test-visual-native:
+	pnpm run test:examples:visual:native
+
+test-visual-browser:
+	pnpm run test:examples:visual:browser
+
+update-visual-snapshots:
+	pnpm run test:examples:visual:update
+
+update-visual-snapshots-native:
+	pnpm run test:examples:visual:update:native
+
+update-visual-snapshots-browser:
+	pnpm run test:examples:visual:update:browser
+
 # Publish rhodonite_core → rhodonite_webgpu → rhodonite to mooncakes (not rhodonite_examples).
 # Prerequisites: `moon login`; network for registry.
 publish-mooncakes:
