@@ -58,6 +58,10 @@ Native executables are emitted under the **root** `_build/native/debug/build/ema
 
 With a root `moon.work`, running `moon test` only inside `moon/rhodonite_core` can pull `rhodonite_webgpu` into the plan and fail resolving `webgpu_objects`. Use [`scripts/test-rhodonite-core-mbt.sh`](scripts/test-rhodonite-core-mbt.sh) from the repo root to pass only packages under `moon/rhodonite_core/src` that contain `*_test.mbt`.
 
+## Visual regression tests
+
+After changing source code that can affect sample rendering, always run the visual regression tests (`pnpm run test:examples:visual`, or the relevant native/browser subset). If a visual test fails, investigate the cause instead of treating the diff as noise. When the source change is expected to alter the correct rendered output in the normal path, consider updating the golden images with the appropriate visual snapshot update command after inspecting the new result.
+
 ## MoonBit layout (inside each module)
 
 - Packages are directories; each has `moon.pkg` (dependencies).
