@@ -119,11 +119,15 @@ pub(all) struct GpuResizeEvent {
 }
 
 ///|
-/// Emitted when the packed builtin GlobalTransform word blob grows.
-pub(all) struct GlobalTransformBlobResizeEvent {
+/// Emitted when a packed builtin GPU word blob grows.
+pub(all) struct PackedGpuBlobResizeEvent {
   required_word_capacity : Int
   needs_full_upload : Bool
 }
+
+///|
+/// Backward-compatible name for GlobalTransform blob resize events.
+pub type GlobalTransformBlobResizeEvent = PackedGpuBlobResizeEvent
 
 ///|
 /// Thin query descriptor for system-style iteration over a fixed `required` component set.
@@ -255,7 +259,7 @@ priv struct PackedGpuBlobStore {
   free_word_counts : Array[Int]
   dirty_word_first : Array[Int]
   dirty_word_last : Array[Int]
-  resize_events : Array[GlobalTransformBlobResizeEvent]
+  resize_events : Array[PackedGpuBlobResizeEvent]
 }
 
 ///|
