@@ -140,7 +140,7 @@ pub fn World::drain_camera_blob_write_views(
 ///|
 pub fn World::drain_camera_blob_resize_events(
   self : World,
-) -> Array[GlobalTransformBlobResizeEvent] {
+) -> Array[PackedGpuBlobResizeEvent] {
   self.assert_system_structural_write("World::drain_camera_blob_resize_events")
   self.camera_blob.drain_resize_events()
 }

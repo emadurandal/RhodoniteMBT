@@ -207,8 +207,8 @@ fn PackedGpuBlobStore::drain_writes(
 ///|
 fn PackedGpuBlobStore::drain_resize_events(
   self : PackedGpuBlobStore,
-) -> Array[GlobalTransformBlobResizeEvent] {
-  let out : Array[GlobalTransformBlobResizeEvent] = []
+) -> Array[PackedGpuBlobResizeEvent] {
+  let out : Array[PackedGpuBlobResizeEvent] = []
   for i = 0; i < self.resize_events.length(); i = i + 1 {
     out.push(self.resize_events[i])
   }

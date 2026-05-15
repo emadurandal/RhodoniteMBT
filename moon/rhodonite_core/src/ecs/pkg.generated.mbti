@@ -63,11 +63,6 @@ pub(all) struct EntityLocation {
   row : Int
 }
 
-pub(all) struct GlobalTransformBlobResizeEvent {
-  required_word_capacity : Int
-  needs_full_upload : Bool
-}
-
 type GlobalTransformBlobStore
 
 pub struct GlobalTransformBlobWriter {
@@ -124,6 +119,12 @@ pub(all) struct GpuWrite {
 pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]
+}
+
+#alias(GlobalTransformBlobResizeEvent)
+pub(all) struct PackedGpuBlobResizeEvent {
+  required_word_capacity : Int
+  needs_full_upload : Bool
 }
 
 pub struct PreparedQuery {
@@ -254,9 +255,9 @@ pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId
 pub fn World::destroy_entity(Self, EntityId) -> Bool
-pub fn World::drain_camera_blob_resize_events(Self) -> Array[GlobalTransformBlobResizeEvent]
+pub fn World::drain_camera_blob_resize_events(Self) -> Array[PackedGpuBlobResizeEvent]
 pub fn World::drain_camera_blob_write_views(Self) -> Array[GpuWriteView]
-pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[GlobalTransformBlobResizeEvent]
+pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[PackedGpuBlobResizeEvent]
 pub fn World::drain_global_transform_blob_write_views(Self) -> Array[GpuWriteView]
 pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
 pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]

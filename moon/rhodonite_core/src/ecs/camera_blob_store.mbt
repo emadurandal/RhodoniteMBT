@@ -55,6 +55,6 @@ fn CameraBlobStore::drain_write_views(
 ///|
 fn CameraBlobStore::drain_resize_events(
   self : CameraBlobStore,
-) -> Array[GlobalTransformBlobResizeEvent] {
+) -> Array[PackedGpuBlobResizeEvent] {
   self.store.drain_resize_events()
 }
