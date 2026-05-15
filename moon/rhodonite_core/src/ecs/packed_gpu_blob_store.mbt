@@ -111,24 +111,6 @@ fn PackedGpuBlobStore::free_words(
 }
 
 ///|
-fn PackedGpuBlobStore::clear_words(
-  self : PackedGpuBlobStore,
-  word_offset : Int,
-  word_count : Int,
-) -> Unit {
-  if word_offset < 0 || word_count <= 0 {
-    return
-  }
-  self.ensure_word_capacity(word_offset + word_count)
-  let start = word_offset * 4
-  let end = start + word_count * 4
-  for i = start; i < end; i = i + 1 {
-    self.bytes[i] = (0 : Byte)
-  }
-  self.mark_dirty_words(word_offset, word_count)
-}
-
-///|
 fn PackedGpuBlobStore::write_words(
   self : PackedGpuBlobStore,
   word_offset : Int,
