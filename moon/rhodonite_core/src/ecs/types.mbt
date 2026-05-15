@@ -247,26 +247,27 @@ pub(all) struct CameraRef {
 }
 
 ///|
-/// Packed `u32` backing store for builtin GlobalTransform affine rows.
-struct GlobalTransformBlobStore {
+/// Packed `u32` backing store with variable-size word span allocation and upload tracking.
+priv struct PackedGpuBlobStore {
   mut bytes : FixedArray[Byte]
   mut next_word_offset : Int
-  free_f16_offsets : Array[Int]
-  free_f32_offsets : Array[Int]
+  free_word_offsets : Array[Int]
+  free_word_counts : Array[Int]
   dirty_word_first : Array[Int]
   dirty_word_last : Array[Int]
   resize_events : Array[GlobalTransformBlobResizeEvent]
 }
 
 ///|
+/// Packed `u32` backing store for builtin GlobalTransform affine rows.
+struct GlobalTransformBlobStore {
+  store : PackedGpuBlobStore
+}
+
+///|
 /// Packed `u32` backing store for builtin Camera GPU rows.
 struct CameraBlobStore {
-  mut bytes : FixedArray[Byte]
-  mut next_word_offset : Int
-  free_offsets : Array[Int]
-  dirty_word_first : Array[Int]
-  dirty_word_last : Array[Int]
-  resize_events : Array[GlobalTransformBlobResizeEvent]
+  store : PackedGpuBlobStore
 }
 
 ///|
