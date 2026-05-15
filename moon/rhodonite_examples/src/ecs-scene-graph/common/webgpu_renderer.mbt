@@ -63,32 +63,6 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
-fn matrix44d_to_f(m : @m44.Matrix44D) -> @m44.Matrix44F {
-  let d = m.data()
-  @m44.Matrix44F::{
-    data: (
-      [
-        Float::from_double(d[0]),
-        Float::from_double(d[1]),
-        Float::from_double(d[2]),
-        Float::from_double(d[3]),
-        Float::from_double(d[4]),
-        Float::from_double(d[5]),
-        Float::from_double(d[6]),
-        Float::from_double(d[7]),
-        Float::from_double(d[8]),
-        Float::from_double(d[9]),
-        Float::from_double(d[10]),
-        Float::from_double(d[11]),
-        Float::from_double(d[12]),
-        Float::from_double(d[13]),
-        Float::from_double(d[14]),
-        Float::from_double(d[15]),
-      ] : FixedArray[Float]),
-  }
-}
-
-///|
 fn empty_offsets() -> Array[UInt] {
   []
 }
@@ -323,14 +297,10 @@ pub fn create_renderer_for_device(
 
 ///|
 fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
-  let view = matrix44d_to_f(
-    @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
-      @m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0),
-    ),
-  )
-  let proj = matrix44d_to_f(
-    @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0),
-  )
+  let view = @m44.Matrix44::rotation_x(camera_elevation_rad)
+    .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
+    .to_float()
+  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0).to_float()
   ignore(
     world.set_camera_matrices(
       camera,

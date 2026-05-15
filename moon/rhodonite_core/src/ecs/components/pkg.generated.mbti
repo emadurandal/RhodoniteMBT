@@ -11,8 +11,6 @@ import {
 // Values
 pub fn camera_gpu_byte_stride() -> Int
 
-pub fn camera_gpu_bytes(@matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> FixedArray[Byte]
-
 pub fn camera_gpu_word_count() -> Int
 
 pub fn camera_ref_bytes(Int) -> FixedArray[Byte]
