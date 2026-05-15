@@ -159,7 +159,7 @@ fn view_space_y_range_corners(
 /// WebGPU clips to `0 ≤ clip.z ≤ clip.w`. [`Matrix44::ortho`] maps view **z** in
 /// `[-far, -near]` to NDC depth `[0, 1]`. This grid can reach **positive** view **z**,
 /// so we pull along **−Z** and extend **far** so the whole slab stays inside the clip volume.
-fn camera_uniform_bytes() -> FixedArray[Byte] {
+fn camera_matrices() -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
   let view_rot = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
     @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
   )
@@ -195,10 +195,13 @@ fn camera_uniform_bytes() -> FixedArray[Byte] {
   let far_need = -z_min_pulled + 8.0
   let far_clip = if far_need > 80.0 { far_need } else { 80.0 }
   let proj = @m44.Matrix44::ortho(left, right, bottom, top, 0.1, far_clip)
-  let vp = proj.mat_mul(view)
-  let bytes = FixedArray::make(256, (0 : Byte))
-  put_mat4_col_major_f64_to_bytes(bytes, vp)
-  bytes
+  (
+    matrix44d_to_f(view),
+    matrix44d_to_f(proj),
+    (0.1 : Float),
+    Float::from_double(far_clip),
+    Float::from_double(aspect),
+  )
 }
 
 ///|
@@ -241,13 +244,28 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
-fn put_mat4_col_major_f64_to_bytes(
-  out : FixedArray[Byte],
-  m : @m44.Matrix44D,
-) -> Unit {
+fn matrix44d_to_f(m : @m44.Matrix44D) -> @m44.Matrix44F {
   let d = m.data()
-  for i = 0; i < 16; i = i + 1 {
-    @writes.put_f32_le(out, i * 4, d[i])
+  @m44.Matrix44F::{
+    data: (
+      [
+        Float::from_double(d[0]),
+        Float::from_double(d[1]),
+        Float::from_double(d[2]),
+        Float::from_double(d[3]),
+        Float::from_double(d[4]),
+        Float::from_double(d[5]),
+        Float::from_double(d[6]),
+        Float::from_double(d[7]),
+        Float::from_double(d[8]),
+        Float::from_double(d[9]),
+        Float::from_double(d[10]),
+        Float::from_double(d[11]),
+        Float::from_double(d[12]),
+        Float::from_double(d[13]),
+        Float::from_double(d[14]),
+        Float::from_double(d[15]),
+      ] : FixedArray[Float]),
   }
 }
 
@@ -405,12 +423,13 @@ pub(all) struct WebGPURenderer {
   instance_buffer : @wgpu.GPUBuffer
   index_buffer : @wgpu.GPUBuffer
   transform_storage : @wgpu.GPUBuffer
-  camera_uniform : @wgpu.GPUBuffer
+  camera_storage : @wgpu.GPUBuffer
   bind_transforms : @wgpu.GPUBindGroup
   bind_camera : @wgpu.GPUBindGroup
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
   world : @ecs.World
+  camera : @ecs.EntityId
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
@@ -424,18 +443,9 @@ pub(all) struct WebGPURenderer {
 
 ///|
 fn ecs_mass_shader_wgsl() -> String {
-  let prefix_camera =
-    #|struct CameraUniform {
-    #|  view_proj: mat4x4<f32>,
-    #|}
-    #|
-  let camera_binding =
-    #|
-    #|@group(1) @binding(0) var<uniform> camera: CameraUniform;
-    #|
   let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
-    camera_binding
-  let prefix = prefix_camera + prefix_bindings
+    @ecs_wgsl.camera_words_binding_default()
+  let prefix = prefix_bindings
   let suffix =
     #|
     #|struct VertexOut {
@@ -453,6 +463,7 @@ fn ecs_mass_shader_wgsl() -> String {
     #|    rn_load_global_transform(transform_ref),
     #|    local_pos,
     #|  );
+    #|  let camera = rn_load_camera(0u);
     #|  let clip = camera.view_proj * world_pos;
     #|  var o: VertexOut;
     #|  o.position = clip;
@@ -465,7 +476,10 @@ fn ecs_mass_shader_wgsl() -> String {
     #|  return vec4<f32>(color, 1.0);
     #|}
     #|
-  let code = prefix + @ecs_wgsl.global_transform_helpers_default() + suffix
+  let code = prefix +
+    @ecs_wgsl.global_transform_helpers_default() +
+    @ecs_wgsl.camera_helpers_default() +
+    suffix
   code
 }
 
@@ -633,27 +647,28 @@ pub fn create_renderer_for_device(
   let transform_upload_range = @ecs.compute_global_transform_upload_range(
     transform_refs, entity_count, dense_transform_layout,
   )
-  let transform_storage = device.create_global_transform_words_buffer(world)
-  let cam_usage = @wgpu.GPU_BUFFER_USAGE_UNIFORM |
-    @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let camera_uniform = device.create_buffer(256UL, cam_usage)
-  queue.write_buffer_from_fixed_array(
-    camera_uniform,
-    0UL,
-    camera_uniform_bytes(),
+  let camera = world.create_entity()
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      camera_view,
+      camera_proj,
+      camera_near,
+      camera_far,
+      camera_aspect,
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
   )
+  let transform_storage = device.create_global_transform_words_buffer(world)
+  let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
     pipeline, transform_storage, 0U, 0U,
   )
-  let bind_camera = device.create_bind_group({
-    layout: layout_camera,
-    entries: [
-      {
-        binding: 0U,
-        resource: @wgpu.GPUBindingResource::Buffer(camera_uniform),
-      },
-    ],
-  })
+  let bind_camera = device.create_camera_words_bind_group(
+    pipeline, camera_storage, 1U, 0U,
+  )
   let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vertex_byte_len = (verts_per_cube * vertex_stride_local).to_uint64()
   let vertex_buffer = device.create_buffer(vertex_byte_len, vusage)
@@ -681,6 +696,7 @@ pub fn create_renderer_for_device(
     true,
   )
   queue.upload_global_transform_writes(transform_storage, writes0)
+  queue.drain_and_upload_camera_writes(camera_storage, world)
   {
     context,
     device,
@@ -692,12 +708,13 @@ pub fn create_renderer_for_device(
     instance_buffer,
     index_buffer,
     transform_storage,
-    camera_uniform,
+    camera_storage,
     bind_transforms,
     bind_camera,
     layout_transforms,
     layout_camera,
     world,
+    camera,
     gt,
     tf,
     per_side,
@@ -830,7 +847,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   self.instance_buffer.release()
   self.vertex_buffer.release()
   self.transform_storage.release()
-  self.camera_uniform.release()
+  self.camera_storage.release()
   @wgpu.textureView_release(self.depth_view)
   self.depth_texture.release()
   self.pipeline.release()

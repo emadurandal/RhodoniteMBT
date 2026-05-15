@@ -36,6 +36,8 @@ pub fn bindGroup_release(GPUBindGroup) -> Unit
 
 pub fn buffer_release(GPUBuffer) -> Unit
 
+pub fn camera_words_buffer_byte_size(Int) -> UInt64
+
 pub fn canvas_getContext(@webgpu_objects.HTMLCanvasElement) -> @webgpu_objects.GPUCanvasContext
 
 pub fn create_canvas_context(@webgpu_objects.GPUCanvasContext) -> GPUCanvasContext
@@ -157,6 +159,8 @@ pub(all) struct GPUDevice {
 }
 pub fn GPUDevice::create_bind_group(Self, GPUBindGroupDescriptor) -> GPUBindGroup
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
+pub fn GPUDevice::create_camera_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
+pub fn GPUDevice::create_camera_words_buffer(Self, @ecs.World) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
 pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
 pub fn GPUDevice::create_global_transform_words_buffer(Self, @ecs.World) -> GPUBuffer
@@ -185,9 +189,11 @@ pub async fn GPUInstance::request_adapter(Self) -> GPUAdapter
 pub(all) struct GPUQueue {
   raw : @webgpu_objects.WebGPUQueue
 }
+pub fn GPUQueue::drain_and_upload_camera_writes(Self, GPUBuffer, @ecs.World) -> Unit
 pub fn GPUQueue::drain_and_upload_global_transform_writes(Self, GPUBuffer, @ecs.World) -> Unit
 pub fn GPUQueue::release(Self) -> Unit
 pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
+pub fn GPUQueue::upload_camera_writes(Self, GPUBuffer, Array[@ecs.GpuWriteView]) -> Unit
 pub fn GPUQueue::upload_global_transform_writes(Self, GPUBuffer, Array[@ecs.GpuWriteView]) -> Unit
 pub fn GPUQueue::write_buffer(Self, GPUBuffer, UInt64, Bytes) -> Unit
 pub fn GPUQueue::write_buffer_from_array_view(Self, GPUBuffer, UInt64, ArrayView[Byte]) -> Unit

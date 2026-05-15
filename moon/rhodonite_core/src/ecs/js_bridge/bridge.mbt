@@ -81,6 +81,11 @@ pub fn world_child_of_component(world : @ecs.World) -> @ecs.ComponentTypeId {
 }
 
 ///|
+pub fn world_camera_component(world : @ecs.World) -> @ecs.ComponentTypeId {
+  world.camera_component()
+}
+
+///|
 pub fn world_register_cpu_component(
   world : @ecs.World,
   name : String,
@@ -307,6 +312,18 @@ pub fn world_write_global_transform_blob_range_views(
 ///|
 pub fn world_global_transform_blob_word_capacity(world : @ecs.World) -> Int {
   world.global_transform_blob_word_capacity()
+}
+
+///|
+pub fn world_drain_camera_blob_write_views(
+  world : @ecs.World,
+) -> Array[@ecs.GpuWriteView] {
+  world.drain_camera_blob_write_views()
+}
+
+///|
+pub fn world_camera_blob_word_capacity(world : @ecs.World) -> Int {
+  world.camera_blob_word_capacity()
 }
 
 ///|
@@ -576,6 +593,11 @@ pub fn gpu_layout_global_transform_f16() -> @comp.GpuLayout {
 ///|
 pub fn gpu_layout_child_of() -> @comp.GpuLayout {
   @comp.child_of_cpu_layout()
+}
+
+///|
+pub fn gpu_layout_camera() -> @comp.GpuLayout {
+  @comp.camera_ref_cpu_layout()
 }
 
 ///|

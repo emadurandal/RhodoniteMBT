@@ -112,9 +112,9 @@ export function uploadGlobalTransformWrites(
 }
 
 export function drainAndUploadGlobalTransformWrites(
-	queue: GPUQueue,
-	buffer: GPUBuffer,
-	world: Pick<World, "drainGlobalTransformBlobWriteViews">,
+  queue: GPUQueue,
+  buffer: GPUBuffer,
+  world: Pick<World, "drainGlobalTransformBlobWriteViews">,
 ): void {
 	uploadGlobalTransformWrites(
 		queue,
@@ -130,6 +130,145 @@ export function uploadGlobalTransformBytes(
 	byteOffset = 0,
 ): void {
 	queue.writeBuffer(buffer, byteOffset, bytes);
+}
+
+type CameraWordCapacitySource =
+	| number
+	| Pick<World, "cameraBlobWordCapacity">;
+
+function cameraWordCapacity(source: CameraWordCapacitySource): number {
+	return typeof source === "number" ? source : source.cameraBlobWordCapacity();
+}
+
+export function cameraWordsBinding(
+	group = 1,
+	binding = 0,
+	varName = "camera_words",
+): string {
+	return `@group(${group}) @binding(${binding}) var<storage, read> ${varName}: array<u32>;\n`;
+}
+
+export function cameraWordsBindingDefault(): string {
+	return cameraWordsBinding();
+}
+
+export function cameraWordsBindGroup(
+	device: GPUDevice,
+	pipeline: GPURenderPipeline,
+	buffer: GPUBuffer,
+	options: {
+		readonly groupIndex?: number;
+		readonly binding?: number;
+	} = {},
+): GPUBindGroup {
+	return device.createBindGroup({
+		layout: pipeline.getBindGroupLayout(options.groupIndex ?? 1),
+		entries: [
+			{
+				binding: options.binding ?? 0,
+				resource: { buffer },
+			},
+		],
+	});
+}
+
+export function cameraWordsBufferByteSize(
+	source: CameraWordCapacitySource,
+): GPUSize64 {
+	return Math.max(cameraWordCapacity(source) * 4, 4);
+}
+
+export function createCameraWordsBuffer(
+	device: GPUDevice,
+	source: CameraWordCapacitySource,
+): GPUBuffer {
+	return device.createBuffer({
+		size: cameraWordsBufferByteSize(source),
+		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+	});
+}
+
+export function uploadCameraWrites(
+	queue: GPUQueue,
+	buffer: GPUBuffer,
+	writes: readonly GpuWriteView[],
+): void {
+	uploadGlobalTransformWrites(queue, buffer, writes);
+}
+
+export function drainAndUploadCameraWrites(
+	queue: GPUQueue,
+	buffer: GPUBuffer,
+	world: Pick<World, "drainCameraBlobWriteViews">,
+): void {
+	uploadCameraWrites(queue, buffer, world.drainCameraBlobWriteViews());
+}
+
+export function cameraHelpers(cameraWordsVar = "camera_words"): string {
+	return `
+struct RnCamera {
+  view_proj: mat4x4<f32>,
+  view: mat4x4<f32>,
+  proj: mat4x4<f32>,
+  inv_view_proj: mat4x4<f32>,
+  world_pos_near: vec4<f32>,
+  params: vec4<f32>,
+}
+
+fn rn_load_camera_mat4(word_offset: u32) -> mat4x4<f32> {
+  return mat4x4<f32>(
+    vec4<f32>(
+      bitcast<f32>(${cameraWordsVar}[word_offset + 0u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 1u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 2u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 3u]),
+    ),
+    vec4<f32>(
+      bitcast<f32>(${cameraWordsVar}[word_offset + 4u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 5u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 6u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 7u]),
+    ),
+    vec4<f32>(
+      bitcast<f32>(${cameraWordsVar}[word_offset + 8u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 9u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 10u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 11u]),
+    ),
+    vec4<f32>(
+      bitcast<f32>(${cameraWordsVar}[word_offset + 12u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 13u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 14u]),
+      bitcast<f32>(${cameraWordsVar}[word_offset + 15u]),
+    ),
+  );
+}
+
+fn rn_load_camera(word_offset: u32) -> RnCamera {
+  var camera: RnCamera;
+  camera.view_proj = rn_load_camera_mat4(word_offset + 0u);
+  camera.view = rn_load_camera_mat4(word_offset + 16u);
+  camera.proj = rn_load_camera_mat4(word_offset + 32u);
+  camera.inv_view_proj = rn_load_camera_mat4(word_offset + 48u);
+  camera.world_pos_near = vec4<f32>(
+    bitcast<f32>(${cameraWordsVar}[word_offset + 64u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 65u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 66u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 67u]),
+  );
+  camera.params = vec4<f32>(
+    bitcast<f32>(${cameraWordsVar}[word_offset + 68u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 69u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 70u]),
+    bitcast<f32>(${cameraWordsVar}[word_offset + 71u]),
+  );
+  return camera;
+}
+`;
+}
+
+export function cameraHelpersDefault(): string {
+	return cameraHelpers();
 }
 
 export function globalTransformHelpers(

@@ -13,6 +13,8 @@ import {
 	gpu_write_view_bytes,
 	world_add_component,
 	world_add_component_bytes,
+	world_camera_blob_word_capacity,
+	world_camera_component,
 	world_child_of_component,
 	world_clear_gpu_component,
 	world_component_bytes_copy,
@@ -23,6 +25,7 @@ import {
 	world_destroy_entity,
 	world_drain_gpu_write_views,
 	world_drain_global_transform_blob_write_views,
+	world_drain_camera_blob_write_views,
 	world_write_global_transform_blob_range_views,
 	world_drain_gpu_writes_copy,
 	world_drain_resize_events,
@@ -154,6 +157,10 @@ export class World {
 		return new ComponentTypeId(world_child_of_component(this.inner));
 	}
 
+	cameraComponent(): ComponentTypeId {
+		return new ComponentTypeId(world_camera_component(this.inner));
+	}
+
 	location(entity: EntityId): EntityLocation | null {
 		const location = world_location(this.inner, entity.inner);
 		return location === undefined || location === null
@@ -258,6 +265,12 @@ export class World {
 		);
 	}
 
+	drainCameraBlobWriteViews(): GpuWriteView[] {
+		return world_drain_camera_blob_write_views(this.inner).map(
+			(write) => new GpuWriteView(write),
+		);
+	}
+
 	writeGlobalTransformBlobRangeViews(
 		firstWord: number,
 		wordCount: number,
@@ -330,6 +343,10 @@ export class World {
 
 	globalTransformBlobWordCapacity(): number {
 		return world_global_transform_blob_word_capacity(this.inner);
+	}
+
+	cameraBlobWordCapacity(): number {
+		return world_camera_blob_word_capacity(this.inner);
 	}
 
 	extractGlobalTransformRefs(entities: EntityId[]): Uint8Array {
