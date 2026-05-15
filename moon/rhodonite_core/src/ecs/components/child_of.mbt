@@ -2,6 +2,7 @@
 /// CPU-only parent link: stores the parent's dense slot index and generation (same logical fields as [`EntityId`] in `ecs`).
 
 ///|
+/// Defines `ChildOf`.
 pub(all) struct ChildOf {
   parent_index : Int
   parent_generation : Int
@@ -20,6 +21,7 @@ pub struct ChildOfMutRow {
 }
 
 ///|
+/// Implements `ChildOf::new`.
 pub fn ChildOf::new(parent_index : Int, parent_generation : Int) -> ChildOf {
   { parent_index, parent_generation }
 }
@@ -35,6 +37,7 @@ pub fn child_of_cpu_layout() -> GpuLayout {
 }
 
 ///|
+/// Implements `ChildOf::to_component_bytes`.
 pub fn ChildOf::to_component_bytes(self : ChildOf) -> FixedArray[Byte] {
   let layout = child_of_cpu_layout()
   if layout.fields.length() != 2 {
@@ -55,6 +58,7 @@ pub fn ChildOf::to_component_bytes(self : ChildOf) -> FixedArray[Byte] {
 }
 
 ///|
+/// Implements `ChildOf::from_component_bytes`.
 pub fn ChildOf::from_component_bytes(bytes : FixedArray[Byte]) -> ChildOf {
   let layout = child_of_cpu_layout()
   if bytes.length() != layout.stride {
@@ -69,6 +73,7 @@ pub fn ChildOf::from_component_bytes(bytes : FixedArray[Byte]) -> ChildOf {
 }
 
 ///|
+/// Implements `ChildOf::from_component_view`.
 pub fn ChildOf::from_component_view(bytes : ArrayView[Byte]) -> ChildOf {
   let layout = child_of_cpu_layout()
   if bytes.length() != layout.stride {
@@ -83,6 +88,7 @@ pub fn ChildOf::from_component_view(bytes : ArrayView[Byte]) -> ChildOf {
 }
 
 ///|
+/// Implements `ChildOfRow::from_component_view`.
 pub fn ChildOfRow::from_component_view(row : ArrayView[Byte]) -> ChildOfRow {
   let layout = child_of_cpu_layout()
   if row.length() != layout.stride {
@@ -92,6 +98,7 @@ pub fn ChildOfRow::from_component_view(row : ArrayView[Byte]) -> ChildOfRow {
 }
 
 ///|
+/// Implements `ChildOfMutRow::from_component_mut_view`.
 pub fn ChildOfMutRow::from_component_mut_view(
   row : MutArrayView[Byte],
 ) -> ChildOfMutRow {
@@ -103,21 +110,25 @@ pub fn ChildOfMutRow::from_component_mut_view(
 }
 
 ///|
+/// Implements `ChildOfRow::to_child_of`.
 pub fn ChildOfRow::to_child_of(self : ChildOfRow) -> ChildOf {
   ChildOf::from_component_view(self.view)
 }
 
 ///|
+/// Implements `ChildOfRow::parent_index`.
 pub fn ChildOfRow::parent_index(self : ChildOfRow) -> Int {
   self.to_child_of().parent_index
 }
 
 ///|
+/// Implements `ChildOfRow::parent_generation`.
 pub fn ChildOfRow::parent_generation(self : ChildOfRow) -> Int {
   self.to_child_of().parent_generation
 }
 
 ///|
+/// Implements `ChildOfMutRow::write_parent`.
 pub fn ChildOfMutRow::write_parent(
   self : ChildOfMutRow,
   parent_index : Int,

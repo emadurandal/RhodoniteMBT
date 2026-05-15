@@ -35,6 +35,7 @@ pub fn GPUVertexFormat::to_js_tag(self : GPUVertexFormat) -> Int {
 }
 
 ///|
+/// Defines `GPUVertexAttribute`.
 pub(all) struct GPUVertexAttribute {
   format : GPUVertexFormat
   offset : UInt64
@@ -42,6 +43,7 @@ pub(all) struct GPUVertexAttribute {
 }
 
 ///|
+/// Defines `GPUVertexBufferLayout`.
 pub(all) struct GPUVertexBufferLayout {
   array_stride : UInt64
   step_mode : GPUVertexStepMode

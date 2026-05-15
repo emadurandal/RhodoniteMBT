@@ -9,11 +9,13 @@ pub(all) enum ImplBindGroupEntry {
 }
 
 ///|
+/// Defines `GPUBindGroupEntry`.
 pub(all) struct GPUBindGroupEntry {
   inner : ImplBindGroupEntry
 }
 
 ///|
+/// Implements `gp_bind_group_entry_buffer`.
 pub fn gp_bind_group_entry_buffer(
   binding : UInt,
   buffer : GPUBuffer,
@@ -22,6 +24,7 @@ pub fn gp_bind_group_entry_buffer(
 }
 
 ///|
+/// Implements `gp_bind_group_entry_buffer_binding`.
 pub fn gp_bind_group_entry_buffer_binding(
   binding : UInt,
   buffer : GPUBuffer,
@@ -32,6 +35,7 @@ pub fn gp_bind_group_entry_buffer_binding(
 }
 
 ///|
+/// Implements `gp_bind_group_entry_texture_view`.
 pub fn gp_bind_group_entry_texture_view(
   binding : UInt,
   view : GPUTextureView,
@@ -40,6 +44,7 @@ pub fn gp_bind_group_entry_texture_view(
 }
 
 ///|
+/// Implements `gp_bind_group_entry_texture`.
 pub fn gp_bind_group_entry_texture(
   binding : UInt,
   texture : WebGPUTexture,
@@ -48,6 +53,7 @@ pub fn gp_bind_group_entry_texture(
 }
 
 ///|
+/// Implements `gp_bind_group_entry_sampler`.
 pub fn gp_bind_group_entry_sampler(
   binding : UInt,
   sampler : GPUSampler,
@@ -56,6 +62,7 @@ pub fn gp_bind_group_entry_sampler(
 }
 
 ///|
+/// Implements `gp_bind_group_entry_external_texture`.
 pub fn gp_bind_group_entry_external_texture(
   binding : UInt,
   tex : GPUExternalTexture,

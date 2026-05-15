@@ -1,9 +1,11 @@
 ///|
+/// Defines `WebGPUAdapter`.
 pub struct WebGPUAdapter {
   adapter : GPUAdapter
 }
 
 ///|
+/// Implements `WebGPUAdapter::new`.
 pub fn WebGPUAdapter::new(adapter : GPUAdapter) -> WebGPUAdapter {
   { adapter, }
 }
@@ -16,6 +18,7 @@ pub async fn webgpu_adapter_request_device(
 }
 
 ///|
+/// Implements `native_webgpu_adapter_request_device`.
 pub fn native_webgpu_adapter_request_device(
   adapter : WebGPUAdapter,
 ) -> WebGPUDevice raise Error {
@@ -27,6 +30,7 @@ pub fn native_webgpu_adapter_request_device(
 }
 
 ///|
+/// Implements `webgpu_adapter_release`.
 pub fn webgpu_adapter_release(adapter : WebGPUAdapter) -> Unit {
   adapter.adapter.raw.release()
 }

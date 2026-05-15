@@ -1,14 +1,17 @@
 ///|
+/// Defines `WebGPUQueue`.
 pub struct WebGPUQueue {
   queue : GPUQueue
 }
 
 ///|
+/// Implements `WebGPUQueue::new`.
 pub fn WebGPUQueue::new(queue : GPUQueue) -> WebGPUQueue {
   { queue, }
 }
 
 ///|
+/// Implements `webgpu_queue_submit`.
 pub fn webgpu_queue_submit(
   queue : WebGPUQueue,
   commandBuffer : GPUCommandBuffer,
@@ -18,6 +21,7 @@ pub fn webgpu_queue_submit(
 }
 
 ///|
+/// Implements `webgpu_queue_write_buffer`.
 pub fn webgpu_queue_write_buffer(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
@@ -37,6 +41,7 @@ extern "C" fn queue_write_buffer_array_view(
 ) -> Unit = "rhodonite_wgpu_queue_write_buffer_array_view"
 
 ///|
+/// Implements `webgpu_queue_write_buffer_array_view`.
 pub fn webgpu_queue_write_buffer_array_view(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
@@ -63,6 +68,7 @@ extern "C" fn queue_write_buffer_bytes_range(
 ) -> Unit = "rhodonite_wgpu_queue_write_buffer_bytes_range"
 
 ///|
+/// Implements `webgpu_queue_write_buffer_bytes_range`.
 pub fn webgpu_queue_write_buffer_bytes_range(
   queue : WebGPUQueue,
   buffer : GPUBuffer,
@@ -82,6 +88,7 @@ pub fn webgpu_queue_write_buffer_bytes_range(
 }
 
 ///|
+/// Implements `webgpu_queue_release`.
 pub fn webgpu_queue_release(queue : WebGPUQueue) -> Unit {
   queue.queue.raw.release()
 }

@@ -1,11 +1,13 @@
 // WebGPU render pass encoder implementation
 
 ///|
+/// Defines `WebGPURenderPassEncoder`.
 pub struct WebGPURenderPassEncoder {
   encoder : GPURenderPassEncoder
 }
 
 ///|
+/// Implements `WebGPURenderPassEncoder::new`.
 pub fn WebGPURenderPassEncoder::new(
   encoder : GPURenderPassEncoder,
 ) -> WebGPURenderPassEncoder {
@@ -13,6 +15,7 @@ pub fn WebGPURenderPassEncoder::new(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_set_pipeline`.
 pub fn webgpu_render_pass_encoder_set_pipeline(
   renderPass : WebGPURenderPassEncoder,
   pipeline : GPURenderPipeline,
@@ -21,6 +24,7 @@ pub fn webgpu_render_pass_encoder_set_pipeline(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_draw`.
 pub fn webgpu_render_pass_encoder_draw(
   renderPass : WebGPURenderPassEncoder,
   vertexCount : Int,
@@ -29,6 +33,7 @@ pub fn webgpu_render_pass_encoder_draw(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_set_vertex_buffer`.
 pub fn webgpu_render_pass_encoder_set_vertex_buffer(
   renderPass : WebGPURenderPassEncoder,
   slot : Int,
@@ -46,6 +51,7 @@ pub fn webgpu_render_pass_encoder_set_vertex_buffer(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_set_index_buffer`.
 pub fn webgpu_render_pass_encoder_set_index_buffer(
   renderPass : WebGPURenderPassEncoder,
   buffer : GPUBuffer,
@@ -63,6 +69,7 @@ pub fn webgpu_render_pass_encoder_set_index_buffer(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_draw_indexed`.
 pub fn webgpu_render_pass_encoder_draw_indexed(
   renderPass : WebGPURenderPassEncoder,
   indexCount : Int,
@@ -82,6 +89,7 @@ pub fn webgpu_render_pass_encoder_draw_indexed(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_set_bind_group`.
 pub fn webgpu_render_pass_encoder_set_bind_group(
   renderPass : WebGPURenderPassEncoder,
   index : UInt,
@@ -92,6 +100,7 @@ pub fn webgpu_render_pass_encoder_set_bind_group(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_end`.
 pub fn webgpu_render_pass_encoder_end(
   renderPass : WebGPURenderPassEncoder,
 ) -> Unit {
@@ -99,6 +108,7 @@ pub fn webgpu_render_pass_encoder_end(
 }
 
 ///|
+/// Implements `webgpu_render_pass_encoder_release`.
 pub fn webgpu_render_pass_encoder_release(
   renderPass : WebGPURenderPassEncoder,
 ) -> Unit {

@@ -1,29 +1,35 @@
 ///|
+/// Implements `Vector4::new`.
 pub fn[T] Vector4::new(x : T, y : T, z : T, w : T) -> Vector4[T] {
   Vector4::{ data: ([x, y, z, w] : FixedArray[T]) }
 }
 
 ///|
+/// Implements `Vector4::zero`.
 pub fn[T : Default] Vector4::zero() -> Vector4[T] {
   Vector4::new(T::default(), T::default(), T::default(), T::default())
 }
 
 ///|
+/// Implements `Vector4::x`.
 pub fn[T] Vector4::x(self : Self[T]) -> T {
   self.data[0]
 }
 
 ///|
+/// Implements `Vector4::y`.
 pub fn[T] Vector4::y(self : Self[T]) -> T {
   self.data[1]
 }
 
 ///|
+/// Implements `Vector4::z`.
 pub fn[T] Vector4::z(self : Self[T]) -> T {
   self.data[2]
 }
 
 ///|
+/// Implements `Vector4::w`.
 pub fn[T] Vector4::w(self : Self[T]) -> T {
   self.data[3]
 }
@@ -46,6 +52,7 @@ pub fn[T : Mul] Vector4::scale(self : Self[T], s : T) -> Vector4[T] {
 }
 
 ///|
+/// Implements `Vector4::div_scalar`.
 pub fn[T : Div] Vector4::div_scalar(self : Self[T], s : T) -> Vector4[T] {
   Vector4::new(
     self.data[0] / s,

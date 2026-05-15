@@ -1,4 +1,5 @@
 ///|
+/// Implements `rows_exc`.
 pub fn rows_exc(skip : Int) -> (Int, Int, Int) {
   match skip {
     0 => (1, 2, 3)
@@ -10,11 +11,13 @@ pub fn rows_exc(skip : Int) -> (Int, Int, Int) {
 }
 
 ///|
+/// Implements `cols_exc`.
 pub fn cols_exc(skip : Int) -> (Int, Int, Int) {
   rows_exc(skip)
 }
 
 ///|
+/// Implements `det3_values`.
 pub fn[T : Mul + Add + Sub] det3_values(
   a00 : T,
   a10 : T,
@@ -32,6 +35,7 @@ pub fn[T : Mul + Add + Sub] det3_values(
 }
 
 ///|
+/// Implements `mat4_minor`.
 fn[T : Mul + Add + Sub] mat4_minor(
   m : Matrix44[T],
   skip_r : Int,
@@ -53,6 +57,7 @@ fn[T : Mul + Add + Sub] mat4_minor(
 }
 
 ///|
+/// Implements `matrix4_cofactor`.
 fn[T : Mul + Add + Sub + Neg] matrix4_cofactor(
   m : Matrix44[T],
   r : Int,
@@ -67,6 +72,7 @@ fn[T : Mul + Add + Sub + Neg] matrix4_cofactor(
 }
 
 ///|
+/// Implements `Matrix44::new_col_major`.
 pub fn[T] Matrix44::new_col_major(
   m00 : T,
   m10 : T,
@@ -95,6 +101,7 @@ pub fn[T] Matrix44::new_col_major(
 }
 
 ///|
+/// Implements `Matrix44::from_cols`.
 pub fn[T] Matrix44::from_cols(
   c0 : @v4.Vector4[T],
   c1 : @v4.Vector4[T],
@@ -122,12 +129,14 @@ pub fn[T] Matrix44::from_cols(
 }
 
 ///|
+/// Implements `Matrix44::zero`.
 pub fn[T : Default] Matrix44::zero() -> Matrix44[T] {
   let z = T::default()
   Matrix44::new_col_major(z, z, z, z, z, z, z, z, z, z, z, z, z, z, z, z)
 }
 
 ///|
+/// Implements `Matrix44::identity_with`.
 pub fn[T] Matrix44::identity_with(one : T, zero : T) -> Matrix44[T] {
   Matrix44::new_col_major(
     one, zero, zero, zero, zero, one, zero, zero, zero, zero, one, zero, zero, zero,
@@ -136,11 +145,13 @@ pub fn[T] Matrix44::identity_with(one : T, zero : T) -> Matrix44[T] {
 }
 
 ///|
+/// Implements `Matrix44F::identity`.
 pub fn Matrix44F::identity() -> Matrix44F {
   Matrix44::identity_with((1.0 : Float), (0.0 : Float))
 }
 
 ///|
+/// Implements `Matrix44D::to_float`.
 pub fn Matrix44D::to_float(self : Matrix44D) -> Matrix44F {
   let src = self.data()
   let dst : FixedArray[Float] = FixedArray::make(16, (0.0 : Float))
@@ -151,6 +162,7 @@ pub fn Matrix44D::to_float(self : Matrix44D) -> Matrix44F {
 }
 
 ///|
+/// Implements `Matrix44::at`.
 pub fn[T] Matrix44::at(self : Matrix44[T], row : Int, col : Int) -> T {
   self.data[col * 4 + row]
 }
@@ -162,6 +174,7 @@ pub fn[T] Matrix44::data(self : Matrix44[T]) -> FixedArray[T] {
 }
 
 ///|
+/// Implements `Matrix44::scale`.
 pub fn[T : Mul] Matrix44::scale(self : Matrix44[T], s : T) -> Matrix44[T] {
   Matrix44::{
     data: (
@@ -187,6 +200,7 @@ pub fn[T : Mul] Matrix44::scale(self : Matrix44[T], s : T) -> Matrix44[T] {
 }
 
 ///|
+/// Implements `Matrix44::div_scalar`.
 pub fn[T : Div] Matrix44::div_scalar(self : Matrix44[T], s : T) -> Matrix44[T] {
   Matrix44::{
     data: (
@@ -212,6 +226,7 @@ pub fn[T : Div] Matrix44::div_scalar(self : Matrix44[T], s : T) -> Matrix44[T] {
 }
 
 ///|
+/// Implements `Matrix44::transpose`.
 pub fn[T] Matrix44::transpose(self : Matrix44[T]) -> Matrix44[T] {
   Matrix44::from_cols(
     @v4.Vector4::new(self.at(0, 0), self.at(0, 1), self.at(0, 2), self.at(0, 3)),
@@ -309,6 +324,7 @@ pub fn Matrix44F::transform_point(
 }
 
 ///|
+/// Implements `Matrix44::determinant`.
 pub fn[T : Mul + Add + Sub] Matrix44::determinant(self : Matrix44[T]) -> T {
   let a00 = self.at(0, 0)
   let a01 = self.at(0, 1)

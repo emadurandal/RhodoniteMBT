@@ -5,6 +5,7 @@ let sample_width : UInt = 800U
 let sample_height : UInt = 600U
 
 ///|
+/// Defines `NativeWebGpuFixture`.
 struct NativeWebGpuFixture {
   instance : @wgpu.GPUInstance
   adapter : @wgpu.GPUAdapter
@@ -13,6 +14,7 @@ struct NativeWebGpuFixture {
 }
 
 ///|
+/// Implements `create_native_webgpu_fixture`.
 fn create_native_webgpu_fixture() -> NativeWebGpuFixture raise Error {
   let instance = @wgpu.create_native_webgpu_instance()
   let adapter = instance.request_adapter_sync()
@@ -22,6 +24,7 @@ fn create_native_webgpu_fixture() -> NativeWebGpuFixture raise Error {
 }
 
 ///|
+/// Implements `try_create_native_webgpu_fixture`.
 fn try_create_native_webgpu_fixture() -> NativeWebGpuFixture? {
   Some(create_native_webgpu_fixture()) catch {
     _ => None
@@ -29,6 +32,7 @@ fn try_create_native_webgpu_fixture() -> NativeWebGpuFixture? {
 }
 
 ///|
+/// Implements `NativeWebGpuFixture::release`.
 fn NativeWebGpuFixture::release(self : NativeWebGpuFixture) -> Unit {
   self.queue.release()
   self.device.release()
@@ -37,6 +41,7 @@ fn NativeWebGpuFixture::release(self : NativeWebGpuFixture) -> Unit {
 }
 
 ///|
+/// Implements `render_webgpu_sample`.
 fn render_webgpu_sample(
   render : (@wgpu.GPUDevice, @wgpu.GPUQueue, String, @wgpu.GPUTextureView) -> Unit raise,
 ) -> RgbaImage? raise {
@@ -84,6 +89,7 @@ fn render_webgpu_sample(
 }
 
 ///|
+/// Implements `assert_webgpu_sample`.
 fn assert_webgpu_sample(
   sample : VisualSample,
   render : (@wgpu.GPUDevice, @wgpu.GPUQueue, String, @wgpu.GPUTextureView) -> Unit raise,
@@ -114,6 +120,7 @@ fn assert_webgpu_sample(
 }
 
 ///|
+/// Implements `assert_native_visual_sample`.
 fn assert_native_visual_sample(id : String) -> Unit raise {
   assert_native_visual_manifest_matches_test_blocks()
   let sample = visual_sample_for_target_id("native", id)
@@ -123,6 +130,7 @@ fn assert_native_visual_sample(id : String) -> Unit raise {
 }
 
 ///|
+/// Implements `assert_native_visual_manifest_matches_test_blocks`.
 fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
   let samples = visual_samples_for_target("native")
   if samples.length() != 5 {
@@ -171,6 +179,7 @@ test "visual WebGPU native ECS mass cubes PNG golden" {
 }
 
 ///|
+/// Implements `render_native_visual_sample`.
 fn render_native_visual_sample(
   id : String,
   device : @wgpu.GPUDevice,

@@ -1,4 +1,5 @@
 ///|
+/// Implements `bytes4_wb`.
 fn bytes4_wb(a : Byte, b : Byte, c : Byte, d : Byte) -> FixedArray[Byte] {
   ([a, b, c, d] : FixedArray[Byte])
 }

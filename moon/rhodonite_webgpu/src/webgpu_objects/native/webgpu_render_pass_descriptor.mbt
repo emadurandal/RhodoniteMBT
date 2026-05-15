@@ -1,10 +1,12 @@
 ///|
+/// Defines `WebGPURenderPassDescriptor`.
 pub struct WebGPURenderPassDescriptor {
   colorAttachments : Array[WebGPURenderPassColorAttachment?]
   depthStencilAttachment : WebGPURenderPassDepthStencilAttachment?
 }
 
 ///|
+/// Implements `WebGPURenderPassDescriptor::new`.
 pub fn WebGPURenderPassDescriptor::new(
   colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
   depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
@@ -13,6 +15,7 @@ pub fn WebGPURenderPassDescriptor::new(
 }
 
 ///|
+/// Implements `create_render_pass_descriptor`.
 pub fn create_render_pass_descriptor(
   colorAttachments~ : Array[WebGPURenderPassColorAttachment?],
   depthStencilAttachment? : WebGPURenderPassDepthStencilAttachment,
@@ -21,6 +24,7 @@ pub fn create_render_pass_descriptor(
 }
 
 ///|
+/// Implements `WebGPURenderPassDescriptor::get`.
 pub fn WebGPURenderPassDescriptor::get(
   self : WebGPURenderPassDescriptor,
 ) -> (

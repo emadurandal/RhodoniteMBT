@@ -2,6 +2,7 @@
 pub type WebGPUQueue
 
 ///|
+/// Implements `webgpu_queue_write_buffer_array_view`.
 pub fn webgpu_queue_write_buffer_array_view(
   WebGPUQueue,
   GPUBuffer,
@@ -10,6 +11,8 @@ pub fn webgpu_queue_write_buffer_array_view(
 ) -> Unit
 
 ///|
+///|
+/// Implements `webgpu_queue_write_buffer_bytes_range`.
 #cfg(target="native")
 pub fn webgpu_queue_write_buffer_bytes_range(
   WebGPUQueue,

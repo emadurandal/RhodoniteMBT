@@ -1,9 +1,11 @@
 ///|
+/// Defines `WebGPUCommandEncoder`.
 pub struct WebGPUCommandEncoder {
   encoder : GPUCommandEncoder
 }
 
 ///|
+/// Implements `WebGPUCommandEncoder::new`.
 pub fn WebGPUCommandEncoder::new(
   encoder : GPUCommandEncoder,
 ) -> WebGPUCommandEncoder {
@@ -11,6 +13,7 @@ pub fn WebGPUCommandEncoder::new(
 }
 
 ///|
+/// Implements `webgpu_command_encoder_begin_render_pass`.
 pub fn webgpu_command_encoder_begin_render_pass(
   encoder : WebGPUCommandEncoder,
   descriptor : WebGPURenderPassDescriptor,
@@ -93,6 +96,7 @@ pub fn webgpu_command_encoder_begin_render_pass(
 }
 
 ///|
+/// Implements `webgpu_command_encoder_finish`.
 pub fn webgpu_command_encoder_finish(
   encoder : WebGPUCommandEncoder,
 ) -> GPUCommandBuffer {
@@ -100,6 +104,7 @@ pub fn webgpu_command_encoder_finish(
 }
 
 ///|
+/// Implements `webgpu_command_encoder_copy_texture_to_buffer_rgba8`.
 pub fn webgpu_command_encoder_copy_texture_to_buffer_rgba8(
   encoder : WebGPUCommandEncoder,
   texture : WebGPUTexture,
@@ -116,6 +121,7 @@ pub fn webgpu_command_encoder_copy_texture_to_buffer_rgba8(
 }
 
 ///|
+/// Implements `webgpu_command_encoder_release`.
 pub fn webgpu_command_encoder_release(encoder : WebGPUCommandEncoder) -> Unit {
   encoder.encoder.raw.release()
 }

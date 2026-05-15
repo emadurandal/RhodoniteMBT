@@ -1,15 +1,18 @@
 ///|
+/// Implements `buffer_release`.
 pub fn buffer_release(buffer : GPUBuffer) -> Unit {
   buffer.raw.release()
 }
 
 ///|
+/// Implements `empty_bytes_view`.
 fn empty_bytes_view() -> BytesView {
   let empty : Bytes = []
   empty[:]
 }
 
 ///|
+/// Implements `webgpu_buffer_readback_view`.
 pub fn webgpu_buffer_readback_view(
   buffer : GPUBuffer,
   instance : WebGPUInstance,
@@ -45,6 +48,7 @@ pub fn webgpu_buffer_readback_view(
 }
 
 ///|
+/// Implements `webgpu_buffer_readback`.
 pub fn webgpu_buffer_readback(
   buffer : GPUBuffer,
   instance : WebGPUInstance,

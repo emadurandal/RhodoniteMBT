@@ -1,4 +1,5 @@
 ///|
+/// Defines `WebGPURenderPipelineDescriptor`.
 pub struct WebGPURenderPipelineDescriptor {
   vertex : GPUShaderModule
   fragment : GPUShaderModule
@@ -7,6 +8,7 @@ pub struct WebGPURenderPipelineDescriptor {
 }
 
 ///|
+/// Implements `WebGPURenderPipelineDescriptor::new`.
 pub fn WebGPURenderPipelineDescriptor::new(
   vertex~ : GPUShaderModule,
   fragment~ : GPUShaderModule,

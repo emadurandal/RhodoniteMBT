@@ -1,4 +1,5 @@
 ///|
+/// Implements `World::camera_ref_from_bytes`.
 fn World::camera_ref_from_bytes(
   self : World,
   bytes : FixedArray[Byte],
@@ -8,6 +9,7 @@ fn World::camera_ref_from_bytes(
 }
 
 ///|
+/// Implements `World::camera_ref_unchecked`.
 fn World::camera_ref_unchecked(self : World, entity : EntityId) -> CameraRef? {
   let id = self.camera_component_id
   if !self.is_alive(entity) {
@@ -30,6 +32,7 @@ fn World::camera_ref_unchecked(self : World, entity : EntityId) -> CameraRef? {
 }
 
 ///|
+/// Implements `World::camera_ref`.
 pub fn World::camera_ref(self : World, entity : EntityId) -> CameraRef? {
   let id = self.camera_component_id
   self.assert_system_component_read(id, "World::camera_ref")
@@ -37,6 +40,7 @@ pub fn World::camera_ref(self : World, entity : EntityId) -> CameraRef? {
 }
 
 ///|
+/// Implements `World::alloc_camera_ref`.
 fn World::alloc_camera_ref(
   self : World,
   view : @m44.Matrix44F,
@@ -55,6 +59,7 @@ fn World::alloc_camera_ref(
 }
 
 ///|
+/// Implements `World::release_camera_ref`.
 fn World::release_camera_ref(self : World, entity : EntityId) -> Unit {
   match self.camera_ref_unchecked(entity) {
     Some(camera_ref) => self.camera_blob.free(camera_ref.word_offset)
@@ -63,6 +68,7 @@ fn World::release_camera_ref(self : World, entity : EntityId) -> Unit {
 }
 
 ///|
+/// Implements `World::set_camera_matrices`.
 pub fn World::set_camera_matrices(
   self : World,
   entity : EntityId,
@@ -111,6 +117,7 @@ pub fn World::set_camera_matrices(
 }
 
 ///|
+/// Implements `World::camera_gpu_row`.
 pub fn World::camera_gpu_row(
   self : World,
   entity : EntityId,
@@ -124,11 +131,13 @@ pub fn World::camera_gpu_row(
 }
 
 ///|
+/// Implements `World::camera_blob_word_capacity`.
 pub fn World::camera_blob_word_capacity(self : World) -> Int {
   self.camera_blob.word_capacity()
 }
 
 ///|
+/// Implements `World::drain_camera_blob_write_views`.
 pub fn World::drain_camera_blob_write_views(
   self : World,
 ) -> Array[GpuWriteView] {
@@ -138,6 +147,7 @@ pub fn World::drain_camera_blob_write_views(
 }
 
 ///|
+/// Implements `World::drain_camera_blob_resize_events`.
 pub fn World::drain_camera_blob_resize_events(
   self : World,
 ) -> Array[PackedGpuBlobResizeEvent] {
@@ -146,6 +156,7 @@ pub fn World::drain_camera_blob_resize_events(
 }
 
 ///|
+/// Implements `World::update_camera_views_from_global_transforms`.
 pub fn World::update_camera_views_from_global_transforms(self : World) -> Unit {
   let camera = self.camera_component_id
   let gt = self.global_transform_component_id

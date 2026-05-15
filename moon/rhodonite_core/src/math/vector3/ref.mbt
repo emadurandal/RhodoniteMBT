@@ -6,6 +6,7 @@ pub(all) struct Vector3Ref[T] {
 }
 
 ///|
+/// Implements `Vector3Ref::from_mut_view`.
 pub fn Vector3Ref::from_mut_view(data : MutArrayView[Byte]) -> Vector3Ref[Byte] {
   guard data.length() == 12 else {
     abort("Vector3Ref::from_mut_view: expected 12 bytes")
@@ -14,16 +15,19 @@ pub fn Vector3Ref::from_mut_view(data : MutArrayView[Byte]) -> Vector3Ref[Byte] 
 }
 
 ///|
+/// Implements `Vector3Ref::x`.
 pub fn Vector3Ref::x(self : Vector3Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 0))
 }
 
 ///|
+/// Implements `Vector3Ref::y`.
 pub fn Vector3Ref::y(self : Vector3Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 4))
 }
 
 ///|
+/// Implements `Vector3Ref::z`.
 pub fn Vector3Ref::z(self : Vector3Ref[Byte]) -> Float {
   Float::reinterpret_from_uint(@writes.get_u32_le_mut_view(self.data, 8))
 }
@@ -69,6 +73,8 @@ extern "js" fn write_f32x3_mut_view(
   #| }
 
 ///|
+///|
+/// Implements `write_f32x3_mut_view`.
 #cfg(not(target="js"))
 fn write_f32x3_mut_view(
   data : MutArrayView[Byte],
@@ -120,16 +126,19 @@ pub fn Vector3Ref::write_mut_view(
 }
 
 ///|
+/// Implements `Vector3Ref::set_x`.
 pub fn Vector3Ref::set_x(self : Vector3Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 0, v.to_double())
 }
 
 ///|
+/// Implements `Vector3Ref::set_y`.
 pub fn Vector3Ref::set_y(self : Vector3Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 4, v.to_double())
 }
 
 ///|
+/// Implements `Vector3Ref::set_z`.
 pub fn Vector3Ref::set_z(self : Vector3Ref[Byte], v : Float) -> Unit {
   @writes.put_f32_le_mut_view(self.data, 8, v.to_double())
 }

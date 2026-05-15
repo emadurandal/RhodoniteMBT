@@ -1,4 +1,5 @@
 ///|
+/// Implements `CommandBuffer::new_for_system`.
 fn CommandBuffer::new_for_system(
   world : World,
   system_name : String,
@@ -15,6 +16,7 @@ fn CommandBuffer::new_for_system(
 }
 
 ///|
+/// Implements `CommandBuffer::assert_component_write`.
 fn CommandBuffer::assert_component_write(
   self : CommandBuffer,
   component : ComponentTypeId,
@@ -33,6 +35,7 @@ fn CommandBuffer::assert_component_write(
 }
 
 ///|
+/// Implements `CommandBuffer::assert_structural_write`.
 fn CommandBuffer::assert_structural_write(
   self : CommandBuffer,
   operation : String,
@@ -48,11 +51,13 @@ fn CommandBuffer::assert_structural_write(
 }
 
 ///|
+/// Implements `CommandBuffer::len`.
 pub fn CommandBuffer::len(self : CommandBuffer) -> Int {
   self.commands.length()
 }
 
 ///|
+/// Implements `CommandBuffer::is_empty`.
 pub fn CommandBuffer::is_empty(self : CommandBuffer) -> Bool {
   self.commands.length() == 0
 }
@@ -67,6 +72,7 @@ pub fn CommandBuffer::create_entity(self : CommandBuffer) -> EntityId {
 }
 
 ///|
+/// Implements `CommandBuffer::destroy_entity`.
 pub fn CommandBuffer::destroy_entity(
   self : CommandBuffer,
   entity : EntityId,
@@ -76,6 +82,7 @@ pub fn CommandBuffer::destroy_entity(
 }
 
 ///|
+/// Implements `CommandBuffer::add_component`.
 pub fn CommandBuffer::add_component(
   self : CommandBuffer,
   entity : EntityId,
@@ -87,6 +94,7 @@ pub fn CommandBuffer::add_component(
 }
 
 ///|
+/// Implements `CommandBuffer::add_component_bytes`.
 pub fn CommandBuffer::add_component_bytes(
   self : CommandBuffer,
   entity : EntityId,
@@ -99,6 +107,7 @@ pub fn CommandBuffer::add_component_bytes(
 }
 
 ///|
+/// Implements `CommandBuffer::set_component_bytes`.
 pub fn CommandBuffer::set_component_bytes(
   self : CommandBuffer,
   entity : EntityId,
@@ -110,6 +119,7 @@ pub fn CommandBuffer::set_component_bytes(
 }
 
 ///|
+/// Implements `CommandBuffer::remove_component`.
 pub fn CommandBuffer::remove_component(
   self : CommandBuffer,
   entity : EntityId,

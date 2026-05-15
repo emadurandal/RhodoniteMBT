@@ -1,16 +1,19 @@
 ///|
+/// Defines `GlobalTransformDenseLayout`.
 pub(all) struct GlobalTransformDenseLayout {
   format : @comp.GlobalTransformGpuFormat
   words_per_entity : Int
 }
 
 ///|
+/// Defines `GlobalTransformUploadRange`.
 pub(all) struct GlobalTransformUploadRange {
   first_word : Int
   word_count : Int
 }
 
 ///|
+/// Defines `GlobalTransformRun`.
 pub(all) struct GlobalTransformRun {
   first_index : Int
   end_index : Int
@@ -20,6 +23,7 @@ pub(all) struct GlobalTransformRun {
 }
 
 ///|
+/// Defines `GlobalTransformBlobWriter`.
 pub struct GlobalTransformBlobWriter {
   priv bytes : MutArrayView[Byte]
   priv refs : FixedArray[Byte]
@@ -29,6 +33,7 @@ pub struct GlobalTransformBlobWriter {
 }
 
 ///|
+/// Implements `put_global_transform_f32_word`.
 fn put_global_transform_f32_word(
   bytes : MutArrayView[Byte],
   word_offset : Int,
@@ -42,6 +47,7 @@ fn put_global_transform_f32_word(
 }
 
 ///|
+/// Implements `put_global_transform_packed_f16x2`.
 fn put_global_transform_packed_f16x2(
   bytes : MutArrayView[Byte],
   word_offset : Int,
@@ -54,6 +60,7 @@ fn put_global_transform_packed_f16x2(
 }
 
 ///|
+/// Implements `GlobalTransformBlobWriter::format_and_relative_word_offset`.
 fn GlobalTransformBlobWriter::format_and_relative_word_offset(
   self : GlobalTransformBlobWriter,
   index : Int,
@@ -81,6 +88,7 @@ fn GlobalTransformBlobWriter::format_and_relative_word_offset(
 }
 
 ///|
+/// Implements `detect_dense_global_transform_layout`.
 pub fn detect_dense_global_transform_layout(
   refs : FixedArray[Byte],
   count : Int,
@@ -111,6 +119,7 @@ pub fn detect_dense_global_transform_layout(
 }
 
 ///|
+/// Implements `compute_global_transform_upload_range`.
 pub fn compute_global_transform_upload_range(
   refs : FixedArray[Byte],
   count : Int,
@@ -148,6 +157,7 @@ pub fn compute_global_transform_upload_range(
 }
 
 ///|
+/// Implements `detect_global_transform_runs`.
 pub fn detect_global_transform_runs(
   refs : FixedArray[Byte],
   count : Int,
@@ -192,6 +202,7 @@ pub fn detect_global_transform_runs(
 }
 
 ///|
+/// Implements `GlobalTransformBlobWriter::set_element_at`.
 pub fn GlobalTransformBlobWriter::set_element_at(
   self : GlobalTransformBlobWriter,
   index : Int,
@@ -374,6 +385,8 @@ extern "C" fn global_transform_element_setter_set_mixed_native(
 ) -> Unit = "rhodonite_global_transform_element_setter_set_mixed"
 
 ///|
+///|
+/// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(target="js")
 pub fn GlobalTransformBlobWriter::element_setter(
   self : GlobalTransformBlobWriter,
@@ -414,6 +427,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
 }
 
 ///|
+///|
+/// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(target="native")
 pub fn GlobalTransformBlobWriter::element_setter(
   self : GlobalTransformBlobWriter,
@@ -428,6 +443,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
     Some(layout) =>
       match layout.format {
         Affine3x4F32 =>
+          ///|
+          /// Implements `this function`.
           fn(index, value) {
             if index < 0 || index >= self.count {
               abort("GlobalTransform element setter: index out of range")
@@ -442,6 +459,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
             )
           }
         Affine3x4F16 =>
+          ///|
+          /// Implements `this function`.
           fn(index, value) {
             if index < 0 || index >= self.count {
               abort("GlobalTransform element setter: index out of range")
@@ -457,6 +476,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
           }
       }
     None =>
+      ///|
+      /// Implements `this function`.
       fn(index, value) {
         if index < 0 || index >= self.count {
           abort("GlobalTransform element setter: index out of range")
@@ -474,6 +495,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
 }
 
 ///|
+///|
+/// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(not(any(target="js", target="native")))
 pub fn GlobalTransformBlobWriter::element_setter(
   self : GlobalTransformBlobWriter,
@@ -488,6 +511,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
     Some(layout) =>
       match layout.format {
         Affine3x4F32 =>
+          ///|
+          /// Implements `this function`.
           fn(index, value) {
             if index < 0 || index >= self.count {
               abort("GlobalTransform element setter: index out of range")
@@ -499,6 +524,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
             )
           }
         Affine3x4F16 =>
+          ///|
+          /// Implements `this function`.
           fn(index, value) {
             if index < 0 || index >= self.count {
               abort("GlobalTransform element setter: index out of range")
@@ -518,6 +545,8 @@ pub fn GlobalTransformBlobWriter::element_setter(
           }
       }
     None =>
+      ///|
+      /// Implements `this function`.
       fn(index, value) {
         if index < 0 || index >= self.count {
           abort("GlobalTransform element setter: index out of range")
@@ -556,6 +585,7 @@ pub fn GlobalTransformBlobWriter::element_setter(
 }
 
 ///|
+/// Implements `GlobalTransformBlobWriter::set_affine3x4_at`.
 pub fn GlobalTransformBlobWriter::set_affine3x4_at(
   self : GlobalTransformBlobWriter,
   index : Int,
@@ -600,6 +630,7 @@ pub fn GlobalTransformBlobWriter::set_affine3x4_at(
 }
 
 ///|
+/// Implements `write_global_transform_blob_by_refs`.
 pub fn write_global_transform_blob_by_refs(
   bytes : MutArrayView[Byte],
   refs : FixedArray[Byte],
@@ -612,6 +643,7 @@ pub fn write_global_transform_blob_by_refs(
 }
 
 ///|
+/// Implements `World::write_global_transform_blob_range_by_refs`.
 pub fn World::write_global_transform_blob_range_by_refs(
   self : World,
   refs : FixedArray[Byte],
@@ -623,6 +655,8 @@ pub fn World::write_global_transform_blob_range_by_refs(
   self.write_global_transform_blob_range_views(
     range.first_word,
     range.word_count,
+    ///|
+    /// Implements `this function`.
     fn(bytes) {
       write_global_transform_blob_by_refs(
         bytes,

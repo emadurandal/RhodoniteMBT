@@ -8,12 +8,16 @@ extern "js" fn monotonic_ms() -> Double =
 extern "C" fn sdl_get_ticks() -> UInt64 = "SDL_GetTicks"
 
 ///|
+///|
+/// Implements `monotonic_ms`.
 #cfg(target="native")
 fn monotonic_ms() -> Double {
   sdl_get_ticks().to_double()
 }
 
 ///|
+///|
+/// Implements `monotonic_ms`.
 #cfg(not(any(target="js", target="native")))
 fn monotonic_ms() -> Double {
   0.0
@@ -205,6 +209,7 @@ fn camera_matrices() -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
 }
 
 ///|
+/// Implements `cube_local_corners`.
 fn cube_local_corners() -> Array[(Double, Double, Double)] {
   [
     (-1.0, -1.0, -1.0),
@@ -219,6 +224,7 @@ fn cube_local_corners() -> Array[(Double, Double, Double)] {
 }
 
 ///|
+/// Implements `index_cube_u16_bytes`.
 fn index_cube_u16_bytes() -> FixedArray[Byte] {
   let buf = FixedArray::make(72, (0 : Byte))
   let idx : Array[UInt] = [
@@ -232,6 +238,7 @@ fn index_cube_u16_bytes() -> FixedArray[Byte] {
 }
 
 ///|
+/// Implements `write_vertex_positions_only`.
 fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
   let corners = cube_local_corners()
   for vi = 0; vi < verts_per_cube; vi = vi + 1 {
@@ -244,6 +251,7 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
 }
 
 ///|
+/// Implements `instance_color_rgb`.
 fn instance_color_rgb(idx : Int) -> (Double, Double, Double) {
   let i = idx % 125
   let r = (i % 5).to_double() * 0.22 + 0.12
@@ -253,6 +261,7 @@ fn instance_color_rgb(idx : Int) -> (Double, Double, Double) {
 }
 
 ///|
+/// Implements `grid_xz_for_index`.
 fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
   let ix = idx % per_side
   let iz = idx / per_side
@@ -263,6 +272,7 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+/// Implements `global_transform_default_format`.
 fn global_transform_default_format() -> @comp.GlobalTransformGpuFormat {
   match global_transform_precision_mode {
     AllF32 => Affine3x4F32
@@ -271,6 +281,7 @@ fn global_transform_default_format() -> @comp.GlobalTransformGpuFormat {
 }
 
 ///|
+/// Implements `entity_uses_f32`.
 fn entity_uses_f32(entity : @ecs.EntityId, local_index : Int) -> Bool {
   match global_transform_precision_mode {
     AllF32 => true
@@ -281,6 +292,7 @@ fn entity_uses_f32(entity : @ecs.EntityId, local_index : Int) -> Bool {
 }
 
 ///|
+/// Implements `apply_global_transform_precision_mode`.
 fn apply_global_transform_precision_mode(
   world : @ecs.World,
   entities : Array[@ecs.EntityId],
@@ -298,6 +310,7 @@ fn apply_global_transform_precision_mode(
 }
 
 ///|
+/// Implements `write_mass_cubes_transform_blob`.
 fn write_mass_cubes_transform_blob(
   writer : @ecs.GlobalTransformBlobWriter,
   per_side : Int,
@@ -361,6 +374,7 @@ fn write_mass_cubes_transform_blob(
 }
 
 ///|
+/// Implements `update_and_drain_global_transforms`.
 fn update_and_drain_global_transforms(
   world : @ecs.World,
   tf : @ecs.ComponentTypeId,
@@ -379,6 +393,8 @@ fn update_and_drain_global_transforms(
     entity_count,
     upload_range,
     dense_transform_layout,
+    ///|
+    /// Implements `this function`.
     fn(writer) {
       write_mass_cubes_transform_blob(writer, per_side, t, full_rows)
     },
@@ -386,6 +402,7 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
+/// Defines `WebGPURenderer`.
 pub(all) struct WebGPURenderer {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
@@ -416,6 +433,7 @@ pub(all) struct WebGPURenderer {
 }
 
 ///|
+/// Implements `ecs_mass_shader_wgsl`.
 fn ecs_mass_shader_wgsl() -> String {
   let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
     @ecs_wgsl.camera_words_binding_default()
@@ -475,12 +493,16 @@ extern "js" fn ecs_mass_cubes_perf_overlay_js(
   #| }
 
 ///|
+///|
+/// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(target="js")
 fn ecs_mass_cubes_perf_overlay(fps : Double, cpu_ms : Double) -> Unit {
   ecs_mass_cubes_perf_overlay_js(fps, cpu_ms)
 }
 
 ///|
+///|
+/// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(not(target="js"))
 fn ecs_mass_cubes_perf_overlay(_fps : Double, _cpu_ms : Double) -> Unit {
   ignore(_fps)
@@ -489,6 +511,8 @@ fn ecs_mass_cubes_perf_overlay(_fps : Double, _cpu_ms : Double) -> Unit {
 }
 
 ///|
+///|
+/// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(target="native")
 fn ecs_mass_cubes_perf_console_log(
   fps : Double,
@@ -508,6 +532,8 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+///|
+/// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(not(target="native"))
 fn ecs_mass_cubes_perf_console_log(
   _fps : Double,
@@ -521,6 +547,7 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+/// Implements `create_renderer`.
 pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
   let (device, canvas_context, format, queue) = context.get()
   Some(
@@ -534,6 +561,7 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 }
 
 ///|
+/// Implements `create_renderer_for_device`.
 pub fn create_renderer_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
@@ -702,6 +730,7 @@ pub fn create_renderer_for_device(
 }
 
 ///|
+/// Implements `render_frame`.
 pub fn render_frame(renderer : WebGPURenderer) -> Unit {
   let canvas_context = match renderer.context {
     Some(c) => c
@@ -715,6 +744,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
   renderer : WebGPURenderer,
   color_view : @wgpu.GPUTextureView,
@@ -812,6 +842,7 @@ pub fn render_frame_to_view(
 }
 
 ///|
+/// Implements `WebGPURenderer::release`.
 pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
   @wgpu.bindGroup_release(self.bind_transforms)
   @wgpu.bindGroup_release(self.bind_camera)
@@ -828,6 +859,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
+/// Implements `webgpu_renderer_release`.
 pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
   renderer.release()
 }

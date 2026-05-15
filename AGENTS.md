@@ -71,6 +71,7 @@ After changing source code that can affect sample rendering, always run the visu
 ## Coding conventions (MoonBit)
 
 - Block-oriented style; blocks are separated by `///|` and order does not matter; refactor block-by-block when useful.
+- When adding or editing MoonBit code, always place a documentation comment (`///` / `///|`) immediately before every `struct` and `fn` (including methods on types), briefly stating purpose and any non-obvious behavior or invariants.
 - Prefer moving deprecated code into `deprecated.mbt` per directory.
 
 ## JS bridge and TypeScript wrappers

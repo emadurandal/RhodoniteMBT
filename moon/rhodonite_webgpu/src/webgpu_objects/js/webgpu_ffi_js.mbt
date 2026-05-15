@@ -53,6 +53,7 @@ extern "js" fn device_createShaderModule(
   #| (device, code) => device.createShaderModule({ code })
 
 ///|
+/// Defines `VertexAttributeFFI`.
 pub(all) struct VertexAttributeFFI {
   formatTag : Int
   offset : Int
@@ -60,6 +61,7 @@ pub(all) struct VertexAttributeFFI {
 }
 
 ///|
+/// Defines `VertexBufferLayoutFFI`.
 pub(all) struct VertexBufferLayoutFFI {
   arrayStride : Int
   stepModeTag : Int
@@ -341,6 +343,7 @@ extern "js" fn bind_group_resource_external(
   #| (external_texture) => external_texture
 
 ///|
+/// Defines `BindGroupEntryResolvedJs`.
 pub(all) struct BindGroupEntryResolvedJs {
   binding : UInt
   resource : BindGroupResourceJs

@@ -1,24 +1,29 @@
 ///|
+/// Defines `WebGPUDevice`.
 pub struct WebGPUDevice {
   device : GPUDevice
 }
 
 ///|
+/// Implements `WebGPUDevice::new`.
 pub fn WebGPUDevice::new(device : GPUDevice) -> WebGPUDevice {
   { device, }
 }
 
 ///|
+/// Implements `webgpu_device_get`.
 pub fn webgpu_device_get(device : WebGPUDevice) -> GPUDevice {
   device.device
 }
 
 ///|
+/// Implements `webgpu_device_get_queue`.
 pub fn webgpu_device_get_queue(device : WebGPUDevice) -> WebGPUQueue {
   WebGPUQueue::new(GPUQueue::{ raw: device.device.raw.queue() })
 }
 
 ///|
+/// Implements `webgpu_device_create_shader_module`.
 pub fn webgpu_device_create_shader_module(
   device : WebGPUDevice,
   code : String,
@@ -41,6 +46,7 @@ fn topology_to_primitive_u32(
 }
 
 ///|
+/// Implements `vertex_step_to_u32`.
 fn vertex_step_to_u32(mode : @webgpu_enums.GPUVertexStepMode) -> UInt {
   match mode {
     Vertex => @wgpu.VERTEX_STEP_MODE_VERTEX
@@ -49,6 +55,7 @@ fn vertex_step_to_u32(mode : @webgpu_enums.GPUVertexStepMode) -> UInt {
 }
 
 ///|
+/// Implements `vertex_format_to_u32`.
 fn vertex_format_to_u32(f : @webgpu_enums.GPUVertexFormat) -> UInt {
   match f {
     Float32x2 => @wgpu.VERTEX_FORMAT_FLOAT32X2
@@ -130,6 +137,7 @@ pub fn webgpu_device_create_render_pipeline(
 }
 
 ///|
+/// Implements `webgpu_device_create_buffer`.
 pub fn webgpu_device_create_buffer(
   device : WebGPUDevice,
   size : UInt64,
@@ -140,6 +148,7 @@ pub fn webgpu_device_create_buffer(
 }
 
 ///|
+/// Implements `webgpu_device_create_texture`.
 pub fn webgpu_device_create_texture(
   device : WebGPUDevice,
   width : UInt,
@@ -166,6 +175,7 @@ pub fn webgpu_device_create_texture(
 }
 
 ///|
+/// Implements `webgpu_device_create_command_encoder`.
 pub fn webgpu_device_create_command_encoder(
   device : WebGPUDevice,
 ) -> WebGPUCommandEncoder {
@@ -175,6 +185,7 @@ pub fn webgpu_device_create_command_encoder(
 }
 
 ///|
+/// Implements `webgpu_render_pipeline_get_bind_group_layout`.
 pub fn webgpu_render_pipeline_get_bind_group_layout(
   pipeline : GPURenderPipeline,
   group_index : UInt,
@@ -185,6 +196,7 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
 }
 
 ///|
+/// Implements `webgpu_device_create_bind_group`.
 pub fn webgpu_device_create_bind_group(
   device : WebGPUDevice,
   layout : GPUBindGroupLayout,
@@ -218,11 +230,13 @@ pub fn webgpu_device_create_bind_group(
 }
 
 ///|
+/// Implements `webgpu_device_poll`.
 pub fn webgpu_device_poll(device : WebGPUDevice, wait? : Bool = false) -> Bool {
   device.device.raw.poll(wait~)
 }
 
 ///|
+/// Implements `webgpu_device_release`.
 pub fn webgpu_device_release(device : WebGPUDevice) -> Unit {
   device.device.raw.release()
 }

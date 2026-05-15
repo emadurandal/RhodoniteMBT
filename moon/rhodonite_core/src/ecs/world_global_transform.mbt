@@ -1,4 +1,5 @@
 ///|
+/// Implements `World::global_transform_ref_from_bytes`.
 fn World::global_transform_ref_from_bytes(
   self : World,
   bytes : FixedArray[Byte],
@@ -11,6 +12,7 @@ fn World::global_transform_ref_from_bytes(
 }
 
 ///|
+/// Implements `World::global_transform_ref_unchecked`.
 fn World::global_transform_ref_unchecked(
   self : World,
   entity : EntityId,
@@ -36,6 +38,7 @@ fn World::global_transform_ref_unchecked(
 }
 
 ///|
+/// Implements `World::global_transform_ref`.
 pub fn World::global_transform_ref(
   self : World,
   entity : EntityId,
@@ -46,6 +49,7 @@ pub fn World::global_transform_ref(
 }
 
 ///|
+/// Implements `World::alloc_global_transform_ref`.
 fn World::alloc_global_transform_ref(
   self : World,
   format : @comp.GlobalTransformGpuFormat,
@@ -57,6 +61,7 @@ fn World::alloc_global_transform_ref(
 }
 
 ///|
+/// Implements `World::write_global_transform_ref_component`.
 fn World::write_global_transform_ref_component(
   self : World,
   entity : EntityId,
@@ -70,6 +75,7 @@ fn World::write_global_transform_ref_component(
 }
 
 ///|
+/// Implements `World::release_global_transform_ref`.
 fn World::release_global_transform_ref(self : World, entity : EntityId) -> Unit {
   match self.global_transform_ref_unchecked(entity) {
     Some(gt_ref) =>
@@ -118,6 +124,7 @@ pub fn World::set_global_transform(
 }
 
 ///|
+/// Implements `World::set_global_transform_format`.
 pub fn World::set_global_transform_format(
   self : World,
   entity : EntityId,
@@ -159,6 +166,7 @@ pub fn World::set_global_transform_format(
 }
 
 ///|
+/// Implements `World::get_global_transform`.
 pub fn World::get_global_transform(
   self : World,
   entity : EntityId,
@@ -181,6 +189,7 @@ pub fn World::get_global_transform(
 }
 
 ///|
+/// Implements `World::drain_global_transform_blob_write_views`.
 pub fn World::drain_global_transform_blob_write_views(
   self : World,
 ) -> Array[GpuWriteView] {
@@ -192,6 +201,7 @@ pub fn World::drain_global_transform_blob_write_views(
 }
 
 ///|
+/// Implements `World::write_global_transform_blob_range_views`.
 pub fn World::write_global_transform_blob_range_views(
   self : World,
   first_word : Int,
@@ -208,6 +218,7 @@ pub fn World::write_global_transform_blob_range_views(
 }
 
 ///|
+/// Implements `World::drain_global_transform_blob_resize_events`.
 pub fn World::drain_global_transform_blob_resize_events(
   self : World,
 ) -> Array[GlobalTransformBlobResizeEvent] {
@@ -218,11 +229,13 @@ pub fn World::drain_global_transform_blob_resize_events(
 }
 
 ///|
+/// Implements `World::global_transform_blob_word_capacity`.
 pub fn World::global_transform_blob_word_capacity(self : World) -> Int {
   self.global_transform_blob.word_capacity()
 }
 
 ///|
+/// Implements `World::extract_global_transform_refs`.
 pub fn World::extract_global_transform_refs(
   self : World,
   entities : Array[EntityId],
@@ -250,6 +263,7 @@ pub fn World::extract_global_transform_refs(
 }
 
 ///|
+/// Implements `World::write_global_transform_refs_into`.
 pub fn World::write_global_transform_refs_into(
   self : World,
   entities : Array[EntityId],
@@ -335,6 +349,8 @@ pub fn World::write_global_transforms_dense_range_views(
 /// `MutArrayView` wrapper traffic and host-side transform recomputation. It is
 /// intended for immediate full-buffer host upload and does not enqueue drain
 /// ranges.
+///|
+/// Implements `World::write_global_transforms_dense_wasm_bytes_range`.
 #cfg(target="wasm")
 pub fn World::write_global_transforms_dense_wasm_bytes_range(
   self : World,
@@ -356,6 +372,8 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
 /// a `Uint8Array` view over the exported wasm memory and upload the ECS GPU store
 /// without recomputing the transform data on the host side. The pointer is valid
 /// until the GlobalTransform GPU store grows and reallocates.
+///|
+/// Implements `World::global_transform_wasm_gpu_bytes_payload_ptr`.
 #cfg(target="wasm")
 pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
   ignore(self)
@@ -364,6 +382,8 @@ pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
 
 ///|
 /// Returns the byte length of the builtin GlobalTransform GPU store payload.
+///|
+/// Implements `World::global_transform_wasm_gpu_bytes_len`.
 #cfg(target="wasm")
 pub fn World::global_transform_wasm_gpu_bytes_len(self : World) -> Int {
   ignore(self)
@@ -483,6 +503,8 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 }
 
 ///|
+///|
+/// Implements `put_f32_array_le`.
 #cfg(not(target="js"))
 fn put_f32_array_le(bytes : Array[Byte], off : Int, v : Float) -> Unit {
   let u = v.reinterpret_as_uint()

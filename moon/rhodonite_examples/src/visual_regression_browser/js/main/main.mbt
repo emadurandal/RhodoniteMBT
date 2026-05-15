@@ -69,6 +69,7 @@ async fn render_basic_triangle_browser_snapshot_async() -> Bytes raise Error {
 }
 
 ///|
+/// Implements `render_basic_triangle_browser_snapshot`.
 pub fn render_basic_triangle_browser_snapshot() -> @js_async.Promise[Bytes] {
   @js_async.Promise::from_async(() => {
     render_basic_triangle_browser_snapshot_async()
@@ -87,6 +88,7 @@ async fn render_triangle_with_buffer_browser_snapshot_async() -> Bytes raise Err
 }
 
 ///|
+/// Implements `render_triangle_with_buffer_browser_snapshot`.
 pub fn render_triangle_with_buffer_browser_snapshot() -> @js_async.Promise[
   Bytes,
 ] {
@@ -105,6 +107,7 @@ async fn render_depth_test_browser_snapshot_async() -> Bytes raise Error {
 }
 
 ///|
+/// Implements `render_depth_test_browser_snapshot`.
 pub fn render_depth_test_browser_snapshot() -> @js_async.Promise[Bytes] {
   @js_async.Promise::from_async(() => render_depth_test_browser_snapshot_async())
 }
@@ -121,6 +124,7 @@ async fn render_ecs_scene_graph_browser_snapshot_async() -> Bytes raise Error {
 }
 
 ///|
+/// Implements `render_ecs_scene_graph_browser_snapshot`.
 pub fn render_ecs_scene_graph_browser_snapshot() -> @js_async.Promise[Bytes] {
   @js_async.Promise::from_async(() => {
     render_ecs_scene_graph_browser_snapshot_async()
@@ -139,6 +143,7 @@ async fn render_ecs_mass_cubes_browser_snapshot_async() -> Bytes raise Error {
 }
 
 ///|
+/// Implements `render_ecs_mass_cubes_browser_snapshot`.
 pub fn render_ecs_mass_cubes_browser_snapshot() -> @js_async.Promise[Bytes] {
   @js_async.Promise::from_async(() => {
     render_ecs_mass_cubes_browser_snapshot_async()
@@ -146,6 +151,7 @@ pub fn render_ecs_mass_cubes_browser_snapshot() -> @js_async.Promise[Bytes] {
 }
 
 ///|
+/// Implements `main {`.
 fn main {
   println("visual_regression_browser js main")
 }

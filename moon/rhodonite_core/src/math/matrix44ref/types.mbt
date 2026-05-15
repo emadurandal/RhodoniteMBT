@@ -23,6 +23,7 @@ pub type Matrix44RefI = Matrix44Ref[Int]
 pub type Matrix44RefU = Matrix44Ref[UInt]
 
 ///|
+/// Implements `Matrix44Ref::from_mut_view`.
 pub fn[T] Matrix44Ref::from_mut_view(data : MutArrayView[T]) -> Matrix44Ref[T] {
   guard data.length() == 16 else {
     abort("Matrix44Ref::from_mut_view: expected length 16")

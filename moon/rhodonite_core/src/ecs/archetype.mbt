@@ -1,4 +1,5 @@
 ///|
+/// Implements `copy_fixed_into_array`.
 fn copy_fixed_into_array(
   dst : Array[Byte],
   offset : Int,
@@ -10,6 +11,7 @@ fn copy_fixed_into_array(
 }
 
 ///|
+/// Implements `copy_array_range_to_fixed`.
 fn copy_array_range_to_fixed(
   src : Array[Byte],
   offset : Int,
@@ -23,6 +25,7 @@ fn copy_array_range_to_fixed(
 }
 
 ///|
+/// Implements `copy_fixed_range_to_fixed`.
 fn copy_fixed_range_to_fixed(
   src : FixedArray[Byte],
   offset : Int,
@@ -36,6 +39,7 @@ fn copy_fixed_range_to_fixed(
 }
 
 ///|
+/// Implements `append_zero_bytes`.
 fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
   for i = 0; i < count; i = i + 1 {
     ignore(i)
@@ -44,6 +48,7 @@ fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
 }
 
 ///|
+/// Implements `ComponentColumn::ensure_row_capacity`.
 fn ComponentColumn::ensure_row_capacity(
   self : ComponentColumn,
   required_rows : Int,
@@ -60,6 +65,7 @@ fn ComponentColumn::ensure_row_capacity(
 }
 
 ///|
+/// Implements `ComponentColumn::clear_row`.
 fn ComponentColumn::clear_row(self : ComponentColumn, row : Int) -> Unit {
   let base = row * self.stride
   for b = 0; b < self.stride; b = b + 1 {
@@ -68,6 +74,7 @@ fn ComponentColumn::clear_row(self : ComponentColumn, row : Int) -> Unit {
 }
 
 ///|
+/// Implements `Archetype::ensure_row_capacity`.
 fn Archetype::ensure_row_capacity(
   self : Archetype,
   required_rows : Int,
@@ -98,6 +105,7 @@ fn Archetype::new(
 }
 
 ///|
+/// Implements `Archetype::column_index`.
 fn Archetype::column_index(
   self : Archetype,
   component : ComponentTypeId,
@@ -140,6 +148,7 @@ fn Archetype::copy_row_to(self : Archetype, row : Int, dst : Archetype) -> Unit 
 }
 
 ///|
+/// Implements `Archetype::set_component_bytes`.
 fn Archetype::set_component_bytes(
   self : Archetype,
   row : Int,
@@ -158,6 +167,7 @@ fn Archetype::set_component_bytes(
 }
 
 ///|
+/// Implements `Archetype::component_bytes`.
 fn Archetype::component_bytes(
   self : Archetype,
   row : Int,

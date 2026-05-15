@@ -1,4 +1,5 @@
 ///|
+/// Defines `RgbaImage`.
 pub(all) struct RgbaImage {
   width : Int
   height : Int
@@ -25,6 +26,7 @@ extern "C" fn write_binary_file(path : String, data : Bytes) -> Unit = "rhodonit
 pub extern "C" fn visual_snapshot_update_enabled() -> Bool = "rhodonite_visual_snapshot_update_enabled"
 
 ///|
+/// Defines `VisualComparisonResult`.
 pub(all) struct VisualComparisonResult {
   mismatches : Int
   pixels : Int
@@ -32,6 +34,7 @@ pub(all) struct VisualComparisonResult {
 }
 
 ///|
+/// Implements `match_or_update_rgba_png_snapshot`.
 pub fn match_or_update_rgba_png_snapshot(
   image : RgbaImage,
   filename~ : String,
@@ -51,6 +54,7 @@ pub fn match_or_update_rgba_png_snapshot(
 }
 
 ///|
+/// Implements `match_or_update_rgba_png_snapshot_perceptual`.
 pub fn match_or_update_rgba_png_snapshot_perceptual(
   image : RgbaImage,
   filename~ : String,
@@ -72,6 +76,7 @@ pub fn match_or_update_rgba_png_snapshot_perceptual(
 }
 
 ///|
+/// Implements `write_rgba_png_snapshot`.
 pub fn write_rgba_png_snapshot(
   image : RgbaImage,
   filename~ : String,
@@ -87,6 +92,7 @@ pub fn write_rgba_png_snapshot(
 }
 
 ///|
+/// Implements `assert_rgba_matches_png_snapshot`.
 pub fn assert_rgba_matches_png_snapshot(
   image : RgbaImage,
   filename~ : String,
@@ -128,6 +134,7 @@ pub fn assert_rgba_matches_png_snapshot(
 }
 
 ///|
+/// Implements `assert_rgba_matches_png_snapshot_perceptual`.
 pub fn assert_rgba_matches_png_snapshot_perceptual(
   image : RgbaImage,
   filename~ : String,
@@ -147,6 +154,7 @@ pub fn assert_rgba_matches_png_snapshot_perceptual(
 }
 
 ///|
+/// Implements `compare_rgba_matches_png_snapshot_perceptual`.
 pub fn compare_rgba_matches_png_snapshot_perceptual(
   image : RgbaImage,
   filename~ : String,
@@ -176,6 +184,7 @@ pub fn compare_rgba_matches_png_snapshot_perceptual(
 }
 
 ///|
+/// Implements `assert_same_dimensions`.
 fn assert_same_dimensions(
   actual : RgbaImage,
   expected : @image.ImageData,
@@ -189,6 +198,7 @@ fn assert_same_dimensions(
 }
 
 ///|
+/// Implements `read_png_snapshot`.
 fn read_png_snapshot(filename : String) -> @image.ImageData raise {
   let bytes = read_binary_file(png_snapshot_path(filename))
   if bytes.length() == 0 {
@@ -200,12 +210,14 @@ fn read_png_snapshot(filename : String) -> @image.ImageData raise {
 }
 
 ///|
+/// Implements `png_snapshot_path`.
 fn png_snapshot_path(filename : String) -> String {
   "moon/rhodonite_examples/src/visual_regression/__image_snapshots__/" +
   filename
 }
 
 ///|
+/// Implements `rgba_to_pixelmatch_image`.
 fn rgba_to_pixelmatch_image(image : RgbaImage) -> @pixelmatch.Image {
   let out = @pixelmatch.Image::new(image.width, image.height)
   for i in 0..<(image.width * image.height * 4) {
@@ -215,6 +227,7 @@ fn rgba_to_pixelmatch_image(image : RgbaImage) -> @pixelmatch.Image {
 }
 
 ///|
+/// Implements `image_data_to_pixelmatch_image`.
 fn image_data_to_pixelmatch_image(
   image : @image.ImageData,
 ) -> @pixelmatch.Image {
@@ -226,6 +239,7 @@ fn image_data_to_pixelmatch_image(
 }
 
 ///|
+/// Implements `assert_mismatch_rate`.
 fn assert_mismatch_rate(
   mismatches : Int,
   pixels : Int,
@@ -241,6 +255,7 @@ fn assert_mismatch_rate(
 }
 
 ///|
+/// Implements `channel_diff_exceeds`.
 fn channel_diff_exceeds(
   actual : Byte,
   expected : Byte,

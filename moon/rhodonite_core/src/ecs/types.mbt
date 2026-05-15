@@ -8,6 +8,7 @@ pub(all) struct EntityId {
 } derive(Eq)
 
 ///|
+/// Implements `EntityId::new`.
 pub fn EntityId::new(index : Int, generation : Int) -> EntityId {
   { index, generation }
 }
@@ -25,6 +26,7 @@ pub(all) struct ComponentTypeId {
 } derive(Eq)
 
 ///|
+/// Implements `ComponentTypeId::new`.
 pub fn ComponentTypeId::new(index : Int) -> ComponentTypeId {
   { index, }
 }

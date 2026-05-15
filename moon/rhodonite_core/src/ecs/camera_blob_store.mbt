@@ -1,19 +1,23 @@
 ///|
+/// Implements `CameraBlobStore::new`.
 fn CameraBlobStore::new() -> CameraBlobStore {
   { store: PackedGpuBlobStore::new() }
 }
 
 ///|
+/// Implements `CameraBlobStore::word_capacity`.
 fn CameraBlobStore::word_capacity(self : CameraBlobStore) -> Int {
   self.store.word_capacity()
 }
 
 ///|
+/// Implements `CameraBlobStore::alloc`.
 fn CameraBlobStore::alloc(self : CameraBlobStore) -> Int {
   self.store.alloc_words(@comp.camera_gpu_word_count())
 }
 
 ///|
+/// Implements `CameraBlobStore::free`.
 fn CameraBlobStore::free(self : CameraBlobStore, word_offset : Int) -> Unit {
   if word_offset < 0 {
     return
@@ -28,6 +32,7 @@ fn CameraBlobStore::free(self : CameraBlobStore, word_offset : Int) -> Unit {
 }
 
 ///|
+/// Implements `CameraBlobStore::write_matrices`.
 fn CameraBlobStore::write_matrices(
   self : CameraBlobStore,
   word_offset : Int,
@@ -47,6 +52,7 @@ fn CameraBlobStore::write_matrices(
 }
 
 ///|
+/// Implements `CameraBlobStore::read_row`.
 fn CameraBlobStore::read_row(
   self : CameraBlobStore,
   word_offset : Int,
@@ -55,6 +61,7 @@ fn CameraBlobStore::read_row(
 }
 
 ///|
+/// Implements `CameraBlobStore::drain_write_views`.
 fn CameraBlobStore::drain_write_views(
   self : CameraBlobStore,
 ) -> Array[GpuWriteView] {
@@ -62,6 +69,7 @@ fn CameraBlobStore::drain_write_views(
 }
 
 ///|
+/// Implements `CameraBlobStore::drain_resize_events`.
 fn CameraBlobStore::drain_resize_events(
   self : CameraBlobStore,
 ) -> Array[PackedGpuBlobResizeEvent] {

@@ -13,6 +13,8 @@ pub extern "js" fn put_u16_le(
 
 ///|
 /// Write a uint16 little-endian into `buf` at `off`.
+///|
+/// Implements `put_u16_le`.
 #cfg(not(target="js"))
 pub fn put_u16_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
@@ -36,6 +38,8 @@ pub extern "js" fn put_u32_le(
 
 ///|
 /// Write a uint32 little-endian into `buf` at `off`.
+///|
+/// Implements `put_u32_le`.
 #cfg(not(target="js"))
 pub fn put_u32_le(buf : FixedArray[Byte], off : Int, u : UInt) -> Unit {
   buf[off] = (u & 0xFFU).to_byte()
@@ -69,6 +73,8 @@ pub extern "js" fn put_f32_le(
 
 ///|
 /// Round `Double` to f32 bits and write them little-endian into `buf` at `off`.
+///|
+/// Implements `put_f32_le`.
 #cfg(not(target="js"))
 pub fn put_f32_le(buf : FixedArray[Byte], off : Int, d : Double) -> Unit {
   let u = Float::from_double(d).reinterpret_as_uint()
@@ -87,6 +93,8 @@ pub extern "js" fn get_u32_le(buf : FixedArray[Byte], off : Int) -> UInt =
 
 ///|
 /// Read a uint32 little-endian from `buf` at `off`.
+///|
+/// Implements `get_u32_le`.
 #cfg(not(target="js"))
 pub fn get_u32_le(buf : FixedArray[Byte], off : Int) -> UInt {
   buf[off].to_uint() |
@@ -113,6 +121,8 @@ pub extern "js" fn get_u32_le_byte_view(
 
 ///|
 /// Same as [`get_u32_le`] for a zero-copy [`ArrayView`] over bytes.
+///|
+/// Implements `get_u32_le_byte_view`.
 #cfg(not(target="js"))
 pub fn get_u32_le_byte_view(buf : ArrayView[Byte], off : Int) -> UInt {
   buf[off].to_uint() |
@@ -143,6 +153,8 @@ pub extern "js" fn get_f32_le(buf : FixedArray[Byte], off : Int) -> Double =
 
 ///|
 /// Read an IEEE754 `f32` stored little-endian at `off`; returns `Double`.
+///|
+/// Implements `get_f32_le`.
 #cfg(not(target="js"))
 pub fn get_f32_le(buf : FixedArray[Byte], off : Int) -> Double {
   Float::reinterpret_from_uint(get_u32_le(buf, off)).to_double()
@@ -166,6 +178,8 @@ pub extern "js" fn get_u32_le_mut_view(
 
 ///|
 /// Same as [`get_u32_le`] for a [`MutArrayView`] over bytes.
+///|
+/// Implements `get_u32_le_mut_view`.
 #cfg(not(target="js"))
 pub fn get_u32_le_mut_view(buf : MutArrayView[Byte], off : Int) -> UInt {
   buf[off].to_uint() |
@@ -193,6 +207,8 @@ pub extern "js" fn put_u32_le_mut_view(
 
 ///|
 /// Same as [`put_u32_le`] into a [`MutArrayView`].
+///|
+/// Implements `put_u32_le_mut_view`.
 #cfg(not(target="js"))
 pub fn put_u32_le_mut_view(
   buf : MutArrayView[Byte],
@@ -232,6 +248,8 @@ pub extern "js" fn put_f32_le_mut_view(
 
 ///|
 /// Same as [`put_f32_le`] into a [`MutArrayView`].
+///|
+/// Implements `put_f32_le_mut_view`.
 #cfg(not(target="js"))
 pub fn put_f32_le_mut_view(
   buf : MutArrayView[Byte],

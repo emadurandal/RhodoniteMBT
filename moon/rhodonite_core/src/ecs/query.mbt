@@ -1,4 +1,5 @@
 ///|
+/// Implements `component_array_index_of`.
 fn component_array_index_of(
   components : Array[ComponentTypeId],
   component : ComponentTypeId,
@@ -40,11 +41,13 @@ pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
 }
 
 ///|
+/// Implements `RawQuery::required_components`.
 pub fn RawQuery::required_components(self : RawQuery) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
 }
 
 ///|
+/// Implements `Query::assert_registered_components`.
 fn Query::assert_registered_components(
   self : Query,
   world : World,
@@ -54,6 +57,7 @@ fn Query::assert_registered_components(
 }
 
 ///|
+/// Implements `assert_query_components_registered`.
 fn assert_query_components_registered(
   required : Array[ComponentTypeId],
   world : World,
@@ -74,6 +78,7 @@ fn assert_query_components_registered(
 }
 
 ///|
+/// Implements `query_archetype_accesses`.
 fn query_archetype_accesses(
   required : Array[ComponentTypeId],
   world : World,
@@ -103,6 +108,7 @@ fn query_archetype_accesses(
 }
 
 ///|
+/// Implements `query_matches_archetype`.
 fn query_matches_archetype(
   required : Array[ComponentTypeId],
   world : World,
@@ -129,6 +135,7 @@ fn query_matches_archetype(
 }
 
 ///|
+/// Implements `build_prepared_query_archetypes`.
 fn build_prepared_query_archetypes(
   required : Array[ComponentTypeId],
   world : World,
@@ -213,6 +220,7 @@ pub fn RawQuery::for_each_archetype(
 }
 
 ///|
+/// Implements `query_row_accesses_from_archetype_accesses`.
 fn query_row_accesses_from_archetype_accesses(
   accesses : Array[QueryArchetypeComponentAccess],
 ) -> Array[QueryRowComponentAccess] {
@@ -346,11 +354,13 @@ pub fn QueryRow::has(self : QueryRow, component : ComponentTypeId) -> Bool {
 }
 
 ///|
+/// Implements `RawQueryRow::entity`.
 pub fn RawQueryRow::entity(self : RawQueryRow) -> EntityId {
   self.entity
 }
 
 ///|
+/// Implements `RawQueryRow::has`.
 pub fn RawQueryRow::has(
   self : RawQueryRow,
   component : ComponentTypeId,
@@ -378,6 +388,7 @@ fn QueryRow::component_payload_index(
 }
 
 ///|
+/// Implements `RawQueryRow::as_query_row`.
 fn RawQueryRow::as_query_row(self : RawQueryRow) -> QueryRow {
   {
     world: self.world,
@@ -445,6 +456,7 @@ pub fn QueryRow::write(
 }
 
 ///|
+/// Implements `RawQueryRow::read_view`.
 pub fn RawQueryRow::read_view(
   self : RawQueryRow,
   component : ComponentTypeId,
@@ -455,6 +467,7 @@ pub fn RawQueryRow::read_view(
 }
 
 ///|
+/// Implements `RawQueryRow::write_view`.
 pub fn RawQueryRow::write_view(
   self : RawQueryRow,
   component : ComponentTypeId,
@@ -465,6 +478,7 @@ pub fn RawQueryRow::write_view(
 }
 
 ///|
+/// Implements `QueryRow::read_transform3d`.
 pub fn QueryRow::read_transform3d(self : QueryRow) -> @comp.Transform3DRow {
   let component = self.world.transform_component_id
   self.world.assert_system_component_read(
@@ -476,6 +490,7 @@ pub fn QueryRow::read_transform3d(self : QueryRow) -> @comp.Transform3DRow {
 }
 
 ///|
+/// Implements `QueryRow::write_transform3d`.
 pub fn QueryRow::write_transform3d(
   self : QueryRow,
   f : (@comp.Transform3DMutRow) -> Unit,
@@ -492,6 +507,7 @@ pub fn QueryRow::write_transform3d(
 }
 
 ///|
+/// Implements `QueryRow::read_child_of`.
 pub fn QueryRow::read_child_of(self : QueryRow) -> EntityId {
   let component = self.world.child_of_component_id
   self.world.assert_system_component_read(component, "QueryRow::read_child_of")
@@ -502,6 +518,7 @@ pub fn QueryRow::read_child_of(self : QueryRow) -> EntityId {
 }
 
 ///|
+/// Implements `QueryRow::write_child_of`.
 pub fn QueryRow::write_child_of(self : QueryRow, parent : EntityId) -> Unit {
   let component = self.world.child_of_component_id
   self.world.assert_system_component_write(
@@ -514,6 +531,7 @@ pub fn QueryRow::write_child_of(self : QueryRow, parent : EntityId) -> Unit {
 }
 
 ///|
+/// Implements `QueryRow::write_global_transform`.
 pub fn QueryRow::write_global_transform(
   self : QueryRow,
   f : (@comp.GlobalTransformGpuMutRow) -> Unit,
@@ -550,11 +568,13 @@ pub fn QueryRow::write_global_transform(
 }
 
 ///|
+/// Implements `RawQueryArchetype::length`.
 pub fn RawQueryArchetype::length(self : RawQueryArchetype) -> Int {
   self.world.archetypes[self.archetype_index].entities.length()
 }
 
 ///|
+/// Implements `RawQueryArchetype::entity`.
 pub fn RawQueryArchetype::entity(
   self : RawQueryArchetype,
   row : Int,
@@ -563,6 +583,7 @@ pub fn RawQueryArchetype::entity(
 }
 
 ///|
+/// Implements `RawQueryArchetype::has`.
 pub fn RawQueryArchetype::has(
   self : RawQueryArchetype,
   component : ComponentTypeId,
@@ -571,6 +592,7 @@ pub fn RawQueryArchetype::has(
 }
 
 ///|
+/// Implements `RawQueryArchetype::component_stride`.
 pub fn RawQueryArchetype::component_stride(
   self : RawQueryArchetype,
   component : ComponentTypeId,
@@ -582,6 +604,7 @@ pub fn RawQueryArchetype::component_stride(
 }
 
 ///|
+/// Implements `RawQueryArchetype::component_access_index`.
 fn RawQueryArchetype::component_access_index(
   self : RawQueryArchetype,
   component : ComponentTypeId,
@@ -595,6 +618,7 @@ fn RawQueryArchetype::component_access_index(
 }
 
 ///|
+/// Implements `RawQueryArchetype::component_payload_index`.
 fn RawQueryArchetype::component_payload_index(
   self : RawQueryArchetype,
   component : ComponentTypeId,
