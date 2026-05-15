@@ -6,33 +6,14 @@ fn ComponentRegistry::new() -> ComponentRegistry {
 }
 
 ///|
-/// Registers a CPU-only component: data lives only in archetype SoA columns (`cpu_stride` bytes per row).
+/// Registers a component: data lives in archetype SoA columns (`cpu_stride` bytes per row).
 fn ComponentRegistry::register_cpu(
   self : ComponentRegistry,
   name : String,
   cpu_stride : Int,
 ) -> ComponentTypeId {
   let id = ComponentTypeId::new(self.components.length())
-  self.components.push({ id, name, kind: CpuOnly, cpu_stride, gpu_layout: None })
-  id
-}
-
-///|
-/// Registers a GPU-visible component: payload lives only in the flat [`GpuComponentStore`]
-/// (`cpu_stride` is always `0`; archetypes hold this id for signatures only; see `GpuLayout.stride` for packing).
-fn ComponentRegistry::register_gpu(
-  self : ComponentRegistry,
-  name : String,
-  gpu_layout : @comp.GpuLayout,
-) -> ComponentTypeId {
-  let id = ComponentTypeId::new(self.components.length())
-  self.components.push({
-    id,
-    name,
-    kind: GpuVisible,
-    cpu_stride: 0,
-    gpu_layout: Some(gpu_layout),
-  })
+  self.components.push({ id, name, cpu_stride })
   id
 }
 
@@ -60,12 +41,3 @@ fn ComponentRegistry::stride(
 }
 
 ///|
-fn ComponentRegistry::gpu_layout(
-  self : ComponentRegistry,
-  id : ComponentTypeId,
-) -> @comp.GpuLayout? {
-  match self.get(id) {
-    Some(component) => component.gpu_layout
-    None => None
-  }
-}

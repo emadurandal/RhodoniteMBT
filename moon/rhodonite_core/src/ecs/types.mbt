@@ -30,25 +30,15 @@ pub fn ComponentTypeId::new(index : Int) -> ComponentTypeId {
 }
 
 ///|
-/// CpuOnly: archetype SoA only (`cpu_stride` bytes per row).
-/// GpuVisible: payload only in flat `GpuComponentStore` (`cpu_stride` is always `0` here; layout stride is `gpu_layout.stride`).
-pub(all) enum ComponentKind {
-  CpuOnly
-  GpuVisible
-} derive(Eq)
-
-///|
-/// Metadata for one registered component: `cpu_stride` is `0` for `GpuVisible` (payload lives only in `GpuComponentStore`).
+/// Metadata for one registered component: `cpu_stride` is the SoA row width.
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
-  kind : ComponentKind
   cpu_stride : Int
-  gpu_layout : @comp.GpuLayout?
 }
 
 ///|
-/// Issues monotonic `ComponentTypeId`s; CPU stride and optional GPU layout are fixed at registration time (no runtime reflection).
+/// Issues monotonic `ComponentTypeId`s; CPU stride is fixed at registration time (no runtime reflection).
 priv struct ComponentRegistry {
   components : Array[RegisteredComponent]
 }
@@ -81,22 +71,6 @@ struct Archetype {
 }
 
 ///|
-/// Flat storage indexed by `EntityId.index * stride`, independent of archetype rows so GPU layout stays stable when entities move.
-struct GpuComponentStore {
-  component : ComponentTypeId
-  stride : Int
-  mut bytes : FixedArray[Byte]
-  dirty_flags : Array[Bool]
-  dirty_indices : Array[Int]
-  dirty_range_first : Array[Int]
-  dirty_range_last : Array[Int]
-  sort_bucket : Array[Bool]
-  active_flags : Array[Bool]
-  active_indices : Array[Int]
-  active_positions : Array[Int]
-}
-
-///|
 /// One contiguous slice for `GPUQueue.writeBuffer` / `write_buffer_from_fixed_array` (byte_offset + payload).
 pub(all) struct GpuWrite {
   byte_offset : Int
@@ -104,18 +78,10 @@ pub(all) struct GpuWrite {
 }
 
 ///|
-/// Borrowed contiguous GPU upload slice. Callers should upload these views before mutating the same GPU component store again.
+/// Borrowed contiguous GPU upload slice. Callers should upload these views before mutating the same packed blob again.
 pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]
-}
-
-///|
-/// Emitted when the flat GPU backing store grows; callers may need to recreate GPU buffers and optionally full-upload.
-pub(all) struct GpuResizeEvent {
-  component : ComponentTypeId
-  required_capacity : Int
-  needs_full_upload : Bool
 }
 
 ///|
@@ -159,7 +125,6 @@ pub struct RawPreparedQuery {
 
 ///|
 priv struct QueryRowComponentAccess {
-  kind : ComponentKind
   column_index : Int
   stride : Int
 }
@@ -169,7 +134,6 @@ priv struct QueryRowComponentAccess {
 /// `column_index` scans inside `RawQueryArchetype::read_column` / `write_column` hot loops.
 priv struct QueryArchetypeComponentAccess {
   component : ComponentTypeId
-  kind : ComponentKind
   column_index : Int
   stride : Int
 }
@@ -229,15 +193,6 @@ pub struct RawQueryArchetype {
 }
 
 ///|
-/// Mutable contiguous GPU-visible component range borrowed through [`World`].
-pub struct GpuComponentWriteRange {
-  priv bytes : MutArrayView[Byte]
-  priv stride : Int
-  priv first_entity_index : Int
-  priv count : Int
-}
-
-///|
 /// CPU-side handle stored in the builtin GlobalTransform component and mirrored into render items.
 pub(all) struct GlobalTransformRef {
   format : @comp.GlobalTransformGpuFormat
@@ -283,7 +238,6 @@ pub(all) enum WorldCommand {
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  ClearGpuComponent(EntityId, ComponentTypeId)
 }
 
 ///|
@@ -331,7 +285,7 @@ pub struct Schedule {
 }
 
 ///|
-/// CPU archetypes for cache-friendly iteration + separate flat GPU stores per GPU-visible component type.
+/// CPU archetypes for cache-friendly iteration.
 pub struct World {
   priv registry : ComponentRegistry
   priv generations : Array[Int]
@@ -343,10 +297,8 @@ pub struct World {
   priv mut archetype_version : Int
   priv archetype_signature_cache : Array[ArchetypeSignatureCacheEntry]
   priv component_archetypes : Array[Array[Int]]
-  priv gpu_stores : Array[GpuComponentStore?]
   priv global_transform_blob : GlobalTransformBlobStore
   priv camera_blob : CameraBlobStore
-  priv resize_events : Array[GpuResizeEvent]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
   /// Schedule execution depth; component registration is closed while this is nonzero.

@@ -313,16 +313,11 @@ pub fn World::write_global_transforms_dense_views(
 }
 
 ///|
-/// Bulk-writes dense GlobalTransform rows `[0, count)` through one contiguous range callback.
-///
-/// This is the high-throughput variant of [`write_global_transforms_dense_views`]. The callback
-/// receives one `GpuComponentWriteRange` with the backing bytes and row stride, so user code can run
-/// its own tight loop without a callback per entity. The callback must fully update any lanes it
-/// wants to change; the dirty range is the full `[0, count)` row span.
+/// Removed dense row API. Use blob refs plus `drain_global_transform_blob_write_views`.
 pub fn World::write_global_transforms_dense_range_views(
   self : World,
   count : Int,
-  write : (GpuComponentWriteRange) -> Unit,
+  write : (MutArrayView[Byte]) -> Unit,
 ) -> Array[GpuWriteView] {
   ignore(self)
   ignore(count)

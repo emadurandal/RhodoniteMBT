@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GpuLayout, Query, RawQuery, World, getF32, putF32 } from "./index.ts";
+import { GpuLayout, Query, RawQuery, World, getF32 } from "./index.ts";
 
 function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	const bytes = new Uint8Array(stride);
@@ -25,21 +25,18 @@ describe("ECS TypeScript wrapper", () => {
 		expect(e2.gpuIndex()).toBe(e2.index());
 	});
 
-	it("registers metadata and GPU layouts", () => {
+	it("registers metadata and keeps GPU layout helpers available", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("TsCPU", 16);
-		const gpuLayout = GpuLayout.empty(16);
-		const gpu = world.registerGpuComponent("TsGPU", gpuLayout);
+		const layout = GpuLayout.empty(16);
 
-		expect(gpuLayout.isValid()).toBe(true);
-		expect(gpuLayout.stride()).toBe(16);
+		expect(layout.isValid()).toBe(true);
+		expect(layout.stride()).toBe(16);
 		expect(world.componentCpuStride(cpu)).toBe(16);
-		expect(world.componentCpuStride(gpu)).toBe(0);
 
-		const info = world.componentInfo(gpu);
-		expect(info?.name()).toBe("TsGPU");
-		expect(info?.kind()).toBe("GpuVisible");
-		expect(world.componentGpuLayout(gpu)?.stride()).toBe(16);
+		const info = world.componentInfo(cpu);
+		expect(info?.name()).toBe("TsCPU");
+		expect(info?.cpuStride()).toBe(16);
 	});
 
 	it("queries CPU component rows without copying the backing storage", () => {
@@ -69,27 +66,6 @@ describe("ECS TypeScript wrapper", () => {
 		expect(copy).not.toBeNull();
 		expect(getF32(copy ?? new Uint8Array(), 0)).toBeCloseTo(9);
 		expect(copy?.[12]).toBe(7);
-	});
-
-	it("returns borrowed GPU write views for immediate upload", () => {
-		const world = World.new();
-		const gpu = world.registerGpuComponent("GpuMaterial", GpuLayout.empty(16));
-		const entity = world.createEntity();
-		const bytes = new Uint8Array(16);
-		putF32(bytes, 0, 12.5);
-
-		expect(world.addComponentBytes(entity, gpu, bytes)).toBe(true);
-		expect(world.drainResizeEvents().length).toBeGreaterThan(0);
-
-		const writes = world.drainGpuWriteViews(gpu);
-		expect(writes).toHaveLength(1);
-		expect(writes[0]?.byteOffset()).toBe(entity.index() * 16);
-		const view = writes[0]?.bytes();
-		expect(view?.length).toBe(16);
-		const typed = view?.asUint8Array();
-		expect(typed).toBeInstanceOf(Uint8Array);
-		expect(typed?.byteLength).toBe(16);
-		expect(view?.getF32(0)).toBeCloseTo(12.5);
 	});
 
 	it("exposes archetype column views for hot CPU loops", () => {
@@ -138,36 +114,33 @@ describe("ECS TypeScript wrapper", () => {
 		expect(sum).toBeCloseTo(4);
 	});
 
-	it("batch-spawns arbitrary CPU and GPU components", () => {
+	it("batch-spawns arbitrary CPU components", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("SpawnBatchTsCpu", 16);
-		const gpu = world.registerGpuComponent("SpawnBatchTsGpu", GpuLayout.empty(16));
+		const cpuA = world.registerCpuComponent("SpawnBatchTsCpuA", 16);
+		const cpuB = world.registerCpuComponent("SpawnBatchTsCpuB", 16);
 
-		const entities = world.spawnBatch([gpu, cpu], 2, (index, entity, row) => {
+		const entities = world.spawnBatch([cpuB, cpuA], 2, (index, entity, row) => {
 			expect(row.entity().index()).toBe(entity.index());
-			row.write(cpu, (bytes) => bytes.setF32(0, index + 1));
-			row.write(gpu, (bytes) => bytes.setF32(0, index + 10));
+			row.write(cpuA, (bytes) => bytes.setF32(0, index + 1));
+			row.write(cpuB, (bytes) => bytes.setF32(0, index + 10));
 		});
 
 		expect(entities).toHaveLength(2);
-		expect(world.componentBytesCopy(entities[0], cpu)?.[0]).not.toBeUndefined();
 		expect(
-			getF32(world.componentBytesCopy(entities[1], cpu) ?? new Uint8Array(), 0),
+			getF32(world.componentBytesCopy(entities[1], cpuA) ?? new Uint8Array(), 0),
 		).toBeCloseTo(2);
-		const writes = world.drainGpuWriteViews(gpu);
-		expect(writes).toHaveLength(1);
-		expect(writes[0]?.bytes().getF32(0)).toBeCloseTo(10);
-		expect(writes[0]?.bytes().getF32(16)).toBeCloseTo(11);
+		expect(
+			getF32(world.componentBytesCopy(entities[1], cpuB) ?? new Uint8Array(), 0),
+		).toBeCloseTo(11);
 	});
 
 	it("supports builtin transform/global transform upload helpers", () => {
 		const world = World.new();
 		const [entity] = world.spawnTransformGlobalBatchIdentity(1);
 		expect(entity).toBeDefined();
-		const globalTransform = world.globalTransformComponent();
 
 		world.updateGlobalTransformsFromTransforms();
-		const writes = world.drainGpuWriteViews(globalTransform);
+		const writes = world.drainGlobalTransformBlobWriteViews();
 		expect(writes.length).toBeGreaterThan(0);
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);
 	});

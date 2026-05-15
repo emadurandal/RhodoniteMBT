@@ -33,18 +33,12 @@ pub struct CommandBuffer {
 }
 pub fn CommandBuffer::add_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-pub fn CommandBuffer::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::create_entity(Self) -> EntityId
 pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
 pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
 pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
-
-pub(all) enum ComponentKind {
-  CpuOnly
-  GpuVisible
-} derive(Eq)
 
 pub(all) struct ComponentTypeId {
   index : Int
@@ -93,22 +87,6 @@ pub(all) struct GlobalTransformRun {
 pub(all) struct GlobalTransformUploadRange {
   first_word : Int
   word_count : Int
-}
-
-type GpuComponentStore
-
-pub struct GpuComponentWriteRange {
-  // private fields
-}
-pub fn GpuComponentWriteRange::bytes(Self) -> MutArrayView[Byte]
-pub fn GpuComponentWriteRange::count(Self) -> Int
-pub fn GpuComponentWriteRange::first_entity_index(Self) -> Int
-pub fn GpuComponentWriteRange::stride(Self) -> Int
-
-pub(all) struct GpuResizeEvent {
-  component : ComponentTypeId
-  required_capacity : Int
-  needs_full_upload : Bool
 }
 
 pub(all) struct GpuWrite {
@@ -189,9 +167,7 @@ pub fn RawQueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
-  kind : ComponentKind
   cpu_stride : Int
-  gpu_layout : @components.GpuLayout?
 }
 
 pub struct Schedule {
@@ -246,10 +222,8 @@ pub fn World::camera_component(Self) -> ComponentTypeId
 pub fn World::camera_gpu_row(Self, EntityId) -> FixedArray[Byte]?
 pub fn World::camera_ref(Self, EntityId) -> CameraRef?
 pub fn World::child_of_component(Self) -> ComponentTypeId
-pub fn World::clear_gpu_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::component_cpu_stride(Self, ComponentTypeId) -> Int?
-pub fn World::component_gpu_layout(Self, ComponentTypeId) -> @components.GpuLayout?
 pub fn World::component_info(Self, ComponentTypeId) -> RegisteredComponent?
 pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
@@ -259,9 +233,6 @@ pub fn World::drain_camera_blob_resize_events(Self) -> Array[PackedGpuBlobResize
 pub fn World::drain_camera_blob_write_views(Self) -> Array[GpuWriteView]
 pub fn World::drain_global_transform_blob_resize_events(Self) -> Array[PackedGpuBlobResizeEvent]
 pub fn World::drain_global_transform_blob_write_views(Self) -> Array[GpuWriteView]
-pub fn World::drain_gpu_write_views(Self, ComponentTypeId) -> Array[GpuWriteView]
-pub fn World::drain_gpu_writes(Self, ComponentTypeId) -> Array[GpuWrite]
-pub fn World::drain_resize_events(Self) -> Array[GpuResizeEvent]
 pub fn World::extract_global_transform_refs(Self, Array[EntityId]) -> FixedArray[Byte]
 pub fn World::get_child_of(Self, EntityId) -> EntityId?
 pub fn World::get_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
@@ -270,14 +241,12 @@ pub fn World::global_transform_blob_word_capacity(Self) -> Int
 pub fn World::global_transform_component(Self) -> ComponentTypeId
 pub fn World::global_transform_gpu_format(Self) -> @components.GlobalTransformGpuFormat
 pub fn World::global_transform_ref(Self, EntityId) -> GlobalTransformRef?
-pub fn World::gpu_component_active_indices(Self, ComponentTypeId) -> Array[Int]
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
-pub fn World::register_gpu_component(Self, String, @components.GpuLayout) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
@@ -292,12 +261,11 @@ pub fn World::transform_component(Self) -> ComponentTypeId
 pub fn World::update_camera_views_from_global_transforms(Self) -> Unit
 pub fn World::update_global_transforms_from_transforms(Self) -> Unit
 pub fn World::update_transform3d_positions(Self, (EntityId) -> (Float, Float, Float)) -> Unit
-pub fn World::with_gpu_component_write_range(Self, ComponentTypeId, Int, Int, (GpuComponentWriteRange) -> Unit) -> Bool
 pub fn World::write_global_transform_blob_range_by_refs(Self, FixedArray[Byte], Int, GlobalTransformUploadRange, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transform_blob_range_views(Self, Int, Int, (MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transform_refs_into(Self, Array[EntityId], FixedArray[Byte], Int, Int) -> Unit
 pub fn World::write_global_transforms_dense(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWrite]
-pub fn World::write_global_transforms_dense_range_views(Self, Int, (GpuComponentWriteRange) -> Unit) -> Array[GpuWriteView]
+pub fn World::write_global_transforms_dense_range_views(Self, Int, (MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 pub fn World::write_global_transforms_dense_views(Self, Int, (Int, MutArrayView[Byte]) -> Unit) -> Array[GpuWriteView]
 
 pub(all) enum WorldCommand {
@@ -307,7 +275,6 @@ pub(all) enum WorldCommand {
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
-  ClearGpuComponent(EntityId, ComponentTypeId)
 }
 
 // Type aliases

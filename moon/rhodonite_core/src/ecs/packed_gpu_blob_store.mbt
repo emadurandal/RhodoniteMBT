@@ -169,24 +169,6 @@ fn PackedGpuBlobStore::drain_write_views(
 }
 
 ///|
-fn PackedGpuBlobStore::drain_writes(
-  self : PackedGpuBlobStore,
-) -> Array[GpuWrite] {
-  let writes : Array[GpuWrite] = []
-  for i = 0; i < self.dirty_word_first.length(); i = i + 1 {
-    let start = self.dirty_word_first[i] * 4
-    let end = (self.dirty_word_last[i] + 1) * 4
-    writes.push({
-      byte_offset: start,
-      bytes: copy_fixed_range_to_fixed(self.bytes, start, end - start),
-    })
-  }
-  self.dirty_word_first.clear()
-  self.dirty_word_last.clear()
-  writes
-}
-
-///|
 fn PackedGpuBlobStore::drain_resize_events(
   self : PackedGpuBlobStore,
 ) -> Array[PackedGpuBlobResizeEvent] {

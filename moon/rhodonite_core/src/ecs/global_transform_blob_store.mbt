@@ -75,13 +75,6 @@ fn GlobalTransformBlobStore::drain_write_views(
 }
 
 ///|
-fn GlobalTransformBlobStore::drain_writes(
-  self : GlobalTransformBlobStore,
-) -> Array[GpuWrite] {
-  self.store.drain_writes()
-}
-
-///|
 fn GlobalTransformBlobStore::drain_resize_events(
   self : GlobalTransformBlobStore,
 ) -> Array[GlobalTransformBlobResizeEvent] {

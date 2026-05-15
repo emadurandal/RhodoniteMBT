@@ -80,7 +80,6 @@ pub fn create_wasm_renderer() -> Unit {
       cube_scale,
     )
   })
-  ignore(world.drain_resize_events())
   let stride = 24
   host_initialize_renderer(per_side, stride)
   host_write_initial_global_transforms(per_side, 0.0)

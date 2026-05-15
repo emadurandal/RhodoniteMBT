@@ -68,7 +68,6 @@ fn make_world(
     )
     ignore(world.set_global_transform(e, id))
   }
-  let _ = world.drain_resize_events()
   let _ = world.drain_global_transform_blob_write_views()
   (world, tf, gt, per_side)
 }
@@ -97,7 +96,6 @@ fn make_world_batch(
       (1.0 : Float),
     )
   })
-  let _ = world.drain_resize_events()
   let _ = world.drain_global_transform_blob_write_views()
   (world, tf, gt, per_side)
 }
