@@ -18,6 +18,7 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
+import { App, Engine, type FrameState } from "./app-runtime";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -452,22 +453,11 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-async function createRenderer(
-	canvas: HTMLCanvasElement,
+function createRendererForEngine(
+	engine: Engine,
 	renderFormat?: GPUTextureFormat,
-): Promise<Renderer> {
-	const adapter = await navigator.gpu.requestAdapter();
-	if (adapter === null) {
-		throw new Error("WebGPU adapter is not available.");
-	}
-	const device = await adapter.requestDevice();
-	const queue = device.queue;
-	const context = canvas.getContext("webgpu");
-	if (context === null) {
-		throw new Error("WebGPU canvas context is not available.");
-	}
-	const format = navigator.gpu.getPreferredCanvasFormat();
-	context.configure({ device, format, alphaMode: "opaque" });
+): Renderer {
+	const { canvas, context, device, queue, format } = engine;
 	const targetFormat = renderFormat ?? format;
 
 	const shader = device.createShaderModule({
@@ -596,6 +586,14 @@ async function createRenderer(
 	return renderer;
 }
 
+function createApp(renderer: Renderer): App {
+	return new App({
+		update: (_engine, frame) => updateScene(renderer, frame),
+		render: () => renderCurrentFrame(renderer),
+		shutdown: () => releaseRenderer(renderer),
+	});
+}
+
 function updatePerfOverlay(fps: number, cpuMs: number): void {
 	const el = document.getElementById("ecs-mass-cubes-perf");
 	if (el === null) {
@@ -604,15 +602,18 @@ function updatePerfOverlay(fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function renderFrame(renderer: Renderer): void {
+function updateScene(renderer: Renderer, frame: FrameState): void {
+	renderer.frame = frame.frameIndex;
+	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
+}
+
+function renderCurrentFrame(renderer: Renderer): void {
 	const frameStart = performance.now();
 	const fps =
 		renderer.lastFrameStartMs >= 0
 			? 1000 / Math.max(frameStart - renderer.lastFrameStartMs, 1.0e-9)
 			: 0;
 	renderer.lastFrameStartMs = frameStart;
-	renderer.frame += 1;
-	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
 
 	const colorView =
 		renderer.snapshotColorView ?? renderer.context.getCurrentTexture().createView();
@@ -646,16 +647,28 @@ function renderFrame(renderer: Renderer): void {
 	updatePerfOverlay(fps, performance.now() - frameStart);
 }
 
+function releaseRenderer(renderer: Renderer): void {
+	renderer.depthTexture.destroy();
+	renderer.vertexBuffer.destroy();
+	renderer.instanceBuffer.destroy();
+	renderer.indexBuffer.destroy();
+	renderer.transformStorage.destroy();
+	renderer.cameraUniform.destroy();
+}
+
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
 	canvas.height = CANVAS_HEIGHT;
-	const renderer = await createRenderer(canvas, "rgba8unorm");
+	const engine = await Engine.create(canvas);
+	const renderer = createRendererForEngine(engine, "rgba8unorm");
+	const app = createApp(renderer);
+	engine.initializeApp(app);
 	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
 	try {
 		renderer.snapshotColorView = target.view;
 		renderer.snapshotDepthView = target.depthView;
-		renderFrame(renderer);
+		engine.tick(app);
 		renderer.snapshotColorView = undefined;
 		renderer.snapshotDepthView = undefined;
 		return await readRgba8Texture(
@@ -668,6 +681,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	} finally {
 		renderer.snapshotColorView = undefined;
 		renderer.snapshotDepthView = undefined;
+		engine.shutdownApp(app);
 		destroyReadbackTarget(target);
 	}
 }
@@ -681,10 +695,13 @@ if (!navigator.gpu) {
 			document.body.innerHTML = "<h1>Missing WebGPU canvas.</h1>";
 			return;
 		}
-		void createRenderer(canvas)
-			.then((renderer) => {
+		void Engine.create(canvas)
+			.then((engine) => {
+				const renderer = createRendererForEngine(engine);
+				const app = createApp(renderer);
+				engine.initializeApp(app);
 				const loop = () => {
-					renderFrame(renderer);
+					engine.tick(app);
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);

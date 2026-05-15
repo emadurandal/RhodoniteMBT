@@ -201,6 +201,8 @@ WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ
 
 ECS sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `App::update` で animated cube vertices を更新し、`App::render` でその frame の描画だけを行います。
 
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createRendererForEngine(engine)`、`createApp(renderer)`、`engine.tick(app)` の順に書きます。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と lifecycle callback は同じです。
+
 [`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
 ### 現在の Phase 2 state
