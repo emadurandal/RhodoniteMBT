@@ -15,9 +15,7 @@ fn CameraBlobStore::alloc(self : CameraBlobStore) -> Int {
 
 ///|
 fn CameraBlobStore::free(self : CameraBlobStore, word_offset : Int) -> Unit {
-  let words = @comp.camera_gpu_word_count()
-  self.store.clear_words(word_offset, words)
-  self.store.free_words(word_offset, words)
+  self.store.free_words(word_offset, @comp.camera_gpu_word_count())
 }
 
 ///|
