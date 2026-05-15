@@ -196,8 +196,8 @@ fn camera_matrices() -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
   let far_clip = if far_need > 80.0 { far_need } else { 80.0 }
   let proj = @m44.Matrix44::ortho(left, right, bottom, top, 0.1, far_clip)
   (
-    matrix44d_to_f(view),
-    matrix44d_to_f(proj),
+    view.to_float(),
+    proj.to_float(),
     (0.1 : Float),
     Float::from_double(far_clip),
     Float::from_double(aspect),
@@ -240,32 +240,6 @@ fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
     @writes.put_f32_le(buf, base + 0, lx * scale)
     @writes.put_f32_le(buf, base + 4, ly * scale)
     @writes.put_f32_le(buf, base + 8, lz * scale)
-  }
-}
-
-///|
-fn matrix44d_to_f(m : @m44.Matrix44D) -> @m44.Matrix44F {
-  let d = m.data()
-  @m44.Matrix44F::{
-    data: (
-      [
-        Float::from_double(d[0]),
-        Float::from_double(d[1]),
-        Float::from_double(d[2]),
-        Float::from_double(d[3]),
-        Float::from_double(d[4]),
-        Float::from_double(d[5]),
-        Float::from_double(d[6]),
-        Float::from_double(d[7]),
-        Float::from_double(d[8]),
-        Float::from_double(d[9]),
-        Float::from_double(d[10]),
-        Float::from_double(d[11]),
-        Float::from_double(d[12]),
-        Float::from_double(d[13]),
-        Float::from_double(d[14]),
-        Float::from_double(d[15]),
-      ] : FixedArray[Float]),
   }
 }
 

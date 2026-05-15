@@ -115,30 +115,6 @@ pub fn camera_write_gpu_row(
 }
 
 ///|
-pub fn camera_gpu_bytes(
-  view : @m44.Matrix44F,
-  proj : @m44.Matrix44F,
-  near : Float,
-  far : Float,
-  aspect : Float,
-  projection_kind : Float,
-  flags : Float,
-) -> FixedArray[Byte] {
-  let bytes = FixedArray::make(camera_gpu_byte_stride(), (0 : Byte))
-  camera_write_gpu_row(
-    bytes.mut_view(start=0, end=bytes.length()),
-    view,
-    proj,
-    near,
-    far,
-    aspect,
-    projection_kind,
-    flags,
-  )
-  bytes
-}
-
-///|
 pub fn camera_view_proj_from_gpu_bytes(
   bytes : FixedArray[Byte],
 ) -> @m44.Matrix44F {
