@@ -1,6 +1,6 @@
 # RhodoniteMBT
 
-A monorepo of graphics-related code using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
+A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
 
 ## Modules
 
@@ -59,6 +59,12 @@ pnpm run dev:wasm-gc:ecs-mass-cubes
 ```
 
 ### Native
+
+> **Note:** SDL3 must be installed in advance for native builds.
+
+```bash
+$ brew install sdl3
+```
 
 ```bash
 pnpm install
