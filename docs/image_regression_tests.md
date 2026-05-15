@@ -60,10 +60,12 @@ The visual test matrix is externalized in:
 moon/rhodonite_examples/src/visual_regression/visual_samples.tsv
 ```
 
-Both the native MoonBit test and the browser harness read this TSV. Each row
+Both the native MoonBit tests and the browser harness read this TSV. Each row
 contains `target`, `id`, display `name`, PNG `filename`,
 `max_mismatch_rate`, and `perceptual_threshold`. Add or remove visual cases in
 this file first, then wire a renderer for any new `id` in the relevant harness.
+Native cases also need a matching MoonBit `test` block so `moon test` reports a
+test count that matches the number of native visual cases.
 
 PNG golden files live under:
 
@@ -135,6 +137,10 @@ then sends comparison results or updated PNG bytes back to the Node runner.
   swapchain view or an offscreen test texture.
 - The sample list and thresholds are data in `visual_samples.tsv`; code only
   maps manifest `id` values to concrete native/browser renderer entry points.
+- Native and browser comparisons both print explicit status-prefixed lines such
+  as
+  `visual_regression(<target>): PASS <filename> mismatch_rate=<rate> mismatches=<count>/<pixels> max=<rate> threshold=<threshold>`,
+  with `UPDATE`, `SKIP`, or `FAIL` used for non-pass outcomes.
 - Browser visual tests are driven by `scripts/run-browser-visual-regression.mjs`,
   which starts Vite and a separate local result server, opens a headless
   Chrome/Chromium page, and waits for the page to POST its result. Browser

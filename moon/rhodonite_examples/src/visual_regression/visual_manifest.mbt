@@ -20,6 +20,20 @@ pub fn visual_samples_for_target(target : String) -> Array[VisualSample] raise {
 }
 
 ///|
+pub fn visual_sample_for_target_id(
+  target : String,
+  id : String,
+) -> VisualSample raise {
+  let samples = visual_samples_for_target(target)
+  for i = 0; i < samples.length(); i = i + 1 {
+    if samples[i].id == id {
+      return samples[i]
+    }
+  }
+  @test.fail("visual regression manifest has no \{target} sample: \{id}")
+}
+
+///|
 fn visual_manifest_path() -> String {
   "moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"
 }

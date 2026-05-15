@@ -30,6 +30,9 @@ type SampleResult = {
 	filename: string;
 	mismatches: number;
 	mismatchRate: number;
+	pixels: number;
+	maxMismatchRate: number;
+	perceptualThreshold: number;
 };
 
 type SampleFailure = {
@@ -167,6 +170,9 @@ async function main(): Promise<void> {
 				filename: sample.filename,
 				mismatches,
 				mismatchRate,
+				pixels: width * height,
+				maxMismatchRate: sample.maxMismatchRate,
+				perceptualThreshold: sample.perceptualThreshold,
 			});
 			if (mismatchRate > sample.maxMismatchRate) {
 				failures.push({

@@ -22,7 +22,14 @@ extern "C" fn write_binary_file(path : String, data : Bytes) -> Unit = "rhodonit
 
 ///|
 #cfg(target="native")
-extern "C" fn visual_snapshot_update_enabled() -> Bool = "rhodonite_visual_snapshot_update_enabled"
+pub extern "C" fn visual_snapshot_update_enabled() -> Bool = "rhodonite_visual_snapshot_update_enabled"
+
+///|
+pub(all) struct VisualComparisonResult {
+  mismatches : Int
+  pixels : Int
+  mismatch_rate : Double
+}
 
 ///|
 pub fn match_or_update_rgba_png_snapshot(
@@ -128,6 +135,25 @@ pub fn assert_rgba_matches_png_snapshot_perceptual(
   perceptual_threshold? : Double = 0.1,
   include_aa? : Bool = false,
 ) -> Unit raise {
+  ignore(
+    compare_rgba_matches_png_snapshot_perceptual(
+      image,
+      filename~,
+      max_mismatch_rate~,
+      perceptual_threshold~,
+      include_aa~,
+    ),
+  )
+}
+
+///|
+pub fn compare_rgba_matches_png_snapshot_perceptual(
+  image : RgbaImage,
+  filename~ : String,
+  max_mismatch_rate~ : Double,
+  perceptual_threshold? : Double = 0.1,
+  include_aa? : Bool = false,
+) -> VisualComparisonResult raise {
   let expected = read_png_snapshot(filename)
   assert_same_dimensions(image, expected, filename)
   let actual = rgba_to_pixelmatch_image(image)
@@ -141,6 +167,12 @@ pub fn assert_rgba_matches_png_snapshot_perceptual(
     max_mismatch_rate,
     "PNG perceptual visual snapshot",
   )
+  {
+    mismatches,
+    pixels: image.width * image.height,
+    mismatch_rate: mismatches.to_double() /
+    (image.width * image.height).to_double(),
+  }
 }
 
 ///|

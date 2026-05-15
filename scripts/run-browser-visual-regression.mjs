@@ -18,7 +18,7 @@ const snapshotDir = path.join(
 
 const browser = findBrowser();
 if (!browser) {
-	console.log("visual_regression(browser): Chrome/Chromium browser not found; skipping");
+	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
 
@@ -149,7 +149,7 @@ try {
 		},
 	);
 	if (result.skipped) {
-		const message = `visual_regression(browser): ${result.reason}; skipping`;
+		const message = `visual_regression(browser): SKIP ${result.reason}`;
 		if (update) {
 			console.error(
 				`${message}. Cannot update browser PNG snapshots without a completed browser WebGPU readback.`,
@@ -165,20 +165,20 @@ try {
 	} else if (update) {
 		await writeUpdatedSnapshots(result.updates ?? []);
 		console.log(
-			`visual_regression(browser): updated ${(result.updates ?? []).length} PNG snapshots`,
+			`visual_regression(browser): UPDATE wrote ${(result.updates ?? []).length} PNG snapshots`,
 		);
 		process.exitCode = 0;
 	} else if (result.ok) {
 		for (const r of result.results ?? []) {
 			console.log(
-				`visual_regression(browser): ${r.filename} mismatch rate ${r.mismatchRate}`,
+				`visual_regression(browser): PASS ${r.filename} mismatch_rate=${r.mismatchRate} mismatches=${r.mismatches}/${r.pixels} max=${r.maxMismatchRate} threshold=${r.perceptualThreshold}`,
 			);
 		}
 		process.exitCode = 0;
 	} else {
 		for (const failure of result.failures ?? []) {
 			console.error(
-				`visual_regression(browser): ${failure.filename ?? failure.name}: ${failure.message}`,
+				`visual_regression(browser): FAIL ${failure.filename ?? failure.name}: ${failure.message}`,
 			);
 		}
 		process.exitCode = 1;

@@ -24,10 +24,7 @@ fn create_native_webgpu_fixture() -> NativeWebGpuFixture raise Error {
 ///|
 fn try_create_native_webgpu_fixture() -> NativeWebGpuFixture? {
   Some(create_native_webgpu_fixture()) catch {
-    _ => {
-      println("visual_regression: native WebGPU adapter unavailable; skipping")
-      None
-    }
+    _ => None
   }
 }
 
@@ -93,25 +90,84 @@ fn assert_webgpu_sample(
 ) -> Unit raise {
   match render_webgpu_sample(render) {
     Some(image) =>
-      match_or_update_rgba_png_snapshot_perceptual(
-        image,
-        filename=sample.filename,
-        max_mismatch_rate=sample.max_mismatch_rate,
-        perceptual_threshold=sample.perceptual_threshold,
+      if visual_snapshot_update_enabled() {
+        write_rgba_png_snapshot(image, filename=sample.filename)
+        println(
+          "visual_regression(native): UPDATE \{sample.filename} wrote golden PNG",
+        )
+      } else {
+        let result = compare_rgba_matches_png_snapshot_perceptual(
+          image,
+          filename=sample.filename,
+          max_mismatch_rate=sample.max_mismatch_rate,
+          perceptual_threshold=sample.perceptual_threshold,
+        )
+        println(
+          "visual_regression(native): PASS \{sample.filename} mismatch_rate=\{result.mismatch_rate} mismatches=\{result.mismatches}/\{result.pixels} max=\{sample.max_mismatch_rate} threshold=\{sample.perceptual_threshold}",
+        )
+      }
+    None =>
+      println(
+        "visual_regression(native): SKIP \{sample.filename} native WebGPU adapter unavailable",
       )
-    None => ()
   }
 }
 
 ///|
-test "visual WebGPU native samples PNG golden" {
+fn assert_native_visual_sample(id : String) -> Unit raise {
+  assert_native_visual_manifest_matches_test_blocks()
+  let sample = visual_sample_for_target_id("native", id)
+  assert_webgpu_sample(sample, fn(device, queue, format, view) raise {
+    render_native_visual_sample(sample.id, device, queue, format, view)
+  })
+}
+
+///|
+fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
   let samples = visual_samples_for_target("native")
-  for i = 0; i < samples.length(); i = i + 1 {
-    let sample = samples[i]
-    assert_webgpu_sample(sample, fn(device, queue, format, view) raise {
-      render_native_visual_sample(sample.id, device, queue, format, view)
-    })
+  if samples.length() != 5 {
+    @test.fail(
+      "native visual regression manifest has \{samples.length()} samples, but MoonBit declares 5 native test blocks",
+    )
   }
+  for i = 0; i < samples.length(); i = i + 1 {
+    match samples[i].id {
+      "basic-triangle"
+      | "triangle-with-buffer"
+      | "depth-test"
+      | "ecs-scene-graph"
+      | "ecs-mass-cubes" => ()
+      id =>
+        @test.fail(
+          "native visual regression manifest sample has no MoonBit test block: \{id}",
+        )
+    }
+  }
+}
+
+///|
+test "visual WebGPU native basic triangle PNG golden" {
+  assert_native_visual_sample("basic-triangle")
+}
+
+///|
+test "visual WebGPU native triangle with buffer PNG golden" {
+  assert_native_visual_sample("triangle-with-buffer")
+}
+
+///|
+test "visual WebGPU native depth test PNG golden" {
+  assert_native_visual_sample("depth-test")
+}
+
+///|
+test "visual WebGPU native ECS scene graph PNG golden" {
+  assert_native_visual_sample("ecs-scene-graph")
+}
+
+///|
+test "visual WebGPU native ECS mass cubes PNG golden" {
+  assert_native_visual_sample("ecs-mass-cubes")
 }
 
 ///|
