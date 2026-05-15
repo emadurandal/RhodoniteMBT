@@ -63,6 +63,7 @@ pnpm run dev:wasm-gc:ecs-mass-cubes
 > **Note:** SDL3 must be installed in advance for native builds.
 
 ```bash
+# macOS
 $ brew install sdl3
 ```
 
