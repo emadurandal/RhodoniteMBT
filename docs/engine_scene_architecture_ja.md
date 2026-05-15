@@ -183,25 +183,25 @@ Renderer
 
 ## 実装計画
 
-### 現在の Phase 1 prototype
+### 現在の Phase 3 runtime package
 
-Phase 1 の prototype は [`moon/rhodonite_examples/src/common/app/`](../moon/rhodonite_examples/src/common/app/) に置きます。この package は public facade ではなく、examples 内で `App` / `Engine` / `Scene` の実コード上の境界を検証するためのものです。
+Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/src/app/`](../moon/rhodonite/src/app/) に昇格しました。import path は `emadurandal/rhodonite/app` です。Phase 1/2 の `moon/rhodonite_examples/src/common/app/` prototype は削除済みで、examples は facade package を直接 import します。
 
-現在の prototype は次の型を持ちます。
+現在の runtime package は次の型を持ちます。
 
 | 型 | 現在の内容 |
 |----|------------|
 | `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
-| `TimeState` | 固定 delta の frame counter。初期値は既存 `ecs-scene-graph` sample に合わせて 0.022 秒。 |
+| `TimeState` | 固定 delta の frame counter。初期値は既存 ECS samples に合わせて 0.022 秒。 |
 | `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
 | `App` | callback-backed lifecycle。`init`、`update`、`render`、`shutdown` を呼び出す。 |
 | `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で update、scene schedule、render を実行する。 |
 
-[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) はこの prototype へ移行済みです。sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。browser/native entry point は `Engine::tick(app)` を呼び、renderer 側の `App` callback が animation input update と render を担当します。
+[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `emadurandal/rhodonite/app` へ移行済みです。sample renderer は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。browser/native entry point は `Engine::tick(app)` を呼び、renderer 側の `App` callback が animation input update と render を担当します。
 
-### 現在の Phase 2 prototype
+### 現在の Phase 2 state
 
-Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) も prototype runtime に寄せます。
+Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) も runtime に寄せました。
 
 - `Scene::new_with_world(name, world)` を追加し、sample ごとの特殊な `World` 初期化を `Scene` に束ねられるようにする。
 - `Scene::add_system(system)` を追加し、`scene.schedule().add_system(...)` より scene 経由の操作を優先する。
@@ -211,11 +211,11 @@ Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodo
 
 この段階でも `Scene::world()` と `Scene::schedule()` は残します。ECS component の登録や sample 固有の setup ではまだ直接 access が必要なためです。ただし system 登録や schedule 実行のように scene の境界を強く出せる操作は `Scene` method へ寄せます。
 
-### Phase 1: examples 内 prototype
+### Phase 1: examples 内 prototype（完了済み）
 
-目的は public API を固定する前に、既存 sample の重複を減らしながら `App` / `Engine` / `Scene` の形を検証することです。
+目的は public API を固定する前に、既存 sample の重複を減らしながら `App` / `Engine` / `Scene` の形を検証することでした。この phase の prototype package は Phase 3 で削除され、現在の実体は `moon/rhodonite/src/app/` です。
 
-- `moon/rhodonite_examples/src/common/app/` を追加する。
+- `moon/rhodonite_examples/src/common/app/` を追加する（Phase 3 で削除済み）。
 - `Scene` prototype を追加し、`World` と `Schedule` を 1:1 で所有させる。
 - `FrameState` / `TimeState` を追加する。
 - browser/native の sample runner が共通の `App` lifecycle を呼べるようにする。
@@ -230,7 +230,7 @@ pnpm run dev:native:ecs-scene-graph
 pnpm run test:examples:visual
 ```
 
-### Phase 2: Scene API の整理
+### Phase 2: Scene API の整理（完了済み）
 
 目的は `Scene` を ECS access の自然な入口にすることです。
 
@@ -238,7 +238,7 @@ pnpm run test:examples:visual
 - `Scene::run_schedule()` を追加する。
 - `Scene::set_main_camera()` / `Scene::main_camera()` を追加する。
 - `Scene` の enabled/visible state を renderer loop に反映する。
-- `ecs-scene-graph` と `ecs-mass-cubes` を `Scene` prototype に寄せる。
+- `ecs-scene-graph` と `ecs-mass-cubes` を `Scene` runtime に寄せる。
 
 検証:
 
@@ -250,13 +250,13 @@ pnpm run test:examples:visual
 
 ### Phase 3: facade への昇格
 
-prototype の API が安定したら、runtime concept を public facade へ移します。
+runtime concept は public facade へ移行済みです。
 
-- `moon/rhodonite/src/app/` または `moon/rhodonite/src/runtime/` を追加する。
+- `moon/rhodonite/src/app/` を追加する。
 - `App`、`Engine`、`Scene`、`FrameState` を facade 側で公開する。
 - `rhodonite_core` は ECS と math に集中させる。
 - `rhodonite_webgpu` は WebGPU abstraction と renderer support に集中させる。
-- docs/module_boundaries.md に runtime layer の公開位置を追記する。
+- [`docs/module_boundaries.md`](module_boundaries.md) に runtime layer の公開位置と examples から facade への依存を追記する。
 
 検証:
 
@@ -295,21 +295,16 @@ pnpm run test:examples:visual
 
 ## Open Questions
 
-- `App` を MoonBit trait で表現するか、callback record で表現するか。
-- `Engine` は `Scene` を値として所有するか、handle table として所有するか。
 - `Scene::world()` をどの程度公開するか。
 - browser/native の platform runner を facade に公開するか、examples/common に置くか。
 - `FrameState` に wall-clock time と fixed-step time の両方を初期から入れるか。
 - `Renderer::render_scene` が直接 ECS query するか、将来の `RenderExtract` layer を最初から薄く用意するか。
 
+Resolved in Phase 3:
+
+- `App` は callback-backed struct として実装する。
+- `Engine` は `Scene` values の array と `main_scene_index` を所有する。
+
 ## 最初の推奨 PR
 
-最初の PR は `examples/common` に閉じた prototype にします。
-
-1. `Scene` prototype を追加する。
-2. `FrameState` / `TimeState` を追加する。
-3. `App` lifecycle の最小形を追加する。
-4. `ecs-scene-graph` を 1 本だけ移行する。
-5. visual regression が変わらないことを確認する。
-
-この PR では mesh/material/resource manager は入れません。まず `Engine`、`Scene`、`World`、`Schedule`、`Renderer` の境界を実コードで検証します。
+Phase 1 の最初の PR は完了済みです。現在は `emadurandal/rhodonite/app` が public runtime package になっており、`ecs-scene-graph` と `ecs-mass-cubes` がこの runtime package を使います。この段階では mesh/material/resource manager はまだ入れていません。まず `Engine`、`Scene`、`World`、`Schedule`、`Renderer` の境界を実コードで検証する状態です。

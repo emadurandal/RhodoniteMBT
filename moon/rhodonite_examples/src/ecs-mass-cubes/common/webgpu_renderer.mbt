@@ -8,6 +8,7 @@ extern "js" fn monotonic_ms() -> Double =
 extern "C" fn sdl_get_ticks() -> UInt64 = "SDL_GetTicks"
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(target="native")
@@ -16,6 +17,7 @@ fn monotonic_ms() -> Double {
 }
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(not(any(target="js", target="native")))
@@ -493,6 +495,7 @@ extern "js" fn ecs_mass_cubes_perf_overlay_js(
   #| }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(target="js")
@@ -501,6 +504,7 @@ fn ecs_mass_cubes_perf_overlay(fps : Double, cpu_ms : Double) -> Unit {
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(not(target="js"))
@@ -511,6 +515,7 @@ fn ecs_mass_cubes_perf_overlay(_fps : Double, _cpu_ms : Double) -> Unit {
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(target="native")
@@ -532,6 +537,7 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(not(target="native"))

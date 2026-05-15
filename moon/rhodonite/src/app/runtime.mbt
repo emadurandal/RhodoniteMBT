@@ -1,5 +1,5 @@
 ///|
-/// Per-frame application state passed through the prototype app lifecycle.
+/// Per-frame application state passed through the app lifecycle.
 pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
@@ -7,7 +7,7 @@ pub(all) struct FrameState {
 }
 
 ///|
-/// Mutable fixed-step clock used by the prototype engine runner.
+/// Mutable fixed-step clock used by the engine runner.
 pub struct TimeState {
   priv mut frame_index : Int
   priv mut elapsed_seconds : Double
@@ -26,7 +26,7 @@ pub struct Scene {
 }
 
 ///|
-/// Callback-backed prototype application lifecycle.
+/// Callback-backed application lifecycle.
 pub struct App {
   priv on_init : (Engine) -> Unit
   priv on_update : (Engine, FrameState) -> Unit
@@ -35,7 +35,7 @@ pub struct App {
 }
 
 ///|
-/// Prototype engine runtime that owns platform context, time state, and scenes.
+/// Runtime that owns platform context, time state, and scenes.
 pub struct Engine {
   priv gpu_context : @wgpu.GPUContext
   priv scenes : Array[Scene]

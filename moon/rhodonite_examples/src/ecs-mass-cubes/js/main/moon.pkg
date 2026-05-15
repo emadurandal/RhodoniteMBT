@@ -1,5 +1,5 @@
 import {
-  "emadurandal/rhodonite_examples/common/app" @app,
+  "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_examples/common/browser" @html_ctx,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @renderer,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,

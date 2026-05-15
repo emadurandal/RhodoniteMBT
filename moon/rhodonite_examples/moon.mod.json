@@ -2,6 +2,9 @@
   "name": "emadurandal/rhodonite_examples",
   "version": "0.1.3",
   "deps": {
+    "emadurandal/rhodonite": {
+      "path": "../rhodonite"
+    },
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"
     },

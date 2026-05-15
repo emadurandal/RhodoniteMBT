@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "emadurandal/rhodonite_examples/common/app"
+package "emadurandal/rhodonite/app"
 
 import {
   "emadurandal/rhodonite_core/ecs",

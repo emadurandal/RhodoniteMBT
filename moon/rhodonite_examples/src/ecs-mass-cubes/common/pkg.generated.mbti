@@ -2,8 +2,8 @@
 package "emadurandal/rhodonite_examples/ecs-mass-cubes/common"
 
 import {
+  "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_core/ecs",
-  "emadurandal/rhodonite_examples/common/app",
   "emadurandal/rhodonite_webgpu/webgpu",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
   "moonbitlang/core/ref",
