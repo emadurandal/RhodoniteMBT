@@ -167,15 +167,26 @@ extern "C" fn sdl_scancode_name_borrowed(
 extern "C" fn sdl_key_name_borrowed(key : @lib.SDL_Keycode) -> String = "rhodonite_sdl_get_key_name_borrowed"
 
 ///|
-/// Converts an SDL scancode event into the current input key code naming.
+/// Returns a browser-style physical key code for mapped SDL scancodes.
+extern "C" fn sdl_browser_key_code_from_scancode(
+  scancode : @lib.SDL_Scancode,
+) -> String = "rhodonite_sdl_browser_key_code_from_scancode"
+
+///|
+/// Converts an SDL keyboard event into the current input key code naming.
 fn sdl_key_code_from_keyboard_event(
   event : @lib.SDL_KeyboardEvent,
 ) -> @input.KeyCode {
-  let scancode_name = sdl_scancode_name_borrowed(event.scancode)
-  if scancode_name == "" {
-    @input.KeyCode::new(sdl_key_name_borrowed(event.key))
+  let browser_code = sdl_browser_key_code_from_scancode(event.scancode)
+  if browser_code != "" {
+    @input.KeyCode::new(browser_code)
   } else {
-    @input.KeyCode::new(scancode_name)
+    let scancode_name = sdl_scancode_name_borrowed(event.scancode)
+    if scancode_name == "" {
+      @input.KeyCode::new(sdl_key_name_borrowed(event.key))
+    } else {
+      @input.KeyCode::new(scancode_name)
+    }
   }
 }
 

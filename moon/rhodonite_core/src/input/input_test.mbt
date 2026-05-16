@@ -1,7 +1,17 @@
 ///|
+test "canonical key codes use browser physical names" {
+  assert_eq(KeyCode::key_w().name(), "KeyW")
+  assert_eq(KeyCode::digit_1().name(), "Digit1")
+  assert_eq(KeyCode::space().name(), "Space")
+  assert_eq(KeyCode::arrow_left().name(), "ArrowLeft")
+  assert_eq(KeyCode::control_left().name(), "ControlLeft")
+  assert_eq(KeyCode::meta_right().name(), "MetaRight")
+}
+
+///|
 test "queued key transitions are visible for one frame" {
   let input = InputState::new()
-  let key = KeyCode::new("KeyW")
+  let key = KeyCode::key_w()
   input.enqueue_event(KeyDown(key, Modifiers::none(), false))
   assert_eq(input.queued_event_count(), 1)
   input.begin_frame()

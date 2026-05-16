@@ -11,6 +11,474 @@ pub fn KeyCode::name(self : KeyCode) -> String {
 }
 
 ///|
+/// Builds a canonical browser-style physical key code.
+fn KeyCode::browser_code(name : String) -> KeyCode {
+  KeyCode::new(name)
+}
+
+///|
+/// Returns the canonical `Escape` key code.
+pub fn KeyCode::escape() -> KeyCode {
+  KeyCode::browser_code("Escape")
+}
+
+///|
+/// Returns the canonical `F1` key code.
+pub fn KeyCode::f1() -> KeyCode {
+  KeyCode::browser_code("F1")
+}
+
+///|
+/// Returns the canonical `F2` key code.
+pub fn KeyCode::f2() -> KeyCode {
+  KeyCode::browser_code("F2")
+}
+
+///|
+/// Returns the canonical `F3` key code.
+pub fn KeyCode::f3() -> KeyCode {
+  KeyCode::browser_code("F3")
+}
+
+///|
+/// Returns the canonical `F4` key code.
+pub fn KeyCode::f4() -> KeyCode {
+  KeyCode::browser_code("F4")
+}
+
+///|
+/// Returns the canonical `F5` key code.
+pub fn KeyCode::f5() -> KeyCode {
+  KeyCode::browser_code("F5")
+}
+
+///|
+/// Returns the canonical `F6` key code.
+pub fn KeyCode::f6() -> KeyCode {
+  KeyCode::browser_code("F6")
+}
+
+///|
+/// Returns the canonical `F7` key code.
+pub fn KeyCode::f7() -> KeyCode {
+  KeyCode::browser_code("F7")
+}
+
+///|
+/// Returns the canonical `F8` key code.
+pub fn KeyCode::f8() -> KeyCode {
+  KeyCode::browser_code("F8")
+}
+
+///|
+/// Returns the canonical `F9` key code.
+pub fn KeyCode::f9() -> KeyCode {
+  KeyCode::browser_code("F9")
+}
+
+///|
+/// Returns the canonical `F10` key code.
+pub fn KeyCode::f10() -> KeyCode {
+  KeyCode::browser_code("F10")
+}
+
+///|
+/// Returns the canonical `F11` key code.
+pub fn KeyCode::f11() -> KeyCode {
+  KeyCode::browser_code("F11")
+}
+
+///|
+/// Returns the canonical `F12` key code.
+pub fn KeyCode::f12() -> KeyCode {
+  KeyCode::browser_code("F12")
+}
+
+///|
+/// Returns the canonical `Backquote` key code.
+pub fn KeyCode::backquote() -> KeyCode {
+  KeyCode::browser_code("Backquote")
+}
+
+///|
+/// Returns the canonical `Digit0` key code.
+pub fn KeyCode::digit_0() -> KeyCode {
+  KeyCode::browser_code("Digit0")
+}
+
+///|
+/// Returns the canonical `Digit1` key code.
+pub fn KeyCode::digit_1() -> KeyCode {
+  KeyCode::browser_code("Digit1")
+}
+
+///|
+/// Returns the canonical `Digit2` key code.
+pub fn KeyCode::digit_2() -> KeyCode {
+  KeyCode::browser_code("Digit2")
+}
+
+///|
+/// Returns the canonical `Digit3` key code.
+pub fn KeyCode::digit_3() -> KeyCode {
+  KeyCode::browser_code("Digit3")
+}
+
+///|
+/// Returns the canonical `Digit4` key code.
+pub fn KeyCode::digit_4() -> KeyCode {
+  KeyCode::browser_code("Digit4")
+}
+
+///|
+/// Returns the canonical `Digit5` key code.
+pub fn KeyCode::digit_5() -> KeyCode {
+  KeyCode::browser_code("Digit5")
+}
+
+///|
+/// Returns the canonical `Digit6` key code.
+pub fn KeyCode::digit_6() -> KeyCode {
+  KeyCode::browser_code("Digit6")
+}
+
+///|
+/// Returns the canonical `Digit7` key code.
+pub fn KeyCode::digit_7() -> KeyCode {
+  KeyCode::browser_code("Digit7")
+}
+
+///|
+/// Returns the canonical `Digit8` key code.
+pub fn KeyCode::digit_8() -> KeyCode {
+  KeyCode::browser_code("Digit8")
+}
+
+///|
+/// Returns the canonical `Digit9` key code.
+pub fn KeyCode::digit_9() -> KeyCode {
+  KeyCode::browser_code("Digit9")
+}
+
+///|
+/// Returns the canonical `Minus` key code.
+pub fn KeyCode::minus() -> KeyCode {
+  KeyCode::browser_code("Minus")
+}
+
+///|
+/// Returns the canonical `Equal` key code.
+pub fn KeyCode::equal() -> KeyCode {
+  KeyCode::browser_code("Equal")
+}
+
+///|
+/// Returns the canonical `Backspace` key code.
+pub fn KeyCode::backspace() -> KeyCode {
+  KeyCode::browser_code("Backspace")
+}
+
+///|
+/// Returns the canonical `Tab` key code.
+pub fn KeyCode::tab() -> KeyCode {
+  KeyCode::browser_code("Tab")
+}
+
+///|
+/// Returns the canonical `KeyA` key code.
+pub fn KeyCode::key_a() -> KeyCode {
+  KeyCode::browser_code("KeyA")
+}
+
+///|
+/// Returns the canonical `KeyB` key code.
+pub fn KeyCode::key_b() -> KeyCode {
+  KeyCode::browser_code("KeyB")
+}
+
+///|
+/// Returns the canonical `KeyC` key code.
+pub fn KeyCode::key_c() -> KeyCode {
+  KeyCode::browser_code("KeyC")
+}
+
+///|
+/// Returns the canonical `KeyD` key code.
+pub fn KeyCode::key_d() -> KeyCode {
+  KeyCode::browser_code("KeyD")
+}
+
+///|
+/// Returns the canonical `KeyE` key code.
+pub fn KeyCode::key_e() -> KeyCode {
+  KeyCode::browser_code("KeyE")
+}
+
+///|
+/// Returns the canonical `KeyF` key code.
+pub fn KeyCode::key_f() -> KeyCode {
+  KeyCode::browser_code("KeyF")
+}
+
+///|
+/// Returns the canonical `KeyG` key code.
+pub fn KeyCode::key_g() -> KeyCode {
+  KeyCode::browser_code("KeyG")
+}
+
+///|
+/// Returns the canonical `KeyH` key code.
+pub fn KeyCode::key_h() -> KeyCode {
+  KeyCode::browser_code("KeyH")
+}
+
+///|
+/// Returns the canonical `KeyI` key code.
+pub fn KeyCode::key_i() -> KeyCode {
+  KeyCode::browser_code("KeyI")
+}
+
+///|
+/// Returns the canonical `KeyJ` key code.
+pub fn KeyCode::key_j() -> KeyCode {
+  KeyCode::browser_code("KeyJ")
+}
+
+///|
+/// Returns the canonical `KeyK` key code.
+pub fn KeyCode::key_k() -> KeyCode {
+  KeyCode::browser_code("KeyK")
+}
+
+///|
+/// Returns the canonical `KeyL` key code.
+pub fn KeyCode::key_l() -> KeyCode {
+  KeyCode::browser_code("KeyL")
+}
+
+///|
+/// Returns the canonical `KeyM` key code.
+pub fn KeyCode::key_m() -> KeyCode {
+  KeyCode::browser_code("KeyM")
+}
+
+///|
+/// Returns the canonical `KeyN` key code.
+pub fn KeyCode::key_n() -> KeyCode {
+  KeyCode::browser_code("KeyN")
+}
+
+///|
+/// Returns the canonical `KeyO` key code.
+pub fn KeyCode::key_o() -> KeyCode {
+  KeyCode::browser_code("KeyO")
+}
+
+///|
+/// Returns the canonical `KeyP` key code.
+pub fn KeyCode::key_p() -> KeyCode {
+  KeyCode::browser_code("KeyP")
+}
+
+///|
+/// Returns the canonical `KeyQ` key code.
+pub fn KeyCode::key_q() -> KeyCode {
+  KeyCode::browser_code("KeyQ")
+}
+
+///|
+/// Returns the canonical `KeyR` key code.
+pub fn KeyCode::key_r() -> KeyCode {
+  KeyCode::browser_code("KeyR")
+}
+
+///|
+/// Returns the canonical `KeyS` key code.
+pub fn KeyCode::key_s() -> KeyCode {
+  KeyCode::browser_code("KeyS")
+}
+
+///|
+/// Returns the canonical `KeyT` key code.
+pub fn KeyCode::key_t() -> KeyCode {
+  KeyCode::browser_code("KeyT")
+}
+
+///|
+/// Returns the canonical `KeyU` key code.
+pub fn KeyCode::key_u() -> KeyCode {
+  KeyCode::browser_code("KeyU")
+}
+
+///|
+/// Returns the canonical `KeyV` key code.
+pub fn KeyCode::key_v() -> KeyCode {
+  KeyCode::browser_code("KeyV")
+}
+
+///|
+/// Returns the canonical `KeyW` key code.
+pub fn KeyCode::key_w() -> KeyCode {
+  KeyCode::browser_code("KeyW")
+}
+
+///|
+/// Returns the canonical `KeyX` key code.
+pub fn KeyCode::key_x() -> KeyCode {
+  KeyCode::browser_code("KeyX")
+}
+
+///|
+/// Returns the canonical `KeyY` key code.
+pub fn KeyCode::key_y() -> KeyCode {
+  KeyCode::browser_code("KeyY")
+}
+
+///|
+/// Returns the canonical `KeyZ` key code.
+pub fn KeyCode::key_z() -> KeyCode {
+  KeyCode::browser_code("KeyZ")
+}
+
+///|
+/// Returns the canonical `BracketLeft` key code.
+pub fn KeyCode::bracket_left() -> KeyCode {
+  KeyCode::browser_code("BracketLeft")
+}
+
+///|
+/// Returns the canonical `BracketRight` key code.
+pub fn KeyCode::bracket_right() -> KeyCode {
+  KeyCode::browser_code("BracketRight")
+}
+
+///|
+/// Returns the canonical `Backslash` key code.
+pub fn KeyCode::backslash() -> KeyCode {
+  KeyCode::browser_code("Backslash")
+}
+
+///|
+/// Returns the canonical `CapsLock` key code.
+pub fn KeyCode::caps_lock() -> KeyCode {
+  KeyCode::browser_code("CapsLock")
+}
+
+///|
+/// Returns the canonical `Semicolon` key code.
+pub fn KeyCode::semicolon() -> KeyCode {
+  KeyCode::browser_code("Semicolon")
+}
+
+///|
+/// Returns the canonical `Quote` key code.
+pub fn KeyCode::quote() -> KeyCode {
+  KeyCode::browser_code("Quote")
+}
+
+///|
+/// Returns the canonical `Enter` key code.
+pub fn KeyCode::enter() -> KeyCode {
+  KeyCode::browser_code("Enter")
+}
+
+///|
+/// Returns the canonical `ShiftLeft` key code.
+pub fn KeyCode::shift_left() -> KeyCode {
+  KeyCode::browser_code("ShiftLeft")
+}
+
+///|
+/// Returns the canonical `Comma` key code.
+pub fn KeyCode::comma() -> KeyCode {
+  KeyCode::browser_code("Comma")
+}
+
+///|
+/// Returns the canonical `Period` key code.
+pub fn KeyCode::period() -> KeyCode {
+  KeyCode::browser_code("Period")
+}
+
+///|
+/// Returns the canonical `Slash` key code.
+pub fn KeyCode::slash() -> KeyCode {
+  KeyCode::browser_code("Slash")
+}
+
+///|
+/// Returns the canonical `ShiftRight` key code.
+pub fn KeyCode::shift_right() -> KeyCode {
+  KeyCode::browser_code("ShiftRight")
+}
+
+///|
+/// Returns the canonical `ControlLeft` key code.
+pub fn KeyCode::control_left() -> KeyCode {
+  KeyCode::browser_code("ControlLeft")
+}
+
+///|
+/// Returns the canonical `AltLeft` key code.
+pub fn KeyCode::alt_left() -> KeyCode {
+  KeyCode::browser_code("AltLeft")
+}
+
+///|
+/// Returns the canonical `Space` key code.
+pub fn KeyCode::space() -> KeyCode {
+  KeyCode::browser_code("Space")
+}
+
+///|
+/// Returns the canonical `AltRight` key code.
+pub fn KeyCode::alt_right() -> KeyCode {
+  KeyCode::browser_code("AltRight")
+}
+
+///|
+/// Returns the canonical `MetaLeft` key code.
+pub fn KeyCode::meta_left() -> KeyCode {
+  KeyCode::browser_code("MetaLeft")
+}
+
+///|
+/// Returns the canonical `MetaRight` key code.
+pub fn KeyCode::meta_right() -> KeyCode {
+  KeyCode::browser_code("MetaRight")
+}
+
+///|
+/// Returns the canonical `ControlRight` key code.
+pub fn KeyCode::control_right() -> KeyCode {
+  KeyCode::browser_code("ControlRight")
+}
+
+///|
+/// Returns the canonical `ArrowLeft` key code.
+pub fn KeyCode::arrow_left() -> KeyCode {
+  KeyCode::browser_code("ArrowLeft")
+}
+
+///|
+/// Returns the canonical `ArrowDown` key code.
+pub fn KeyCode::arrow_down() -> KeyCode {
+  KeyCode::browser_code("ArrowDown")
+}
+
+///|
+/// Returns the canonical `ArrowUp` key code.
+pub fn KeyCode::arrow_up() -> KeyCode {
+  KeyCode::browser_code("ArrowUp")
+}
+
+///|
+/// Returns the canonical `ArrowRight` key code.
+pub fn KeyCode::arrow_right() -> KeyCode {
+  KeyCode::browser_code("ArrowRight")
+}
+
+///|
 /// Builds an empty modifier snapshot.
 pub fn Modifiers::none() -> Modifiers {
   { shift: false, ctrl: false, alt: false, meta: false }
