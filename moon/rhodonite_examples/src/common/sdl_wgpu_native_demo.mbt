@@ -216,12 +216,16 @@ fn enqueue_sdl_mouse_wheel_event(
   event : @lib.SDL_Event,
 ) -> Unit {
   let wheel_event : SdlMouseWheelEvent = @lib.unsafe_from_sdl_event(event)
-  let direction_scale : Float = match wheel_event.direction {
+  let direction_scale_x : Float = match wheel_event.direction {
+    SDL_MOUSEWHEEL_NORMAL => (100.0 : Float)
+    SDL_MOUSEWHEEL_FLIPPED => (-100.0 : Float)
+  }
+  let direction_scale_y : Float = match wheel_event.direction {
     SDL_MOUSEWHEEL_NORMAL => (-100.0 : Float)
     SDL_MOUSEWHEEL_FLIPPED => (100.0 : Float)
   }
   input.enqueue_event(
-    Wheel(wheel_event.x * direction_scale, wheel_event.y * direction_scale),
+    Wheel(wheel_event.x * direction_scale_x, wheel_event.y * direction_scale_y),
   )
 }
 
