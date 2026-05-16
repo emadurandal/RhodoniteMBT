@@ -165,3 +165,75 @@ test "camera blob sync system writes from GlobalTransform and CameraLens" {
     None => abort("expected camera gpu row")
   }
 }
+
+///|
+test "orbit camera blob sync applies orthographic dolly scale" {
+  let world = World::new()
+  let orbit = register_orbit_camera_controller_component(world)
+  let lens = register_camera_lens_component(world)
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_orbit_camera_controller_with_distance(
+      world,
+      camera,
+      orbit,
+      0.0,
+      0.0,
+      (16.0 : Float),
+    ),
+  )
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame(
+      world,
+      camera,
+      orbit,
+      false,
+      false,
+      false,
+      false,
+      (0.0 : Float),
+      (0.0 : Float),
+      (1000.0 : Float),
+    ),
+  )
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/render_extract")
+  let schedule = Schedule::new()
+  schedule.add_system(orbit_camera_blob_sync_system(world, phase, orbit, lens))
+  assert_true(
+    schedule.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+  )
+  match world.camera_gpu_row(camera) {
+    Some(bytes) => {
+      let view_proj = @comp.camera_view_proj_from_gpu_bytes(bytes)
+      assert_eq(view_proj.at(0, 0), (0.25 : Float))
+      assert_eq(view_proj.at(1, 1), (0.25 : Float))
+    }
+    None => abort("expected camera gpu row")
+  }
+}

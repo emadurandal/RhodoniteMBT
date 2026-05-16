@@ -15,6 +15,8 @@ pub fn add_orbit_camera_controller(World, EntityId, ComponentTypeId, Double, Dou
 
 pub fn add_orbit_camera_controller_with_distance(World, EntityId, ComponentTypeId, Double, Double, Float) -> Bool
 
+pub fn add_orbit_camera_controller_with_pose(World, EntityId, ComponentTypeId, Double, Double, Float, Float, Float, Float) -> Bool
+
 pub fn camera_blob_sync_system(World, PhaseKey, ComponentTypeId) -> System
 
 pub fn camera_lens_projection_from_view(ArrayView[Byte]) -> (@matrix44.Matrix44[Float], Float, Float, Float, Float, Float)
@@ -28,6 +30,8 @@ pub fn compute_global_transform_upload_range(FixedArray[Byte], Int, GlobalTransf
 pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTransformDenseLayout?
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
+
+pub fn orbit_camera_blob_sync_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
 
 pub fn orbit_camera_pose(World, EntityId, ComponentTypeId) -> (Float, Float, Float, Float, Float, Float)
 

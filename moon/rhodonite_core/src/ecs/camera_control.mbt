@@ -296,6 +296,41 @@ pub fn add_orbit_camera_controller_with_distance(
 }
 
 ///|
+/// Adds an orbit camera controller component with an explicit pose.
+pub fn add_orbit_camera_controller_with_pose(
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+  yaw : Double,
+  pitch : Double,
+  pan_x : Float,
+  pan_y : Float,
+  dolly : Float,
+  distance : Float,
+) -> Bool {
+  world.add_component_bytes(
+    camera,
+    component,
+    orbit_camera_controller_bytes(
+      Float::from_double(yaw),
+      Float::from_double(pitch),
+      (0.006 : Float),
+      (-1.25 : Float),
+      (1.25 : Float),
+      pan_x,
+      pan_y,
+      (0.01 : Float),
+      dolly,
+      (0.001 : Float),
+      (0.01 : Float),
+      (4.0 : Float),
+      distance,
+      false,
+    ),
+  )
+}
+
+///|
 /// Reads the current orbit camera controller transform fields.
 pub fn orbit_camera_transform(
   world : World,
@@ -551,6 +586,15 @@ fn perspective_projection(
 pub fn camera_lens_projection_from_view(
   lens : ArrayView[Byte],
 ) -> (@m44.Matrix44F, Float, Float, Float, Float, Float) {
+  camera_lens_projection_from_view_with_ortho_scale(lens, (1.0 : Float))
+}
+
+///|
+/// Builds the projection matrix described by a CameraLens row with an orthographic scale.
+fn camera_lens_projection_from_view_with_ortho_scale(
+  lens : ArrayView[Byte],
+  ortho_scale : Float,
+) -> (@m44.Matrix44F, Float, Float, Float, Float, Float) {
   if lens.length() != camera_lens_stride {
     abort("camera_lens_projection_from_view: row length mismatch")
   }
@@ -564,8 +608,16 @@ pub fn camera_lens_projection_from_view(
   let half_h = @comp.get_gpu_f32_byte_view(lens, lens_ortho_half_height_offset)
   let flags = @comp.get_gpu_f32_byte_view(lens, lens_flags_offset)
   let proj = if projection_kind == camera_projection_orthographic() {
-    let half_w = half_h * aspect
-    @m44.Matrix44::ortho(-half_w, half_w, -half_h, half_h, near, far)
+    let scaled_half_h = half_h * ortho_scale
+    let half_w = scaled_half_h * aspect
+    @m44.Matrix44::ortho(
+      -half_w,
+      half_w,
+      -scaled_half_h,
+      scaled_half_h,
+      near,
+      far,
+    )
   } else {
     perspective_projection(fov_y, aspect, near, far)
   }
@@ -803,6 +855,62 @@ pub fn camera_blob_sync_system(
           None => ()
         }
       })
+    },
+  )
+}
+
+///|
+/// Builds a system that writes Camera blob rows from GlobalTransform, CameraLens, and orbit dolly.
+pub fn orbit_camera_blob_sync_system(
+  world : World,
+  phase : PhaseKey,
+  orbit_component : ComponentTypeId,
+  lens_component : ComponentTypeId,
+) -> System {
+  let gt = world.global_transform_component()
+  let camera = world.camera_component()
+  System::new(
+    "rhodonite/orbit_camera_blob_sync",
+    phase,
+    [gt, lens_component, orbit_component],
+    [camera],
+    fn(world, _ctx, _commands) {
+      Query::new([gt, camera, lens_component, orbit_component]).for_each(
+        world,
+        row => {
+          let entity = row.entity()
+          match world.get_global_transform(entity) {
+            Some(global) =>
+              match global.inverse() {
+                Some(view) =>
+                  row.read(orbit_component, orbit_row => {
+                    let (
+                      _yaw,
+                      _pitch,
+                      _pan_x,
+                      _pan_y,
+                      dolly,
+                      _distance,
+                      _requested,
+                    ) = orbit_camera_pose_from_controller_view(orbit_row)
+                    row.read(lens_component, lens_row => {
+                      let (proj, near, far, aspect, projection_kind, flags) = camera_lens_projection_from_view_with_ortho_scale(
+                        lens_row, dolly,
+                      )
+                      ignore(
+                        world.set_camera_matrices(
+                          entity, view, proj, near, far, aspect, projection_kind,
+                          flags,
+                        ),
+                      )
+                    })
+                  })
+                None => ()
+              }
+            None => ()
+          }
+        },
+      )
     },
   )
 }

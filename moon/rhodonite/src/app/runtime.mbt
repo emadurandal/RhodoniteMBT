@@ -429,6 +429,44 @@ pub fn Scene::add_camera_blob_sync_system(
 }
 
 ///|
+/// Adds the Camera blob sync system that applies orbit camera dolly to orthographic lenses.
+pub fn Scene::add_orbit_camera_blob_sync_system(
+  self : Scene,
+  phase : PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  lens_component : @ecs.ComponentTypeId,
+) -> Unit {
+  self.add_ecs_system(
+    @ecs.orbit_camera_blob_sync_system(
+      self.world,
+      phase,
+      orbit_component,
+      lens_component,
+    ),
+  )
+}
+
+///|
+/// Adds the standard orbit-camera transform and Camera blob sync systems.
+pub fn Scene::add_orbit_camera_systems(
+  self : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  home_component : @ecs.ComponentTypeId,
+  lens_component : @ecs.ComponentTypeId,
+) -> Unit {
+  self.add_orbit_camera_transform_system(
+    phase_post_update(),
+    orbit_component,
+    home_component,
+  )
+  self.add_orbit_camera_blob_sync_system(
+    phase_render_extract(),
+    orbit_component,
+    lens_component,
+  )
+}
+
+///|
 /// Implements `Scene::set_main_camera`.
 pub fn Scene::set_main_camera(self : Scene, camera : @ecs.EntityId?) -> Unit {
   self.main_camera = camera
@@ -522,19 +560,73 @@ pub fn Engine::main_scene(self : Engine) -> Scene {
 }
 
 ///|
-/// Registers a function to run in an engine phase slot.
-pub fn Engine::on_phase(
+/// Returns the scene main camera or aborts because a camera-bound engine handler requires one.
+fn scene_main_camera_or_abort(scene : Scene, caller : String) -> @ecs.EntityId {
+  match scene.main_camera() {
+    Some(camera) => camera
+    None => abort(caller + ": Scene.main_camera is not set")
+  }
+}
+
+///|
+/// Ensures a phase handler can still be registered.
+fn Engine::ensure_phase_handler_registration_open(
+  self : Engine,
+  caller : String,
+) -> Unit {
+  if self.phase_registration_locked {
+    abort(
+      caller +
+      ": phase handlers cannot be registered after engine initialization",
+    )
+  }
+}
+
+///|
+/// Appends a function to run in an engine phase slot.
+pub fn Engine::add_handler_on_phase(
   self : Engine,
   phase : PhaseKey,
   handler : (Engine, FrameState) -> Unit,
   slot? : PhaseSlot = BeforeSchedule,
 ) -> Unit {
-  if self.phase_registration_locked {
-    abort(
-      "Engine::on_phase: phase handlers cannot be registered after engine initialization",
-    )
-  }
+  self.ensure_phase_handler_registration_open("Engine::add_handler_on_phase")
   self.phase_handlers.push({ phase, slot, run: handler })
+}
+
+///|
+/// Appends the standard input handler for a scene main camera's orbit controller.
+pub fn Engine::add_orbit_camera_controller_input_handler(
+  self : Engine,
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  phase? : PhaseKey = phase_input(),
+  slot? : PhaseSlot = BeforeSchedule,
+) -> Unit {
+  self.add_handler_on_phase(
+    phase,
+    fn(engine, _frame) {
+      let camera = scene_main_camera_or_abort(
+        scene, "Engine::add_orbit_camera_controller_input_handler",
+      )
+      let input = engine.input()
+      ignore(
+        @ecs.update_orbit_camera_controller_from_mouse_frame(
+          scene.world(),
+          camera,
+          orbit_component,
+          input.mouse_down(Left),
+          input.mouse_pressed(Left),
+          input.mouse_down(Middle),
+          input.mouse_pressed(Middle),
+          input.pointer_delta_x(),
+          input.pointer_delta_y(),
+          input.wheel_delta_y(),
+        ),
+      )
+    },
+    slot~,
+  )
 }
 
 ///|

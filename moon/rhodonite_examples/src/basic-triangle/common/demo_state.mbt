@@ -128,12 +128,12 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.on_phase(
+  engine.add_handler_on_phase(
     @app.phase_render(),
     fn(_engine, _frame) { render_current_frame(demo_state) },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }

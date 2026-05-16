@@ -574,17 +574,25 @@ export class Engine {
 		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
 	}
 
-	onPhase(
+	addHandlerOnPhase(
 		phase: PhaseKey,
 		callback: EngineCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
-				"Engine.onPhase cannot register phase handlers after engine initialization.",
+				"Engine.addHandlerOnPhase cannot register phase handlers after engine initialization.",
 			);
 		}
 		this.phaseHandlers.push({ phase, slot, callback });
+	}
+
+	onPhase(
+		phase: PhaseKey,
+		callback: EngineCallback,
+		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
+	): void {
+		this.addHandlerOnPhase(phase, callback, slot);
 	}
 
 	initialize(): void {

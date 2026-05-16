@@ -951,31 +951,18 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.on_phase(@app.phase_input(), fn(engine, _frame) {
-    let input = engine.input()
-    ignore(
-      @ecs.update_orbit_camera_controller_from_mouse_frame(
-        demo_state.scene.world(),
-        scene_main_camera_or_abort(demo_state.scene),
-        demo_state.orbit_controller,
-        input.mouse_down(Left),
-        input.mouse_pressed(Left),
-        input.mouse_down(Middle),
-        input.mouse_pressed(Middle),
-        input.pointer_delta_x(),
-        input.pointer_delta_y(),
-        input.wheel_delta_y(),
-      ),
-    )
-  })
-  engine.on_phase(@app.phase_update(), fn(_engine, frame) {
+  engine.add_orbit_camera_controller_input_handler(
+    demo_state.scene,
+    demo_state.orbit_controller,
+  )
+  engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
   })
-  engine.on_phase(@app.phase_render_extract(), fn(_engine, _frame) {
+  engine.add_handler_on_phase(@app.phase_render_extract(), fn(_engine, _frame) {
     demo_state.sync_mass_cubes_camera_blob()
   })
-  engine.on_phase(
+  engine.add_handler_on_phase(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
@@ -984,7 +971,7 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }

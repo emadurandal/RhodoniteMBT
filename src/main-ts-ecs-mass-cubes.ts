@@ -460,7 +460,7 @@ function createDemoStateForEngine(
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.onPhase(Phase.Input, (engine) => {
+	engine.addHandlerOnPhase(Phase.Input, (engine) => {
 		const world = demoState.scene.world();
 		updateOrbitCameraControllerComponentFromInput(
 			world,
@@ -469,11 +469,11 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 			engine.input,
 		);
 	});
-	engine.onPhase(Phase.Update, (_engine, frame) => {
+	engine.addHandlerOnPhase(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
-	engine.onPhase(Phase.PostUpdate, () => {
+	engine.addHandlerOnPhase(Phase.PostUpdate, () => {
 		syncOrbitCameraTransformComponent(
 			demoState.scene.world(),
 			sceneMainCameraOrThrow(demoState.scene),
@@ -481,10 +481,10 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 			demoState.cameraHomeComponent,
 		);
 	});
-	engine.onPhase(Phase.RenderExtract, () => {
+	engine.addHandlerOnPhase(Phase.RenderExtract, () => {
 		syncMassCubesCameraBlob(demoState);
 	});
-	engine.onPhase(
+	engine.addHandlerOnPhase(
 		Phase.Render,
 		() => {
 			if (demoState.scene.visible()) {
@@ -493,7 +493,7 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 		},
 		PhaseSlot.AfterSchedule,
 	);
-	engine.onPhase(Phase.Shutdown, () => releaseDemoState(demoState));
+	engine.addHandlerOnPhase(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
