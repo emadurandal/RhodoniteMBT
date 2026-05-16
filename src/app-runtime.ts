@@ -333,18 +333,16 @@ export class Engine {
 		if (!this.initializingApp) {
 			throw new Error("Engine phases can only be inserted during initializeApp.");
 		}
-		if (phaseIsLifecycleOnly(phaseKey)) {
+		if (phaseIsOneShot(phaseKey)) {
 			throw new Error(
-				"Startup/shutdown phases cannot be inserted into frame phase order.",
+				"One-shot phases cannot be inserted into frame phase order.",
 			);
 		}
 		if (this.phaseOrderValue.includes(phaseKey)) {
 			throw new Error(`Frame phase '${phaseKey}' already exists.`);
 		}
-		if (phaseIsLifecycleOnly(anchor)) {
-			throw new Error(
-				"Startup/shutdown phases cannot be used as frame phase anchors.",
-			);
+		if (phaseIsOneShot(anchor)) {
+			throw new Error("One-shot phases cannot be used as frame phase anchors.");
 		}
 		const anchorIndex = this.phaseOrderValue.indexOf(anchor);
 		if (anchorIndex < 0) {
@@ -372,7 +370,7 @@ export class Engine {
 	}
 }
 
-function phaseIsLifecycleOnly(phaseKey: PhaseKey): boolean {
+function phaseIsOneShot(phaseKey: PhaseKey): boolean {
 	return phaseKey === Phase.Startup || phaseKey === Phase.Shutdown;
 }
 

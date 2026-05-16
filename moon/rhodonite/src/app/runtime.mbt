@@ -165,7 +165,7 @@ pub fn default_frame_phases() -> Array[PhaseKey] {
 }
 
 ///|
-/// Builds a frame state for lifecycle phases that do not advance time.
+/// Builds a frame state for one-shot phases that do not advance time.
 fn zero_frame_state() -> FrameState {
   FrameState::new((0.0 : Float), 0, 0.0)
 }
@@ -231,8 +231,8 @@ fn phase_array_insert(
 }
 
 ///|
-/// Reports whether a phase is a non-frame lifecycle phase.
-fn phase_is_lifecycle_only(phase_key : PhaseKey) -> Bool {
+/// Reports whether a phase is an engine one-shot phase.
+fn phase_is_one_shot(phase_key : PhaseKey) -> Bool {
   phase_key == phase_startup() || phase_key == phase_shutdown()
 }
 
@@ -493,10 +493,9 @@ fn Engine::ensure_insertable_frame_phase(
   caller : String,
   phase_key : PhaseKey,
 ) -> Unit {
-  if phase_is_lifecycle_only(phase_key) {
+  if phase_is_one_shot(phase_key) {
     abort(
-      caller +
-      ": startup/shutdown phases cannot be inserted into frame phase order",
+      caller + ": one-shot phases cannot be inserted into frame phase order",
     )
   }
 }
@@ -508,10 +507,8 @@ fn Engine::find_frame_phase_anchor(
   caller : String,
   anchor : PhaseKey,
 ) -> Int {
-  if phase_is_lifecycle_only(anchor) {
-    abort(
-      caller + ": startup/shutdown phases cannot be used as frame phase anchors",
-    )
+  if phase_is_one_shot(anchor) {
+    abort(caller + ": one-shot phases cannot be used as frame phase anchors")
   }
   let index = phase_array_index(self.phase_order, anchor)
   if index < 0 {
