@@ -152,6 +152,162 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
+/// Converts a GlobalTransform GPU format to the compact numeric code used by dense writers.
+fn global_transform_format_code_int(
+  format : @comp.GlobalTransformGpuFormat,
+) -> Int {
+  @comp.global_transform_format_code(format).reinterpret_as_int()
+}
+
+///|
+/// Writes the animated Y translation for a dense GlobalTransform blob in JavaScript.
+#cfg(target="js")
+extern "js" fn write_mass_cubes_dense_y_transform_wave(
+  bytes : MutArrayView[Byte],
+  count : Int,
+  first_word : Int,
+  words_per_entity : Int,
+  format_code : Int,
+  wave_time : Double,
+) -> Unit =
+  #| (
+  #|   bytes,
+  #|   count,
+  #|   firstWord,
+  #|   wordsPerEntity,
+  #|   formatCode,
+  #|   waveTime,
+  #| ) => {
+  #|   const src = bytes.buf;
+  #|   const start = bytes.start;
+  #|   const byteLength = bytes.end - bytes.start;
+  #|   if (!ArrayBuffer.isView(src)) {
+  #|     throw new Error("MassCubes dense transform writer requires typed byte storage.");
+  #|   }
+  #|   const words = new Uint32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   let scratch = globalThis.__rhodonite_mass_cubes_f32_to_f16_scratch;
+  #|   if (!scratch) {
+  #|     const scratchF32 = new Float32Array(1);
+  #|     const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|     scratch = globalThis.__rhodonite_mass_cubes_f32_to_f16_scratch = {
+  #|       scratchF32,
+  #|       scratchU32,
+  #|     };
+  #|   }
+  #|   const f32ToF16Bits = (value) => {
+  #|     scratch.scratchF32[0] = Math.fround(value);
+  #|     const bits = scratch.scratchU32[0] >>> 0;
+  #|     const sign = (bits >>> 16) & 0x8000;
+  #|     const exp = (bits >>> 23) & 0xff;
+  #|     const mant = bits & 0x007fffff;
+  #|     if (exp === 255) {
+  #|       return mant === 0 ? sign | 0x7c00 : sign | 0x7e00;
+  #|     }
+  #|     const halfExp = exp - 127 + 15;
+  #|     if (halfExp >= 31) return sign | 0x7c00;
+  #|     if (halfExp <= 0) {
+  #|       if (halfExp < -10) return sign;
+  #|       const mantissa = mant | 0x00800000;
+  #|       const shift = 14 - halfExp;
+  #|       let halfMant = mantissa >>> shift;
+  #|       if (((mantissa >>> (shift - 1)) & 1) !== 0) halfMant += 1;
+  #|       return sign | halfMant;
+  #|     }
+  #|     let half = sign | (halfExp << 10) | (mant >>> 13);
+  #|     if (((mant >>> 12) & 1) !== 0) half += 1;
+  #|     return half;
+  #|   };
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   let waveSin = Math.sin(waveTime);
+  #|   let waveCos = Math.cos(waveTime);
+  #|   if (formatCode === 1) {
+  #|     const baseWord = 3 - firstWord;
+  #|     for (let i = 0; i < count; i++) {
+  #|       const word = i * wordsPerEntity + baseWord;
+  #|       const half = f32ToF16Bits(waveSin * 0.12);
+  #|       words[word] = (words[word] & 0x0000ffff) | (half << 16);
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|     }
+  #|     return;
+  #|   }
+  #|   const baseWord = 7 - firstWord;
+  #|   for (let i = 0; i < count; i++) {
+  #|     floats[i * wordsPerEntity + baseWord] = Math.fround(waveSin * 0.12);
+  #|     const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|     waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|     waveSin = nextSin;
+  #|   }
+  #| }
+
+///|
+/// Writes the animated Y translation for a dense GlobalTransform blob in native builds.
+#cfg(target="native")
+#borrow(bytes)
+extern "C" fn write_mass_cubes_dense_y_transform_wave(
+  bytes : MutArrayView[Byte],
+  count : Int,
+  first_word : Int,
+  words_per_entity : Int,
+  format_code : Int,
+  wave_time : Double,
+) -> Unit = "rhodonite_mass_cubes_write_dense_y_transform_wave"
+
+///|
+/// Writes the animated Y translation for a dense GlobalTransform blob.
+#cfg(not(any(target="js", target="native")))
+fn write_mass_cubes_dense_y_transform_wave(
+  bytes : MutArrayView[Byte],
+  count : Int,
+  first_word : Int,
+  words_per_entity : Int,
+  format_code : Int,
+  wave_time : Double,
+) -> Unit {
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let mut i = 0
+  let mut wave_sin = @math.sin(wave_time)
+  let mut wave_cos = @math.cos(wave_time)
+  if format_code == 1 {
+    let base_word = 3 - first_word
+    while i < count {
+      let word = i * words_per_entity + base_word
+      let byte_offset = word * 4
+      let old = @writes.get_u32_le_mut_view(bytes, byte_offset)
+      let half = @comp.global_transform_f32_to_f16_bits(
+        Float::from_double(wave_sin * 0.12),
+      )
+      @writes.put_u32_le_mut_view(
+        bytes,
+        byte_offset,
+        (old & 0x0000FFFFU) | (half << 16),
+      )
+      let next_sin = wave_sin * cos_step + wave_cos * sin_step
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step
+      wave_sin = next_sin
+      i = i + 1
+    }
+    return
+  }
+  let base_word = 7 - first_word
+  while i < count {
+    @writes.put_u32_le_mut_view(
+      bytes,
+      (i * words_per_entity + base_word) * 4,
+      Float::from_double(wave_sin * 0.12).reinterpret_as_uint(),
+    )
+    let next_sin = wave_sin * cos_step + wave_cos * sin_step
+    wave_cos = wave_cos * cos_step - wave_sin * sin_step
+    wave_sin = next_sin
+    i = i + 1
+  }
+}
+
+///|
 /// Implements `global_transform_default_format`.
 fn global_transform_default_format() -> @comp.GlobalTransformGpuFormat {
   match global_transform_precision_mode {
@@ -268,6 +424,28 @@ fn update_and_drain_global_transforms(
 ) -> Array[@ecs.GpuWriteView] {
   ignore(tf)
   ignore(gt)
+  if !full_rows {
+    match dense_transform_layout {
+      Some(layout) =>
+        return world.write_global_transform_blob_range_views(
+          upload_range.first_word,
+          upload_range.word_count,
+          ///|
+          /// Implements `this function`.
+          fn(bytes) {
+            write_mass_cubes_dense_y_transform_wave(
+              bytes,
+              entity_count,
+              upload_range.first_word,
+              layout.words_per_entity,
+              global_transform_format_code_int(layout.format),
+              t * 1.8,
+            )
+          },
+        )
+      None => ()
+    }
+  }
   world.write_global_transform_blob_range_by_refs(
     transform_refs,
     entity_count,
