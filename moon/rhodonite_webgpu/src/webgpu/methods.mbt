@@ -24,6 +24,7 @@ pub async fn GPUInstance::request_adapter(self : GPUInstance) -> GPUAdapter {
 }
 
 ///|
+
 ///|
 /// Implements `GPUInstance::request_adapter_sync`.
 #cfg(target="native")
@@ -51,6 +52,7 @@ pub async fn GPUAdapter::request_device(self : GPUAdapter) -> GPUDevice {
 }
 
 ///|
+
 ///|
 /// Implements `GPUAdapter::request_device_sync`.
 #cfg(target="native")
@@ -402,6 +404,7 @@ pub fn GPUQueue::drain_and_upload_camera_writes(
 
 ///|
 /// Writes a borrowed subrange of `Bytes` to a GPU buffer without compacting the payload.
+
 ///|
 /// Implements `GPUQueue::write_buffer_from_bytes_range`.
 #cfg(target="native")
@@ -435,6 +438,7 @@ pub fn GPUBuffer::release(self : GPUBuffer) -> Unit {
 /// WebGPU native mapping requires aligned offset/size. This helper reads the aligned range into a
 /// staging `Bytes`, then returns the requested subrange as `BytesView` without compacting it into a
 /// second `Bytes`. Use `BytesView::to_owned` only when an owned, exact-length `Bytes` is required.
+
 ///|
 /// Implements `GPUBuffer::readback_view`.
 #cfg(target="native")
@@ -449,6 +453,7 @@ pub fn GPUBuffer::readback_view(
 
 ///|
 /// Reads a native GPU buffer range into an owned `Bytes`.
+
 ///|
 /// Implements `GPUBuffer::readback`.
 #cfg(target="native")
@@ -607,6 +612,7 @@ pub fn GPUCommandEncoder::finish(self : GPUCommandEncoder) -> GPUCommandBuffer {
 /// Copies an RGBA8 texture into a buffer using WebGPU's padded row layout.
 ///
 /// The destination buffer must be at least `rgba8_copy_padded_byte_length(width, height)` bytes.
+
 ///|
 /// Implements `GPUCommandEncoder::copy_texture_to_buffer_rgba8`.
 #cfg(any(target="js", target="native"))

@@ -449,6 +449,7 @@ extern "js" fn write_affine3x4_to_gpu_row_js(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+
 ///|
 /// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(target="js")
@@ -519,6 +520,7 @@ pub fn global_transform_write_identity_row_format(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+
 ///|
 /// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(not(target="js"))

@@ -385,6 +385,7 @@ extern "C" fn global_transform_element_setter_set_mixed_native(
 ) -> Unit = "rhodonite_global_transform_element_setter_set_mixed"
 
 ///|
+
 ///|
 /// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(target="js")
@@ -427,6 +428,7 @@ pub fn GlobalTransformBlobWriter::element_setter(
 }
 
 ///|
+
 ///|
 /// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(target="native")
@@ -495,6 +497,7 @@ pub fn GlobalTransformBlobWriter::element_setter(
 }
 
 ///|
+
 ///|
 /// Implements `GlobalTransformBlobWriter::element_setter`.
 #cfg(not(any(target="js", target="native")))

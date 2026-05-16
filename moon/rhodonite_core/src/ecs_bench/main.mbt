@@ -8,6 +8,7 @@ extern "js" fn monotonic_ms() -> Double =
 extern "C" fn c_clock() -> Int = "clock"
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(target="native")
@@ -16,6 +17,7 @@ fn monotonic_ms() -> Double {
 }
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(not(any(target="js", target="native")))

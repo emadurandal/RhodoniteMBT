@@ -164,9 +164,7 @@ extern "C" fn sdl_scancode_name_borrowed(
 
 ///|
 /// Returns an SDL key name without freeing SDL's borrowed static string.
-extern "C" fn sdl_key_name_borrowed(
-  key : @lib.SDL_Keycode,
-) -> String = "rhodonite_sdl_get_key_name_borrowed"
+extern "C" fn sdl_key_name_borrowed(key : @lib.SDL_Keycode) -> String = "rhodonite_sdl_get_key_name_borrowed"
 
 ///|
 /// Converts an SDL scancode event into the current input key code naming.
