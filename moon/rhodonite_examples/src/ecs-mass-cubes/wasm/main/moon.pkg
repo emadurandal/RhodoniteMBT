@@ -1,6 +1,10 @@
 import {
+  "emadurandal/rhodonite_core/binary/writes" @writes,
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/components" @comp,
+  "emadurandal/rhodonite_core/math/matrix44" @m44,
+  "emadurandal/rhodonite_core/math/vector4" @v4,
+  "emadurandal/rhodonite_examples/common/orbit_camera" @orbit,
   "moonbitlang/core/ref" @ref,
 }
 

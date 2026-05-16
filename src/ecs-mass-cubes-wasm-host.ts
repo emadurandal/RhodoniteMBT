@@ -1,5 +1,6 @@
 import "./style.css";
 import {
+	createCameraWordsBuffer,
 	createGlobalTransformWordsBuffer,
 	uploadGlobalTransformBytes,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -8,7 +9,7 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
-import { InputState, installBrowserInputState } from "./app-runtime";
+import { InputState, MouseButton, installBrowserInputState } from "./app-runtime";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,
@@ -16,14 +17,10 @@ import {
 	MASS_CUBES_ENTITY_COUNT,
 	MASS_CUBES_GRID_SPACING,
 	createMassCubesInstanceBytesFromRefs,
-	createMassCubesOrbitCameraController,
-	createMassCubesRenderResources,
+	createMassCubesRenderResourcesFromCameraStorage,
 	gridSideLen,
 	renderMassCubesScene,
-	updateOrbitCameraControllerFromInput,
-	writeMassCubesCameraUniform,
 	type MassCubesRenderResources,
-	type OrbitCameraController,
 } from "./ecs-mass-cubes-renderer";
 
 type GlobalTransformPrecisionMode =
@@ -36,6 +33,7 @@ const GLOBAL_TRANSFORM_FORMAT_F32 = 0;
 const GLOBAL_TRANSFORM_FORMAT_F16 = 1;
 const TRANSFORM_WORDS_PER_ENTITY_F16 = 6;
 const TRANSFORM_WORDS_PER_ENTITY_F32 = 12;
+const CAMERA_WORD_COUNT = 72;
 const F16_SCRATCH_F32 = new Float32Array(1);
 const F16_SCRATCH_U32 = new Uint32Array(F16_SCRATCH_F32.buffer);
 const F32_TO_F16_BASE = new Uint16Array(512);
@@ -71,12 +69,13 @@ type DemoState = {
 	readonly render: MassCubesRenderResources;
 	readonly transformStorage: GPUBuffer;
 	readonly input: InputState;
-	readonly orbitController: OrbitCameraController;
 	readonly transformRefs: Uint32Array;
 	readonly transformBytes: Uint8Array;
 	readonly transformWords: Uint32Array;
 	readonly transformFloats: Float32Array;
 	readonly transformHalves: Float16ArrayLike | Uint16Array;
+	readonly cameraBytes: Uint8Array;
+	readonly cameraWords: Uint32Array;
 	readonly transformWordUploadFirst: number;
 	readonly transformWordUploadCount: number;
 	perSide: number;
@@ -392,14 +391,14 @@ async function createDemoState(
 		device,
 		transformLayout.wordCapacity,
 	);
-	const orbitController = createMassCubesOrbitCameraController();
-	const render = createMassCubesRenderResources({
+	const cameraStorage = createCameraWordsBuffer(device, CAMERA_WORD_COUNT);
+	const render = createMassCubesRenderResourcesFromCameraStorage({
 		device,
 		queue,
 		targetFormat,
 		transformStorage,
+		cameraStorage,
 		instanceData: createMassCubesInstanceBytesFromRefs(transformLayout.refs),
-		orbitController,
 	});
 
 	const transformBytes = new Uint8Array(transformLayout.uploadWordCount * 4);
@@ -425,6 +424,12 @@ async function createDemoState(
 					transformBytes.byteOffset,
 					transformBytes.byteLength >>> 1,
 				);
+	const cameraBytes = new Uint8Array(CAMERA_WORD_COUNT * 4);
+	const cameraWords = new Uint32Array(
+		cameraBytes.buffer,
+		cameraBytes.byteOffset,
+		cameraBytes.byteLength >>> 2,
+	);
 	return {
 		context,
 		device,
@@ -432,12 +437,13 @@ async function createDemoState(
 		render,
 		transformStorage,
 		input: new InputState(),
-		orbitController,
 		transformRefs: transformLayout.refs,
 		transformBytes,
 		transformWords,
 		transformFloats,
 		transformHalves,
+		cameraBytes,
+		cameraWords,
 		transformWordUploadFirst: transformLayout.uploadFirstWord,
 		transformWordUploadCount: transformLayout.uploadWordCount,
 		perSide: gridSideLen(MASS_CUBES_ENTITY_COUNT),
@@ -492,17 +498,30 @@ function createHostImports(
 			write_global_transform_bytes: (ptr: number, byteLength: number) => {
 				writeTransformBytesFromWasmMemory(demoState, getMemory(), ptr, byteLength);
 			},
-			render_demo_frame: (fps: number, cpuMs: number) => {
+			begin_input_frame: () => {
 				demoState.input.beginFrame();
-				updateOrbitCameraControllerFromInput(
-					demoState.orbitController,
-					demoState.input,
-				);
-				writeMassCubesCameraUniform(
-					demoState.queue,
+			},
+			input_mouse_down: (button: number) =>
+				demoState.input.mouseDown(button === 1 ? MouseButton.Middle : MouseButton.Left),
+			input_mouse_pressed: (button: number) =>
+				demoState.input.mousePressed(button === 1 ? MouseButton.Middle : MouseButton.Left),
+			input_pointer_delta_x: () => demoState.input.pointerDeltaX(),
+			input_pointer_delta_y: () => demoState.input.pointerDeltaY(),
+			input_wheel_delta_y: () => demoState.input.wheelDeltaY(),
+			write_camera_word: (wordIndex: number, word: number) => {
+				if (wordIndex < 0 || wordIndex >= demoState.cameraWords.length) {
+					throw new RangeError(`camera word index out of range: ${wordIndex}`);
+				}
+				demoState.cameraWords[wordIndex] = word >>> 0;
+			},
+			upload_camera_words: () => {
+				demoState.queue.writeBuffer(
 					demoState.render.cameraBuffer,
-					demoState.orbitController,
+					0,
+					demoState.cameraBytes,
 				);
+			},
+			render_demo_frame: (fps: number, cpuMs: number) => {
 				const colorView =
 					demoState.snapshotColorView ??
 					demoState.context.getCurrentTexture().createView();

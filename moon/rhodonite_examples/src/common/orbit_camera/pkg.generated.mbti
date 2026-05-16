@@ -17,6 +17,8 @@ pub fn register_orbit_camera_controller_component(@ecs.World) -> @ecs.ComponentT
 
 pub fn update_orbit_camera_controller_from_input(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId, @input.InputState) -> Bool
 
+pub fn update_orbit_camera_controller_from_mouse_frame(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
+
 // Errors
 
 // Types and methods

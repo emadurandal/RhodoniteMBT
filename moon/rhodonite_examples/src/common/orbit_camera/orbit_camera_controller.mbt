@@ -192,12 +192,18 @@ pub fn orbit_camera_transform(
 }
 
 ///|
-/// Updates an orbit camera controller from per-frame mouse drag input.
-pub fn update_orbit_camera_controller_from_input(
+/// Updates an orbit camera controller from already-folded per-frame mouse values.
+pub fn update_orbit_camera_controller_from_mouse_frame(
   world : @ecs.World,
   camera : @ecs.EntityId,
   component : @ecs.ComponentTypeId,
-  input : @input.InputState,
+  left_down : Bool,
+  left_pressed : Bool,
+  middle_down : Bool,
+  middle_pressed : Bool,
+  pointer_delta_x : Float,
+  pointer_delta_y : Float,
+  wheel_delta_y : Float,
 ) -> Bool {
   match world.component_bytes(camera, component) {
     Some(bytes) => {
@@ -223,25 +229,25 @@ pub fn update_orbit_camera_controller_from_input(
       let mut next_pan_y = pan_y
       let mut next_dolly = dolly
       let mut changed = false
-      if input.mouse_down(Left) && !input.mouse_pressed(Left) {
-        next_yaw = yaw + input.pointer_delta_x().to_double() * sensitivity
+      if left_down && !left_pressed {
+        next_yaw = yaw + pointer_delta_x.to_double() * sensitivity
         next_pitch = clamp_angle(
-          pitch + input.pointer_delta_y().to_double() * sensitivity,
+          pitch + pointer_delta_y.to_double() * sensitivity,
           min_pitch,
           max_pitch,
         )
         changed = true
       }
-      if input.mouse_down(Middle) && !input.mouse_pressed(Middle) {
+      if middle_down && !middle_pressed {
         next_pan_x = pan_x +
-          input.pointer_delta_x().to_double() * pan_sensitivity * dolly
+          pointer_delta_x.to_double() * pan_sensitivity * dolly
         next_pan_y = pan_y -
-          input.pointer_delta_y().to_double() * pan_sensitivity * dolly
+          pointer_delta_y.to_double() * pan_sensitivity * dolly
         changed = true
       }
-      if input.wheel_delta_y() != (0.0 : Float) {
+      if wheel_delta_y != (0.0 : Float) {
         next_dolly = clamp_angle(
-          dolly + input.wheel_delta_y().to_double() * dolly_sensitivity * dolly,
+          dolly + wheel_delta_y.to_double() * dolly_sensitivity * dolly,
           min_dolly,
           max_dolly,
         )
@@ -263,4 +269,26 @@ pub fn update_orbit_camera_controller_from_input(
     }
     None => false
   }
+}
+
+///|
+/// Updates an orbit camera controller from per-frame mouse drag input.
+pub fn update_orbit_camera_controller_from_input(
+  world : @ecs.World,
+  camera : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+  input : @input.InputState,
+) -> Bool {
+  update_orbit_camera_controller_from_mouse_frame(
+    world,
+    camera,
+    component,
+    input.mouse_down(Left),
+    input.mouse_pressed(Left),
+    input.mouse_down(Middle),
+    input.mouse_pressed(Middle),
+    input.pointer_delta_x(),
+    input.pointer_delta_y(),
+    input.wheel_delta_y(),
+  )
 }
