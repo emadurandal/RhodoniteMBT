@@ -113,15 +113,7 @@ pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
 ///|
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  let (device, canvas_context, format, queue) = engine.gpu_context().get()
-  Some(
-    create_demo_state_for_device(
-      device,
-      queue,
-      format,
-      context=Some(canvas_context),
-    ),
-  )
+  create_demo_state(engine.gpu_context())
 }
 
 ///|
