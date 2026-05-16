@@ -72,8 +72,8 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
-/// Updates the builtin Camera blob from the orbit controller component.
-fn push_camera_matrices(
+/// Updates the builtin Camera blob from the MassCubes camera solver.
+fn sync_mass_cubes_camera_blob(
   world : @ecs.World,
   camera : @ecs.EntityId,
   orbit_controller : @ecs.ComponentTypeId,
@@ -146,6 +146,8 @@ struct WasmDemoState {
   orbit_controller : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
+  perf_frame_start_ms : @ref.Ref[Double]
+  perf_current_fps : @ref.Ref[Double]
 }
 
 ///|
@@ -188,7 +190,7 @@ pub fn create_wasm_demo_state() -> Unit {
       world, camera, orbit_controller, 0.0, camera_elevation_rad,
     ),
   )
-  push_camera_matrices(world, camera, orbit_controller, count)
+  sync_mass_cubes_camera_blob(world, camera, orbit_controller, count)
   upload_current_camera(world, camera)
   demo_state.val = Some({
     world,
@@ -196,12 +198,14 @@ pub fn create_wasm_demo_state() -> Unit {
     orbit_controller,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
+    perf_frame_start_ms: @ref.new(-1.0),
+    perf_current_fps: @ref.new(0.0),
   })
 }
 
 ///|
-/// Implements `ecs_mass_cubes_wasm_render_tick`.
-pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
+/// Runs the WASM-owned input and update phase for one MassCubes frame.
+pub fn ecs_mass_cubes_wasm_update_tick() -> Unit {
   match demo_state.val {
     None => ()
     Some(demo_state) => {
@@ -218,6 +222,8 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
         0.0
       }
       demo_state.perf_last_frame_start_ms.val = t_frame_start
+      demo_state.perf_frame_start_ms.val = t_frame_start
+      demo_state.perf_current_fps.val = fps
       demo_state.frame.val = demo_state.frame.val + 1
       let wave_time = demo_state.frame.val.to_double() * 0.018 * 1.8
       host_write_global_transform_y(wave_time)
@@ -227,17 +233,51 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
         demo_state.camera,
         demo_state.orbit_controller,
       )
-      push_camera_matrices(
+    }
+  }
+}
+
+///|
+/// Runs the WASM-owned render-extract phase for the MassCubes camera blob.
+pub fn ecs_mass_cubes_wasm_render_extract() -> Unit {
+  match demo_state.val {
+    None => ()
+    Some(demo_state) => {
+      sync_mass_cubes_camera_blob(
         demo_state.world,
         demo_state.camera,
         demo_state.orbit_controller,
         @mass_shared.entity_count(),
       )
       upload_current_camera(demo_state.world, demo_state.camera)
-      let cpu_ms = host_now_ms() - t_frame_start
-      host_render_demo_frame(fps, cpu_ms)
     }
   }
+}
+
+///|
+/// Runs the host render pass after update and render-extract have prepared data.
+pub fn ecs_mass_cubes_wasm_render() -> Unit {
+  match demo_state.val {
+    None => ()
+    Some(demo_state) => {
+      let t_frame_start = if demo_state.perf_frame_start_ms.val >= 0.0 {
+        demo_state.perf_frame_start_ms.val
+      } else {
+        host_now_ms()
+      }
+      let cpu_ms = host_now_ms() - t_frame_start
+      host_render_demo_frame(demo_state.perf_current_fps.val, cpu_ms)
+      demo_state.perf_frame_start_ms.val = -1.0
+    }
+  }
+}
+
+///|
+/// Implements `ecs_mass_cubes_wasm_render_tick`.
+pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
+  ecs_mass_cubes_wasm_update_tick()
+  ecs_mass_cubes_wasm_render_extract()
+  ecs_mass_cubes_wasm_render()
 }
 
 ///|

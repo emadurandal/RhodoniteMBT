@@ -227,7 +227,7 @@ ECS sample の `DemoState` は `World` と `Schedule` を直接所有せず、`S
 
 TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`registerEngineHandlers(engine, demo_state)`、`engine.runRenderFrame()` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、phase group と phase lifecycle は同じです。
 
-[`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
+[`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。WASM ABI は update / render-extract / render に分け、MoonBit JS/native 版と同じく MassCubes camera solver を render-extract 相当に閉じ込めます。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
 ### 現在の Phase 2 state
 

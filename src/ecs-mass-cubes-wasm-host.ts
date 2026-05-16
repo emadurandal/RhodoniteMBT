@@ -125,6 +125,9 @@ type WasmExports = {
 	_start?: () => void;
 	memory?: WebAssembly.Memory;
 	create_wasm_demo_state: () => void;
+	ecs_mass_cubes_wasm_update_tick: () => void;
+	ecs_mass_cubes_wasm_render_extract: () => void;
+	ecs_mass_cubes_wasm_render: () => void;
 	ecs_mass_cubes_wasm_render_tick: () => void;
 };
 
@@ -537,6 +540,12 @@ function createHostImports(
 	};
 }
 
+function runWasmRenderFrame(wasm: WasmExports): void {
+	wasm.ecs_mass_cubes_wasm_update_tick();
+	wasm.ecs_mass_cubes_wasm_render_extract();
+	wasm.ecs_mass_cubes_wasm_render();
+}
+
 async function instantiateWasm(
 	demoState: DemoState,
 	wasmUrl: string,
@@ -577,7 +586,7 @@ export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
 				wasm._start?.();
 				wasm.create_wasm_demo_state();
 				const loop = () => {
-					wasm.ecs_mass_cubes_wasm_render_tick();
+					runWasmRenderFrame(wasm);
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);
@@ -608,7 +617,7 @@ export async function renderEcsMassCubesWasmSnapshot(
 		wasm.create_wasm_demo_state();
 		demoState.snapshotColorView = target.view;
 		demoState.snapshotDepthView = target.depthView;
-		wasm.ecs_mass_cubes_wasm_render_tick();
+		runWasmRenderFrame(wasm);
 		demoState.snapshotColorView = undefined;
 		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(

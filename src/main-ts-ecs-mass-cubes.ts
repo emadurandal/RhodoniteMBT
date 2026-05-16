@@ -245,6 +245,22 @@ function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
 	);
 }
 
+function sceneMainCameraOrThrow(scene: Scene<World, EntityId>): EntityId {
+	const camera = scene.mainCamera();
+	if (camera === null) {
+		throw new Error("syncMassCubesCameraBlob requires Scene.mainCamera.");
+	}
+	return camera;
+}
+
+function syncMassCubesCameraBlob(demoState: DemoState): void {
+	pushCameraMatrices(
+		demoState.scene.world(),
+		sceneMainCameraOrThrow(demoState.scene),
+		demoState.orbitController,
+	);
+}
+
 function createDemoStateForEngine(
 	engine: Engine,
 	renderFormat?: GPUTextureFormat,
@@ -324,6 +340,9 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
+	engine.onPhase(Phase.RenderExtract, () => {
+		syncMassCubesCameraBlob(demoState);
+	});
 	engine.onPhase(
 		Phase.Render,
 		() => {
@@ -375,12 +394,7 @@ function renderScene(
 	scene: Scene<World, EntityId>,
 	colorView: GPUTextureView,
 ): void {
-	const camera = scene.mainCamera();
-	if (camera === null) {
-		throw new Error("renderScene requires Scene.mainCamera.");
-	}
 	const world = scene.world();
-	pushCameraMatrices(world, camera, demoState.orbitController);
 	drainAndUploadCameraWrites(
 		demoState.queue,
 		demoState.render.cameraBuffer,
