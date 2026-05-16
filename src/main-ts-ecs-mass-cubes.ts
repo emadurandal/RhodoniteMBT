@@ -341,6 +341,12 @@ function syncMassCubesCameraBlob(demoState: DemoState): void {
 	);
 }
 
+function addMassCubesCameraSyncSystem(demoState: DemoState): void {
+	demoState.scene.setSchedule(() => {
+		syncMassCubesCameraBlob(demoState);
+	}, Phase.RenderExtract);
+}
+
 function createDemoStateForEngine(
 	engine: Engine,
 	renderFormat?: GPUTextureFormat,
@@ -454,35 +460,23 @@ function createDemoStateForEngine(
 		lastFrameStartMs: -1,
 		cpuFrameStartMs: -1,
 	};
+	addMassCubesCameraSyncSystem(demoState);
 	uploadInitialGlobalTransforms(demoState);
 	drainAndUploadCameraWrites(queue, render.cameraBuffer, world);
 	return demoState;
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.addHandlerOnPhase(Phase.Input, (engine) => {
-		const world = demoState.scene.world();
-		updateOrbitCameraControllerComponentFromInput(
-			world,
-			sceneMainCameraOrThrow(demoState.scene),
-			demoState.orbitControllerComponent,
-			engine.input,
-		);
+	engine.addCommonHandlers(demoState.scene, {
+		orbitControllerComponent: demoState.orbitControllerComponent,
+		homeComponent: demoState.cameraHomeComponent,
+		updateOrbitCameraControllerFromInput:
+			updateOrbitCameraControllerComponentFromInput,
+		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
 	});
 	engine.addHandlerOnPhase(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
-	});
-	engine.addHandlerOnPhase(Phase.PostUpdate, () => {
-		syncOrbitCameraTransformComponent(
-			demoState.scene.world(),
-			sceneMainCameraOrThrow(demoState.scene),
-			demoState.orbitControllerComponent,
-			demoState.cameraHomeComponent,
-		);
-	});
-	engine.addHandlerOnPhase(Phase.RenderExtract, () => {
-		syncMassCubesCameraBlob(demoState);
 	});
 	engine.addHandlerOnPhase(
 		Phase.Render,

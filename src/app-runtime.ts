@@ -505,6 +505,23 @@ export function installBrowserInput(
 	return installBrowserInputState(engine.input, engine.canvas, options);
 }
 
+export type CommonOrbitCameraHandlers<TWorld, TMainCamera, TComponent> = {
+	readonly orbitControllerComponent?: TComponent;
+	readonly homeComponent?: TComponent;
+	readonly updateOrbitCameraControllerFromInput?: (
+		world: TWorld,
+		camera: TMainCamera,
+		orbitComponent: TComponent,
+		input: InputState,
+	) => void;
+	readonly syncOrbitCameraTransform?: (
+		world: TWorld,
+		camera: TMainCamera,
+		orbitComponent: TComponent,
+		homeComponent: TComponent,
+	) => void;
+};
+
 export class Engine {
 	readonly canvas: HTMLCanvasElement;
 	readonly adapter: GPUAdapter;
@@ -593,6 +610,63 @@ export class Engine {
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
 	): void {
 		this.addHandlerOnPhase(phase, callback, slot);
+	}
+
+	addCommonHandlers<TWorld, TMainCamera, TComponent>(
+		scene: Scene<TWorld, TMainCamera>,
+		options: CommonOrbitCameraHandlers<TWorld, TMainCamera, TComponent> = {},
+	): void {
+		const {
+			orbitControllerComponent,
+			homeComponent,
+			updateOrbitCameraControllerFromInput,
+			syncOrbitCameraTransform,
+		} = options;
+		if (homeComponent !== undefined && orbitControllerComponent === undefined) {
+			throw new Error(
+				"Engine.addCommonHandlers: homeComponent requires orbitControllerComponent.",
+			);
+		}
+		if (orbitControllerComponent === undefined) {
+			return;
+		}
+		if (updateOrbitCameraControllerFromInput === undefined) {
+			throw new Error(
+				"Engine.addCommonHandlers: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
+			);
+		}
+		this.addHandlerOnPhase(Phase.Input, (engine) => {
+			const camera = scene.mainCamera();
+			if (camera === null) {
+				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
+			}
+			updateOrbitCameraControllerFromInput(
+				scene.world(),
+				camera,
+				orbitControllerComponent,
+				engine.input,
+			);
+		});
+		if (homeComponent === undefined) {
+			return;
+		}
+		if (syncOrbitCameraTransform === undefined) {
+			throw new Error(
+				"Engine.addCommonHandlers: homeComponent requires syncOrbitCameraTransform.",
+			);
+		}
+		scene.setSchedule((world) => {
+			const camera = scene.mainCamera();
+			if (camera === null) {
+				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
+			}
+			syncOrbitCameraTransform(
+				world,
+				camera,
+				orbitControllerComponent,
+				homeComponent,
+			);
+		}, Phase.PostUpdate);
 	}
 
 	initialize(): void {
