@@ -249,6 +249,19 @@ fn matrix44f_from_col_major_array(data : FixedArray[Float]) -> @m44.Matrix44F {
 }
 
 ///|
+/// Implements `world_set_global_transform_col_major`.
+pub fn world_set_global_transform_col_major(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  matrix_col_major : FixedArray[Float],
+) -> Bool {
+  world.set_global_transform(
+    entity,
+    matrix44f_from_col_major_array(matrix_col_major),
+  )
+}
+
+///|
 /// Implements `world_set_camera_matrices_col_major`.
 pub fn world_set_camera_matrices_col_major(
   world : @ecs.World,

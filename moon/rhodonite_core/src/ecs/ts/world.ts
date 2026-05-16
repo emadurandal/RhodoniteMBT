@@ -35,6 +35,7 @@ import {
 	world_remove_component,
 	world_set_camera_matrices_col_major,
 	world_set_component_bytes,
+	world_set_global_transform_col_major,
 	world_set_global_transform_format,
 	world_set_transform_trs,
 	spawn_batch_row_entity,
@@ -280,6 +281,16 @@ export class World {
 				sx,
 				sy,
 				sz,
+			),
+		);
+	}
+
+	setGlobalTransform(entity: EntityId, matrixColMajor: ArrayLike<number>): boolean {
+		return moonBool(
+			world_set_global_transform_col_major(
+				this.inner,
+				entity.inner,
+				Array.from(matrixColMajor),
 			),
 		);
 	}

@@ -39,6 +39,7 @@ options(
         "world_remove_component",
         "world_component_bytes_copy",
         "world_set_transform_trs",
+        "world_set_global_transform_col_major",
         "world_set_camera_matrices_col_major",
         "world_update_global_transforms_from_transforms",
         "world_set_global_transform_format",
