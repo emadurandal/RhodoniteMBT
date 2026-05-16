@@ -710,13 +710,19 @@ pub fn create_demo_state_for_scene(
     perf_last_frame_start_ms: @ref.new(-1.0),
     perf_frame_start_ms: @ref.new(-1.0),
   }
+  demo_state.add_mass_cubes_camera_sync_system()
   ignore(
     scene.run_schedule_phase(
       @app.phase_post_update(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
-  demo_state.sync_mass_cubes_camera_blob()
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_render_extract(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
   queue.drain_and_upload_camera_writes(camera_storage, world)
   demo_state
 }
@@ -765,6 +771,19 @@ fn DemoState::sync_mass_cubes_camera_blob(self : DemoState) -> Unit {
       @ecs.camera_projection_orthographic(),
       (0.0 : Float),
     ),
+  )
+}
+
+///|
+/// Adds the MassCubes-specific camera blob sync as a render-extract ECS system.
+fn DemoState::add_mass_cubes_camera_sync_system(self : DemoState) -> Unit {
+  let world = self.scene.world()
+  self.scene.add_system(
+    @app.phase_render_extract(),
+    "MassCubesCameraSync",
+    [self.orbit_controller],
+    [world.global_transform_component(), world.camera_component()],
+    fn(_world, _ctx, _commands) { self.sync_mass_cubes_camera_blob() },
   )
 }
 
@@ -850,7 +869,16 @@ pub fn render_frame_to_view(
       ),
     ),
   )
-  demo_state.sync_mass_cubes_camera_blob()
+  ignore(
+    demo_state.scene.run_schedule_phase(
+      @app.phase_render_extract(),
+      @app.FrameState::new(
+        (0.022 : Float),
+        demo_state.frame.val,
+        demo_state.frame.val.to_double() * 0.022,
+      ),
+    ),
+  )
   render_current_frame_to_view(demo_state, color_view, record_perf~)
 }
 
@@ -879,7 +907,6 @@ pub fn render_current_frame_to_view(
     0.0
   }
   demo_state.perf_last_frame_start_ms.val = t_frame_start
-  demo_state.sync_mass_cubes_camera_blob()
   demo_state.render_scene(demo_state.scene, color_view)
   if record_perf {
     let cpu_ms = monotonic_ms() - t_frame_start
@@ -958,9 +985,6 @@ pub fn register_engine_handlers(
   engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
-  })
-  engine.add_handler_on_phase(@app.phase_render_extract(), fn(_engine, _frame) {
-    demo_state.sync_mass_cubes_camera_blob()
   })
   engine.add_handler_on_phase(
     @app.phase_render(),
