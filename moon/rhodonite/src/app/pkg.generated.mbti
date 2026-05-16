@@ -60,9 +60,8 @@ pub(all) enum PhaseSlot {
 pub struct Scene {
   // private fields
 }
-pub fn Scene::add_structural_system_on_phase(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
-pub fn Scene::add_system(Self, @ecs.System) -> Unit
-pub fn Scene::add_system_on_phase(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_structural_system(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_system(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_transform_propagation_system(Self, AppPhase) -> Unit
 pub fn Scene::enabled(Self) -> Bool
 pub fn Scene::main_camera(Self) -> @ecs.EntityId?

@@ -218,7 +218,7 @@ TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-
 Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) も runtime に寄せました。
 
 - `Scene::new_with_world(name, world)` を追加し、sample ごとの特殊な `World` 初期化を `Scene` に束ねられるようにする。
-- `Scene::add_system(system)` を追加し、system 登録を scene 経由に寄せる。
+- `Scene::add_system(phase, ...)` を追加し、system 登録を scene 経由に寄せる。
 - `Engine::new_with_main_scene(context, scene)` を追加し、main scene を明示的に指定できるようにする。
 - `ecs-scene-graph` は `Scene::add_system` と `Scene::visible` を使う形に寄せる。
 - `ecs-mass-cubes` は fp16 global transform 用の `World` を `Scene::new_with_world` で包み、browser/native entry point を `Engine::tick(app)` 経由へ移行する。

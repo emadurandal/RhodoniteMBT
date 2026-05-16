@@ -174,14 +174,14 @@ pub fn Scene::world(self : Scene) -> @ecs.World {
 }
 
 ///|
-/// Adds a system to this scene's schedule.
-pub fn Scene::add_system(self : Scene, system : @ecs.System) -> Unit {
+/// Adds an already-built ECS system to this scene's schedule.
+fn Scene::add_ecs_system(self : Scene, system : @ecs.System) -> Unit {
   self.schedule.add_system(system)
 }
 
 ///|
 /// Builds and adds a non-structural ECS system for one app phase.
-pub fn Scene::add_system_on_phase(
+pub fn Scene::add_system(
   self : Scene,
   phase : AppPhase,
   name : String,
@@ -189,14 +189,14 @@ pub fn Scene::add_system_on_phase(
   writes : Array[@ecs.ComponentTypeId],
   run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
 ) -> Unit {
-  self.add_system(
+  self.add_ecs_system(
     @ecs.System::new(name, phase.system_phase(), reads, writes, run),
   )
 }
 
 ///|
 /// Builds and adds a structural-write ECS system for one app phase.
-pub fn Scene::add_structural_system_on_phase(
+pub fn Scene::add_structural_system(
   self : Scene,
   phase : AppPhase,
   name : String,
@@ -204,7 +204,7 @@ pub fn Scene::add_structural_system_on_phase(
   writes : Array[@ecs.ComponentTypeId],
   run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
 ) -> Unit {
-  self.add_system(
+  self.add_ecs_system(
     @ecs.System::new_with_structural_write(
       name,
       phase.system_phase(),
@@ -221,7 +221,7 @@ pub fn Scene::add_transform_propagation_system(
   self : Scene,
   phase : AppPhase,
 ) -> Unit {
-  self.add_system(
+  self.add_ecs_system(
     @ecs.transform_propagation_system(self.world, phase.system_phase()),
   )
 }
