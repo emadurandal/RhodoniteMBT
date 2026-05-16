@@ -5,15 +5,33 @@ export type SceneScheduleCallback<TWorld> = (
 	frame: FrameState,
 ) => void;
 
-export const AppPhase = {
-	Startup: "Startup",
-	Update: "Update",
-	Extract: "Extract",
-	Render: "Render",
-	Shutdown: "Shutdown",
+export type PhaseKey = string;
+
+export const Phase = {
+	Startup: "rhodonite/startup",
+	Update: "rhodonite/update",
+	PostUpdate: "rhodonite/post_update",
+	RenderExtract: "rhodonite/render_extract",
+	RenderPrepare: "rhodonite/render_prepare",
+	Render: "rhodonite/render",
+	Present: "rhodonite/present",
+	Shutdown: "rhodonite/shutdown",
 } as const;
 
-export type AppPhase = (typeof AppPhase)[keyof typeof AppPhase];
+export function phase(name: string): PhaseKey {
+	return name;
+}
+
+export function defaultFramePhases(): PhaseKey[] {
+	return [
+		Phase.Update,
+		Phase.PostUpdate,
+		Phase.RenderExtract,
+		Phase.RenderPrepare,
+		Phase.Render,
+		Phase.Present,
+	];
+}
 
 export const PhaseSlot = {
 	BeforeSchedule: "BeforeSchedule",
@@ -23,13 +41,13 @@ export const PhaseSlot = {
 export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
 
 type PhaseHandler = {
-	phase: AppPhase;
+	phase: PhaseKey;
 	slot: PhaseSlot;
 	callback: AppCallback;
 };
 
 type SceneScheduleHandler<TWorld> = {
-	phase: AppPhase;
+	phase: PhaseKey;
 	callback: SceneScheduleCallback<TWorld>;
 };
 
@@ -99,7 +117,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 
 	setSchedule(
 		schedule: SceneScheduleCallback<TWorld>,
-		phase: AppPhase = AppPhase.Update,
+		phase: PhaseKey = Phase.Update,
 	): void {
 		this.scheduleHandlers.push({ phase, callback: schedule });
 	}
@@ -120,7 +138,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		return this.visibleValue;
 	}
 
-	runSchedulePhase(phase: AppPhase, frame: FrameState): boolean {
+	runSchedulePhase(phase: PhaseKey, frame: FrameState): boolean {
 		if (this.worldValue === null) {
 			return true;
 		}
@@ -137,7 +155,7 @@ export class App {
 	private readonly phaseHandlers: PhaseHandler[] = [];
 
 	onPhase(
-		phase: AppPhase,
+		phase: PhaseKey,
 		callback: AppCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
 	): void {
@@ -145,7 +163,7 @@ export class App {
 	}
 
 	runPhaseHandlers(
-		phase: AppPhase,
+		phase: PhaseKey,
 		slot: PhaseSlot,
 		engine: Engine,
 		frame: FrameState,
@@ -161,7 +179,7 @@ export class App {
 type RuntimeScene = {
 	enabled: () => boolean;
 	visible: () => boolean;
-	runSchedulePhase: (phase: AppPhase, frame: FrameState) => boolean;
+	runSchedulePhase: (phase: PhaseKey, frame: FrameState) => boolean;
 };
 
 export class Engine {
@@ -173,6 +191,7 @@ export class Engine {
 	readonly format: GPUTextureFormat;
 	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
+	private readonly phaseOrderValue: PhaseKey[];
 	private mainSceneIndex = 0;
 
 	private constructor(
@@ -191,6 +210,7 @@ export class Engine {
 		this.format = format;
 		this.scenes = [mainScene];
 		this.timeState = new TimeState();
+		this.phaseOrderValue = defaultFramePhases();
 	}
 
 	static async create(
@@ -226,14 +246,26 @@ export class Engine {
 	}
 
 	initializeApp(app: App): void {
-		this.runPhase(app, AppPhase.Startup, new FrameState(0, 0, 0));
+		this.runPhase(app, Phase.Startup, new FrameState(0, 0, 0));
 	}
 
 	shutdownApp(app: App): void {
-		this.runPhase(app, AppPhase.Shutdown, new FrameState(0, 0, 0));
+		this.runPhase(app, Phase.Shutdown, new FrameState(0, 0, 0));
 	}
 
-	runPhase(app: App, phase: AppPhase, frame: FrameState): void {
+	phaseOrder(): PhaseKey[] {
+		return [...this.phaseOrderValue];
+	}
+
+	insertPhaseBefore(anchor: PhaseKey, phaseKey: PhaseKey): void {
+		this.insertPhase(anchor, phaseKey, 0);
+	}
+
+	insertPhaseAfter(anchor: PhaseKey, phaseKey: PhaseKey): void {
+		this.insertPhase(anchor, phaseKey, 1);
+	}
+
+	runPhase(app: App, phase: PhaseKey, frame: FrameState): void {
 		app.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, this, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
@@ -245,15 +277,35 @@ export class Engine {
 
 	tick(app: App): void {
 		const frame = this.timeState.nextFrame();
-		for (const phase of [AppPhase.Update, AppPhase.Extract, AppPhase.Render]) {
+		for (const phase of this.phaseOrderValue) {
 			this.runPhase(app, phase, frame);
 		}
 	}
 
-	private sceneParticipatesInPhase(scene: RuntimeScene, phase: AppPhase): boolean {
-		if (phase === AppPhase.Render) {
+	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {
+		if (phaseIsRenderPath(phase)) {
 			return scene.visible();
 		}
 		return scene.enabled();
 	}
+
+	private insertPhase(anchor: PhaseKey, phaseKey: PhaseKey, offset: number): void {
+		if (this.phaseOrderValue.includes(phaseKey)) {
+			throw new Error(`Frame phase '${phaseKey}' already exists.`);
+		}
+		const anchorIndex = this.phaseOrderValue.indexOf(anchor);
+		if (anchorIndex < 0) {
+			throw new Error(`Anchor frame phase '${anchor}' was not found.`);
+		}
+		this.phaseOrderValue.splice(anchorIndex + offset, 0, phaseKey);
+	}
+}
+
+function phaseIsRenderPath(phaseKey: PhaseKey): boolean {
+	return (
+		phaseKey === Phase.RenderExtract ||
+		phaseKey === Phase.RenderPrepare ||
+		phaseKey === Phase.Render ||
+		phaseKey === Phase.Present
+	);
 }

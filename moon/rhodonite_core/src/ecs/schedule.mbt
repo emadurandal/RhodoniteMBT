@@ -14,10 +14,7 @@ fn component_array_intersects(
 
 ///|
 /// Implements `phase_array_contains`.
-fn phase_array_contains(
-  phases : Array[SystemPhase],
-  phase : SystemPhase,
-) -> Bool {
+fn phase_array_contains(phases : Array[PhaseKey], phase : PhaseKey) -> Bool {
   for i = 0; i < phases.length(); i = i + 1 {
     if phases[i] == phase {
       return true
@@ -100,15 +97,15 @@ pub fn SystemContext::new(
 }
 
 ///|
-/// Implements `SystemPhase::new`.
-pub fn SystemPhase::new(id : Int) -> SystemPhase {
-  { id, }
+/// Implements `PhaseKey::new`.
+pub fn PhaseKey::new(name : String) -> PhaseKey {
+  { name, }
 }
 
 ///|
-/// Implements `SystemPhase::id`.
-pub fn SystemPhase::id(self : SystemPhase) -> Int {
-  self.id
+/// Implements `PhaseKey::name`.
+pub fn PhaseKey::name(self : PhaseKey) -> String {
+  self.name
 }
 
 ///|
@@ -116,7 +113,7 @@ pub fn SystemPhase::id(self : SystemPhase) -> Int {
 fn build_system(
   constructor_name : String,
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   structural_write : Bool,
@@ -160,7 +157,7 @@ fn build_system(
 /// Implements `System::new`.
 pub fn System::new(
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
@@ -172,7 +169,7 @@ pub fn System::new(
 /// Builds a system that may create or destroy entities in addition to its declared component access.
 pub fn System::new_with_structural_write(
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
@@ -190,7 +187,7 @@ pub fn System::name(self : System) -> String {
 
 ///|
 /// Implements `System::phase`.
-pub fn System::phase(self : System) -> SystemPhase {
+pub fn System::phase(self : System) -> PhaseKey {
   self.phase
 }
 
@@ -256,10 +253,7 @@ pub fn Schedule::has_parallel_access_conflicts(self : Schedule) -> Bool {
 
 ///|
 /// Builtin system that mirrors [`World::update_global_transforms_from_transforms`].
-pub fn transform_propagation_system(
-  world : World,
-  phase : SystemPhase,
-) -> System {
+pub fn transform_propagation_system(world : World, phase : PhaseKey) -> System {
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let co = world.child_of_component()
@@ -282,7 +276,7 @@ pub fn Schedule::run_phase(
   self : Schedule,
   world : World,
   ctx : SystemContext,
-  phase : SystemPhase,
+  phase : PhaseKey,
 ) -> Bool {
   world.lock_component_registration()
   let mut ok = true
@@ -319,10 +313,10 @@ pub fn Schedule::run(
   self : Schedule,
   world : World,
   ctx : SystemContext,
-  phases : Array[SystemPhase],
+  phases : Array[PhaseKey],
 ) -> Bool {
   let mut ok = true
-  let seen : Array[SystemPhase] = []
+  let seen : Array[PhaseKey] = []
   for i = 0; i < phases.length(); i = i + 1 {
     let phase = phases[i]
     if phase_array_contains(seen, phase) {

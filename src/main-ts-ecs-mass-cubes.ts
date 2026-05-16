@@ -20,8 +20,8 @@ import {
 } from "./visual-regression/webgpu-readback";
 import {
 	App,
-	AppPhase,
 	Engine,
+	Phase,
 	PhaseSlot,
 	Scene,
 	type FrameState,
@@ -605,11 +605,11 @@ function createDemoStateForEngine(
 
 function createApp(demoState: DemoState): App {
 	const app = new App();
-	app.onPhase(AppPhase.Update, (_engine, frame) =>
+	app.onPhase(Phase.Update, (_engine, frame) =>
 		updateScene(demoState, frame),
 	);
 	app.onPhase(
-		AppPhase.Render,
+		Phase.Render,
 		() => {
 			if (demoState.scene.visible()) {
 				renderCurrentFrame(demoState);
@@ -617,7 +617,7 @@ function createApp(demoState: DemoState): App {
 		},
 		PhaseSlot.AfterSchedule,
 	);
-	app.onPhase(AppPhase.Shutdown, () => releaseDemoState(demoState));
+	app.onPhase(Phase.Shutdown, () => releaseDemoState(demoState));
 	return app;
 }
 

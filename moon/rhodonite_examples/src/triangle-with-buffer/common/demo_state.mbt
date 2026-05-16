@@ -218,11 +218,11 @@ pub fn render_frame_to_view(
 pub fn create_app(demo_state : DemoState) -> @app.App {
   let app = @app.App::new()
   app.on_phase(
-    @app.AppPhase::Render,
+    @app.phase_render(),
     fn(_engine, _frame) { render_current_frame(demo_state) },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  app.on_phase(@app.AppPhase::Shutdown, fn(_engine, _frame) {
+  app.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
   app

@@ -7,7 +7,25 @@ import {
 }
 
 // Values
-pub fn app_frame_phases() -> Array[AppPhase]
+pub fn default_frame_phases() -> Array[@ecs.PhaseKey]
+
+pub fn phase(String) -> @ecs.PhaseKey
+
+pub fn phase_post_update() -> @ecs.PhaseKey
+
+pub fn phase_present() -> @ecs.PhaseKey
+
+pub fn phase_render() -> @ecs.PhaseKey
+
+pub fn phase_render_extract() -> @ecs.PhaseKey
+
+pub fn phase_render_prepare() -> @ecs.PhaseKey
+
+pub fn phase_shutdown() -> @ecs.PhaseKey
+
+pub fn phase_startup() -> @ecs.PhaseKey
+
+pub fn phase_update() -> @ecs.PhaseKey
 
 // Errors
 
@@ -16,28 +34,23 @@ pub struct App {
   // private fields
 }
 pub fn App::new() -> Self
-pub fn App::on_phase(Self, AppPhase, (Engine, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
-pub fn App::run_after_schedule(Self, AppPhase, Engine, FrameState) -> Unit
-pub fn App::run_before_schedule(Self, AppPhase, Engine, FrameState) -> Unit
-pub fn App::run_phase_handlers(Self, AppPhase, PhaseSlot, Engine, FrameState) -> Unit
-
-pub(all) enum AppPhase {
-  Startup
-  Update
-  Extract
-  Render
-  Shutdown
-} derive(Eq)
+pub fn App::on_phase(Self, @ecs.PhaseKey, (Engine, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn App::run_after_schedule(Self, @ecs.PhaseKey, Engine, FrameState) -> Unit
+pub fn App::run_before_schedule(Self, @ecs.PhaseKey, Engine, FrameState) -> Unit
+pub fn App::run_phase_handlers(Self, @ecs.PhaseKey, PhaseSlot, Engine, FrameState) -> Unit
 
 pub struct Engine {
   // private fields
 }
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize_app(Self, App) -> Unit
+pub fn Engine::insert_phase_after(Self, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::insert_phase_before(Self, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
-pub fn Engine::run_phase(Self, App, AppPhase, FrameState) -> Unit
+pub fn Engine::phase_order(Self) -> Array[@ecs.PhaseKey]
+pub fn Engine::run_phase(Self, App, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::shutdown_app(Self, App) -> Unit
 pub fn Engine::tick(Self, App) -> Unit
 
@@ -60,15 +73,15 @@ pub(all) enum PhaseSlot {
 pub struct Scene {
   // private fields
 }
-pub fn Scene::add_structural_system(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
-pub fn Scene::add_system(Self, AppPhase, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
-pub fn Scene::add_transform_propagation_system(Self, AppPhase) -> Unit
+pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_transform_propagation_system(Self, @ecs.PhaseKey) -> Unit
 pub fn Scene::enabled(Self) -> Bool
 pub fn Scene::main_camera(Self) -> @ecs.EntityId?
 pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
-pub fn Scene::run_schedule_phase(Self, AppPhase, FrameState) -> Bool
+pub fn Scene::run_schedule_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
@@ -82,6 +95,7 @@ pub fn TimeState::new(Float) -> Self
 pub fn TimeState::next_frame(Self) -> FrameState
 
 // Type aliases
+pub using @ecs {type PhaseKey}
 
 // Traits
 

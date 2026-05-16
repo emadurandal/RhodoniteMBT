@@ -260,17 +260,17 @@ pub(all) struct SystemContext {
 }
 
 ///|
-/// Externally defined schedule phase token. The scheduler only compares phase ids; lifecycle
-/// meaning and execution order are supplied by the caller.
-pub(all) struct SystemPhase {
-  id : Int
+/// Open schedule phase identifier. The scheduler only compares phase names; lifecycle meaning and
+/// execution order are supplied by the caller.
+pub(all) struct PhaseKey {
+  name : String
 } derive(Eq)
 
 ///|
 /// Function-backed ECS system metadata plus declared component access.
 pub struct System {
   priv name : String
-  priv phase : SystemPhase
+  priv phase : PhaseKey
   priv reads : Array[ComponentTypeId]
   priv writes : Array[ComponentTypeId]
   priv structural_write : Bool

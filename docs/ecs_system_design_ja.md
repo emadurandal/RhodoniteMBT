@@ -18,7 +18,7 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 
 ## Schedule Access Rules
 
-`Schedule` は固定の update/render lifecycle を持ちません。`SystemPhase` は外部から渡される id token で、phase の意味と実行順序は `Schedule::run(world, ctx, phases)` または `Schedule::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では `AppPhase` を `SystemPhase` に変換し、`PhaseSlot::BeforeSchedule`、scene schedule、`PhaseSlot::AfterSchedule` の順に処理します。
+`Schedule` は固定の update/render lifecycle を持ちません。`PhaseKey` は外部から渡される文字列名付き id で、phase の意味と実行順序は `Schedule::run(world, ctx, phases)` または `Schedule::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では標準 phase を `phase_update()` / `phase_render_extract()` / `phase_render()` などの関数で提供し、`PhaseSlot::BeforeSchedule`、scene schedule、`PhaseSlot::AfterSchedule` の順に処理します。
 
 | API | Required access |
 |-----|-----------------|

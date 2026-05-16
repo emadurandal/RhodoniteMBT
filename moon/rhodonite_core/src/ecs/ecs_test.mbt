@@ -6,19 +6,19 @@ fn bytes4(a : Byte, b : Byte, c : Byte, d : Byte) -> FixedArray[Byte] {
 
 ///|
 /// Test phase used for ordinary update systems.
-fn update_phase() -> SystemPhase {
-  SystemPhase::new(1)
+fn update_phase() -> PhaseKey {
+  PhaseKey::new("test/update")
 }
 
 ///|
 /// Test phase used for systems that run after update systems.
-fn post_update_phase() -> SystemPhase {
-  SystemPhase::new(2)
+fn post_update_phase() -> PhaseKey {
+  PhaseKey::new("test/post_update")
 }
 
 ///|
 /// Phase order used by schedule tests.
-fn test_phases() -> Array[SystemPhase] {
+fn test_phases() -> Array[PhaseKey] {
   [update_phase(), post_update_phase()]
 }
 

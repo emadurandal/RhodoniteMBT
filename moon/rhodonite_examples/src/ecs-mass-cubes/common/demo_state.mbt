@@ -951,11 +951,11 @@ pub fn DemoState::render_scene(
 /// Builds an app lifecycle that drives this DemoState from an engine tick.
 pub fn create_app(demo_state : DemoState) -> @app.App {
   let app = @app.App::new()
-  app.on_phase(@app.AppPhase::Update, fn(_engine, frame) {
+  app.on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })
   app.on_phase(
-    @app.AppPhase::Render,
+    @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
         render_current_frame(demo_state, record_perf=true)
@@ -963,7 +963,7 @@ pub fn create_app(demo_state : DemoState) -> @app.App {
     },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  app.on_phase(@app.AppPhase::Shutdown, fn(_engine, _frame) {
+  app.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
   app
