@@ -13,6 +13,6 @@ describe("OrbitCameraController", () => {
 		input.beginFrame();
 
 		expect(updateOrbitCameraControllerFromInput(controller, input)).toBe(true);
-		expect(controller.dolly).toBeCloseTo(0.1);
+		expect(controller.dolly).toBeCloseTo(0.01);
 	});
 });

@@ -30,7 +30,7 @@ export function createOrbitCameraController(
 		panSensitivity: 0.01,
 		dolly: 1,
 		dollySensitivity: 0.001,
-		minDolly: 0.1,
+		minDolly: 0.01,
 		maxDolly: 4,
 	};
 }

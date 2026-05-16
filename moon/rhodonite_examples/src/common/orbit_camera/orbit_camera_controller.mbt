@@ -72,7 +72,7 @@ let default_max_pitch : Double = 1.25
 
 ///|
 /// Default lower dolly scale clamp.
-let default_min_dolly : Double = 0.1
+let default_min_dolly : Double = 0.01
 
 ///|
 /// Default upper dolly scale clamp.

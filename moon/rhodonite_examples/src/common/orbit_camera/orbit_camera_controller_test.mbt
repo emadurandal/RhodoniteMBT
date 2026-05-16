@@ -11,6 +11,6 @@ test "wheel dolly can zoom in to the default lower clamp" {
     update_orbit_camera_controller_from_input(world, camera, component, input),
   )
   let (_, _, _, _, dolly) = orbit_camera_transform(world, camera, component)
-  assert_true(dolly > 0.09)
-  assert_true(dolly < 0.11)
+  assert_true(dolly > 0.009)
+  assert_true(dolly < 0.011)
 }
