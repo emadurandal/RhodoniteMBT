@@ -149,8 +149,8 @@ Engine::tick
 
 ```moonbit
 let app = App::new()
-app.register_phase(AppPhase::Update, fn(engine, frame) { ... })
-app.register_phase(
+app.on_phase(AppPhase::Update, fn(engine, frame) { ... })
+app.on_phase(
   AppPhase::Render,
   fn(engine, frame) { ... },
   slot=PhaseSlot::AfterSchedule,
@@ -203,10 +203,10 @@ Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/sr
 | `PhaseSlot` | phase 内の `BeforeSchedule` / `AfterSchedule` 実行帯。schedule 外処理や将来の renderer task を phase lifecycle 内に置く。 |
 | `TimeState` | 固定 delta の frame counter。初期値は既存 ECS samples に合わせて 0.022 秒。 |
 | `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
-| `App` | phase handler registry。`register_phase` で `AppPhase` / `PhaseSlot` に処理を登録する。 |
+| `App` | phase handler registry。`on_phase` で `AppPhase` / `PhaseSlot` に処理を登録する。 |
 | `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で `Update`、`Extract`、`Render` phase を順に実行する。 |
 
-WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の処理は `App::register_phase` で `Update`、`Render`、`Shutdown` に登録します。
+WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の処理は `App::on_phase` で `Update`、`Render`、`Shutdown` に登録します。
 
 Browser JS export も sample-local state の名前に合わせ、`create_webgpu_demo_state(canvas)` を入口にします。WASM host-driven sample も `create_wasm_demo_state`、`initialize_demo_state`、`render_demo_frame` を ABI 名として使い、sample-local state と将来の engine-owned `Renderer` を名前で混同しないようにします。
 

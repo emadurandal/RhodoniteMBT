@@ -605,10 +605,10 @@ function createDemoStateForEngine(
 
 function createApp(demoState: DemoState): App {
 	const app = new App();
-	app.registerPhase(AppPhase.Update, (_engine, frame) =>
+	app.onPhase(AppPhase.Update, (_engine, frame) =>
 		updateScene(demoState, frame),
 	);
-	app.registerPhase(
+	app.onPhase(
 		AppPhase.Render,
 		() => {
 			if (demoState.scene.visible()) {
@@ -617,7 +617,7 @@ function createApp(demoState: DemoState): App {
 		},
 		PhaseSlot.AfterSchedule,
 	);
-	app.registerPhase(AppPhase.Shutdown, () => releaseDemoState(demoState));
+	app.onPhase(AppPhase.Shutdown, () => releaseDemoState(demoState));
 	return app;
 }
 

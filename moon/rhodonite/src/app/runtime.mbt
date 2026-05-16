@@ -254,7 +254,7 @@ pub fn App::new() -> App {
 
 ///|
 /// Registers a function to run in an app phase slot.
-pub fn App::register_phase(
+pub fn App::on_phase(
   self : App,
   phase : AppPhase,
   handler : (Engine, FrameState) -> Unit,

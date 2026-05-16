@@ -136,7 +136,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 export class App {
 	private readonly phaseHandlers: PhaseHandler[] = [];
 
-	registerPhase(
+	onPhase(
 		phase: AppPhase,
 		callback: AppCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,

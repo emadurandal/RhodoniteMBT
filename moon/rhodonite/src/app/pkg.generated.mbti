@@ -16,7 +16,7 @@ pub struct App {
   // private fields
 }
 pub fn App::new() -> Self
-pub fn App::register_phase(Self, AppPhase, (Engine, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn App::on_phase(Self, AppPhase, (Engine, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn App::run_after_schedule(Self, AppPhase, Engine, FrameState) -> Unit
 pub fn App::run_before_schedule(Self, AppPhase, Engine, FrameState) -> Unit
 pub fn App::run_phase_handlers(Self, AppPhase, PhaseSlot, Engine, FrameState) -> Unit
