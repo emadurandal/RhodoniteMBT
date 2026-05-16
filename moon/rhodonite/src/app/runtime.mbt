@@ -1,5 +1,5 @@
 ///|
-/// Per-frame application state passed through the app lifecycle.
+/// Per-frame state passed through the engine lifecycle.
 pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
@@ -7,7 +7,7 @@ pub(all) struct FrameState {
 }
 
 ///|
-/// Open lifecycle phase identifier shared by engine tasks, app handlers, and scene schedules.
+/// Open lifecycle phase identifier shared by engine tasks, engine handlers, and scene schedules.
 pub type PhaseKey = @ecs.PhaseKey
 
 ///|
@@ -17,14 +17,14 @@ pub(all) struct PhaseGroupKey {
 } derive(Eq)
 
 ///|
-/// Execution slot inside an app phase.
+/// Execution slot inside an engine phase.
 pub(all) enum PhaseSlot {
   BeforeSchedule
   AfterSchedule
 } derive(Eq)
 
 ///|
-/// Function registered by an app to run inside a phase slot.
+/// Function registered by the engine to run inside a phase slot.
 priv struct PhaseHandler {
   phase : PhaseKey
   slot : PhaseSlot
@@ -58,13 +58,6 @@ pub struct Scene {
 }
 
 ///|
-/// Application phase handler registry.
-pub struct App {
-  priv phase_handlers : Array[PhaseHandler]
-  priv mut phase_registration_locked : Bool
-}
-
-///|
 /// Runtime that owns platform context, time state, and scenes.
 pub struct Engine {
   priv gpu_context : @wgpu.GPUContext
@@ -72,8 +65,10 @@ pub struct Engine {
   priv main_scene_index : Int
   priv time_state : TimeState
   priv phase_groups : Array[PhaseGroup]
-  priv mut initializing_app : Bool
-  priv mut app_initialized : Bool
+  priv phase_handlers : Array[PhaseHandler]
+  priv mut phase_registration_locked : Bool
+  priv mut initializing : Bool
+  priv mut initialized : Bool
 }
 
 ///|
@@ -105,7 +100,7 @@ pub fn FrameState::elapsed_seconds(self : FrameState) -> Double {
 }
 
 ///|
-/// Converts the app frame state to an ECS system context.
+/// Converts the engine frame state to an ECS system context.
 pub fn FrameState::system_context(self : FrameState) -> @ecs.SystemContext {
   @ecs.SystemContext::new(self.delta_seconds, self.frame_index)
 }
@@ -370,7 +365,7 @@ fn Scene::add_ecs_system(self : Scene, system : @ecs.System) -> Unit {
 }
 
 ///|
-/// Builds and adds a non-structural ECS system for one app phase.
+/// Builds and adds a non-structural ECS system for one engine phase.
 pub fn Scene::add_system(
   self : Scene,
   phase : PhaseKey,
@@ -383,7 +378,7 @@ pub fn Scene::add_system(
 }
 
 ///|
-/// Builds and adds a structural-write ECS system for one app phase.
+/// Builds and adds a structural-write ECS system for one engine phase.
 pub fn Scene::add_structural_system(
   self : Scene,
   phase : PhaseKey,
@@ -398,7 +393,7 @@ pub fn Scene::add_structural_system(
 }
 
 ///|
-/// Adds the builtin transform propagation system for one app phase.
+/// Adds the builtin transform propagation system for one engine phase.
 pub fn Scene::add_transform_propagation_system(
   self : Scene,
   phase : PhaseKey,
@@ -443,81 +438,13 @@ pub fn Scene::visible(self : Scene) -> Bool {
 }
 
 ///|
-/// Runs this scene's schedule for one app phase.
+/// Runs this scene's schedule for one engine phase.
 pub fn Scene::run_schedule_phase(
   self : Scene,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Bool {
   self.schedule.run_phase(self.world, frame.system_context(), phase)
-}
-
-///|
-/// Implements `App::new`.
-pub fn App::new() -> App {
-  let phase_handlers : Array[PhaseHandler] = []
-  { phase_handlers, phase_registration_locked: false }
-}
-
-///|
-/// Registers a function to run in an app phase slot.
-pub fn App::on_phase(
-  self : App,
-  phase : PhaseKey,
-  handler : (Engine, FrameState) -> Unit,
-  slot? : PhaseSlot = BeforeSchedule,
-) -> Unit {
-  if self.phase_registration_locked {
-    abort(
-      "App::on_phase: phase handlers cannot be registered after app initialization",
-    )
-  }
-  self.phase_handlers.push({ phase, slot, run: handler })
-}
-
-///|
-/// Prevents additional phase handler registration.
-fn App::lock_phase_registration(self : App) -> Unit {
-  self.phase_registration_locked = true
-}
-
-///|
-/// Runs handlers registered for a phase slot.
-pub fn App::run_phase_handlers(
-  self : App,
-  phase : PhaseKey,
-  slot : PhaseSlot,
-  engine : Engine,
-  frame : FrameState,
-) -> Unit {
-  for i = 0; i < self.phase_handlers.length(); i = i + 1 {
-    let handler = self.phase_handlers[i]
-    if handler.phase == phase && handler.slot == slot {
-      (handler.run)(engine, frame)
-    }
-  }
-}
-
-///|
-/// Runs handlers registered before a phase's scene schedules.
-pub fn App::run_before_schedule(
-  self : App,
-  phase : PhaseKey,
-  engine : Engine,
-  frame : FrameState,
-) -> Unit {
-  self.run_phase_handlers(phase, BeforeSchedule, engine, frame)
-}
-
-///|
-/// Runs handlers registered after a phase's scene schedules.
-pub fn App::run_after_schedule(
-  self : App,
-  phase : PhaseKey,
-  engine : Engine,
-  frame : FrameState,
-) -> Unit {
-  self.run_phase_handlers(phase, AfterSchedule, engine, frame)
 }
 
 ///|
@@ -533,6 +460,7 @@ pub fn Engine::new_with_main_scene(
   main_scene : Scene,
 ) -> Engine {
   let scenes : Array[Scene] = []
+  let phase_handlers : Array[PhaseHandler] = []
   scenes.push(main_scene)
   {
     gpu_context,
@@ -540,8 +468,10 @@ pub fn Engine::new_with_main_scene(
     main_scene_index: 0,
     time_state: TimeState::new((0.022 : Float)),
     phase_groups: default_phase_groups(),
-    initializing_app: false,
-    app_initialized: false,
+    phase_handlers,
+    phase_registration_locked: false,
+    initializing: false,
+    initialized: false,
   }
 }
 
@@ -555,6 +485,64 @@ pub fn Engine::gpu_context(self : Engine) -> @wgpu.GPUContext {
 /// Implements `Engine::main_scene`.
 pub fn Engine::main_scene(self : Engine) -> Scene {
   self.scenes[self.main_scene_index]
+}
+
+///|
+/// Registers a function to run in an engine phase slot.
+pub fn Engine::on_phase(
+  self : Engine,
+  phase : PhaseKey,
+  handler : (Engine, FrameState) -> Unit,
+  slot? : PhaseSlot = BeforeSchedule,
+) -> Unit {
+  if self.phase_registration_locked {
+    abort(
+      "Engine::on_phase: phase handlers cannot be registered after engine initialization",
+    )
+  }
+  self.phase_handlers.push({ phase, slot, run: handler })
+}
+
+///|
+/// Prevents additional phase handler registration.
+fn Engine::lock_phase_registration(self : Engine) -> Unit {
+  self.phase_registration_locked = true
+}
+
+///|
+/// Runs handlers registered for a phase slot.
+fn Engine::run_phase_handlers(
+  self : Engine,
+  phase : PhaseKey,
+  slot : PhaseSlot,
+  frame : FrameState,
+) -> Unit {
+  for i = 0; i < self.phase_handlers.length(); i = i + 1 {
+    let handler = self.phase_handlers[i]
+    if handler.phase == phase && handler.slot == slot {
+      (handler.run)(self, frame)
+    }
+  }
+}
+
+///|
+/// Runs handlers registered before a phase's scene schedules.
+fn Engine::run_before_schedule(
+  self : Engine,
+  phase : PhaseKey,
+  frame : FrameState,
+) -> Unit {
+  self.run_phase_handlers(phase, BeforeSchedule, frame)
+}
+
+///|
+/// Runs handlers registered after a phase's scene schedules.
+fn Engine::run_after_schedule(
+  self : Engine,
+  phase : PhaseKey,
+  frame : FrameState,
+) -> Unit {
+  self.run_phase_handlers(phase, AfterSchedule, frame)
 }
 
 ///|
@@ -579,9 +567,9 @@ fn Engine::ensure_phase_group_edit_window(
   self : Engine,
   caller : String,
 ) -> Unit {
-  if !self.initializing_app {
+  if !self.initializing {
     abort(
-      caller + ": phase groups can only be edited during Engine::initialize_app",
+      caller + ": phase groups can only be edited during Engine::initialize",
     )
   }
 }
@@ -733,13 +721,13 @@ fn Engine::can_run_phase(self : Engine, phase : PhaseKey) -> Bool {
 }
 
 ///|
-/// Verifies that all app handlers target phases owned by this engine.
-fn Engine::validate_app_phases(self : Engine, app : App) -> Unit {
-  for i = 0; i < app.phase_handlers.length(); i = i + 1 {
-    let handler = app.phase_handlers[i]
+/// Verifies that all phase handlers target phases owned by this engine.
+fn Engine::validate_phase_handlers(self : Engine) -> Unit {
+  for i = 0; i < self.phase_handlers.length(); i = i + 1 {
+    let handler = self.phase_handlers[i]
     if !self.can_run_phase(handler.phase) {
       abort(
-        "Engine::initialize_app: app handler phase is not registered in this engine: " +
+        "Engine::initialize: phase handler target is not registered in this engine: " +
         handler.phase.name(),
       )
     }
@@ -747,57 +735,55 @@ fn Engine::validate_app_phases(self : Engine, app : App) -> Unit {
 }
 
 ///|
-/// Requires the app lifecycle to have been initialized.
-fn Engine::ensure_app_initialized(self : Engine, caller : String) -> Unit {
-  if !self.app_initialized {
+/// Requires the engine lifecycle to have been initialized.
+fn Engine::ensure_initialized(self : Engine, caller : String) -> Unit {
+  if !self.initialized {
     abort(
       caller +
-      ": app must be initialized with Engine::initialize_app before execution",
+      ": engine must be initialized with Engine::initialize before execution",
     )
   }
 }
 
 ///|
-/// Implements `Engine::shutdown_app`.
-pub fn Engine::shutdown_app(self : Engine, app : App) -> Unit {
-  self.ensure_app_initialized("Engine::shutdown_app")
-  self.run_phase(app, phase_shutdown(), zero_frame_state())
+/// Implements `Engine::shutdown`.
+pub fn Engine::shutdown(self : Engine) -> Unit {
+  self.ensure_initialized("Engine::shutdown")
+  self.run_phase(phase_shutdown(), zero_frame_state())
 }
 
 ///|
-/// Runs one app phase without lifecycle initialization checks.
+/// Runs one engine phase without lifecycle initialization checks.
 fn Engine::run_phase_unchecked(
   self : Engine,
-  app : App,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  app.run_before_schedule(phase, self, frame)
+  self.run_before_schedule(phase, frame)
   for i = 0; i < self.scenes.length(); i = i + 1 {
     let scene = self.scenes[i]
     if self.scene_participates_in_phase(scene, phase) {
       ignore(scene.run_schedule_phase(phase, frame))
     }
   }
-  app.run_after_schedule(phase, self, frame)
+  self.run_after_schedule(phase, frame)
 }
 
 ///|
-/// Runs one app phase, including app handlers and matching scene schedules.
+/// Runs one engine phase, including handlers and matching scene schedules.
 pub fn Engine::run_phase(
   self : Engine,
-  app : App,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  self.ensure_app_initialized("Engine::run_phase")
+  self.ensure_initialized("Engine::run_phase")
   if !self.can_run_phase(phase) {
     abort(
       "Engine::run_phase: phase is not registered in this engine: " +
       phase.name(),
     )
   }
-  self.run_phase_unchecked(app, phase, frame)
+  self.run_phase_unchecked(phase, frame)
 }
 
 ///|
@@ -815,39 +801,38 @@ fn Engine::scene_participates_in_phase(
 }
 
 ///|
-/// Implements `Engine::initialize_app`.
-pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
-  if self.initializing_app || self.app_initialized {
-    abort("Engine::initialize_app: app is already initialized")
+/// Implements `Engine::initialize`.
+pub fn Engine::initialize(self : Engine) -> Unit {
+  if self.initializing || self.initialized {
+    abort("Engine::initialize: engine is already initialized")
   }
-  app.lock_phase_registration()
-  self.initializing_app = true
-  self.run_phase_unchecked(app, phase_startup(), zero_frame_state())
-  self.initializing_app = false
-  self.validate_app_phases(app)
-  self.app_initialized = true
+  self.lock_phase_registration()
+  self.initializing = true
+  self.run_phase_unchecked(phase_startup(), zero_frame_state())
+  self.initializing = false
+  self.validate_phase_handlers()
+  self.initialized = true
 }
 
 ///|
 /// Runs all phases in one phase group using a caller-supplied frame state.
 pub fn Engine::run_phase_group(
   self : Engine,
-  app : App,
   group_key : PhaseGroupKey,
   frame : FrameState,
 ) -> Unit {
-  self.ensure_app_initialized("Engine::run_phase_group")
+  self.ensure_initialized("Engine::run_phase_group")
   let group_index = self.find_phase_group("Engine::run_phase_group", group_key)
   let phases = self.phase_groups[group_index].phases
   for i = 0; i < phases.length(); i = i + 1 {
-    self.run_phase(app, phases[i], frame)
+    self.run_phase(phases[i], frame)
   }
 }
 
 ///|
 /// Advances the render-frame clock and runs the standard render-frame phase group.
-pub fn Engine::run_render_frame(self : Engine, app : App) -> Unit {
-  self.ensure_app_initialized("Engine::run_render_frame")
+pub fn Engine::run_render_frame(self : Engine) -> Unit {
+  self.ensure_initialized("Engine::run_render_frame")
   let frame = self.time_state.next_frame()
-  self.run_phase_group(app, phase_group_render_frame(), frame)
+  self.run_phase_group(phase_group_render_frame(), frame)
 }

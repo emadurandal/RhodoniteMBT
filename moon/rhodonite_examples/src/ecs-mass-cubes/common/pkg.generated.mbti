@@ -10,8 +10,6 @@ import {
 }
 
 // Values
-pub fn create_app(DemoState) -> @app.App
-
 pub fn create_demo_state(@webgpu.GPUContext) -> DemoState?
 
 pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
@@ -23,6 +21,8 @@ pub fn create_demo_state_for_scene(@app.Scene, @webgpu.GPUDevice, @webgpu.GPUQue
 pub fn create_engine(@webgpu.GPUContext) -> @app.Engine
 
 pub fn demo_state_release(DemoState) -> Unit
+
+pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState, record_perf? : Bool) -> Unit
 

@@ -124,18 +124,19 @@ pub fn render_frame_to_view(
 }
 
 ///|
-/// Builds an app lifecycle that drives this DemoState from an engine tick.
-pub fn create_app(demo_state : DemoState) -> @app.App {
-  let app = @app.App::new()
-  app.on_phase(
+/// Registers engine phase handlers that drive this DemoState.
+pub fn register_engine_handlers(
+  engine : @app.Engine,
+  demo_state : DemoState,
+) -> Unit {
+  engine.on_phase(
     @app.phase_render(),
     fn(_engine, _frame) { render_current_frame(demo_state) },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  app.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
-  app
 }
 
 ///|

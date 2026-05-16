@@ -36,32 +36,24 @@ pub fn phase_update() -> @ecs.PhaseKey
 // Errors
 
 // Types and methods
-pub struct App {
-  // private fields
-}
-pub fn App::new() -> Self
-pub fn App::on_phase(Self, @ecs.PhaseKey, (Engine, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
-pub fn App::run_after_schedule(Self, @ecs.PhaseKey, Engine, FrameState) -> Unit
-pub fn App::run_before_schedule(Self, @ecs.PhaseKey, Engine, FrameState) -> Unit
-pub fn App::run_phase_handlers(Self, @ecs.PhaseKey, PhaseSlot, Engine, FrameState) -> Unit
-
 pub struct Engine {
   // private fields
 }
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
-pub fn Engine::initialize_app(Self, App) -> Unit
+pub fn Engine::initialize(Self) -> Unit
 pub fn Engine::insert_phase_after_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
+pub fn Engine::on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
-pub fn Engine::run_phase(Self, App, @ecs.PhaseKey, FrameState) -> Unit
-pub fn Engine::run_phase_group(Self, App, PhaseGroupKey, FrameState) -> Unit
-pub fn Engine::run_render_frame(Self, App) -> Unit
-pub fn Engine::shutdown_app(Self, App) -> Unit
+pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
+pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
+pub fn Engine::run_render_frame(Self) -> Unit
+pub fn Engine::shutdown(Self) -> Unit
 
 pub(all) struct FrameState {
   delta_seconds : Float

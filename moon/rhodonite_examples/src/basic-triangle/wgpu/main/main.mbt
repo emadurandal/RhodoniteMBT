@@ -24,12 +24,12 @@ async fn run_sdl_wgpu_triangle() -> Unit raise Error {
           return
         }
       }
-      let app = @demo_state.create_app(demo_state)
-      engine.initialize_app(app)
+      @demo_state.register_engine_handlers(engine, demo_state)
+      engine.initialize()
       let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
-        engine.run_render_frame(app)
+        engine.run_render_frame()
       })
-      engine.shutdown_app(app)
+      engine.shutdown()
       @sdl_wgpu.release_native_demo_infrastructure(session)
     }
   }

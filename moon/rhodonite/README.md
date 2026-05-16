@@ -6,7 +6,7 @@ Public **facade** module for [RhodoniteMBT](https://github.com/emadurandal/Rhodo
 
 It also exposes early high-level runtime helpers:
 
-- `emadurandal/rhodonite/app` — `App`, `Engine`, `Scene`, `FrameState`, and `TimeState`
+- `emadurandal/rhodonite/app` — `Engine`, `Scene`, `FrameState`, and `TimeState`
 
 For lower-level surface area, import packages from the underlying modules directly:
 

@@ -19,7 +19,6 @@ import {
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
 import {
-	App,
 	Engine,
 	Phase,
 	PhaseSlot,
@@ -605,13 +604,12 @@ function createDemoStateForEngine(
 	return demoState;
 }
 
-function createApp(demoState: DemoState): App {
-	const app = new App();
-	app.onPhase(Phase.Update, (_engine, frame) => {
+function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
+	engine.onPhase(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
-	app.onPhase(
+	engine.onPhase(
 		Phase.Render,
 		() => {
 			if (demoState.scene.visible()) {
@@ -620,8 +618,7 @@ function createApp(demoState: DemoState): App {
 		},
 		PhaseSlot.AfterSchedule,
 	);
-	app.onPhase(Phase.Shutdown, () => releaseDemoState(demoState));
-	return app;
+	engine.onPhase(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
@@ -714,13 +711,13 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 		mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
 	});
 	const demoState = createDemoStateForEngine(engine, "rgba8unorm");
-	const app = createApp(demoState);
-	engine.initializeApp(app);
+	registerEngineHandlers(engine, demoState);
+	engine.initialize();
 	const target = createRgba8ReadbackTarget(demoState.device, CANVAS_WIDTH, CANVAS_HEIGHT);
 	try {
 		demoState.snapshotColorView = target.view;
 		demoState.snapshotDepthView = target.depthView;
-		engine.runRenderFrame(app);
+		engine.runRenderFrame();
 		demoState.snapshotColorView = undefined;
 		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
@@ -733,7 +730,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	} finally {
 		demoState.snapshotColorView = undefined;
 		demoState.snapshotDepthView = undefined;
-		engine.shutdownApp(app);
+		engine.shutdown();
 		destroyReadbackTarget(target);
 	}
 }
@@ -752,10 +749,10 @@ if (!navigator.gpu) {
 		})
 			.then((engine) => {
 				const demoState = createDemoStateForEngine(engine);
-				const app = createApp(demoState);
-				engine.initializeApp(app);
+				registerEngineHandlers(engine, demoState);
+				engine.initialize();
 				const loop = () => {
-					engine.runRenderFrame(app);
+					engine.runRenderFrame();
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);

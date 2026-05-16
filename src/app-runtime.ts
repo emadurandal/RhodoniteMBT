@@ -1,4 +1,4 @@
-export type AppCallback = (engine: Engine, frame: FrameState) => void;
+export type EngineCallback = (engine: Engine, frame: FrameState) => void;
 
 export type SceneScheduleCallback<TWorld> = (
 	world: TWorld,
@@ -65,7 +65,7 @@ export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
 type PhaseHandler = {
 	phase: PhaseKey;
 	slot: PhaseSlot;
-	callback: AppCallback;
+	callback: EngineCallback;
 };
 
 type SceneScheduleHandler<TWorld> = {
@@ -173,51 +173,6 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 }
 
-export class App {
-	private readonly phaseHandlers: PhaseHandler[] = [];
-	private phaseRegistrationLocked = false;
-
-	onPhase(
-		phase: PhaseKey,
-		callback: AppCallback,
-		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
-	): void {
-		if (this.phaseRegistrationLocked) {
-			throw new Error(
-				"App.onPhase cannot register phase handlers after app initialization.",
-			);
-		}
-		this.phaseHandlers.push({ phase, slot, callback });
-	}
-
-	lockPhaseRegistration(): void {
-		this.phaseRegistrationLocked = true;
-	}
-
-	validateForEngine(phaseCanRun: (phase: PhaseKey) => boolean): void {
-		for (const handler of this.phaseHandlers) {
-			if (!phaseCanRun(handler.phase)) {
-				throw new Error(
-					`App phase '${handler.phase}' is not registered in this engine.`,
-				);
-			}
-		}
-	}
-
-	runPhaseHandlers(
-		phase: PhaseKey,
-		slot: PhaseSlot,
-		engine: Engine,
-		frame: FrameState,
-	): void {
-		for (const handler of this.phaseHandlers) {
-			if (handler.phase === phase && handler.slot === slot) {
-				handler.callback(engine, frame);
-			}
-		}
-	}
-}
-
 type RuntimeScene = {
 	enabled: () => boolean;
 	visible: () => boolean;
@@ -234,8 +189,10 @@ export class Engine {
 	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
 	private readonly phaseGroupsValue: PhaseGroupRecord[];
-	private initializingApp = false;
-	private appInitialized = false;
+	private readonly phaseHandlers: PhaseHandler[] = [];
+	private phaseRegistrationLocked = false;
+	private initializing = false;
+	private initialized = false;
 	private mainSceneIndex = 0;
 
 	private constructor(
@@ -289,21 +246,34 @@ export class Engine {
 		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
 	}
 
-	initializeApp(app: App): void {
-		if (this.initializingApp || this.appInitialized) {
-			throw new Error("Engine app is already initialized.");
+	onPhase(
+		phase: PhaseKey,
+		callback: EngineCallback,
+		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
+	): void {
+		if (this.phaseRegistrationLocked) {
+			throw new Error(
+				"Engine.onPhase cannot register phase handlers after engine initialization.",
+			);
 		}
-		app.lockPhaseRegistration();
-		this.initializingApp = true;
-		this.runPhaseUnchecked(app, Phase.Startup, new FrameState(0, 0, 0));
-		this.initializingApp = false;
-		app.validateForEngine((phaseKey) => this.phaseCanRun(phaseKey));
-		this.appInitialized = true;
+		this.phaseHandlers.push({ phase, slot, callback });
 	}
 
-	shutdownApp(app: App): void {
-		this.ensureAppInitialized("Engine.shutdownApp");
-		this.runPhase(app, Phase.Shutdown, new FrameState(0, 0, 0));
+	initialize(): void {
+		if (this.initializing || this.initialized) {
+			throw new Error("Engine is already initialized.");
+		}
+		this.lockPhaseRegistration();
+		this.initializing = true;
+		this.runPhaseUnchecked(Phase.Startup, new FrameState(0, 0, 0));
+		this.initializing = false;
+		this.validatePhaseHandlers();
+		this.initialized = true;
+	}
+
+	shutdown(): void {
+		this.ensureInitialized("Engine.shutdown");
+		this.runPhase(Phase.Shutdown, new FrameState(0, 0, 0));
 	}
 
 	phaseGroupOrder(group: PhaseGroupKey): PhaseKey[] {
@@ -346,36 +316,36 @@ export class Engine {
 		this.insertPhaseInGroup(group, anchor, phaseKey, 1);
 	}
 
-	runPhase(app: App, phase: PhaseKey, frame: FrameState): void {
-		this.ensureAppInitialized("Engine.runPhase");
+	runPhase(phase: PhaseKey, frame: FrameState): void {
+		this.ensureInitialized("Engine.runPhase");
 		if (!this.phaseCanRun(phase)) {
 			throw new Error(`Phase '${phase}' is not registered in this engine.`);
 		}
-		this.runPhaseUnchecked(app, phase, frame);
+		this.runPhaseUnchecked(phase, frame);
 	}
 
-	private runPhaseUnchecked(app: App, phase: PhaseKey, frame: FrameState): void {
-		app.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, this, frame);
+	private runPhaseUnchecked(phase: PhaseKey, frame: FrameState): void {
+		this.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
 				scene.runSchedulePhase(phase, frame);
 			}
 		}
-		app.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, this, frame);
+		this.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, frame);
 	}
 
-	runPhaseGroup(app: App, group: PhaseGroupKey, frame: FrameState): void {
-		this.ensureAppInitialized("Engine.runPhaseGroup");
+	runPhaseGroup(group: PhaseGroupKey, frame: FrameState): void {
+		this.ensureInitialized("Engine.runPhaseGroup");
 		const phaseGroup = this.findPhaseGroup("Engine.runPhaseGroup", group);
 		for (const phase of phaseGroup.phases) {
-			this.runPhase(app, phase, frame);
+			this.runPhase(phase, frame);
 		}
 	}
 
-	runRenderFrame(app: App): void {
-		this.ensureAppInitialized("Engine.runRenderFrame");
+	runRenderFrame(): void {
+		this.ensureInitialized("Engine.runRenderFrame");
 		const frame = this.timeState.nextFrame();
-		this.runPhaseGroup(app, PhaseGroup.RenderFrame, frame);
+		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {
@@ -414,9 +384,9 @@ export class Engine {
 	}
 
 	private ensurePhaseGroupEditWindow(caller: string): void {
-		if (!this.initializingApp) {
+		if (!this.initializing) {
 			throw new Error(
-				`${caller} can only edit phase groups during Engine.initializeApp.`,
+				`${caller} can only edit phase groups during Engine.initialize.`,
 			);
 		}
 	}
@@ -451,10 +421,36 @@ export class Engine {
 		);
 	}
 
-	private ensureAppInitialized(caller: string): void {
-		if (!this.appInitialized) {
+	private lockPhaseRegistration(): void {
+		this.phaseRegistrationLocked = true;
+	}
+
+	private validatePhaseHandlers(): void {
+		for (const handler of this.phaseHandlers) {
+			if (!this.phaseCanRun(handler.phase)) {
+				throw new Error(
+					`Engine phase handler target '${handler.phase}' is not registered in this engine.`,
+				);
+			}
+		}
+	}
+
+	private runPhaseHandlers(
+		phase: PhaseKey,
+		slot: PhaseSlot,
+		frame: FrameState,
+	): void {
+		for (const handler of this.phaseHandlers) {
+			if (handler.phase === phase && handler.slot === slot) {
+				handler.callback(this, frame);
+			}
+		}
+	}
+
+	private ensureInitialized(caller: string): void {
+		if (!this.initialized) {
 			throw new Error(
-				`${caller} requires Engine.initializeApp(app) to run first.`,
+				`${caller} requires Engine.initialize() to run first.`,
 			);
 		}
 	}
