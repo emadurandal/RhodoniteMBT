@@ -234,17 +234,6 @@ fn copy_phase_array(src : Array[PhaseKey]) -> Array[PhaseKey] {
 }
 
 ///|
-/// Reports whether a phase key array contains a phase.
-fn phase_array_contains(phases : Array[PhaseKey], phase_key : PhaseKey) -> Bool {
-  for i = 0; i < phases.length(); i = i + 1 {
-    if phases[i] == phase_key {
-      return true
-    }
-  }
-  false
-}
-
-///|
 /// Finds a phase key index or returns -1.
 fn phase_array_index(phases : Array[PhaseKey], phase_key : PhaseKey) -> Int {
   for i = 0; i < phases.length(); i = i + 1 {
@@ -607,7 +596,7 @@ fn Engine::phase_registered_in_any_group(
   phase : PhaseKey,
 ) -> Bool {
   for i = 0; i < self.phase_groups.length(); i = i + 1 {
-    if phase_array_contains(self.phase_groups[i].phases, phase) {
+    if @ecs.phase_array_contains(self.phase_groups[i].phases, phase) {
       return true
     }
   }

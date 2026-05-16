@@ -14,7 +14,7 @@ fn component_array_intersects(
 
 ///|
 /// Implements `phase_array_contains`.
-fn phase_array_contains(phases : Array[PhaseKey], phase : PhaseKey) -> Bool {
+pub fn phase_array_contains(phases : Array[PhaseKey], phase : PhaseKey) -> Bool {
   for i = 0; i < phases.length(); i = i + 1 {
     if phases[i] == phase {
       return true

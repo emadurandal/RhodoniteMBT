@@ -99,8 +99,15 @@ pub(all) struct DemoState {
 ///|
 /// Implements `create_demo_state`.
 pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
-  let engine = @app.Engine::new(context)
-  create_demo_state_for_engine(engine)
+  let (device, canvas_context, format, queue) = context.get()
+  Some(
+    create_demo_state_for_device(
+      device,
+      queue,
+      format,
+      context=Some(canvas_context),
+    ),
+  )
 }
 
 ///|
