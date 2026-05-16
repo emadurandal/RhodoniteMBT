@@ -165,10 +165,13 @@ fn view_space_y_range_corners(
 /// WebGPU clips to `0 ≤ clip.z ≤ clip.w`. [`Matrix44::ortho`] maps view **z** in
 /// `[-far, -near]` to NDC depth `[0, 1]`. This grid can reach **positive** view **z**,
 /// so we pull along **−Z** and extend **far** so the whole slab stays inside the clip volume.
-fn camera_matrices() -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
-  let view_rot = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
-    @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
-  )
+fn camera_matrices(
+  yaw : Double,
+  pitch : Double,
+) -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
+  let view_rot = @m44.Matrix44::rotation_x(pitch)
+    .mat_mul(@m44.Matrix44::rotation_y(yaw))
+    .mat_mul(@m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0))
   let per_side = grid_side_len(entity_count)
   let half = (per_side - 1).to_double() * 0.5
   let extent_xz = half * grid_spacing
@@ -429,6 +432,7 @@ pub(all) struct DemoState {
   transform_upload_range : @ecs.GlobalTransformUploadRange
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
   bind_group_offsets : Array[UInt]
+  orbit_controller : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
@@ -650,6 +654,9 @@ pub fn create_demo_state_for_scene(
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
+  let orbit_controller = @orbit.register_orbit_camera_controller_component(
+    world,
+  )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
@@ -691,7 +698,17 @@ pub fn create_demo_state_for_scene(
     transform_refs, entity_count, dense_transform_layout,
   )
   let camera = world.create_entity()
-  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  ignore(
+    @orbit.add_orbit_camera_controller(
+      world, camera, orbit_controller, 0.0, camera_elevation_rad,
+    ),
+  )
+  let (camera_yaw, camera_pitch) = @orbit.orbit_camera_yaw_pitch(
+    world, camera, orbit_controller,
+  )
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
+    camera_yaw, camera_pitch,
+  )
   ignore(
     world.set_camera_matrices(
       camera,
@@ -765,6 +782,7 @@ pub fn create_demo_state_for_scene(
     transform_upload_range,
     dense_transform_layout,
     bind_group_offsets: [],
+    orbit_controller,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
     perf_frame_start_ms: @ref.new(-1.0),
@@ -905,7 +923,14 @@ pub fn DemoState::render_scene(
 ) -> Unit {
   let world = scene.world()
   let camera = scene_main_camera_or_abort(scene)
-  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  let (camera_yaw, camera_pitch) = @orbit.orbit_camera_yaw_pitch(
+    world,
+    camera,
+    self.orbit_controller,
+  )
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
+    camera_yaw, camera_pitch,
+  )
   ignore(
     world.set_camera_matrices(
       camera,
@@ -971,6 +996,16 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
+  engine.on_phase(@app.phase_input(), fn(engine, _frame) {
+    ignore(
+      @orbit.update_orbit_camera_controller_from_input(
+        demo_state.scene.world(),
+        scene_main_camera_or_abort(demo_state.scene),
+        demo_state.orbit_controller,
+        engine.input(),
+      ),
+    )
+  })
   engine.on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)

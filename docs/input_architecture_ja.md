@@ -37,6 +37,8 @@ rhodonite/present
 
 入力を読む gameplay system は通常 `rhodonite/update` に置く。`rhodonite/input` は、入力確定直後に adapter 由来の補正や user-level action mapping を挟みたい場合のために予約する。
 
+ECS component に入力状態を反映して、その component を後続の update / render が読む controller 型の処理は `rhodonite/input` に置いてよい。これにより、同一フレーム内で「入力確定 -> controller 更新 -> scene 更新 -> 描画」の順序を保てる。
+
 ## Event flow
 
 Browser:
@@ -90,3 +92,10 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 `pointer_delta_x/y` と `wheel_delta_x/y` はフレームごとに 0 に戻り、そのフレームで適用されたイベントの合計になる。button state はフレームをまたいで保持される。
 
+## ECS sample camera controller
+
+`ecs-scene-graph` と `ecs-mass-cubes` は、サンプル共通 package の [`OrbitCameraController`](../moon/rhodonite_examples/src/common/orbit_camera/orbit_camera_controller.mbt) を使う。これは ECS の CPU component として yaw / pitch / sensitivity / pitch clamp を保持し、`rhodonite/input` phase の handler が `Engine::input()` から mouse drag delta を読んで component を更新する。
+
+camera matrix の生成側は DOM や SDL3 を見ず、camera entity に付いた `OrbitCameraController` の yaw / pitch だけを読む。browser サンプルでは TypeScript entry が pointer event を MoonBit export へ渡し、native サンプルでは既存 SDL adapter が `Engine::input()` へ enqueue するため、同じ controller code を両 target で共有できる。
+
+この controller は現時点では examples 側の sample utility として置く。複数サンプルやアプリで API と挙動が固まったら、汎用 camera controller component / system としてライブラリ側へ移す候補にする。ただし platform adapter と同様に、controller は入力モデルと ECS / app layer の責務であり、`rhodonite_webgpu` には置かない。

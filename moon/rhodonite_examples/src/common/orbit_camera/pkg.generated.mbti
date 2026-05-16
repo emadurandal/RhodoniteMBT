@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/common/orbit_camera"
+
+import {
+  "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_core/input",
+}
+
+// Values
+pub fn add_orbit_camera_controller(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId, Double, Double) -> Bool
+
+pub fn orbit_camera_yaw_pitch(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId) -> (Double, Double)
+
+pub fn register_orbit_camera_controller_component(@ecs.World) -> @ecs.ComponentTypeId
+
+pub fn update_orbit_camera_controller_from_input(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId, @input.InputState) -> Bool
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

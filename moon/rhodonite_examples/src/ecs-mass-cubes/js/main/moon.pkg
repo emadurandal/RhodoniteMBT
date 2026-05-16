@@ -1,5 +1,6 @@
 import {
   "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_examples/common/browser" @html_ctx,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @demo_state,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
@@ -13,7 +14,14 @@ options(
   "is-main": true,
   link: {
     "js": {
-      "exports": [ "create_webgpu_demo_state", "ecs_mass_cubes_render_tick" ],
+      "exports": [
+        "create_webgpu_demo_state",
+        "ecs_mass_cubes_render_tick",
+        "ecs_mass_cubes_input_pointer_move",
+        "ecs_mass_cubes_input_mouse_down",
+        "ecs_mass_cubes_input_mouse_up",
+        "ecs_mass_cubes_input_focus_lost",
+      ],
       "format": "esm",
     },
   },

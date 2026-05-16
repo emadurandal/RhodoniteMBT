@@ -92,6 +92,7 @@ pub(all) struct DemoState {
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
+  orbit_controller : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 
@@ -223,6 +224,9 @@ pub fn create_demo_state_for_scene(
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
   let world = scene.world()
+  let orbit_controller = @orbit.register_orbit_camera_controller_component(
+    world,
+  )
   let camera = world.create_entity()
   let sun = world.create_entity()
   let earth = world.create_entity()
@@ -237,7 +241,12 @@ pub fn create_demo_state_for_scene(
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
   scene.set_main_camera(Some(camera))
-  push_camera_matrices(world, camera)
+  ignore(
+    @orbit.add_orbit_camera_controller(
+      world, camera, orbit_controller, 0.0, camera_elevation_rad,
+    ),
+  )
+  push_camera_matrices(world, camera, orbit_controller)
   let transform_storage = device.create_global_transform_words_buffer(world)
   let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
@@ -326,6 +335,7 @@ pub fn create_demo_state_for_scene(
     scene,
     bodies,
     gt,
+    orbit_controller,
     frame: @ref.new(0),
   }
 }
@@ -341,8 +351,16 @@ fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
 
 ///|
 /// Implements `push_camera_matrices`.
-fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
-  let view = @m44.Matrix44::rotation_x(camera_elevation_rad)
+fn push_camera_matrices(
+  world : @ecs.World,
+  camera : @ecs.EntityId,
+  orbit_controller : @ecs.ComponentTypeId,
+) -> Unit {
+  let (yaw, pitch) = @orbit.orbit_camera_yaw_pitch(
+    world, camera, orbit_controller,
+  )
+  let view = @m44.Matrix44::rotation_x(pitch)
+    .mat_mul(@m44.Matrix44::rotation_y(yaw))
     .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
     .to_float()
   let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0).to_float()
@@ -513,7 +531,11 @@ pub fn DemoState::render_scene(
     self.transform_storage,
     world,
   )
-  push_camera_matrices(world, scene_main_camera_or_abort(scene))
+  push_camera_matrices(
+    world,
+    scene_main_camera_or_abort(scene),
+    self.orbit_controller,
+  )
   self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
   let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -567,6 +589,16 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
+  engine.on_phase(@app.phase_input(), fn(engine, _frame) {
+    ignore(
+      @orbit.update_orbit_camera_controller_from_input(
+        demo_state.scene.world(),
+        scene_main_camera_or_abort(demo_state.scene),
+        demo_state.orbit_controller,
+        engine.input(),
+      ),
+    )
+  })
   engine.on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })
