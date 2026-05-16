@@ -94,8 +94,10 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 ## ECS sample camera controller
 
-`ecs-scene-graph` と `ecs-mass-cubes` は、サンプル共通 package の [`OrbitCameraController`](../moon/rhodonite_examples/src/common/orbit_camera/orbit_camera_controller.mbt) を使う。これは ECS の CPU component として yaw / pitch / sensitivity / pitch clamp を保持し、`rhodonite/input` phase の handler が `Engine::input()` から mouse drag delta を読んで component を更新する。
+`ecs-scene-graph` と MoonBit 実装の `ecs-mass-cubes` は、サンプル共通 package の [`OrbitCameraController`](../moon/rhodonite_examples/src/common/orbit_camera/orbit_camera_controller.mbt) を使う。これは ECS の CPU component として yaw / pitch / sensitivity / pitch clamp を保持し、`rhodonite/input` phase の handler が `Engine::input()` から mouse drag delta を読んで component を更新する。
 
 camera matrix の生成側は DOM や SDL3 を見ず、camera entity に付いた `OrbitCameraController` の yaw / pitch だけを読む。browser サンプルでは TypeScript entry が pointer event を MoonBit export へ渡し、native サンプルでは既存 SDL adapter が `Engine::input()` へ enqueue するため、同じ controller code を両 target で共有できる。
+
+TypeScript 実装の `ts-ecs-mass-cubes` と、WASM / WASM-GC 実装の `ecs-mass-cubes` host は [`src/orbit-camera-controller.ts`](../src/orbit-camera-controller.ts) の同等 controller を使う。`ts-ecs-mass-cubes` は `Engine.input` を、WASM host は host 側で所有する `InputState` を使い、どちらも [`installBrowserInputState`](../src/app-runtime.ts) で browser pointer event を同じ入力モデルへ正規化する。
 
 この controller は現時点では examples 側の sample utility として置く。複数サンプルやアプリで API と挙動が固まったら、汎用 camera controller component / system としてライブラリ側へ移す候補にする。ただし platform adapter と同様に、controller は入力モデルと ECS / app layer の責務であり、`rhodonite_webgpu` には置かない。

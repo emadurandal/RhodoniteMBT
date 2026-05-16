@@ -420,13 +420,12 @@ function pointerButton(button: number): MouseButton {
 	}
 }
 
-export function installBrowserInput(
-	engine: Engine,
+export function installBrowserInputState(
+	input: InputState,
+	canvas: HTMLCanvasElement,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
-	const canvas = engine.canvas;
 	const keyboardTarget = options.keyboardTarget ?? window;
-	const input = engine.input;
 	const onKeyDown: EventListener = (event): void => {
 		const keyboardEvent = event as KeyboardEvent;
 		input.enqueueEvent({
@@ -495,6 +494,13 @@ export function installBrowserInput(
 			window.removeEventListener("blur", onBlur);
 		},
 	};
+}
+
+export function installBrowserInput(
+	engine: Engine,
+	options: { keyboardTarget?: Window | HTMLElement } = {},
+): BrowserInputBinding {
+	return installBrowserInputState(engine.input, engine.canvas, options);
 }
 
 export class Engine {

@@ -12,6 +12,12 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
+import { InputState, installBrowserInputState } from "./app-runtime";
+import {
+	createOrbitCameraController,
+	updateOrbitCameraControllerFromInput,
+	type OrbitCameraController,
+} from "./orbit-camera-controller";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -73,8 +79,11 @@ type DemoState = {
 	readonly instanceBuffer: GPUBuffer;
 	readonly indexBuffer: GPUBuffer;
 	readonly transformStorage: GPUBuffer;
+	readonly cameraUniform: GPUBuffer;
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
+	readonly input: InputState;
+	readonly orbitController: OrbitCameraController;
 	readonly transformRefs: Uint32Array;
 	readonly transformBytes: Uint8Array;
 	readonly transformWords: Uint32Array;
@@ -267,6 +276,17 @@ function mat4RotationX(rad: number): Mat4 {
 	return out;
 }
 
+function mat4RotationY(rad: number): Mat4 {
+	const out = mat4Identity();
+	const c = Math.cos(rad);
+	const s = Math.sin(rad);
+	out[0] = c;
+	out[2] = -s;
+	out[8] = s;
+	out[10] = c;
+	return out;
+}
+
 function mat4Mul(a: Mat4, b: Mat4): Mat4 {
 	const out = new Float32Array(16);
 	for (let col = 0; col < 4; col += 1) {
@@ -341,9 +361,9 @@ function viewSpaceRangeCorners(
 	return [min, max];
 }
 
-function cameraUniformBytes(): Uint8Array {
+function cameraUniformBytes(yaw: number, pitch: number): Uint8Array {
 	const viewRot = mat4Mul(
-		mat4RotationX(CAMERA_ELEVATION_RAD),
+		mat4Mul(mat4RotationX(pitch), mat4RotationY(yaw)),
 		mat4Translation(0, 0, -16),
 	);
 	const perSide = gridSideLen(ENTITY_COUNT);
@@ -696,7 +716,12 @@ async function createDemoState(
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
-	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes());
+	const orbitController = createOrbitCameraController(CAMERA_ELEVATION_RAD);
+	queue.writeBuffer(
+		cameraUniform,
+		0,
+		cameraUniformBytes(orbitController.yaw, orbitController.pitch),
+	);
 
 	const bindTransforms = globalTransformWordsBindGroup(
 		device,
@@ -763,8 +788,11 @@ async function createDemoState(
 		instanceBuffer,
 		indexBuffer,
 		transformStorage,
+		cameraUniform,
 		bindTransforms,
 		bindCamera,
+		input: new InputState(),
+		orbitController,
 		transformRefs: transformLayout.refs,
 		transformBytes,
 		transformWords,
@@ -825,6 +853,19 @@ function createHostImports(
 				writeTransformBytesFromWasmMemory(demoState, getMemory(), ptr, byteLength);
 			},
 			render_demo_frame: (fps: number, cpuMs: number) => {
+				demoState.input.beginFrame();
+				updateOrbitCameraControllerFromInput(
+					demoState.orbitController,
+					demoState.input,
+				);
+				demoState.queue.writeBuffer(
+					demoState.cameraUniform,
+					0,
+					cameraUniformBytes(
+						demoState.orbitController.yaw,
+						demoState.orbitController.pitch,
+					),
+				);
 				const colorView =
 					demoState.snapshotColorView ??
 					demoState.context.getCurrentTexture().createView();
@@ -906,6 +947,7 @@ export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
 		}
 		void createDemoState(canvas)
 			.then(async (demoState) => {
+				installBrowserInputState(demoState.input, canvas);
 				const wasm = await instantiateWasm(demoState, wasmUrl, label);
 				wasm._start?.();
 				wasm.create_wasm_demo_state();

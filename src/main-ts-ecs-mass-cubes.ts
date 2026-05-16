@@ -23,8 +23,15 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
+	installBrowserInput,
+	type BrowserInputBinding,
 	type FrameState,
 } from "./app-runtime";
+import {
+	createOrbitCameraController,
+	updateOrbitCameraControllerFromInput,
+	type OrbitCameraController,
+} from "./orbit-camera-controller";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -45,7 +52,7 @@ const CUBE_SCALE = 0.055;
 type Mat4 = Float32Array;
 
 type Camera = {
-	uniformBytes: () => Uint8Array;
+	uniformBytes: (orbit: OrbitCameraController) => Uint8Array;
 };
 
 type DemoState = {
@@ -64,6 +71,7 @@ type DemoState = {
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
 	readonly scene: Scene<World, Camera>;
+	readonly orbitController: OrbitCameraController;
 	readonly transformRefs: Uint32Array;
 	readonly transformWordUploadFirst: number;
 	readonly transformWordUploadCount: number;
@@ -74,6 +82,7 @@ type DemoState = {
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
+	browserInputBinding?: BrowserInputBinding;
 };
 
 function gridSideLen(count: number): number {
@@ -158,6 +167,17 @@ function mat4RotationX(rad: number): Mat4 {
 	return out;
 }
 
+function mat4RotationY(rad: number): Mat4 {
+	const out = mat4Identity();
+	const c = Math.cos(rad);
+	const s = Math.sin(rad);
+	out[0] = c;
+	out[2] = -s;
+	out[8] = s;
+	out[10] = c;
+	return out;
+}
+
 function mat4Mul(a: Mat4, b: Mat4): Mat4 {
 	const out = new Float32Array(16);
 	for (let col = 0; col < 4; col += 1) {
@@ -232,9 +252,9 @@ function viewSpaceRangeCorners(
 	return [min, max];
 }
 
-function cameraUniformBytes(): Uint8Array {
+function cameraUniformBytes(yaw: number, pitch: number): Uint8Array {
 	const viewRot = mat4Mul(
-		mat4RotationX(CAMERA_ELEVATION_RAD),
+		mat4Mul(mat4RotationX(pitch), mat4RotationY(yaw)),
 		mat4Translation(0, 0, -16),
 	);
 	const perSide = gridSideLen(ENTITY_COUNT);
@@ -535,9 +555,13 @@ function createDemoStateForEngine(
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
-	const camera = { uniformBytes: cameraUniformBytes };
+	const orbitController = createOrbitCameraController(CAMERA_ELEVATION_RAD);
+	const camera = {
+		uniformBytes: (orbit: OrbitCameraController) =>
+			cameraUniformBytes(orbit.yaw, orbit.pitch),
+	};
 	scene.setMainCamera(camera);
-	queue.writeBuffer(cameraUniform, 0, camera.uniformBytes());
+	queue.writeBuffer(cameraUniform, 0, camera.uniformBytes(orbitController));
 
 	const bindTransforms = globalTransformWordsBindGroup(
 		device,
@@ -589,6 +613,7 @@ function createDemoStateForEngine(
 		bindTransforms,
 		bindCamera,
 		scene,
+		orbitController,
 		transformRefs,
 		transformWordUploadFirst: transformUploadRange.firstWord,
 		transformWordUploadCount: transformUploadRange.wordCount,
@@ -605,6 +630,9 @@ function createDemoStateForEngine(
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
+	engine.onPhase(Phase.Input, (engine) => {
+		updateOrbitCameraControllerFromInput(demoState.orbitController, engine.input);
+	});
 	engine.onPhase(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
@@ -664,7 +692,11 @@ function renderScene(
 	if (camera === null) {
 		throw new Error("renderScene requires Scene.mainCamera.");
 	}
-	demoState.queue.writeBuffer(demoState.cameraUniform, 0, camera.uniformBytes());
+	demoState.queue.writeBuffer(
+		demoState.cameraUniform,
+		0,
+		camera.uniformBytes(demoState.orbitController),
+	);
 	const depthView = demoState.snapshotDepthView ?? demoState.depthView;
 	const encoder = demoState.device.createCommandEncoder();
 	const pass = encoder.beginRenderPass({
@@ -701,6 +733,7 @@ function releaseDemoState(demoState: DemoState): void {
 	demoState.indexBuffer.destroy();
 	demoState.transformStorage.destroy();
 	demoState.cameraUniform.destroy();
+	demoState.browserInputBinding?.dispose();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -749,6 +782,7 @@ if (!navigator.gpu) {
 		})
 			.then((engine) => {
 				const demoState = createDemoStateForEngine(engine);
+				demoState.browserInputBinding = installBrowserInput(engine);
 				registerEngineHandlers(engine, demoState);
 				engine.initialize();
 				const loop = () => {
