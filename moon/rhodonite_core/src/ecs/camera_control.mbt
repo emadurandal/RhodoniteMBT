@@ -365,9 +365,6 @@ pub fn update_orbit_camera_controller_from_mouse_frame(
       let dolly_sensitivity = fixed_f32(bytes, orbit_dolly_sensitivity_offset)
       let min_dolly = fixed_f32(bytes, orbit_min_dolly_offset)
       let max_dolly = fixed_f32(bytes, orbit_max_dolly_offset)
-      let distance = fixed_f32(bytes, orbit_distance_offset)
-      let reset_requested = fixed_f32(bytes, orbit_reset_requested_offset) !=
-        (0.0 : Float)
       let mut next_yaw = yaw
       let mut next_pitch = pitch
       let mut next_pan_x = pan_x
@@ -397,15 +394,12 @@ pub fn update_orbit_camera_controller_from_mouse_frame(
         changed = true
       }
       if changed {
-        world.set_component_bytes(
-          camera,
-          component,
-          orbit_camera_controller_bytes(
-            next_yaw, next_pitch, sensitivity, min_pitch, max_pitch, next_pan_x,
-            next_pan_y, pan_sensitivity, next_dolly, dolly_sensitivity, min_dolly,
-            max_dolly, distance, reset_requested,
-          ),
-        )
+        @writes.put_f32_le(bytes, orbit_yaw_offset, next_yaw.to_double())
+        @writes.put_f32_le(bytes, orbit_pitch_offset, next_pitch.to_double())
+        @writes.put_f32_le(bytes, orbit_pan_x_offset, next_pan_x.to_double())
+        @writes.put_f32_le(bytes, orbit_pan_y_offset, next_pan_y.to_double())
+        @writes.put_f32_le(bytes, orbit_dolly_offset, next_dolly.to_double())
+        world.set_component_bytes(camera, component, bytes)
       } else {
         false
       }
