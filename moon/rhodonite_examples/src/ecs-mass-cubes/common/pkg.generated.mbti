@@ -61,6 +61,7 @@ pub(all) struct DemoState {
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
+  perf_frame_start_ms : @ref.Ref[Double]
 }
 pub fn DemoState::release(Self) -> Unit
 pub fn DemoState::render_scene(Self, @app.Scene, @webgpu_objects.GPUTextureView) -> Unit

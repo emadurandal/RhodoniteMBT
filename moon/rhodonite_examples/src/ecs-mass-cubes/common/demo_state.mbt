@@ -431,6 +431,7 @@ pub(all) struct DemoState {
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
+  perf_frame_start_ms : @ref.Ref[Double]
 }
 
 ///|
@@ -766,7 +767,15 @@ pub fn create_demo_state_for_scene(
     bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
+    perf_frame_start_ms: @ref.new(-1.0),
   }
+}
+
+///|
+/// Starts per-frame CPU timing and updates the FPS reference point.
+fn DemoState::begin_perf_frame(self : DemoState) -> Unit {
+  let t_frame_start = monotonic_ms()
+  self.perf_frame_start_ms.val = t_frame_start
 }
 
 ///|
@@ -840,6 +849,9 @@ pub fn render_frame_to_view(
   record_perf? : Bool = false,
 ) -> Unit {
   demo_state.frame.val = demo_state.frame.val + 1
+  if record_perf {
+    demo_state.begin_perf_frame()
+  }
   demo_state.update_scene(
     @app.FrameState::new(
       (0.022 : Float),
@@ -857,7 +869,12 @@ pub fn render_current_frame_to_view(
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
-  let t_frame_start = monotonic_ms()
+  let t_render_start = monotonic_ms()
+  let t_frame_start = if demo_state.perf_frame_start_ms.val >= 0.0 {
+    demo_state.perf_frame_start_ms.val
+  } else {
+    t_render_start
+  }
   let last_start = demo_state.perf_last_frame_start_ms.val
   let fps = if last_start >= 0.0 {
     let wall_dt = t_frame_start - last_start
@@ -876,6 +893,7 @@ pub fn render_current_frame_to_view(
     ecs_mass_cubes_perf_overlay(fps, cpu_ms)
     ecs_mass_cubes_perf_console_log(fps, cpu_ms, demo_state.frame.val)
   }
+  demo_state.perf_frame_start_ms.val = -1.0
 }
 
 ///|
@@ -952,6 +970,7 @@ pub fn DemoState::render_scene(
 pub fn create_app(demo_state : DemoState) -> @app.App {
   let app = @app.App::new()
   app.on_phase(@app.phase_update(), fn(_engine, frame) {
+    demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
   })
   app.on_phase(

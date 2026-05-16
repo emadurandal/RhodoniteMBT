@@ -74,6 +74,7 @@ type DemoState = {
 	snapshotDepthView?: GPUTextureView;
 	frame: number;
 	lastFrameStartMs: number;
+	cpuFrameStartMs: number;
 };
 
 function gridSideLen(count: number): number {
@@ -598,6 +599,7 @@ function createDemoStateForEngine(
 		snapshotDepthView: undefined,
 		frame: 0,
 		lastFrameStartMs: -1,
+		cpuFrameStartMs: -1,
 	};
 	uploadInitialGlobalTransforms(demoState);
 	return demoState;
@@ -605,9 +607,10 @@ function createDemoStateForEngine(
 
 function createApp(demoState: DemoState): App {
 	const app = new App();
-	app.onPhase(Phase.Update, (_engine, frame) =>
-		updateScene(demoState, frame),
-	);
+	app.onPhase(Phase.Update, (_engine, frame) => {
+		beginPerfFrame(demoState);
+		updateScene(demoState, frame);
+	});
 	app.onPhase(
 		Phase.Render,
 		() => {
@@ -629,13 +632,19 @@ function updatePerfOverlay(fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
+function beginPerfFrame(demoState: DemoState): void {
+	demoState.cpuFrameStartMs = performance.now();
+}
+
 function updateScene(demoState: DemoState, frame: FrameState): void {
 	demoState.frame = frame.frameIndex;
 	updateAndDrainGlobalTransforms(demoState, demoState.frame * 0.018);
 }
 
 function renderCurrentFrame(demoState: DemoState): void {
-	const frameStart = performance.now();
+	const renderStart = performance.now();
+	const frameStart =
+		demoState.cpuFrameStartMs >= 0 ? demoState.cpuFrameStartMs : renderStart;
 	const fps =
 		demoState.lastFrameStartMs >= 0
 			? 1000 / Math.max(frameStart - demoState.lastFrameStartMs, 1.0e-9)
@@ -646,6 +655,7 @@ function renderCurrentFrame(demoState: DemoState): void {
 		demoState.snapshotColorView ?? demoState.context.getCurrentTexture().createView();
 	renderScene(demoState, demoState.scene, colorView);
 	updatePerfOverlay(fps, performance.now() - frameStart);
+	demoState.cpuFrameStartMs = -1;
 }
 
 function renderScene(
