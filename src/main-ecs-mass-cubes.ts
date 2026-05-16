@@ -5,6 +5,7 @@ import {
 	ecs_mass_cubes_input_mouse_down,
 	ecs_mass_cubes_input_mouse_up,
 	ecs_mass_cubes_input_pointer_move,
+	ecs_mass_cubes_input_wheel,
 	ecs_mass_cubes_render_tick,
 } from "../_build/js/debug/build/emadurandal/rhodonite_examples/ecs-mass-cubes/js/main/main.js";
 
@@ -22,6 +23,7 @@ function installOrbitPointerInput(canvas: HTMLCanvasElement) {
 		ecs_mass_cubes_input_pointer_move(point.x, point.y);
 	});
 	canvas.addEventListener("pointerdown", (event) => {
+		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		const point = canvasPoint(canvas, event);
 		ecs_mass_cubes_input_mouse_down(event.button, point.x, point.y);
@@ -30,6 +32,10 @@ function installOrbitPointerInput(canvas: HTMLCanvasElement) {
 		const point = canvasPoint(canvas, event);
 		ecs_mass_cubes_input_mouse_up(event.button, point.x, point.y);
 	});
+	canvas.addEventListener("wheel", (event) => {
+		event.preventDefault();
+		ecs_mass_cubes_input_wheel(event.deltaX, event.deltaY);
+	}, { passive: false });
 	window.addEventListener("blur", () => {
 		ecs_mass_cubes_input_focus_lost();
 	});

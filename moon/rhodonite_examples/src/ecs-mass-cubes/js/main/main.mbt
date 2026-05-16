@@ -98,6 +98,12 @@ pub fn ecs_mass_cubes_input_mouse_up(
 }
 
 ///|
+/// Implements `ecs_mass_cubes_input_wheel`.
+pub fn ecs_mass_cubes_input_wheel(delta_x : Double, delta_y : Double) -> Unit {
+  enqueue_input(Wheel(Float::from_double(delta_x), Float::from_double(delta_y)))
+}
+
+///|
 /// Implements `ecs_mass_cubes_input_focus_lost`.
 pub fn ecs_mass_cubes_input_focus_lost() -> Unit {
   enqueue_input(FocusLost)

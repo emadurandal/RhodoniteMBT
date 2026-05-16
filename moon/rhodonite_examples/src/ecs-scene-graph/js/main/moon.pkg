@@ -20,6 +20,7 @@ options(
         "ecs_scene_graph_input_pointer_move",
         "ecs_scene_graph_input_mouse_down",
         "ecs_scene_graph_input_mouse_up",
+        "ecs_scene_graph_input_wheel",
         "ecs_scene_graph_input_focus_lost",
       ],
       "format": "esm",

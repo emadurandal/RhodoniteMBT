@@ -168,8 +168,11 @@ fn view_space_y_range_corners(
 fn camera_matrices(
   yaw : Double,
   pitch : Double,
+  pan_x : Double,
+  pan_y : Double,
+  dolly : Double,
 ) -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
-  let view_rot = @m44.Matrix44::rotation_x(pitch)
+  let view_base = @m44.Matrix44::rotation_x(pitch)
     .mat_mul(@m44.Matrix44::rotation_y(yaw))
     .mat_mul(@m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0))
   let per_side = grid_side_len(entity_count)
@@ -179,7 +182,7 @@ fn camera_matrices(
   let margin = cube_scale.to_double() * 2.5
   /// World **y** bound: wave motion + scaled unit cube local **y** (±1 in mesh space).
   let wave_y = wave + cube_scale.to_double() * 1.1
-  let (y_lo, y_hi) = view_space_y_range_corners(view_rot, extent_xz, wave_y)
+  let (y_lo, y_hi) = view_space_y_range_corners(view_base, extent_xz, wave_y)
   let cy = (y_lo + y_hi) * 0.5
   let hy = (y_hi - y_lo) * 0.5 + margin
   let hx = extent_xz + margin
@@ -191,14 +194,16 @@ fn camera_matrices(
   } else {
     half_h = half_w / aspect
   }
-  let left = -half_w
-  let right = half_w
-  let bottom = cy - half_h
-  let top = cy + half_h
-  let (z_lo, z_hi) = view_space_z_range_corners(view_rot, extent_xz, wave_y)
+  let scaled_half_w = half_w * dolly
+  let scaled_half_h = half_h * dolly
+  let left = -scaled_half_w
+  let right = scaled_half_w
+  let bottom = cy - scaled_half_h
+  let top = cy + scaled_half_h
+  let (z_lo, z_hi) = view_space_z_range_corners(view_base, extent_xz, wave_y)
   let pull_z = if z_hi > -0.15 { -z_hi - 1.0 } else { 0.0 }
-  let view = @m44.Matrix44::translation(0.0, 0.0, pull_z, 1.0, 0.0).mat_mul(
-    view_rot,
+  let view = @m44.Matrix44::translation(pan_x, pan_y, pull_z, 1.0, 0.0).mat_mul(
+    view_base,
   )
   let z_min_pulled = z_lo + pull_z
   let far_need = -z_min_pulled + 8.0
@@ -703,11 +708,11 @@ pub fn create_demo_state_for_scene(
       world, camera, orbit_controller, 0.0, camera_elevation_rad,
     ),
   )
-  let (camera_yaw, camera_pitch) = @orbit.orbit_camera_yaw_pitch(
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @orbit.orbit_camera_transform(
     world, camera, orbit_controller,
   )
   let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
-    camera_yaw, camera_pitch,
+    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
   )
   ignore(
     world.set_camera_matrices(
@@ -923,13 +928,13 @@ pub fn DemoState::render_scene(
 ) -> Unit {
   let world = scene.world()
   let camera = scene_main_camera_or_abort(scene)
-  let (camera_yaw, camera_pitch) = @orbit.orbit_camera_yaw_pitch(
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @orbit.orbit_camera_transform(
     world,
     camera,
     self.orbit_controller,
   )
   let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
-    camera_yaw, camera_pitch,
+    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
   )
   ignore(
     world.set_camera_matrices(

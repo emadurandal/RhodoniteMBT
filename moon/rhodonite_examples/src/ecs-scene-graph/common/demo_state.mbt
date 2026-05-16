@@ -356,14 +356,22 @@ fn push_camera_matrices(
   camera : @ecs.EntityId,
   orbit_controller : @ecs.ComponentTypeId,
 ) -> Unit {
-  let (yaw, pitch) = @orbit.orbit_camera_yaw_pitch(
+  let (yaw, pitch, pan_x, pan_y, dolly) = @orbit.orbit_camera_transform(
     world, camera, orbit_controller,
   )
   let view = @m44.Matrix44::rotation_x(pitch)
     .mat_mul(@m44.Matrix44::rotation_y(yaw))
-    .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
+    .mat_mul(@m44.Matrix44::translation(pan_x, -2.0 + pan_y, -5.6, 1.0, 0.0))
     .to_float()
-  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0).to_float()
+  let ortho_extent = 3.8 * dolly
+  let proj = @m44.Matrix44::ortho(
+    -ortho_extent,
+    ortho_extent,
+    -ortho_extent,
+    ortho_extent,
+    0.1,
+    50.0,
+  ).to_float()
   ignore(
     world.set_camera_matrices(
       camera,

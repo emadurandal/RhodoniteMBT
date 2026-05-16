@@ -6,6 +6,13 @@ export type OrbitCameraController = {
 	sensitivity: number;
 	minPitch: number;
 	maxPitch: number;
+	panX: number;
+	panY: number;
+	panSensitivity: number;
+	dolly: number;
+	dollySensitivity: number;
+	minDolly: number;
+	maxDolly: number;
 };
 
 export function createOrbitCameraController(
@@ -18,6 +25,13 @@ export function createOrbitCameraController(
 		sensitivity: 0.006,
 		minPitch: -1.25,
 		maxPitch: 1.25,
+		panX: 0,
+		panY: 0,
+		panSensitivity: 0.01,
+		dolly: 1,
+		dollySensitivity: 0.001,
+		minDolly: 0.25,
+		maxDolly: 4,
 	};
 }
 
@@ -25,16 +39,38 @@ export function updateOrbitCameraControllerFromInput(
 	controller: OrbitCameraController,
 	input: InputState,
 ): boolean {
-	if (!input.mouseDown(MouseButton.Left) || input.mousePressed(MouseButton.Left)) {
-		return false;
+	let changed = false;
+	if (input.mouseDown(MouseButton.Left) && !input.mousePressed(MouseButton.Left)) {
+		controller.yaw += input.pointerDeltaX() * controller.sensitivity;
+		controller.pitch = Math.min(
+			controller.maxPitch,
+			Math.max(
+				controller.minPitch,
+				controller.pitch + input.pointerDeltaY() * controller.sensitivity,
+			),
+		);
+		changed = true;
 	}
-	controller.yaw += input.pointerDeltaX() * controller.sensitivity;
-	controller.pitch = Math.min(
-		controller.maxPitch,
-		Math.max(
-			controller.minPitch,
-			controller.pitch + input.pointerDeltaY() * controller.sensitivity,
-		),
-	);
-	return true;
+	if (
+		input.mouseDown(MouseButton.Middle) &&
+		!input.mousePressed(MouseButton.Middle)
+	) {
+		controller.panX -=
+			input.pointerDeltaX() * controller.panSensitivity * controller.dolly;
+		controller.panY +=
+			input.pointerDeltaY() * controller.panSensitivity * controller.dolly;
+		changed = true;
+	}
+	if (input.wheelDeltaY() !== 0) {
+		controller.dolly = Math.min(
+			controller.maxDolly,
+			Math.max(
+				controller.minDolly,
+				controller.dolly +
+					input.wheelDeltaY() * controller.dollySensitivity * controller.dolly,
+			),
+		);
+		changed = true;
+	}
+	return changed;
 }

@@ -15,6 +15,48 @@ pub(all) struct SdlMetalWebGpuNativeSession {
 }
 
 ///|
+/// Mirrors the SDL mouse wheel event layout needed by the native input adapter.
+priv struct SdlMouseWheelEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  which : @lib.SDL_MouseID
+  x : Float
+  y : Float
+  direction : @lib.SDL_MouseWheelDirection
+  mouse_x : Float
+  mouse_y : Float
+}
+
+///|
+/// Keeps the private SDL wheel mirror visible to MoonBit's field checks.
+fn _touch_sdl_mouse_wheel_event_struct() -> Unit {
+  let event = SdlMouseWheelEvent::{
+    event_type: SDL_EVENT_MOUSE_WHEEL,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    which: 0U,
+    x: (0.0 : Float),
+    y: (0.0 : Float),
+    direction: SDL_MOUSEWHEEL_NORMAL,
+    mouse_x: (0.0 : Float),
+    mouse_y: (0.0 : Float),
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.which)
+  ignore(event.x)
+  ignore(event.y)
+  ignore(event.direction)
+  ignore(event.mouse_x)
+  ignore(event.mouse_y)
+}
+
+///|
 pub async fn init_sdl_metal_webgpu_native(
   window_title : String,
   width : Int,
@@ -147,6 +189,22 @@ fn enqueue_sdl_keyboard_event(
 }
 
 ///|
+/// Queues one mouse wheel event from SDL into the engine input state.
+fn enqueue_sdl_mouse_wheel_event(
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+) -> Unit {
+  let wheel_event : SdlMouseWheelEvent = @lib.unsafe_from_sdl_event(event)
+  let direction_scale : Float = match wheel_event.direction {
+    SDL_MOUSEWHEEL_NORMAL => (-100.0 : Float)
+    SDL_MOUSEWHEEL_FLIPPED => (100.0 : Float)
+  }
+  input.enqueue_event(
+    Wheel(wheel_event.x * direction_scale, wheel_event.y * direction_scale),
+  )
+}
+
+///|
 /// Reports whether a native mouse button flag is present in the SDL state mask.
 fn sdl_mouse_mask_has(flags : UInt, mask : UInt) -> Bool {
   (flags & mask) != 0U
@@ -238,6 +296,7 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
         SDL_EVENT_WINDOW_FOCUS_LOST => input.enqueue_event(FocusLost)
         SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP =>
           enqueue_sdl_keyboard_event(input, event)
+        SDL_EVENT_MOUSE_WHEEL => enqueue_sdl_mouse_wheel_event(input, event)
         _ => ()
       }
     }

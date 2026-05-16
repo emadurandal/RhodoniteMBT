@@ -9,6 +9,8 @@ import {
 // Values
 pub fn add_orbit_camera_controller(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId, Double, Double) -> Bool
 
+pub fn orbit_camera_transform(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId) -> (Double, Double, Double, Double, Double)
+
 pub fn orbit_camera_yaw_pitch(@ecs.World, @ecs.EntityId, @ecs.ComponentTypeId) -> (Double, Double)
 
 pub fn register_orbit_camera_controller_component(@ecs.World) -> @ecs.ComponentTypeId

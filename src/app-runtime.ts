@@ -448,6 +448,7 @@ export function installBrowserInputState(
 		input.enqueueEvent({ type: "PointerMove", x, y });
 	};
 	const onPointerDown = (event: PointerEvent): void => {
+		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		const { x, y } = pointerPosition(canvas, event);
 		input.enqueueEvent({
@@ -467,6 +468,7 @@ export function installBrowserInputState(
 		});
 	};
 	const onWheel = (event: WheelEvent): void => {
+		event.preventDefault();
 		input.enqueueEvent({
 			type: "Wheel",
 			deltaX: event.deltaX,
@@ -481,7 +483,7 @@ export function installBrowserInputState(
 	canvas.addEventListener("pointermove", onPointerMove);
 	canvas.addEventListener("pointerdown", onPointerDown);
 	canvas.addEventListener("pointerup", onPointerUp);
-	canvas.addEventListener("wheel", onWheel, { passive: true });
+	canvas.addEventListener("wheel", onWheel, { passive: false });
 	window.addEventListener("blur", onBlur);
 	return {
 		dispose: (): void => {

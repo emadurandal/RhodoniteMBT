@@ -92,6 +92,8 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 `pointer_delta_x/y` と `wheel_delta_x/y` はフレームごとに 0 に戻り、そのフレームで適用されたイベントの合計になる。button state はフレームをまたいで保持される。
 
+wheel delta は controller 側で同じ sensitivity を使えるよう、adapter 側で browser の `WheelEvent.deltaX/Y` に近い符号と大きさへ寄せる。native SDL3 adapter は wheel step を DOM wheel の pixel delta 相当に近づけるため 100 倍して enqueue し、通常スクロールの上方向が dolly-in になるよう `deltaY` を負方向へ正規化する。
+
 ## ECS sample camera controller
 
 `ecs-scene-graph` と MoonBit 実装の `ecs-mass-cubes` は、サンプル共通 package の [`OrbitCameraController`](../moon/rhodonite_examples/src/common/orbit_camera/orbit_camera_controller.mbt) を使う。これは ECS の CPU component として yaw / pitch / sensitivity / pitch clamp を保持し、`rhodonite/input` phase の handler が `Engine::input()` から mouse drag delta を読んで component を更新する。
@@ -99,5 +101,7 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 camera matrix の生成側は DOM や SDL3 を見ず、camera entity に付いた `OrbitCameraController` の yaw / pitch だけを読む。browser サンプルでは TypeScript entry が pointer event を MoonBit export へ渡し、native サンプルでは既存 SDL adapter が `Engine::input()` へ enqueue するため、同じ controller code を両 target で共有できる。
 
 TypeScript 実装の `ts-ecs-mass-cubes` と、WASM / WASM-GC 実装の `ecs-mass-cubes` host は [`src/orbit-camera-controller.ts`](../src/orbit-camera-controller.ts) の同等 controller を使う。`ts-ecs-mass-cubes` は `Engine.input` を、WASM host は host 側で所有する `InputState` を使い、どちらも [`installBrowserInputState`](../src/app-runtime.ts) で browser pointer event を同じ入力モデルへ正規化する。描画定数、camera uniform、pipeline / buffer 作成、render pass は [`src/ecs-mass-cubes-renderer.ts`](../src/ecs-mass-cubes-renderer.ts) に寄せ、TS ECS backend と WASM backend の transform 更新経路は entry ごとに残す。
+
+sample controller の操作は、左 button drag が yaw / pitch の orbit、中 button drag が view-space の左右上下 pan、wheel が dolly scale である。mass-cubes と scene-graph はどちらも orthographic projection を使うため、wheel の dolly は view-space camera state に加えて ortho 表示範囲にも反映し、前後移動として見た目に分かるようにする。
 
 この controller は現時点では examples 側の sample utility として置く。複数サンプルやアプリで API と挙動が固まったら、汎用 camera controller component / system としてライブラリ側へ移す候補にする。ただし platform adapter と同様に、controller は入力モデルと ECS / app layer の責務であり、`rhodonite_webgpu` には置かない。

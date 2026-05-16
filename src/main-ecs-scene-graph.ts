@@ -5,6 +5,7 @@ import {
 	ecs_scene_graph_input_mouse_down,
 	ecs_scene_graph_input_mouse_up,
 	ecs_scene_graph_input_pointer_move,
+	ecs_scene_graph_input_wheel,
 	ecs_scene_graph_render_tick,
 } from "../_build/js/debug/build/emadurandal/rhodonite_examples/ecs-scene-graph/js/main/main.js";
 
@@ -22,6 +23,7 @@ function installOrbitPointerInput(canvas: HTMLCanvasElement) {
 		ecs_scene_graph_input_pointer_move(point.x, point.y);
 	});
 	canvas.addEventListener("pointerdown", (event) => {
+		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		const point = canvasPoint(canvas, event);
 		ecs_scene_graph_input_mouse_down(event.button, point.x, point.y);
@@ -30,6 +32,10 @@ function installOrbitPointerInput(canvas: HTMLCanvasElement) {
 		const point = canvasPoint(canvas, event);
 		ecs_scene_graph_input_mouse_up(event.button, point.x, point.y);
 	});
+	canvas.addEventListener("wheel", (event) => {
+		event.preventDefault();
+		ecs_scene_graph_input_wheel(event.deltaX, event.deltaY);
+	}, { passive: false });
 	window.addEventListener("blur", () => {
 		ecs_scene_graph_input_focus_lost();
 	});

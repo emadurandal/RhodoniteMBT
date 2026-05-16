@@ -75,7 +75,7 @@ export function createMassCubesOrbitCameraController(): OrbitCameraController {
 
 export function createMassCubesCamera(): MassCubesCamera {
 	return {
-		uniformBytes: (orbit) => cameraUniformBytes(orbit.yaw, orbit.pitch),
+		uniformBytes: (orbit) => cameraUniformBytes(orbit),
 	};
 }
 
@@ -84,7 +84,7 @@ export function writeMassCubesCameraUniform(
 	cameraUniform: GPUBuffer,
 	orbit: OrbitCameraController,
 ): void {
-	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes(orbit.yaw, orbit.pitch));
+	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes(orbit));
 }
 
 export function createMassCubesInstanceBytesFromRefs(
@@ -382,9 +382,9 @@ function viewSpaceRangeCorners(
 	return [min, max];
 }
 
-function cameraUniformBytes(yaw: number, pitch: number): Uint8Array {
-	const viewRot = mat4Mul(
-		mat4Mul(mat4RotationX(pitch), mat4RotationY(yaw)),
+function cameraUniformBytes(orbit: OrbitCameraController): Uint8Array {
+	const viewBase = mat4Mul(
+		mat4Mul(mat4RotationX(orbit.pitch), mat4RotationY(orbit.yaw)),
 		mat4Translation(0, 0, -16),
 	);
 	const perSide = gridSideLen(MASS_CUBES_ENTITY_COUNT);
@@ -393,7 +393,7 @@ function cameraUniformBytes(yaw: number, pitch: number): Uint8Array {
 	const wave = 0.12;
 	const margin = MASS_CUBES_CUBE_SCALE * 2.5;
 	const waveY = wave + MASS_CUBES_CUBE_SCALE * 1.1;
-	const [yLo, yHi] = viewSpaceRangeCorners(viewRot, extentXz, waveY, 1);
+	const [yLo, yHi] = viewSpaceRangeCorners(viewBase, extentXz, waveY, 1);
 	const cy = (yLo + yHi) * 0.5;
 	let halfH = (yHi - yLo) * 0.5 + margin;
 	let halfW = extentXz + margin;
@@ -403,12 +403,24 @@ function cameraUniformBytes(yaw: number, pitch: number): Uint8Array {
 	} else {
 		halfH = halfW / aspect;
 	}
-	const [zLo, zHi] = viewSpaceRangeCorners(viewRot, extentXz, waveY, 2);
+	const [zLo, zHi] = viewSpaceRangeCorners(viewBase, extentXz, waveY, 2);
 	const pullZ = zHi > -0.15 ? -zHi - 1 : 0;
-	const view = mat4Mul(mat4Translation(0, 0, pullZ), viewRot);
+	const view = mat4Mul(
+		mat4Translation(orbit.panX, orbit.panY, pullZ),
+		viewBase,
+	);
 	const farNeed = -(zLo + pullZ) + 8;
 	const farClip = Math.max(farNeed, 80);
-	const proj = mat4Ortho(-halfW, halfW, cy - halfH, cy + halfH, 0.1, farClip);
+	const scaledHalfW = halfW * orbit.dolly;
+	const scaledHalfH = halfH * orbit.dolly;
+	const proj = mat4Ortho(
+		-scaledHalfW,
+		scaledHalfW,
+		cy - scaledHalfH,
+		cy + scaledHalfH,
+		0.1,
+		farClip,
+	);
 	const vp = mat4Mul(proj, view);
 	const bytes = new Uint8Array(256);
 	new Float32Array(bytes.buffer, 0, 16).set(vp);
