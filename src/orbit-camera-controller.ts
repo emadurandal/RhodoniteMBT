@@ -55,9 +55,9 @@ export function updateOrbitCameraControllerFromInput(
 		input.mouseDown(MouseButton.Middle) &&
 		!input.mousePressed(MouseButton.Middle)
 	) {
-		controller.panX -=
+		controller.panX +=
 			input.pointerDeltaX() * controller.panSensitivity * controller.dolly;
-		controller.panY +=
+		controller.panY -=
 			input.pointerDeltaY() * controller.panSensitivity * controller.dolly;
 		changed = true;
 	}

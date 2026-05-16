@@ -233,9 +233,9 @@ pub fn update_orbit_camera_controller_from_input(
         changed = true
       }
       if input.mouse_down(Middle) && !input.mouse_pressed(Middle) {
-        next_pan_x = pan_x -
+        next_pan_x = pan_x +
           input.pointer_delta_x().to_double() * pan_sensitivity * dolly
-        next_pan_y = pan_y +
+        next_pan_y = pan_y -
           input.pointer_delta_y().to_double() * pan_sensitivity * dolly
         changed = true
       }
