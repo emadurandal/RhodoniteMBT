@@ -13,6 +13,8 @@ pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTran
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
+pub fn phase_array_contains(Array[PhaseKey], PhaseKey) -> Bool
+
 pub fn transform_propagation_system(World, PhaseKey) -> System
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
