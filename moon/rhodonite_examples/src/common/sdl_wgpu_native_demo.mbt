@@ -157,13 +157,25 @@ pub fn run_sdl_metal_webgpu_render_loop(
 }
 
 ///|
+/// Returns an SDL scancode name without freeing SDL's borrowed static string.
+extern "C" fn sdl_scancode_name_borrowed(
+  scancode : @lib.SDL_Scancode,
+) -> String = "rhodonite_sdl_get_scancode_name_borrowed"
+
+///|
+/// Returns an SDL key name without freeing SDL's borrowed static string.
+extern "C" fn sdl_key_name_borrowed(
+  key : @lib.SDL_Keycode,
+) -> String = "rhodonite_sdl_get_key_name_borrowed"
+
+///|
 /// Converts an SDL scancode event into the current input key code naming.
 fn sdl_key_code_from_keyboard_event(
   event : @lib.SDL_KeyboardEvent,
 ) -> @input.KeyCode {
-  let scancode_name = @lib.sdl_GetScancodeName(event.scancode)
+  let scancode_name = sdl_scancode_name_borrowed(event.scancode)
   if scancode_name == "" {
-    @input.KeyCode::new(@lib.sdl_GetKeyName(event.key))
+    @input.KeyCode::new(sdl_key_name_borrowed(event.key))
   } else {
     @input.KeyCode::new(scancode_name)
   }
