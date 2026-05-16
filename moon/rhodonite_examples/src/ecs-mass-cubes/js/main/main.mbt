@@ -1,32 +1,37 @@
 ///|
-let demo_renderer : @ref.Ref[@renderer.WebGPURenderer?] = @ref.new(None)
+let demo_engine : @ref.Ref[@app.Engine?] = @ref.new(None)
 
 ///|
-async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+async fn create_webgpu_demo_state_async(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
-  match @renderer.create_renderer(ctx) {
-    Some(renderer) => {
-      demo_renderer.val = Some(renderer)
-      println("ecs-mass-cubes: renderer ready")
+  let engine = @demo_state.create_engine(ctx)
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      @demo_state.register_engine_handlers(engine, demo_state)
+      engine.initialize()
+      demo_engine.val = Some(engine)
+      println("ecs-mass-cubes: DemoState ready")
     }
-    None => println("ecs-mass-cubes: failed to create renderer")
+    None => println("ecs-mass-cubes: failed to create DemoState")
   }
 }
 
 ///|
-/// Implements `create_webgpu_renderer`.
-pub fn create_webgpu_renderer(
+/// Implements `create_webgpu_demo_state`.
+pub fn create_webgpu_demo_state(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
+  @js_async.Promise::from_async(() => create_webgpu_demo_state_async(canvas))
 }
 
 ///|
 /// Implements `ecs_mass_cubes_render_tick`.
 pub fn ecs_mass_cubes_render_tick() -> Unit {
-  match demo_renderer.val {
-    Some(renderer) => @renderer.render_frame(renderer)
-    None => ()
+  match demo_engine.val {
+    Some(engine) => engine.run_render_frame()
+    _ => ()
   }
 }
 

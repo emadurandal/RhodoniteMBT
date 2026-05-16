@@ -6,7 +6,7 @@ A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser
 
 | Module | Description |
 |--------|-------------|
-| `emadurandal/rhodonite` | Thin public facade ([`moon/rhodonite`](moon/rhodonite)) |
+| `emadurandal/rhodonite` | Public facade and high-level app/runtime helpers ([`moon/rhodonite`](moon/rhodonite)) |
 | `emadurandal/rhodonite_core` | Core (vectors, JS bridge, binary buffer writes, etc.) |
 | `emadurandal/rhodonite_webgpu` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | Samples |
@@ -40,7 +40,7 @@ pnpm install
 pnpm run dev:js:basic-triangle
 ```
 
-The browser demos also include a TypeScript-only WebGPU renderer using the ECS
+The browser demos also include a TypeScript-only WebGPU DemoState using the ECS
 TypeScript wrapper:
 
 ```bash

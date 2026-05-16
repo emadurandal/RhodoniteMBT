@@ -18,6 +18,8 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 
 ## Schedule Access Rules
 
+`Schedule` は固定の update/render lifecycle を持ちません。`PhaseKey` は外部から渡される文字列名付き id で、phase の意味と実行順序は `Schedule::run(world, ctx, phases)` または `Schedule::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では標準 phase を `phase_update()` / `phase_render_extract()` / `phase_render()` などの関数で提供し、`Engine::run_phase_group` が `PhaseGroupKey` ごとの順序で `PhaseSlot::BeforeSchedule`、scene schedule、`PhaseSlot::AfterSchedule` の順に処理します。
+
 | API | Required access |
 |-----|-----------------|
 | `has_component`, `component_bytes`, query prepare/iteration | `reads` または `writes` |
@@ -26,7 +28,7 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 | `register_cpu_component` | schedule execution 外 |
 | builtin blob resize event drain | `structural_write` |
 
-`Schedule::run` 中は component 登録が lock されます。新しい component type は schedule 実行前、または実行と実行の間で登録します。
+`Schedule::run` / `Schedule::run_phase` 中は component 登録が lock されます。新しい component type は schedule 実行前、または実行と実行の間で登録します。
 
 ## Query Model
 

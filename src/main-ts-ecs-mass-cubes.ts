@@ -18,6 +18,13 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
+import {
+	Engine,
+	Phase,
+	PhaseSlot,
+	Scene,
+	type FrameState,
+} from "./app-runtime";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -37,7 +44,11 @@ const GRID_SPACING = 0.14;
 const CUBE_SCALE = 0.055;
 type Mat4 = Float32Array;
 
-type Renderer = {
+type Camera = {
+	uniformBytes: () => Uint8Array;
+};
+
+type DemoState = {
 	readonly canvas: HTMLCanvasElement;
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
@@ -52,7 +63,7 @@ type Renderer = {
 	readonly cameraUniform: GPUBuffer;
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
-	readonly world: World;
+	readonly scene: Scene<World, Camera>;
 	readonly transformRefs: Uint32Array;
 	readonly transformWordUploadFirst: number;
 	readonly transformWordUploadCount: number;
@@ -62,6 +73,7 @@ type Renderer = {
 	snapshotDepthView?: GPUTextureView;
 	frame: number;
 	lastFrameStartMs: number;
+	cpuFrameStartMs: number;
 };
 
 function gridSideLen(count: number): number {
@@ -372,38 +384,40 @@ function writeMassCubesTransformBlob(
 	}
 }
 
-function uploadInitialGlobalTransforms(renderer: Renderer): void {
+function uploadInitialGlobalTransforms(demoState: DemoState): void {
+	const world = demoState.scene.world();
 	uploadGlobalTransformWrites(
-		renderer.queue,
-		renderer.transformStorage,
-		writeGlobalTransformBlobRangeByRefs(renderer.world, {
-			refs: renderer.transformRefs,
+		demoState.queue,
+		demoState.transformStorage,
+		writeGlobalTransformBlobRangeByRefs(world, {
+			refs: demoState.transformRefs,
 			count: ENTITY_COUNT,
 			range: {
-				firstWord: renderer.transformWordUploadFirst,
-				wordCount: renderer.transformWordUploadCount,
+				firstWord: demoState.transformWordUploadFirst,
+				wordCount: demoState.transformWordUploadCount,
 			},
-			denseLayout: renderer.denseTransformLayout,
+			denseLayout: demoState.denseTransformLayout,
 			write: (writer) =>
-				writeMassCubesTransformBlob(writer, renderer.perSide, 0, true),
+				writeMassCubesTransformBlob(writer, demoState.perSide, 0, true),
 		}),
 	);
 }
 
-function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
+function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
+	const world = demoState.scene.world();
 	uploadGlobalTransformWrites(
-		renderer.queue,
-		renderer.transformStorage,
-		writeGlobalTransformBlobRangeByRefs(renderer.world, {
-			refs: renderer.transformRefs,
+		demoState.queue,
+		demoState.transformStorage,
+		writeGlobalTransformBlobRangeByRefs(world, {
+			refs: demoState.transformRefs,
 			count: ENTITY_COUNT,
 			range: {
-				firstWord: renderer.transformWordUploadFirst,
-				wordCount: renderer.transformWordUploadCount,
+				firstWord: demoState.transformWordUploadFirst,
+				wordCount: demoState.transformWordUploadCount,
 			},
-			denseLayout: renderer.denseTransformLayout,
+			denseLayout: demoState.denseTransformLayout,
 			write: (writer) =>
-				writeMassCubesTransformBlob(writer, renderer.perSide, t, false),
+				writeMassCubesTransformBlob(writer, demoState.perSide, t, false),
 		}),
 	);
 }
@@ -452,22 +466,12 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-async function createRenderer(
-	canvas: HTMLCanvasElement,
+function createDemoStateForEngine(
+	engine: Engine,
 	renderFormat?: GPUTextureFormat,
-): Promise<Renderer> {
-	const adapter = await navigator.gpu.requestAdapter();
-	if (adapter === null) {
-		throw new Error("WebGPU adapter is not available.");
-	}
-	const device = await adapter.requestDevice();
-	const queue = device.queue;
-	const context = canvas.getContext("webgpu");
-	if (context === null) {
-		throw new Error("WebGPU canvas context is not available.");
-	}
-	const format = navigator.gpu.getPreferredCanvasFormat();
-	context.configure({ device, format, alphaMode: "opaque" });
+): DemoState {
+	const { canvas, context, device, queue, format } = engine;
+	const scene = engine.mainScene<World, Camera>();
 	const targetFormat = renderFormat ?? format;
 
 	const shader = device.createShaderModule({
@@ -507,6 +511,7 @@ async function createRenderer(
 	const world = globalTransformDefaultIsF16()
 		? World.newWithGlobalTransformF16()
 		: World.new();
+	scene.setWorld(world);
 	const perSide = gridSideLen(ENTITY_COUNT);
 	const entities = world.spawnTransformGlobalBatchIdentity(ENTITY_COUNT);
 	applyGlobalTransformPrecisionMode(world, entities);
@@ -530,7 +535,9 @@ async function createRenderer(
 		size: 256,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
-	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes());
+	const camera = { uniformBytes: cameraUniformBytes };
+	scene.setMainCamera(camera);
+	queue.writeBuffer(cameraUniform, 0, camera.uniformBytes());
 
 	const bindTransforms = globalTransformWordsBindGroup(
 		device,
@@ -566,7 +573,7 @@ async function createRenderer(
 	});
 	const depthView = depthTexture.createView();
 
-	const renderer: Renderer = {
+	const demoState: DemoState = {
 		canvas,
 		context,
 		device,
@@ -581,7 +588,7 @@ async function createRenderer(
 		cameraUniform,
 		bindTransforms,
 		bindCamera,
-		world,
+		scene,
 		transformRefs,
 		transformWordUploadFirst: transformUploadRange.firstWord,
 		transformWordUploadCount: transformUploadRange.wordCount,
@@ -591,9 +598,27 @@ async function createRenderer(
 		snapshotDepthView: undefined,
 		frame: 0,
 		lastFrameStartMs: -1,
+		cpuFrameStartMs: -1,
 	};
-	uploadInitialGlobalTransforms(renderer);
-	return renderer;
+	uploadInitialGlobalTransforms(demoState);
+	return demoState;
+}
+
+function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
+	engine.onPhase(Phase.Update, (_engine, frame) => {
+		beginPerfFrame(demoState);
+		updateScene(demoState, frame);
+	});
+	engine.onPhase(
+		Phase.Render,
+		() => {
+			if (demoState.scene.visible()) {
+				renderCurrentFrame(demoState);
+			}
+		},
+		PhaseSlot.AfterSchedule,
+	);
+	engine.onPhase(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
@@ -604,20 +629,44 @@ function updatePerfOverlay(fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function renderFrame(renderer: Renderer): void {
-	const frameStart = performance.now();
+function beginPerfFrame(demoState: DemoState): void {
+	demoState.cpuFrameStartMs = performance.now();
+}
+
+function updateScene(demoState: DemoState, frame: FrameState): void {
+	demoState.frame = frame.frameIndex;
+	updateAndDrainGlobalTransforms(demoState, demoState.frame * 0.018);
+}
+
+function renderCurrentFrame(demoState: DemoState): void {
+	const renderStart = performance.now();
+	const frameStart =
+		demoState.cpuFrameStartMs >= 0 ? demoState.cpuFrameStartMs : renderStart;
 	const fps =
-		renderer.lastFrameStartMs >= 0
-			? 1000 / Math.max(frameStart - renderer.lastFrameStartMs, 1.0e-9)
+		demoState.lastFrameStartMs >= 0
+			? 1000 / Math.max(frameStart - demoState.lastFrameStartMs, 1.0e-9)
 			: 0;
-	renderer.lastFrameStartMs = frameStart;
-	renderer.frame += 1;
-	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
+	demoState.lastFrameStartMs = frameStart;
 
 	const colorView =
-		renderer.snapshotColorView ?? renderer.context.getCurrentTexture().createView();
-	const depthView = renderer.snapshotDepthView ?? renderer.depthView;
-	const encoder = renderer.device.createCommandEncoder();
+		demoState.snapshotColorView ?? demoState.context.getCurrentTexture().createView();
+	renderScene(demoState, demoState.scene, colorView);
+	updatePerfOverlay(fps, performance.now() - frameStart);
+	demoState.cpuFrameStartMs = -1;
+}
+
+function renderScene(
+	demoState: DemoState,
+	scene: Scene<World, Camera>,
+	colorView: GPUTextureView,
+): void {
+	const camera = scene.mainCamera();
+	if (camera === null) {
+		throw new Error("renderScene requires Scene.mainCamera.");
+	}
+	demoState.queue.writeBuffer(demoState.cameraUniform, 0, camera.uniformBytes());
+	const depthView = demoState.snapshotDepthView ?? demoState.depthView;
+	const encoder = demoState.device.createCommandEncoder();
 	const pass = encoder.beginRenderPass({
 		colorAttachments: [
 			{
@@ -634,40 +683,54 @@ function renderFrame(renderer: Renderer): void {
 			depthStoreOp: "store",
 		},
 	});
-	pass.setPipeline(renderer.pipeline);
-	pass.setBindGroup(0, renderer.bindTransforms);
-	pass.setBindGroup(1, renderer.bindCamera);
-	pass.setIndexBuffer(renderer.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
-	pass.setVertexBuffer(0, renderer.vertexBuffer, 0, VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL);
-	pass.setVertexBuffer(1, renderer.instanceBuffer, 0, ENTITY_COUNT * INSTANCE_STRIDE);
+	pass.setPipeline(demoState.pipeline);
+	pass.setBindGroup(0, demoState.bindTransforms);
+	pass.setBindGroup(1, demoState.bindCamera);
+	pass.setIndexBuffer(demoState.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
+	pass.setVertexBuffer(0, demoState.vertexBuffer, 0, VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL);
+	pass.setVertexBuffer(1, demoState.instanceBuffer, 0, ENTITY_COUNT * INSTANCE_STRIDE);
 	pass.drawIndexed(INDEX_U16_COUNT, ENTITY_COUNT);
 	pass.end();
-	renderer.queue.submit([encoder.finish()]);
-	updatePerfOverlay(fps, performance.now() - frameStart);
+	demoState.queue.submit([encoder.finish()]);
+}
+
+function releaseDemoState(demoState: DemoState): void {
+	demoState.depthTexture.destroy();
+	demoState.vertexBuffer.destroy();
+	demoState.instanceBuffer.destroy();
+	demoState.indexBuffer.destroy();
+	demoState.transformStorage.destroy();
+	demoState.cameraUniform.destroy();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
 	canvas.height = CANVAS_HEIGHT;
-	const renderer = await createRenderer(canvas, "rgba8unorm");
-	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	const engine = await Engine.create(canvas, {
+		mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
+	});
+	const demoState = createDemoStateForEngine(engine, "rgba8unorm");
+	registerEngineHandlers(engine, demoState);
+	engine.initialize();
+	const target = createRgba8ReadbackTarget(demoState.device, CANVAS_WIDTH, CANVAS_HEIGHT);
 	try {
-		renderer.snapshotColorView = target.view;
-		renderer.snapshotDepthView = target.depthView;
-		renderFrame(renderer);
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = target.view;
+		demoState.snapshotDepthView = target.depthView;
+		engine.runRenderFrame();
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
-			renderer.device,
-			renderer.queue,
+			demoState.device,
+			demoState.queue,
 			target.texture,
 			CANVAS_WIDTH,
 			CANVAS_HEIGHT,
 		);
 	} finally {
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
+		engine.shutdown();
 		destroyReadbackTarget(target);
 	}
 }
@@ -681,10 +744,15 @@ if (!navigator.gpu) {
 			document.body.innerHTML = "<h1>Missing WebGPU canvas.</h1>";
 			return;
 		}
-		void createRenderer(canvas)
-			.then((renderer) => {
+		void Engine.create(canvas, {
+			mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
+		})
+			.then((engine) => {
+				const demoState = createDemoStateForEngine(engine);
+				registerEngineHandlers(engine, demoState);
+				engine.initialize();
 				const loop = () => {
-					renderFrame(renderer);
+					engine.runRenderFrame();
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);

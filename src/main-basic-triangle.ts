@@ -1,5 +1,5 @@
 import "./style.css";
-import { create_webgpu_renderer } from "../_build/js/debug/build/emadurandal/rhodonite_examples/basic-triangle/js/main/main.js";
+import { create_webgpu_demo_state } from "../_build/js/debug/build/emadurandal/rhodonite_examples/basic-triangle/js/main/main.js";
 
 if (!navigator.gpu) {
 	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
@@ -12,7 +12,7 @@ if (!navigator.gpu) {
 
 			// `Promise::from_async` in MoonBit returns a JS Promise; await here
 			// (adapter / device / configure run inside MoonBit with a valid coroutine)
-			await create_webgpu_renderer(canvas);
+			await create_webgpu_demo_state(canvas);
 		} catch (error) {
 			console.error("Failed to initialize WebGPU:", error);
 			document.body.innerHTML =

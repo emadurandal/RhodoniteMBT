@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub fn create_webgpu_renderer(@webgpu_objects.HTMLCanvasElement) -> @js_async.Promise[Unit]
+pub fn create_webgpu_demo_state(@webgpu_objects.HTMLCanvasElement) -> @js_async.Promise[Unit]
 
 // Errors
 
@@ -16,4 +16,3 @@ pub fn create_webgpu_renderer(@webgpu_objects.HTMLCanvasElement) -> @js_async.Pr
 // Type aliases
 
 // Traits
-

@@ -1,0 +1,107 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite/app"
+
+import {
+  "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_webgpu/webgpu",
+}
+
+// Values
+pub fn default_render_frame_phases() -> Array[@ecs.PhaseKey]
+
+pub fn phase(String) -> @ecs.PhaseKey
+
+pub fn phase_group(String) -> PhaseGroupKey
+
+pub fn phase_group_fixed_step() -> PhaseGroupKey
+
+pub fn phase_group_render_frame() -> PhaseGroupKey
+
+pub fn phase_post_update() -> @ecs.PhaseKey
+
+pub fn phase_present() -> @ecs.PhaseKey
+
+pub fn phase_render() -> @ecs.PhaseKey
+
+pub fn phase_render_extract() -> @ecs.PhaseKey
+
+pub fn phase_render_prepare() -> @ecs.PhaseKey
+
+pub fn phase_shutdown() -> @ecs.PhaseKey
+
+pub fn phase_startup() -> @ecs.PhaseKey
+
+pub fn phase_update() -> @ecs.PhaseKey
+
+// Errors
+
+// Types and methods
+pub struct Engine {
+  // private fields
+}
+pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
+pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
+pub fn Engine::initialize(Self) -> Unit
+pub fn Engine::insert_phase_after_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::main_scene(Self) -> Scene
+pub fn Engine::new(@webgpu.GPUContext) -> Self
+pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
+pub fn Engine::on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
+pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
+pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
+pub fn Engine::run_render_frame(Self) -> Unit
+pub fn Engine::shutdown(Self) -> Unit
+
+pub(all) struct FrameState {
+  delta_seconds : Float
+  frame_index : Int
+  elapsed_seconds : Double
+}
+pub fn FrameState::delta_seconds(Self) -> Float
+pub fn FrameState::elapsed_seconds(Self) -> Double
+pub fn FrameState::frame_index(Self) -> Int
+pub fn FrameState::new(Float, Int, Double) -> Self
+pub fn FrameState::system_context(Self) -> @ecs.SystemContext
+
+pub(all) struct PhaseGroupKey {
+  name : String
+} derive(Eq)
+pub fn PhaseGroupKey::name(Self) -> String
+
+pub(all) enum PhaseSlot {
+  BeforeSchedule
+  AfterSchedule
+} derive(Eq)
+
+pub struct Scene {
+  // private fields
+}
+pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
+pub fn Scene::add_transform_propagation_system(Self, @ecs.PhaseKey) -> Unit
+pub fn Scene::enabled(Self) -> Bool
+pub fn Scene::main_camera(Self) -> @ecs.EntityId?
+pub fn Scene::name(Self) -> String
+pub fn Scene::new(String) -> Self
+pub fn Scene::new_with_world(String, @ecs.World) -> Self
+pub fn Scene::run_schedule_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
+pub fn Scene::set_enabled(Self, Bool) -> Unit
+pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
+pub fn Scene::set_visible(Self, Bool) -> Unit
+pub fn Scene::visible(Self) -> Bool
+pub fn Scene::world(Self) -> @ecs.World
+
+pub struct TimeState {
+  // private fields
+}
+pub fn TimeState::new(Float) -> Self
+pub fn TimeState::next_frame(Self) -> FrameState
+
+// Type aliases
+pub using @ecs {type PhaseKey}
+
+// Traits
+

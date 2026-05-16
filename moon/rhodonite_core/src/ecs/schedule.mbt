@@ -1,22 +1,4 @@
 ///|
-/// Implements `system_phase_rank`.
-fn system_phase_rank(phase : SystemPhase) -> Int {
-  match phase {
-    PreUpdate => 0
-    Update => 1
-    PostUpdate => 2
-    PreRender => 3
-    RenderExtract => 4
-  }
-}
-
-///|
-/// Implements `system_phase_count`.
-fn system_phase_count() -> Int {
-  5
-}
-
-///|
 /// Implements `component_array_intersects`.
 fn component_array_intersects(
   a : Array[ComponentTypeId],
@@ -24,6 +6,17 @@ fn component_array_intersects(
 ) -> Bool {
   for i = 0; i < a.length(); i = i + 1 {
     if component_array_contains(b, a[i]) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Implements `phase_array_contains`.
+pub fn phase_array_contains(phases : Array[PhaseKey], phase : PhaseKey) -> Bool {
+  for i = 0; i < phases.length(); i = i + 1 {
+    if phases[i] == phase {
       return true
     }
   }
@@ -104,11 +97,23 @@ pub fn SystemContext::new(
 }
 
 ///|
+/// Implements `PhaseKey::new`.
+pub fn PhaseKey::new(name : String) -> PhaseKey {
+  { name, }
+}
+
+///|
+/// Implements `PhaseKey::name`.
+pub fn PhaseKey::name(self : PhaseKey) -> String {
+  self.name
+}
+
+///|
 /// Implements `build_system`.
 fn build_system(
   constructor_name : String,
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   structural_write : Bool,
@@ -152,7 +157,7 @@ fn build_system(
 /// Implements `System::new`.
 pub fn System::new(
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
@@ -164,7 +169,7 @@ pub fn System::new(
 /// Builds a system that may create or destroy entities in addition to its declared component access.
 pub fn System::new_with_structural_write(
   name : String,
-  phase : SystemPhase,
+  phase : PhaseKey,
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
@@ -182,7 +187,7 @@ pub fn System::name(self : System) -> String {
 
 ///|
 /// Implements `System::phase`.
-pub fn System::phase(self : System) -> SystemPhase {
+pub fn System::phase(self : System) -> PhaseKey {
   self.phase
 }
 
@@ -248,11 +253,11 @@ pub fn Schedule::has_parallel_access_conflicts(self : Schedule) -> Bool {
 
 ///|
 /// Builtin system that mirrors [`World::update_global_transforms_from_transforms`].
-pub fn transform_propagation_system(world : World) -> System {
+pub fn transform_propagation_system(world : World, phase : PhaseKey) -> System {
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let co = world.child_of_component()
-  System::new("TransformPropagation", PostUpdate, [tf, co], [gt], (
+  System::new("TransformPropagation", phase, [tf, co], [gt], (
     system_world,
     _ctx,
     _commands,
@@ -260,47 +265,67 @@ pub fn transform_propagation_system(world : World) -> System {
 }
 
 ///|
-/// Runs systems by phase order, preserving registration order within the same phase.
+/// Runs systems in one phase, preserving registration order within the phase.
 ///
 /// Within each phase, systems are greedily split into conflict-free batches. A fresh
 /// [`CommandBuffer`] is passed to each system; commands from a batch are applied only after every
 /// system in that batch has returned, preserving registration order for apply. Later batches can
 /// observe earlier batch commands, while systems in the same batch cannot observe each other's
 /// queued changes.
+pub fn Schedule::run_phase(
+  self : Schedule,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+) -> Bool {
+  world.lock_component_registration()
+  let mut ok = true
+  let batch : Array[System] = []
+  for i = 0; i < self.systems.length(); i = i + 1 {
+    let system = self.systems[i]
+    if system.phase == phase {
+      if system_batch_conflicts_with(batch, system) {
+        if !run_system_batch(batch, world, ctx) {
+          ok = false
+        }
+        while batch.length() > 0 {
+          let _ = batch.pop()
+        }
+      }
+      batch.push(system)
+    }
+  }
+  if batch.length() > 0 {
+    if !run_system_batch(batch, world, ctx) {
+      ok = false
+    }
+    while batch.length() > 0 {
+      let _ = batch.pop()
+    }
+  }
+  world.unlock_component_registration()
+  ok
+}
+
+///|
+/// Runs systems by the externally supplied phase order.
 pub fn Schedule::run(
   self : Schedule,
   world : World,
   ctx : SystemContext,
+  phases : Array[PhaseKey],
 ) -> Bool {
-  world.lock_component_registration()
   let mut ok = true
-  for phase_rank = 0
-      phase_rank < system_phase_count()
-      phase_rank = phase_rank + 1 {
-    let batch : Array[System] = []
-    for i = 0; i < self.systems.length(); i = i + 1 {
-      let system = self.systems[i]
-      if system_phase_rank(system.phase) == phase_rank {
-        if system_batch_conflicts_with(batch, system) {
-          if !run_system_batch(batch, world, ctx) {
-            ok = false
-          }
-          while batch.length() > 0 {
-            let _ = batch.pop()
-          }
-        }
-        batch.push(system)
-      }
+  let seen : Array[PhaseKey] = []
+  for i = 0; i < phases.length(); i = i + 1 {
+    let phase = phases[i]
+    if phase_array_contains(seen, phase) {
+      abort("Schedule::run: duplicate phase in phase order")
     }
-    if batch.length() > 0 {
-      if !run_system_batch(batch, world, ctx) {
-        ok = false
-      }
-      while batch.length() > 0 {
-        let _ = batch.pop()
-      }
+    seen.push(phase)
+    if !self.run_phase(world, ctx, phase) {
+      ok = false
     }
   }
-  world.unlock_component_registration()
   ok
 }

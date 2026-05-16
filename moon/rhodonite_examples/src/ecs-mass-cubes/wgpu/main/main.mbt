@@ -8,17 +8,20 @@ async fn run_ecs_mass_cubes_native() -> Unit raise Error {
     ) {
     None => ()
     Some(session) => {
-      let renderer = match @renderer.create_renderer(session.gpu_context) {
-        Some(renderer) => renderer
+      let engine = @demo_state.create_engine(session.gpu_context)
+      let demo_state = match @demo_state.create_demo_state_for_engine(engine) {
+        Some(demo_state) => demo_state
         None => {
           @sdl_wgpu.release_native_demo_infrastructure(session)
           return
         }
       }
+      @demo_state.register_engine_handlers(engine, demo_state)
+      engine.initialize()
       let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
-        @renderer.render_frame(renderer)
+        engine.run_render_frame()
       })
-      renderer.release()
+      engine.shutdown()
       @sdl_wgpu.release_native_demo_infrastructure(session)
     }
   }

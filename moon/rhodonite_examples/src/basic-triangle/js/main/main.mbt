@@ -1,26 +1,27 @@
 ///|
-/// Entry point for the CLI or runnable program in this template.
-/// Keep main focused; move logic into the library package.
-/// Run with `moon run src/basic-triangle/js/main` from the moon/rhodonite_examples module root.
-/// 
-/// 
-async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+/// Initializes the browser WebGPU sample and renders the first engine tick.
+async fn create_webgpu_demo_state_async(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
-  match @renderer.create_renderer(ctx) {
-    Some(renderer) => {
-      @renderer.render_frame(renderer)
+  let engine = @app.Engine::new(ctx)
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      @demo_state.register_engine_handlers(engine, demo_state)
+      engine.initialize()
+      engine.run_render_frame()
       println("WebGPU triangle rendered successfully!")
     }
-    None => println("Failed to create renderer")
+    None => println("Failed to create DemoState")
   }
 }
 
 ///|
-/// Implements `create_webgpu_renderer`.
-pub fn create_webgpu_renderer(
+/// Implements `create_webgpu_demo_state`.
+pub fn create_webgpu_demo_state(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
+  @js_async.Promise::from_async(() => create_webgpu_demo_state_async(canvas))
 }
 
 ///|

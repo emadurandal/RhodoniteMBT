@@ -13,6 +13,6 @@
   "repository": "https://github.com/emadurandal/RhodoniteMBT",
   "license": "Apache-2.0",
   "keywords": ["rhodonite", "moonbit", "webgpu", "graphics"],
-  "description": "Thin public facade over RhodoniteMBT modules (WebGPU, core). Prefer importing subpackages under emadurandal/rhodonite_* for full APIs.",
+  "description": "Public facade over RhodoniteMBT modules with high-level app/runtime helpers.",
   "source": "src"
 }

@@ -8,6 +8,7 @@ extern "js" fn monotonic_ms() -> Double =
 extern "C" fn sdl_get_ticks() -> UInt64 = "SDL_GetTicks"
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(target="native")
@@ -16,6 +17,7 @@ fn monotonic_ms() -> Double {
 }
 
 ///|
+
 ///|
 /// Implements `monotonic_ms`.
 #cfg(not(any(target="js", target="native")))
@@ -402,8 +404,8 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-/// Defines `WebGPURenderer`.
-pub(all) struct WebGPURenderer {
+/// Defines `DemoState`.
+pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
@@ -419,8 +421,7 @@ pub(all) struct WebGPURenderer {
   bind_camera : @wgpu.GPUBindGroup
   layout_transforms : @wgpu.GPUBindGroupLayout
   layout_camera : @wgpu.GPUBindGroupLayout
-  world : @ecs.World
-  camera : @ecs.EntityId
+  scene : @app.Scene
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
@@ -430,6 +431,7 @@ pub(all) struct WebGPURenderer {
   bind_group_offsets : Array[UInt]
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
+  perf_frame_start_ms : @ref.Ref[Double]
 }
 
 ///|
@@ -493,6 +495,7 @@ extern "js" fn ecs_mass_cubes_perf_overlay_js(
   #| }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(target="js")
@@ -501,6 +504,7 @@ fn ecs_mass_cubes_perf_overlay(fps : Double, cpu_ms : Double) -> Unit {
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_overlay`.
 #cfg(not(target="js"))
@@ -511,6 +515,7 @@ fn ecs_mass_cubes_perf_overlay(_fps : Double, _cpu_ms : Double) -> Unit {
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(target="native")
@@ -532,6 +537,7 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+
 ///|
 /// Implements `ecs_mass_cubes_perf_console_log`.
 #cfg(not(target="native"))
@@ -547,11 +553,36 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
-/// Implements `create_renderer`.
-pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
-  let (device, canvas_context, format, queue) = context.get()
+/// Builds the ECS scene used by the mass-cubes sample.
+fn create_scene() -> @app.Scene {
+  @app.Scene::new_with_world(
+    "ecs-mass-cubes",
+    @ecs.World::new_with_global_transform_format(
+      global_transform_default_format(),
+    ),
+  )
+}
+
+///|
+/// Implements `create_engine`.
+pub fn create_engine(context : @wgpu.GPUContext) -> @app.Engine {
+  @app.Engine::new_with_main_scene(context, create_scene())
+}
+
+///|
+/// Implements `create_demo_state`.
+pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
+  let engine = create_engine(context)
+  create_demo_state_for_engine(engine)
+}
+
+///|
+/// Implements `create_demo_state_for_engine`.
+pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
+  let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
-    create_renderer_for_device(
+    create_demo_state_for_scene(
+      engine.main_scene(),
       device,
       queue,
       format,
@@ -561,13 +592,25 @@ pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
 }
 
 ///|
-/// Implements `create_renderer_for_device`.
-pub fn create_renderer_for_device(
+/// Implements `create_demo_state_for_device`.
+pub fn create_demo_state_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
-) -> WebGPURenderer {
+) -> DemoState {
+  create_demo_state_for_scene(create_scene(), device, queue, format, context~)
+}
+
+///|
+/// Implements `create_demo_state_for_scene`.
+pub fn create_demo_state_for_scene(
+  scene : @app.Scene,
+  device : @wgpu.GPUDevice,
+  queue : @wgpu.GPUQueue,
+  format : String,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> DemoState {
   let shader = device.create_shader_module(ecs_mass_shader_wgsl())
   let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
     array_stride: vertex_stride_local.to_uint64(),
@@ -604,9 +647,7 @@ pub fn create_renderer_for_device(
   @wgpu.shaderModule_release(shader)
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
-  let world = @ecs.World::new_with_global_transform_format(
-    global_transform_default_format(),
-  )
+  let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
   let per_side = grid_side_len(entity_count)
@@ -663,6 +704,7 @@ pub fn create_renderer_for_device(
       (0.0 : Float),
     ),
   )
+  scene.set_main_camera(Some(camera))
   let transform_storage = device.create_global_transform_words_buffer(world)
   let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
@@ -715,8 +757,7 @@ pub fn create_renderer_for_device(
     bind_camera,
     layout_transforms,
     layout_camera,
-    world,
-    camera,
+    scene,
     gt,
     tf,
     per_side,
@@ -726,32 +767,115 @@ pub fn create_renderer_for_device(
     bind_group_offsets: [],
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
+    perf_frame_start_ms: @ref.new(-1.0),
+  }
+}
+
+///|
+/// Starts per-frame CPU timing and updates the FPS reference point.
+fn DemoState::begin_perf_frame(self : DemoState) -> Unit {
+  let t_frame_start = monotonic_ms()
+  self.perf_frame_start_ms.val = t_frame_start
+}
+
+///|
+/// Returns the scene main camera or aborts because this DemoState requires one.
+fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
+  match scene.main_camera() {
+    Some(camera) => camera
+    None => abort("render_scene requires Scene.main_camera")
   }
 }
 
 ///|
 /// Implements `render_frame`.
-pub fn render_frame(renderer : WebGPURenderer) -> Unit {
-  let canvas_context = match renderer.context {
+pub fn render_frame(demo_state : DemoState) -> Unit {
+  let canvas_context = match demo_state.context {
     Some(c) => c
     None => abort("render_frame requires a canvas context")
   }
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
-  render_frame_to_view(renderer, color_view, record_perf=true)
+  render_frame_to_view(demo_state, color_view, record_perf=true)
   @wgpu.textureView_release(color_view)
   canvas_context.present()
 }
 
 ///|
+/// Renders the current scene state without advancing app time.
+pub fn render_current_frame(
+  demo_state : DemoState,
+  record_perf? : Bool = false,
+) -> Unit {
+  let canvas_context = match demo_state.context {
+    Some(c) => c
+    None => abort("render_current_frame requires a canvas context")
+  }
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_current_frame_to_view(demo_state, color_view, record_perf~)
+  @wgpu.textureView_release(color_view)
+  canvas_context.present()
+}
+
+///|
+/// Updates the wave animation and transform upload data for one app frame.
+pub fn DemoState::update_scene(
+  self : DemoState,
+  frame : @app.FrameState,
+) -> Unit {
+  self.frame.val = frame.frame_index()
+  let t = frame.frame_index().to_double() * 0.018
+  let world = self.scene.world()
+  let writes = update_and_drain_global_transforms(
+    world,
+    self.tf,
+    self.gt,
+    self.per_side,
+    t,
+    self.transform_refs,
+    self.transform_upload_range,
+    self.dense_transform_layout,
+    false,
+  )
+  self.queue.upload_global_transform_writes(self.transform_storage, writes)
+}
+
+///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
-  renderer : WebGPURenderer,
+  demo_state : DemoState,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
-  let t_frame_start = monotonic_ms()
-  let last_start = renderer.perf_last_frame_start_ms.val
+  demo_state.frame.val = demo_state.frame.val + 1
+  if record_perf {
+    demo_state.begin_perf_frame()
+  }
+  demo_state.update_scene(
+    @app.FrameState::new(
+      (0.022 : Float),
+      demo_state.frame.val,
+      demo_state.frame.val.to_double() * 0.022,
+    ),
+  )
+  render_current_frame_to_view(demo_state, color_view, record_perf~)
+}
+
+///|
+/// Renders the current scene state to a target view without advancing the scene.
+pub fn render_current_frame_to_view(
+  demo_state : DemoState,
+  color_view : @wgpu.GPUTextureView,
+  record_perf? : Bool = false,
+) -> Unit {
+  let t_render_start = monotonic_ms()
+  let t_frame_start = if demo_state.perf_frame_start_ms.val >= 0.0 {
+    demo_state.perf_frame_start_ms.val
+  } else {
+    t_render_start
+  }
+  let last_start = demo_state.perf_last_frame_start_ms.val
   let fps = if last_start >= 0.0 {
     let wall_dt = t_frame_start - last_start
     if wall_dt > 1.0e-9 {
@@ -762,27 +886,40 @@ pub fn render_frame_to_view(
   } else {
     0.0
   }
-  renderer.perf_last_frame_start_ms.val = t_frame_start
-  renderer.frame.val = renderer.frame.val + 1
-  let t = renderer.frame.val.to_double() * 0.018
-  let gt = renderer.gt
-  let tf = renderer.tf
-  let writes = update_and_drain_global_transforms(
-    renderer.world,
-    tf,
-    gt,
-    renderer.per_side,
-    t,
-    renderer.transform_refs,
-    renderer.transform_upload_range,
-    renderer.dense_transform_layout,
-    false,
+  demo_state.perf_last_frame_start_ms.val = t_frame_start
+  demo_state.render_scene(demo_state.scene, color_view)
+  if record_perf {
+    let cpu_ms = monotonic_ms() - t_frame_start
+    ecs_mass_cubes_perf_overlay(fps, cpu_ms)
+    ecs_mass_cubes_perf_console_log(fps, cpu_ms, demo_state.frame.val)
+  }
+  demo_state.perf_frame_start_ms.val = -1.0
+}
+
+///|
+/// Renders a scene by uploading scene-owned camera data and issuing draw commands.
+pub fn DemoState::render_scene(
+  self : DemoState,
+  scene : @app.Scene,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  let world = scene.world()
+  let camera = scene_main_camera_or_abort(scene)
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      camera_view,
+      camera_proj,
+      camera_near,
+      camera_far,
+      camera_aspect,
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
   )
-  renderer.queue.upload_global_transform_writes(
-    renderer.transform_storage,
-    writes,
-  )
-  let encoder = renderer.device.create_command_encoder()
+  self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
+  let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
     color_attachments: [
       Some({
@@ -793,38 +930,30 @@ pub fn render_frame_to_view(
       }),
     ],
     depth_stencil_attachment: Some({
-      view: renderer.depth_view,
+      view: self.depth_view,
       depth_clear_value: Some(1.0),
       depth_load_op: @wgpu.GPULoadOp::Clear,
       depth_store_op: @wgpu.GPUStoreOp::Store,
     }),
   })
-  render_pass.set_pipeline(renderer.pipeline)
-  render_pass.set_bind_group(
-    0U,
-    renderer.bind_transforms,
-    renderer.bind_group_offsets,
-  )
-  render_pass.set_bind_group(
-    1U,
-    renderer.bind_camera,
-    renderer.bind_group_offsets,
-  )
+  render_pass.set_pipeline(self.pipeline)
+  render_pass.set_bind_group(0U, self.bind_transforms, self.bind_group_offsets)
+  render_pass.set_bind_group(1U, self.bind_camera, self.bind_group_offsets)
   render_pass.set_index_buffer(
-    renderer.index_buffer,
+    self.index_buffer,
     @wgpu.GPUIndexFormat::Uint16,
     0UL,
     index_buffer_byte_length,
   )
   render_pass.set_vertex_buffer(
     0,
-    renderer.vertex_buffer,
+    self.vertex_buffer,
     0UL,
     (verts_per_cube * vertex_stride_local).to_uint64(),
   )
   render_pass.set_vertex_buffer(
     1,
-    renderer.instance_buffer,
+    self.instance_buffer,
     0UL,
     (entity_count * instance_stride).to_uint64(),
   )
@@ -832,18 +961,37 @@ pub fn render_frame_to_view(
   render_pass.end()
   render_pass.release()
   let command_buffer = encoder.finish()
-  renderer.queue.submit(command_buffer)
+  self.queue.submit(command_buffer)
   encoder.release()
-  if record_perf {
-    let cpu_ms = monotonic_ms() - t_frame_start
-    ecs_mass_cubes_perf_overlay(fps, cpu_ms)
-    ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
-  }
 }
 
 ///|
-/// Implements `WebGPURenderer::release`.
-pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
+/// Registers engine phase handlers that drive this DemoState.
+pub fn register_engine_handlers(
+  engine : @app.Engine,
+  demo_state : DemoState,
+) -> Unit {
+  engine.on_phase(@app.phase_update(), fn(_engine, frame) {
+    demo_state.begin_perf_frame()
+    demo_state.update_scene(frame)
+  })
+  engine.on_phase(
+    @app.phase_render(),
+    fn(_engine, _frame) {
+      if demo_state.scene.visible() {
+        render_current_frame(demo_state, record_perf=true)
+      }
+    },
+    slot=@app.PhaseSlot::AfterSchedule,
+  )
+  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+    demo_state.release()
+  })
+}
+
+///|
+/// Implements `DemoState::release`.
+pub fn DemoState::release(self : DemoState) -> Unit {
   @wgpu.bindGroup_release(self.bind_transforms)
   @wgpu.bindGroup_release(self.bind_camera)
   @wgpu.bindGroupLayout_release(self.layout_transforms)
@@ -859,7 +1007,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
-/// Implements `webgpu_renderer_release`.
-pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
-  renderer.release()
+/// Implements `demo_state_release`.
+pub fn demo_state_release(demo_state : DemoState) -> Unit {
+  demo_state.release()
 }

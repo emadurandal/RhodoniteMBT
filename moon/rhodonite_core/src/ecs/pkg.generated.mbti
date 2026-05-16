@@ -13,7 +13,9 @@ pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTran
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
-pub fn transform_propagation_system(World) -> System
+pub fn phase_array_contains(Array[PhaseKey], PhaseKey) -> Bool
+
+pub fn transform_propagation_system(World, PhaseKey) -> System
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 
@@ -105,6 +107,12 @@ pub(all) struct PackedGpuBlobResizeEvent {
   needs_full_upload : Bool
 }
 
+pub(all) struct PhaseKey {
+  name : String
+} derive(Eq)
+pub fn PhaseKey::name(Self) -> String
+pub fn PhaseKey::new(String) -> Self
+
 pub struct PreparedQuery {
   // private fields
 }
@@ -177,7 +185,8 @@ pub fn Schedule::add_system(Self, System) -> Unit
 pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
 pub fn Schedule::len(Self) -> Int
 pub fn Schedule::new() -> Self
-pub fn Schedule::run(Self, World, SystemContext) -> Bool
+pub fn Schedule::run(Self, World, SystemContext, Array[PhaseKey]) -> Bool
+pub fn Schedule::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 
 pub struct SpawnBatchRow {
   // private fields
@@ -191,9 +200,9 @@ pub struct System {
 }
 pub fn System::conflicts_with(Self, Self) -> Bool
 pub fn System::name(Self) -> String
-pub fn System::new(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
-pub fn System::new_with_structural_write(String, SystemPhase, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
-pub fn System::phase(Self) -> SystemPhase
+pub fn System::new(String, PhaseKey, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::new_with_structural_write(String, PhaseKey, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::phase(Self) -> PhaseKey
 pub fn System::reads(Self) -> Array[ComponentTypeId]
 pub fn System::structural_write(Self) -> Bool
 pub fn System::writes(Self) -> Array[ComponentTypeId]
@@ -203,14 +212,6 @@ pub(all) struct SystemContext {
   frame_index : Int
 }
 pub fn SystemContext::new(Float, Int) -> Self
-
-pub(all) enum SystemPhase {
-  PreUpdate
-  Update
-  PostUpdate
-  PreRender
-  RenderExtract
-} derive(Eq)
 
 pub struct World {
   // private fields

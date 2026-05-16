@@ -128,8 +128,8 @@ async function main(): Promise<void> {
 	}
 
 	const manifest = await loadVisualManifest("browser");
-	const renderers = await createRendererRegistry(snapshotModule);
-	const samples = createSamples(manifest, renderers);
+	const sampleRenders = await createSampleRenderRegistry(snapshotModule);
+	const samples = createSamples(manifest, sampleRenders);
 
 	const results: SampleResult[] = [];
 	const failures: SampleFailure[] = [];
@@ -209,10 +209,10 @@ async function main(): Promise<void> {
 
 function createSamples(
 	manifest: VisualSampleManifestEntry[],
-	renderers: Map<string, () => Promise<Uint8Array>>,
+	sampleRenders: Map<string, () => Promise<Uint8Array>>,
 ): BrowserSnapshotSample[] {
 	return manifest.map((entry) => {
-		const render = renderers.get(entry.id);
+		const render = sampleRenders.get(entry.id);
 		if (!render) {
 			throw new Error(`unknown browser visual regression sample id: ${entry.id}`);
 		}
@@ -226,7 +226,7 @@ function createSamples(
 	});
 }
 
-async function createRendererRegistry(
+async function createSampleRenderRegistry(
 	snapshotModule: SnapshotModule,
 ): Promise<Map<string, () => Promise<Uint8Array>>> {
 	const [tsModule, wasmHost, wasmModule, wasmGcModule] = await Promise.all([
@@ -371,7 +371,7 @@ function toUint8Array(value: unknown): Uint8Array {
 	if (ArrayBuffer.isView(value)) {
 		return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
 	}
-	throw new Error("MoonBit snapshot renderer did not return bytes");
+	throw new Error("MoonBit snapshot render function did not return bytes");
 }
 
 async function loadExpectedRgba(filename: string): Promise<Uint8Array> {

@@ -57,7 +57,7 @@ Queries reject duplicate required components. Structural mutation and direct pay
 
 ## Mutation And Scheduling
 
-`World` mutation APIs are guarded by `System` access declarations during `Schedule::run`:
+`Schedule` does not own a fixed update/render lifecycle. Callers supply named `PhaseKey` values and either run one phase with `Schedule::run_phase` or pass an explicit phase order to `Schedule::run`; the facade runtime groups those phases with `PhaseGroupKey` before running scene schedules. `World` mutation APIs are guarded by `System` access declarations during schedule execution:
 
 | Operation | Required declaration |
 |-----------|----------------------|

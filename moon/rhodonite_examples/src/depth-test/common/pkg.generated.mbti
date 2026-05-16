@@ -2,26 +2,35 @@
 package "emadurandal/rhodonite_examples/depth-test/common"
 
 import {
+  "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_webgpu/webgpu",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
   "moonbitlang/core/ref",
 }
 
 // Values
-pub fn create_renderer(@webgpu.GPUContext) -> WebGPURenderer?
+pub fn create_demo_state(@webgpu.GPUContext) -> DemoState?
 
-pub fn create_renderer_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> WebGPURenderer
+pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
-pub fn render_frame(WebGPURenderer) -> Unit
+pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
 
-pub fn render_frame_to_view(WebGPURenderer, @webgpu_objects.GPUTextureView) -> Unit
+pub fn demo_state_release(DemoState) -> Unit
 
-pub fn webgpu_renderer_release(WebGPURenderer) -> Unit
+pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
+
+pub fn render_current_frame(DemoState) -> Unit
+
+pub fn render_current_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
+
+pub fn render_frame(DemoState) -> Unit
+
+pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
 
 // Errors
 
 // Types and methods
-pub(all) struct WebGPURenderer {
+pub(all) struct DemoState {
   context : @webgpu.GPUCanvasContext?
   device : @webgpu.GPUDevice
   queue : @webgpu.GPUQueue
@@ -33,7 +42,8 @@ pub(all) struct WebGPURenderer {
   index_buffer : @webgpu.GPUBuffer
   frame : @ref.Ref[Int]
 }
-pub fn WebGPURenderer::release(Self) -> Unit
+pub fn DemoState::release(Self) -> Unit
+pub fn DemoState::update_scene(Self, @app.FrameState) -> Unit
 
 // Type aliases
 

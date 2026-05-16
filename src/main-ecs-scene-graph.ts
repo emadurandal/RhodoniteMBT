@@ -1,6 +1,6 @@
 import "./style.css";
 import {
-	create_webgpu_renderer,
+	create_webgpu_demo_state,
 	ecs_scene_graph_render_tick,
 } from "../_build/js/debug/build/emadurandal/rhodonite_examples/ecs-scene-graph/js/main/main.js";
 
@@ -13,7 +13,7 @@ if (!navigator.gpu) {
 				"webgpu-canvas",
 			) as HTMLCanvasElement;
 
-			await create_webgpu_renderer(canvas);
+			await create_webgpu_demo_state(canvas);
 
 			const loop = () => {
 				ecs_scene_graph_render_tick();

@@ -2,13 +2,13 @@
 
 `moon/rhodonite_examples/src/visual_regression` and
 `moon/rhodonite_examples/src/visual_regression_browser/js/main` are the visual
-regression layers for existing examples. They render the real sample renderer
+regression layers for existing examples. They render the real sample DemoState
 into an offscreen `rgba8unorm` texture, copy that texture into a readback
 buffer, unpack the padded RGBA rows, and compare the resulting image with PNG
 golden files.
 
 This is intentionally **not** a CPU-side canvas reference. A test only validates
-pixels produced by the WebGPU backend and the sample renderer path. The native
+pixels produced by the WebGPU backend and the sample DemoState path. The native
 path uses the SDL/wgpu backend; the browser path runs the MoonBit JS target in a
 headless Chrome/Chromium WebGPU page.
 
@@ -72,7 +72,7 @@ moon/rhodonite_examples/src/visual_regression/visual_samples.tsv
 Both the native MoonBit tests and the browser harness read this TSV. Each row
 contains `target`, `id`, display `name`, PNG `filename`,
 `max_mismatch_rate`, and `perceptual_threshold`. Add or remove visual cases in
-this file first, then wire a renderer for any new `id` in the relevant harness.
+this file first, then wire a sample render entry for any new `id` in the relevant harness.
 Native cases also need a matching MoonBit `test` block so `moon test` reports a
 test count that matches the number of native visual cases.
 
@@ -141,11 +141,11 @@ then sends comparison results or updated PNG bytes back to the Node runner.
 - `rhodonite_webgpu` exposes offscreen RGBA texture creation, texture-to-buffer
   copy, padded-row sizing helpers, native buffer readback, and JS async buffer
   readback.
-- Sample renderers expose `create_renderer_for_device` and
-  `render_frame_to_view`, so the same renderer state and draw code can target a
+- Sample DemoStates expose `create_demo_state_for_device` and
+  `render_frame_to_view`, so the same DemoState and draw code can target a
   swapchain view or an offscreen test texture.
 - The sample list and thresholds are data in `visual_samples.tsv`; code only
-  maps manifest `id` values to concrete native/browser renderer entry points.
+  maps manifest `id` values to concrete native/browser sample render entry points.
 - Native and browser comparisons both print explicit status-prefixed lines such
   as
   `visual_regression(<target>): PASS <filename> mismatch_rate=<rate> mismatches=<count>/<pixels> max=<rate> threshold=<threshold>`,

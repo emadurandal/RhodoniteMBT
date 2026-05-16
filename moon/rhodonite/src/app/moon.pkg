@@ -1,0 +1,4 @@
+import {
+  "emadurandal/rhodonite_core/ecs" @ecs,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+}

@@ -7,8 +7,8 @@ fn host_now_ms() -> Double = "rhodonite_ecs_mass_cubes_host" "now_ms"
 fn host_entity_count() -> Int = "rhodonite_ecs_mass_cubes_host" "entity_count"
 
 ///|
-/// Implements `host_initialize_renderer`.
-fn host_initialize_renderer(per_side : Int, transform_stride : Int) -> Unit = "rhodonite_ecs_mass_cubes_host" "initialize_renderer"
+/// Implements `host_initialize_demo_state`.
+fn host_initialize_demo_state(per_side : Int, transform_stride : Int) -> Unit = "rhodonite_ecs_mass_cubes_host" "initialize_demo_state"
 
 ///|
 /// Implements `host_write_initial_global_transforms`.
@@ -22,8 +22,8 @@ fn host_write_initial_global_transforms(
 fn host_write_global_transform_y(wave_time : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "write_global_transform_y"
 
 ///|
-/// Implements `host_render_frame`.
-fn host_render_frame(fps : Double, cpu_ms : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "render_frame"
+/// Implements `host_render_demo_frame`.
+fn host_render_demo_frame(fps : Double, cpu_ms : Double) -> Unit = "rhodonite_ecs_mass_cubes_host" "render_demo_frame"
 
 ///|
 let grid_spacing : Double = 0.14
@@ -53,18 +53,18 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
-/// Defines `WasmRenderer`.
-struct WasmRenderer {
+/// Defines `WasmDemoState`.
+struct WasmDemoState {
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
 }
 
 ///|
-let demo_renderer : @ref.Ref[WasmRenderer?] = @ref.new(None)
+let demo_state : @ref.Ref[WasmDemoState?] = @ref.new(None)
 
 ///|
-/// Implements `create_wasm_renderer`.
-pub fn create_wasm_renderer() -> Unit {
+/// Implements `create_wasm_demo_state`.
+pub fn create_wasm_demo_state() -> Unit {
   let world = @ecs.World::new()
   let count = host_entity_count()
   let per_side = grid_side_len(count)
@@ -91,11 +91,11 @@ pub fn create_wasm_renderer() -> Unit {
     )
   })
   let stride = 24
-  host_initialize_renderer(per_side, stride)
+  host_initialize_demo_state(per_side, stride)
   host_write_initial_global_transforms(per_side, 0.0)
   ignore(gt)
   ignore(world)
-  demo_renderer.val = Some({
+  demo_state.val = Some({
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
   })
@@ -104,11 +104,11 @@ pub fn create_wasm_renderer() -> Unit {
 ///|
 /// Implements `ecs_mass_cubes_wasm_render_tick`.
 pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
-  match demo_renderer.val {
+  match demo_state.val {
     None => ()
-    Some(renderer) => {
+    Some(demo_state) => {
       let t_frame_start = host_now_ms()
-      let last_start = renderer.perf_last_frame_start_ms.val
+      let last_start = demo_state.perf_last_frame_start_ms.val
       let fps = if last_start >= 0.0 {
         let wall_dt = t_frame_start - last_start
         if wall_dt > 1.0e-9 {
@@ -119,12 +119,12 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit {
       } else {
         0.0
       }
-      renderer.perf_last_frame_start_ms.val = t_frame_start
-      renderer.frame.val = renderer.frame.val + 1
-      let wave_time = renderer.frame.val.to_double() * 0.018 * 1.8
+      demo_state.perf_last_frame_start_ms.val = t_frame_start
+      demo_state.frame.val = demo_state.frame.val + 1
+      let wave_time = demo_state.frame.val.to_double() * 0.018 * 1.8
       host_write_global_transform_y(wave_time)
       let cpu_ms = host_now_ms() - t_frame_start
-      host_render_frame(fps, cpu_ms)
+      host_render_demo_frame(fps, cpu_ms)
     }
   }
 }
