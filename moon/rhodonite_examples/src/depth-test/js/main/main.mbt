@@ -37,7 +37,7 @@ pub fn create_webgpu_demo_state(
 /// Implements `depth_test_render_tick`.
 pub fn depth_test_render_tick() -> Unit {
   match (demo_engine.val, demo_app.val) {
-    (Some(engine), Some(app)) => engine.tick(app)
+    (Some(engine), Some(app)) => engine.run_render_frame(app)
     _ => ()
   }
 }

@@ -19,7 +19,7 @@ async fn create_webgpu_demo_state_async(
       engine.initialize_app(app)
       demo_engine.val = Some(engine)
       demo_app.val = Some(app)
-      engine.tick(app)
+      engine.run_render_frame(app)
       println("WebGPU triangle rendered successfully!")
     }
     None => println("Failed to create DemoState")

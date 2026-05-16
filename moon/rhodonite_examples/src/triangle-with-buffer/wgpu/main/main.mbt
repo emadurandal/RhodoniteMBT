@@ -27,7 +27,7 @@ async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
       let app = @demo_state.create_app(demo_state)
       engine.initialize_app(app)
       let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
-        engine.tick(app)
+        engine.run_render_frame(app)
       })
       engine.shutdown_app(app)
       @sdl_wgpu.release_native_demo_infrastructure(session)

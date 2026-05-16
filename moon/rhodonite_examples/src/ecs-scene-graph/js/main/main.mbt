@@ -34,7 +34,7 @@ pub fn create_webgpu_demo_state(
 /// Implements `ecs_scene_graph_render_tick`.
 pub fn ecs_scene_graph_render_tick() -> Unit {
   match (demo_engine.val, demo_app.val) {
-    (Some(engine), Some(app)) => engine.tick(app)
+    (Some(engine), Some(app)) => engine.run_render_frame(app)
     _ => ()
   }
 }

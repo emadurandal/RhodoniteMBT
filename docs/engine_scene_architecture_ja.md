@@ -119,28 +119,31 @@ let scene = engine.main_scene()
 engine.run_app(app)
 ```
 
-frame の標準順序:
+render-frame group の標準順序:
 
 ```text
-Engine::tick
+Engine::run_render_frame
   update time/frame state
-  run phase_update()
+  run phase_group_render_frame()
+    run phase_update()
     app handlers in PhaseSlot::BeforeSchedule
     enabled scene schedules for Update
     app handlers in PhaseSlot::AfterSchedule
-  run phase_post_update()
+    run phase_post_update()
     same slot/schedule structure
-  run phase_render_extract()
+    run phase_render_extract()
     same slot/schedule structure
-  run phase_render_prepare()
+    run phase_render_prepare()
     same slot/schedule structure
-  run phase_render()
+    run phase_render()
     app handlers in PhaseSlot::BeforeSchedule
     visible scene schedules for Render
     app handlers in PhaseSlot::AfterSchedule
-  run phase_present()
+    run phase_present()
     same slot/schedule structure
 ```
+
+`Engine` は group 同士に total order を持たせません。`phase_group_render_frame()` は SDL の render loop や browser の `requestAnimationFrame` から呼ばれる group、`phase_group_fixed_step()` は物理シミュレーションなど caller-owned な固定周期 driver から呼ばれる group です。固定周期 driver は `FrameState` を自分で作り、`Engine::run_phase_group(app, phase_group_fixed_step(), frame)` を呼びます。
 
 初期実装では scene は 1 つだけでもよいです。`Engine` の内部 field や命名だけを `scenes` / `main_scene_index` にしておくと、後で複数 scene を追加しやすくなります。
 
@@ -203,21 +206,22 @@ Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/sr
 |----|------------|
 | `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
 | `PhaseKey` | 文字列名を持つ open phase id。`phase("user/foo")` で追加でき、標準 phase は `phase_update()`、`phase_render_extract()`、`phase_render()` などで取得する。 |
+| `PhaseGroupKey` | 文字列名を持つ open phase group id。`phase_group("user/simulation")` で追加でき、標準 group は `phase_group_render_frame()`、`phase_group_fixed_step()` で取得する。 |
 | `PhaseSlot` | phase 内の `BeforeSchedule` / `AfterSchedule` 実行帯。schedule 外処理や将来の renderer task を phase lifecycle 内に置く。 |
 | `TimeState` | 固定 delta の frame counter。初期値は既存 ECS samples に合わせて 0.022 秒。 |
 | `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
 | `App` | phase handler registry。`on_phase` で `PhaseKey` / `PhaseSlot` に処理を登録する。初回実行時に登録を lock し、以後の `on_phase` は error にする。 |
-| `Engine` | `GPUContext`、scene collection、main scene index、time state、frame phase order を持ち、`tick(app)` で標準 phase を順に実行する。`insert_phase_before` / `insert_phase_after` で独自 phase を挿入できるが、呼び出せるのは `Engine::initialize_app(app)` の実行中だけにする。 |
+| `Engine` | `GPUContext`、scene collection、main scene index、time state、phase groups を持つ。`run_render_frame(app)` は render-frame group を実行し、`run_phase_group(app, group, frame)` は caller-owned driver から任意 group を実行する。 |
 
-`Engine::initialize_app(app)` は `phase_startup()` handler を実行し、その実行中だけ `Engine::insert_phase_before` / `Engine::insert_phase_after` を許可します。`phase_startup()` / `phase_shutdown()` は frame phase order には入らない OneShot Phase なので、挿入対象にも anchor にも使えません。frame phase order の先頭に独自 phase を置きたい場合は、startup handler 内で `insert_phase_before(phase_update(), custom_phase)` を使います。その後、app の登録 handler が `phase_startup()`、`phase_shutdown()`、または engine の frame phase order に含まれる phase だけを使っているか検証します。未登録 phase を `App::on_phase` に渡した場合は `Engine::initialize_app(app)` で error になります。`Engine::tick(app)`、`Engine::run_phase(app, phase, frame)`、`Engine::shutdown_app(app)` は `Engine::initialize_app(app)` 済みであることを要求します。
+`Engine::initialize_app(app)` は `phase_startup()` handler を実行し、その実行中だけ phase group の編集を許可します。標準 group として `phase_group_render_frame()` と `phase_group_fixed_step()` があり、必要なら `Engine::add_phase_group(group)` で custom group を追加できます。phase の追加は `append_phase_to_group(group, phase)`、`insert_phase_before_in_group(group, anchor, phase)`、`insert_phase_after_in_group(group, anchor, phase)` で行います。`phase_startup()` / `phase_shutdown()` は OneShot Phase なので、どの phase group にも追加できず、anchor にも使えません。render-frame group の先頭に独自 phase を置きたい場合は、startup handler 内で `insert_phase_before_in_group(phase_group_render_frame(), phase_update(), custom_phase)` を使います。その後、app の登録 handler が `phase_startup()`、`phase_shutdown()`、またはいずれかの phase group に含まれる phase だけを使っているか検証します。未登録 phase を `App::on_phase` に渡した場合は `Engine::initialize_app(app)` で error になります。`Engine::run_render_frame(app)`、`Engine::run_phase_group(app, group, frame)`、`Engine::run_phase(app, phase, frame)`、`Engine::shutdown_app(app)` は `Engine::initialize_app(app)` 済みであることを要求します。
 
-WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の処理は `App::on_phase` で `phase_update()`、`phase_render()`、`phase_shutdown()` に登録します。
+WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::run_render_frame(app)` から render-frame group を駆動します。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の処理は `App::on_phase` で `phase_update()`、`phase_render()`、`phase_shutdown()` に登録します。
 
 Browser JS export も sample-local state の名前に合わせ、`create_webgpu_demo_state(canvas)` を入口にします。WASM host-driven sample も `create_wasm_demo_state`、`initialize_demo_state`、`render_demo_frame` を ABI 名として使い、sample-local state と将来の engine-owned `Renderer` を名前で混同しないようにします。
 
 ECS sample の `DemoState` は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `phase_update()` handler で animated cube vertices を更新し、`phase_render()` handler でその frame の描画だけを行います。
 
-TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`PhaseKey`、`PhaseSlot`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`createApp(demo_state)`、`engine.tick(app)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と phase lifecycle は同じです。
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`createApp(demo_state)`、`engine.runRenderFrame(app)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、phase group と phase lifecycle は同じです。
 
 [`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
@@ -229,7 +233,7 @@ Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodo
 - `Scene::add_system(phase, ...)` を追加し、system 登録を scene 経由に寄せる。
 - `Engine::new_with_main_scene(context, scene)` を追加し、main scene を明示的に指定できるようにする。
 - `ecs-scene-graph` は `Scene::add_system` と `Scene::visible` を使う形に寄せる。
-- `ecs-mass-cubes` は fp16 global transform 用の `World` を `Scene::new_with_world` で包み、browser/native entry point を `Engine::tick(app)` 経由へ移行する。
+- `ecs-mass-cubes` は fp16 global transform 用の `World` を `Scene::new_with_world` で包み、browser/native entry point を `Engine::run_render_frame(app)` 経由へ移行する。
 
 この段階でも `Scene::world()` は残します。ECS component の登録や sample 固有の setup ではまだ直接 access が必要なためです。ただし `Schedule` は公開せず、system 登録や schedule 実行のように scene の境界を強く出せる操作は `Scene` method へ寄せます。
 

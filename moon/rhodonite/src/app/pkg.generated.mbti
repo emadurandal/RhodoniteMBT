@@ -7,9 +7,15 @@ import {
 }
 
 // Values
-pub fn default_frame_phases() -> Array[@ecs.PhaseKey]
+pub fn default_render_frame_phases() -> Array[@ecs.PhaseKey]
 
 pub fn phase(String) -> @ecs.PhaseKey
+
+pub fn phase_group(String) -> PhaseGroupKey
+
+pub fn phase_group_fixed_step() -> PhaseGroupKey
+
+pub fn phase_group_render_frame() -> PhaseGroupKey
 
 pub fn phase_post_update() -> @ecs.PhaseKey
 
@@ -42,17 +48,20 @@ pub fn App::run_phase_handlers(Self, @ecs.PhaseKey, PhaseSlot, Engine, FrameStat
 pub struct Engine {
   // private fields
 }
+pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
+pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize_app(Self, App) -> Unit
-pub fn Engine::insert_phase_after(Self, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
-pub fn Engine::insert_phase_before(Self, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::insert_phase_after_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
-pub fn Engine::phase_order(Self) -> Array[@ecs.PhaseKey]
+pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
 pub fn Engine::run_phase(Self, App, @ecs.PhaseKey, FrameState) -> Unit
+pub fn Engine::run_phase_group(Self, App, PhaseGroupKey, FrameState) -> Unit
+pub fn Engine::run_render_frame(Self, App) -> Unit
 pub fn Engine::shutdown_app(Self, App) -> Unit
-pub fn Engine::tick(Self, App) -> Unit
 
 pub(all) struct FrameState {
   delta_seconds : Float
@@ -64,6 +73,11 @@ pub fn FrameState::elapsed_seconds(Self) -> Double
 pub fn FrameState::frame_index(Self) -> Int
 pub fn FrameState::new(Float, Int, Double) -> Self
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
+
+pub(all) struct PhaseGroupKey {
+  name : String
+} derive(Eq)
+pub fn PhaseGroupKey::name(Self) -> String
 
 pub(all) enum PhaseSlot {
   BeforeSchedule

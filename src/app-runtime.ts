@@ -6,6 +6,7 @@ export type SceneScheduleCallback<TWorld> = (
 ) => void;
 
 export type PhaseKey = string;
+export type PhaseGroupKey = string;
 
 export const Phase = {
 	Startup: "rhodonite/startup",
@@ -18,11 +19,20 @@ export const Phase = {
 	Shutdown: "rhodonite/shutdown",
 } as const;
 
+export const PhaseGroup = {
+	RenderFrame: "rhodonite/render_frame",
+	FixedStep: "rhodonite/fixed_step",
+} as const;
+
 export function phase(name: string): PhaseKey {
 	return name;
 }
 
-export function defaultFramePhases(): PhaseKey[] {
+export function phaseGroup(name: string): PhaseGroupKey {
+	return name;
+}
+
+export function defaultRenderFramePhases(): PhaseKey[] {
 	return [
 		Phase.Update,
 		Phase.PostUpdate,
@@ -30,6 +40,18 @@ export function defaultFramePhases(): PhaseKey[] {
 		Phase.RenderPrepare,
 		Phase.Render,
 		Phase.Present,
+	];
+}
+
+type PhaseGroupRecord = {
+	key: PhaseGroupKey;
+	phases: PhaseKey[];
+};
+
+function defaultPhaseGroups(): PhaseGroupRecord[] {
+	return [
+		{ key: PhaseGroup.RenderFrame, phases: defaultRenderFramePhases() },
+		{ key: PhaseGroup.FixedStep, phases: [] },
 	];
 }
 
@@ -211,7 +233,7 @@ export class Engine {
 	readonly format: GPUTextureFormat;
 	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
-	private readonly phaseOrderValue: PhaseKey[];
+	private readonly phaseGroupsValue: PhaseGroupRecord[];
 	private initializingApp = false;
 	private appInitialized = false;
 	private mainSceneIndex = 0;
@@ -232,7 +254,7 @@ export class Engine {
 		this.format = format;
 		this.scenes = [mainScene];
 		this.timeState = new TimeState();
-		this.phaseOrderValue = defaultFramePhases();
+		this.phaseGroupsValue = defaultPhaseGroups();
 	}
 
 	static async create(
@@ -284,16 +306,44 @@ export class Engine {
 		this.runPhase(app, Phase.Shutdown, new FrameState(0, 0, 0));
 	}
 
-	phaseOrder(): PhaseKey[] {
-		return [...this.phaseOrderValue];
+	phaseGroupOrder(group: PhaseGroupKey): PhaseKey[] {
+		const phaseGroup = this.findPhaseGroup("Engine.phaseGroupOrder", group);
+		return [...phaseGroup.phases];
 	}
 
-	insertPhaseBefore(anchor: PhaseKey, phaseKey: PhaseKey): void {
-		this.insertPhase(anchor, phaseKey, 0);
+	addPhaseGroup(group: PhaseGroupKey): void {
+		const caller = "Engine.addPhaseGroup";
+		this.ensurePhaseGroupEditWindow(caller);
+		if (this.phaseGroupsValue.some((phaseGroup) => phaseGroup.key === group)) {
+			throw new Error(`Phase group '${group}' already exists.`);
+		}
+		this.phaseGroupsValue.push({ key: group, phases: [] });
 	}
 
-	insertPhaseAfter(anchor: PhaseKey, phaseKey: PhaseKey): void {
-		this.insertPhase(anchor, phaseKey, 1);
+	appendPhaseToGroup(group: PhaseGroupKey, phaseKey: PhaseKey): void {
+		const caller = "Engine.appendPhaseToGroup";
+		this.ensurePhaseGroupEditWindow(caller);
+		this.ensureInsertableGroupPhase(caller, phaseKey);
+		if (this.phaseRegisteredInAnyGroup(phaseKey)) {
+			throw new Error(`Phase '${phaseKey}' already exists in a phase group.`);
+		}
+		this.findPhaseGroup(caller, group).phases.push(phaseKey);
+	}
+
+	insertPhaseBeforeInGroup(
+		group: PhaseGroupKey,
+		anchor: PhaseKey,
+		phaseKey: PhaseKey,
+	): void {
+		this.insertPhaseInGroup(group, anchor, phaseKey, 0);
+	}
+
+	insertPhaseAfterInGroup(
+		group: PhaseGroupKey,
+		anchor: PhaseKey,
+		phaseKey: PhaseKey,
+	): void {
+		this.insertPhaseInGroup(group, anchor, phaseKey, 1);
 	}
 
 	runPhase(app: App, phase: PhaseKey, frame: FrameState): void {
@@ -314,12 +364,18 @@ export class Engine {
 		app.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, this, frame);
 	}
 
-	tick(app: App): void {
-		this.ensureAppInitialized("Engine.tick");
-		const frame = this.timeState.nextFrame();
-		for (const phase of this.phaseOrderValue) {
+	runPhaseGroup(app: App, group: PhaseGroupKey, frame: FrameState): void {
+		this.ensureAppInitialized("Engine.runPhaseGroup");
+		const phaseGroup = this.findPhaseGroup("Engine.runPhaseGroup", group);
+		for (const phase of phaseGroup.phases) {
 			this.runPhase(app, phase, frame);
 		}
+	}
+
+	runRenderFrame(app: App): void {
+		this.ensureAppInitialized("Engine.runRenderFrame");
+		const frame = this.timeState.nextFrame();
+		this.runPhaseGroup(app, PhaseGroup.RenderFrame, frame);
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {
@@ -329,35 +385,69 @@ export class Engine {
 		return scene.enabled();
 	}
 
-	private insertPhase(anchor: PhaseKey, phaseKey: PhaseKey, offset: number): void {
-		if (!this.initializingApp) {
-			throw new Error("Engine phases can only be inserted during initializeApp.");
-		}
-		if (phaseIsOneShot(phaseKey)) {
-			throw new Error(
-				"One-shot phases cannot be inserted into frame phase order.",
-			);
-		}
-		if (this.phaseOrderValue.includes(phaseKey)) {
-			throw new Error(`Frame phase '${phaseKey}' already exists.`);
+	private insertPhaseInGroup(
+		group: PhaseGroupKey,
+		anchor: PhaseKey,
+		phaseKey: PhaseKey,
+		offset: number,
+	): void {
+		const caller =
+			offset === 0
+				? "Engine.insertPhaseBeforeInGroup"
+				: "Engine.insertPhaseAfterInGroup";
+		this.ensurePhaseGroupEditWindow(caller);
+		this.ensureInsertableGroupPhase(caller, phaseKey);
+		if (this.phaseRegisteredInAnyGroup(phaseKey)) {
+			throw new Error(`Phase '${phaseKey}' already exists in a phase group.`);
 		}
 		if (phaseIsOneShot(anchor)) {
-			throw new Error("One-shot phases cannot be used as frame phase anchors.");
+			throw new Error("One-shot phases cannot be used as phase group anchors.");
 		}
-		const anchorIndex = this.phaseOrderValue.indexOf(anchor);
+		const phaseGroup = this.findPhaseGroup(caller, group);
+		const anchorIndex = phaseGroup.phases.indexOf(anchor);
 		if (anchorIndex < 0) {
 			throw new Error(
-				`Anchor phase '${anchor}' is not registered in frame phase order.`,
+				`Anchor phase '${anchor}' is not registered in phase group '${group}'.`,
 			);
 		}
-		this.phaseOrderValue.splice(anchorIndex + offset, 0, phaseKey);
+		phaseGroup.phases.splice(anchorIndex + offset, 0, phaseKey);
+	}
+
+	private ensurePhaseGroupEditWindow(caller: string): void {
+		if (!this.initializingApp) {
+			throw new Error(
+				`${caller} can only edit phase groups during Engine.initializeApp.`,
+			);
+		}
+	}
+
+	private ensureInsertableGroupPhase(caller: string, phaseKey: PhaseKey): void {
+		if (phaseIsOneShot(phaseKey)) {
+			throw new Error(
+				`${caller} cannot insert one-shot phases into phase groups.`,
+			);
+		}
+	}
+
+	private findPhaseGroup(caller: string, group: PhaseGroupKey): PhaseGroupRecord {
+		const phaseGroup = this.phaseGroupsValue.find(
+			(candidate) => candidate.key === group,
+		);
+		if (phaseGroup === undefined) {
+			throw new Error(`${caller}: phase group '${group}' is not registered.`);
+		}
+		return phaseGroup;
+	}
+
+	private phaseRegisteredInAnyGroup(phase: PhaseKey): boolean {
+		return this.phaseGroupsValue.some((group) => group.phases.includes(phase));
 	}
 
 	private phaseCanRun(phase: PhaseKey): boolean {
 		return (
 			phase === Phase.Startup ||
 			phase === Phase.Shutdown ||
-			this.phaseOrderValue.includes(phase)
+			this.phaseRegisteredInAnyGroup(phase)
 		);
 	}
 

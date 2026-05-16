@@ -11,6 +11,12 @@ pub(all) struct FrameState {
 pub type PhaseKey = @ecs.PhaseKey
 
 ///|
+/// Open phase group identifier used by external drivers to choose a clock domain.
+pub(all) struct PhaseGroupKey {
+  name : String
+} derive(Eq)
+
+///|
 /// Execution slot inside an app phase.
 pub(all) enum PhaseSlot {
   BeforeSchedule
@@ -23,6 +29,13 @@ priv struct PhaseHandler {
   phase : PhaseKey
   slot : PhaseSlot
   run : (Engine, FrameState) -> Unit
+}
+
+///|
+/// Ordered phase list for one externally driven clock domain.
+priv struct PhaseGroup {
+  key : PhaseGroupKey
+  phases : Array[PhaseKey]
 }
 
 ///|
@@ -58,7 +71,7 @@ pub struct Engine {
   priv scenes : Array[Scene]
   priv main_scene_index : Int
   priv time_state : TimeState
-  priv phase_order : Array[PhaseKey]
+  priv phase_groups : Array[PhaseGroup]
   priv mut initializing_app : Bool
   priv mut app_initialized : Bool
 }
@@ -101,6 +114,30 @@ pub fn FrameState::system_context(self : FrameState) -> @ecs.SystemContext {
 /// Builds a custom phase key. Use namespaced strings such as `user/my_phase` to avoid collisions.
 pub fn phase(name : String) -> PhaseKey {
   @ecs.PhaseKey::new(name)
+}
+
+///|
+/// Builds a custom phase group key. Use namespaced strings such as `user/fixed` to avoid collisions.
+pub fn phase_group(name : String) -> PhaseGroupKey {
+  { name, }
+}
+
+///|
+/// Implements `PhaseGroupKey::name`.
+pub fn PhaseGroupKey::name(self : PhaseGroupKey) -> String {
+  self.name
+}
+
+///|
+/// Standard render-frame group driven by display frame callbacks.
+pub fn phase_group_render_frame() -> PhaseGroupKey {
+  phase_group("rhodonite/render_frame")
+}
+
+///|
+/// Standard fixed-step group driven by caller-owned fixed cadence.
+pub fn phase_group_fixed_step() -> PhaseGroupKey {
+  phase_group("rhodonite/fixed_step")
 }
 
 ///|
@@ -152,8 +189,8 @@ pub fn phase_shutdown() -> PhaseKey {
 }
 
 ///|
-/// Returns the default per-frame phases in engine execution order.
-pub fn default_frame_phases() -> Array[PhaseKey] {
+/// Returns the default render-frame phases in engine execution order.
+pub fn default_render_frame_phases() -> Array[PhaseKey] {
   [
     phase_update(),
     phase_post_update(),
@@ -162,6 +199,18 @@ pub fn default_frame_phases() -> Array[PhaseKey] {
     phase_render(),
     phase_present(),
   ]
+}
+
+///|
+/// Returns the default engine phase groups.
+fn default_phase_groups() -> Array[PhaseGroup] {
+  let groups : Array[PhaseGroup] = []
+  groups.push({
+    key: phase_group_render_frame(),
+    phases: default_render_frame_phases(),
+  })
+  groups.push({ key: phase_group_fixed_step(), phases: [] })
+  groups
 }
 
 ///|
@@ -205,6 +254,34 @@ fn phase_array_contains(phases : Array[PhaseKey], phase_key : PhaseKey) -> Bool 
 fn phase_array_index(phases : Array[PhaseKey], phase_key : PhaseKey) -> Int {
   for i = 0; i < phases.length(); i = i + 1 {
     if phases[i] == phase_key {
+      return i
+    }
+  }
+  -1
+}
+
+///|
+/// Reports whether a phase group array contains a group.
+fn phase_group_array_contains(
+  groups : Array[PhaseGroup],
+  group_key : PhaseGroupKey,
+) -> Bool {
+  for i = 0; i < groups.length(); i = i + 1 {
+    if groups[i].key == group_key {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Finds a phase group index or returns -1.
+fn phase_group_array_index(
+  groups : Array[PhaseGroup],
+  group_key : PhaseGroupKey,
+) -> Int {
+  for i = 0; i < groups.length(); i = i + 1 {
+    if groups[i].key == group_key {
       return i
     }
   }
@@ -462,7 +539,7 @@ pub fn Engine::new_with_main_scene(
     scenes,
     main_scene_index: 0,
     time_state: TimeState::new((0.022 : Float)),
-    phase_order: default_frame_phases(),
+    phase_groups: default_phase_groups(),
     initializing_app: false,
     app_initialized: false,
   }
@@ -481,40 +558,93 @@ pub fn Engine::main_scene(self : Engine) -> Scene {
 }
 
 ///|
-/// Returns a copy of this engine's per-frame phase order.
-pub fn Engine::phase_order(self : Engine) -> Array[PhaseKey] {
-  copy_phase_array(self.phase_order)
+/// Returns a copy of one phase group's phase order.
+pub fn Engine::phase_group_order(
+  self : Engine,
+  group_key : PhaseGroupKey,
+) -> Array[PhaseKey] {
+  let index = phase_group_array_index(self.phase_groups, group_key)
+  if index < 0 {
+    abort(
+      "Engine::phase_group_order: phase group is not registered: " +
+      group_key.name(),
+    )
+  }
+  copy_phase_array(self.phase_groups[index].phases)
 }
 
 ///|
-/// Validates a phase can be inserted into the per-frame phase order.
-fn Engine::ensure_insertable_frame_phase(
-  _self : Engine,
+/// Requires phase group edits to happen during startup.
+fn Engine::ensure_phase_group_edit_window(
+  self : Engine,
   caller : String,
-  phase_key : PhaseKey,
 ) -> Unit {
-  if phase_is_one_shot(phase_key) {
+  if !self.initializing_app {
     abort(
-      caller + ": one-shot phases cannot be inserted into frame phase order",
+      caller + ": phase groups can only be edited during Engine::initialize_app",
     )
   }
 }
 
 ///|
-/// Finds a frame phase anchor or reports why it cannot be used.
-fn Engine::find_frame_phase_anchor(
+/// Validates a phase can be inserted into a phase group.
+fn Engine::ensure_insertable_group_phase(
+  _self : Engine,
+  caller : String,
+  phase_key : PhaseKey,
+) -> Unit {
+  if phase_is_one_shot(phase_key) {
+    abort(caller + ": one-shot phases cannot be inserted into phase groups")
+  }
+}
+
+///|
+/// Finds a phase group or reports why it cannot be used.
+fn Engine::find_phase_group(
   self : Engine,
   caller : String,
+  group_key : PhaseGroupKey,
+) -> Int {
+  let group_index = phase_group_array_index(self.phase_groups, group_key)
+  if group_index < 0 {
+    abort(caller + ": phase group is not registered: " + group_key.name())
+  }
+  group_index
+}
+
+///|
+/// Reports whether a phase is already registered in any phase group.
+fn Engine::phase_registered_in_any_group(
+  self : Engine,
+  phase : PhaseKey,
+) -> Bool {
+  for i = 0; i < self.phase_groups.length(); i = i + 1 {
+    if phase_array_contains(self.phase_groups[i].phases, phase) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Finds a phase group anchor or reports why it cannot be used.
+fn Engine::find_group_phase_anchor(
+  self : Engine,
+  caller : String,
+  group_key : PhaseGroupKey,
   anchor : PhaseKey,
 ) -> Int {
   if phase_is_one_shot(anchor) {
-    abort(caller + ": one-shot phases cannot be used as frame phase anchors")
+    abort(caller + ": one-shot phases cannot be used as phase group anchors")
   }
-  let index = phase_array_index(self.phase_order, anchor)
+  let group_index = self.find_phase_group(caller, group_key)
+  let index = phase_array_index(self.phase_groups[group_index].phases, anchor)
   if index < 0 {
     abort(
       caller +
-      ": anchor phase is not registered in frame phase order: " +
+      ": anchor phase is not registered in phase group " +
+      group_key.name() +
+      ": " +
       anchor.name(),
     )
   }
@@ -522,45 +652,76 @@ fn Engine::find_frame_phase_anchor(
 }
 
 ///|
-/// Inserts a custom frame phase before an existing anchor phase.
-pub fn Engine::insert_phase_before(
+/// Registers an empty custom phase group.
+pub fn Engine::add_phase_group(
   self : Engine,
-  anchor : PhaseKey,
-  phase_key : PhaseKey,
+  group_key : PhaseGroupKey,
 ) -> Unit {
-  let caller = "Engine::insert_phase_before"
-  if !self.initializing_app {
-    abort(
-      caller + ": phases can only be inserted during Engine::initialize_app",
-    )
+  let caller = "Engine::add_phase_group"
+  self.ensure_phase_group_edit_window(caller)
+  if phase_group_array_contains(self.phase_groups, group_key) {
+    abort(caller + ": phase group already exists: " + group_key.name())
   }
-  self.ensure_insertable_frame_phase(caller, phase_key)
-  if phase_array_contains(self.phase_order, phase_key) {
-    abort(caller + ": phase already exists")
-  }
-  let index = self.find_frame_phase_anchor(caller, anchor)
-  phase_array_insert(self.phase_order, index, phase_key)
+  self.phase_groups.push({ key: group_key, phases: [] })
 }
 
 ///|
-/// Inserts a custom frame phase after an existing anchor phase.
-pub fn Engine::insert_phase_after(
+/// Appends a custom phase to a phase group.
+pub fn Engine::append_phase_to_group(
   self : Engine,
+  group_key : PhaseGroupKey,
+  phase_key : PhaseKey,
+) -> Unit {
+  let caller = "Engine::append_phase_to_group"
+  self.ensure_phase_group_edit_window(caller)
+  self.ensure_insertable_group_phase(caller, phase_key)
+  if self.phase_registered_in_any_group(phase_key) {
+    abort(caller + ": phase already exists in a phase group")
+  }
+  let group_index = self.find_phase_group(caller, group_key)
+  self.phase_groups[group_index].phases.push(phase_key)
+}
+
+///|
+/// Inserts a custom phase before an existing phase in a group.
+pub fn Engine::insert_phase_before_in_group(
+  self : Engine,
+  group_key : PhaseGroupKey,
   anchor : PhaseKey,
   phase_key : PhaseKey,
 ) -> Unit {
-  let caller = "Engine::insert_phase_after"
-  if !self.initializing_app {
-    abort(
-      caller + ": phases can only be inserted during Engine::initialize_app",
-    )
+  let caller = "Engine::insert_phase_before_in_group"
+  self.ensure_phase_group_edit_window(caller)
+  self.ensure_insertable_group_phase(caller, phase_key)
+  if self.phase_registered_in_any_group(phase_key) {
+    abort(caller + ": phase already exists in a phase group")
   }
-  self.ensure_insertable_frame_phase(caller, phase_key)
-  if phase_array_contains(self.phase_order, phase_key) {
-    abort(caller + ": phase already exists")
+  let group_index = self.find_phase_group(caller, group_key)
+  let index = self.find_group_phase_anchor(caller, group_key, anchor)
+  phase_array_insert(self.phase_groups[group_index].phases, index, phase_key)
+}
+
+///|
+/// Inserts a custom phase after an existing phase in a group.
+pub fn Engine::insert_phase_after_in_group(
+  self : Engine,
+  group_key : PhaseGroupKey,
+  anchor : PhaseKey,
+  phase_key : PhaseKey,
+) -> Unit {
+  let caller = "Engine::insert_phase_after_in_group"
+  self.ensure_phase_group_edit_window(caller)
+  self.ensure_insertable_group_phase(caller, phase_key)
+  if self.phase_registered_in_any_group(phase_key) {
+    abort(caller + ": phase already exists in a phase group")
   }
-  let index = self.find_frame_phase_anchor(caller, anchor)
-  phase_array_insert(self.phase_order, index + 1, phase_key)
+  let group_index = self.find_phase_group(caller, group_key)
+  let index = self.find_group_phase_anchor(caller, group_key, anchor)
+  phase_array_insert(
+    self.phase_groups[group_index].phases,
+    index + 1,
+    phase_key,
+  )
 }
 
 ///|
@@ -568,7 +729,7 @@ pub fn Engine::insert_phase_after(
 fn Engine::can_run_phase(self : Engine, phase : PhaseKey) -> Bool {
   phase == phase_startup() ||
   phase == phase_shutdown() ||
-  phase_array_contains(self.phase_order, phase)
+  self.phase_registered_in_any_group(phase)
 }
 
 ///|
@@ -668,11 +829,25 @@ pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
 }
 
 ///|
-/// Advances the engine one frame and runs the default frame phases.
-pub fn Engine::tick(self : Engine, app : App) -> Unit {
-  self.ensure_app_initialized("Engine::tick")
-  let frame = self.time_state.next_frame()
-  for i = 0; i < self.phase_order.length(); i = i + 1 {
-    self.run_phase(app, self.phase_order[i], frame)
+/// Runs all phases in one phase group using a caller-supplied frame state.
+pub fn Engine::run_phase_group(
+  self : Engine,
+  app : App,
+  group_key : PhaseGroupKey,
+  frame : FrameState,
+) -> Unit {
+  self.ensure_app_initialized("Engine::run_phase_group")
+  let group_index = self.find_phase_group("Engine::run_phase_group", group_key)
+  let phases = self.phase_groups[group_index].phases
+  for i = 0; i < phases.length(); i = i + 1 {
+    self.run_phase(app, phases[i], frame)
   }
+}
+
+///|
+/// Advances the render-frame clock and runs the standard render-frame phase group.
+pub fn Engine::run_render_frame(self : Engine, app : App) -> Unit {
+  self.ensure_app_initialized("Engine::run_render_frame")
+  let frame = self.time_state.next_frame()
+  self.run_phase_group(app, phase_group_render_frame(), frame)
 }
