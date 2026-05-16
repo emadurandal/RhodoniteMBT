@@ -9,7 +9,7 @@ async fn run_ecs_mass_cubes_native() -> Unit raise Error {
     None => ()
     Some(session) => {
       let engine = @renderer.create_engine(session.gpu_context)
-      let renderer = match @renderer.create_renderer_for_engine(engine) {
+      let renderer = match @renderer.create_demo_state_for_engine(engine) {
         Some(renderer) => renderer
         None => {
           @sdl_wgpu.release_native_demo_infrastructure(session)

@@ -63,7 +63,7 @@ type TransformLayout = {
 	readonly uploadWordCount: number;
 };
 
-type Renderer = {
+type DemoState = {
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
@@ -433,15 +433,15 @@ function instanceBytes(transformRefs: Uint32Array): Uint8Array {
 }
 
 function writeMassCubesFullTransformData(
-	renderer: Renderer,
+	demoState: DemoState,
 	perSide: number,
 	waveTime: number,
 ): void {
-	const refs = renderer.transformRefs;
-	const words = renderer.transformWords;
-	const floats = renderer.transformFloats;
-	const halves = renderer.transformHalves;
-	const uploadFirstWord = renderer.transformWordUploadFirst;
+	const refs = demoState.transformRefs;
+	const words = demoState.transformWords;
+	const floats = demoState.transformFloats;
+	const halves = demoState.transformHalves;
+	const uploadFirstWord = demoState.transformWordUploadFirst;
 	const half = (perSide - 1) * 0.5;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
@@ -499,11 +499,11 @@ function writeMassCubesFullTransformData(
 	}
 }
 
-function writeMassCubesYTransformData(renderer: Renderer, waveTime: number): void {
-	const refs = renderer.transformRefs;
-	const floats = renderer.transformFloats;
-	const halves = renderer.transformHalves;
-	const uploadFirstWord = renderer.transformWordUploadFirst;
+function writeMassCubesYTransformData(demoState: DemoState, waveTime: number): void {
+	const refs = demoState.transformRefs;
+	const floats = demoState.transformFloats;
+	const halves = demoState.transformHalves;
+	const uploadFirstWord = demoState.transformWordUploadFirst;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
 	let localIndex = 0;
@@ -567,28 +567,28 @@ function writeWasmBytesToBuffer(
 }
 
 function writeTransformBytesFromWasmMemory(
-	renderer: Renderer,
+	demoState: DemoState,
 	memory: WebAssembly.Memory | undefined,
 	ptr: number,
 	byteLength: number,
 ): void {
 	writeWasmBytesToBuffer(
-		renderer.queue,
-		renderer.transformStorage,
+		demoState.queue,
+		demoState.transformStorage,
 		memory,
 		ptr,
 		byteLength,
 		() => ({
-			buffer: renderer.wasmTransformUploadBuffer,
-			ptr: renderer.wasmTransformUploadPtr,
-			byteLength: renderer.wasmTransformUploadByteLength,
-			view: renderer.wasmTransformUploadView,
+			buffer: demoState.wasmTransformUploadBuffer,
+			ptr: demoState.wasmTransformUploadPtr,
+			byteLength: demoState.wasmTransformUploadByteLength,
+			view: demoState.wasmTransformUploadView,
 		}),
 		(buffer, cachedPtr, cachedByteLength, view) => {
-			renderer.wasmTransformUploadBuffer = buffer;
-			renderer.wasmTransformUploadPtr = cachedPtr;
-			renderer.wasmTransformUploadByteLength = cachedByteLength;
-			renderer.wasmTransformUploadView = view;
+			demoState.wasmTransformUploadBuffer = buffer;
+			demoState.wasmTransformUploadPtr = cachedPtr;
+			demoState.wasmTransformUploadByteLength = cachedByteLength;
+			demoState.wasmTransformUploadView = view;
 		},
 	);
 }
@@ -637,10 +637,10 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-async function createRenderer(
+async function createDemoState(
 	canvas: HTMLCanvasElement,
 	renderFormat?: GPUTextureFormat,
-): Promise<Renderer> {
+): Promise<DemoState> {
 	const adapter = await navigator.gpu.requestAdapter();
 	if (adapter === null) {
 		throw new Error("WebGPU adapter is not available.");
@@ -788,7 +788,7 @@ function updatePerfOverlay(label: string, fps: number, cpuMs: number): void {
 }
 
 function createHostImports(
-	renderer: Renderer,
+	demoState: DemoState,
 	label: string,
 	getMemory: () => WebAssembly.Memory | undefined,
 ): WebAssembly.Imports {
@@ -797,39 +797,39 @@ function createHostImports(
 			now_ms: () => performance.now(),
 			entity_count: () => ENTITY_COUNT,
 			initialize_renderer: (perSide: number, transformStride: number) => {
-				renderer.perSide = perSide;
-				renderer.transformStride = transformStride;
-				},
-				write_initial_global_transforms: (perSide: number, waveTime: number) => {
-					writeMassCubesFullTransformData(renderer, perSide, waveTime);
-					uploadGlobalTransformBytes(
-						renderer.queue,
-						renderer.transformStorage,
-						renderer.transformBytes,
-						renderer.transformWordUploadFirst * 4,
-					);
-				},
-				write_global_transform_y: (waveTime: number) => {
-					writeMassCubesYTransformData(renderer, waveTime);
-					uploadGlobalTransformBytes(
-						renderer.queue,
-						renderer.transformStorage,
-						renderer.transformBytes,
-						renderer.transformWordUploadFirst * 4,
-					);
-				},
+				demoState.perSide = perSide;
+				demoState.transformStride = transformStride;
+			},
+			write_initial_global_transforms: (perSide: number, waveTime: number) => {
+				writeMassCubesFullTransformData(demoState, perSide, waveTime);
+				uploadGlobalTransformBytes(
+					demoState.queue,
+					demoState.transformStorage,
+					demoState.transformBytes,
+					demoState.transformWordUploadFirst * 4,
+				);
+			},
+			write_global_transform_y: (waveTime: number) => {
+				writeMassCubesYTransformData(demoState, waveTime);
+				uploadGlobalTransformBytes(
+					demoState.queue,
+					demoState.transformStorage,
+					demoState.transformBytes,
+					demoState.transformWordUploadFirst * 4,
+				);
+			},
 			write_initial_global_transform_bytes: (ptr: number, byteLength: number) => {
-				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
+				writeTransformBytesFromWasmMemory(demoState, getMemory(), ptr, byteLength);
 			},
 			write_global_transform_bytes: (ptr: number, byteLength: number) => {
-				writeTransformBytesFromWasmMemory(renderer, getMemory(), ptr, byteLength);
+				writeTransformBytesFromWasmMemory(demoState, getMemory(), ptr, byteLength);
 			},
 			render_frame: (fps: number, cpuMs: number) => {
 				const colorView =
-					renderer.snapshotColorView ??
-					renderer.context.getCurrentTexture().createView();
-				const depthView = renderer.snapshotDepthView ?? renderer.depthView;
-				const encoder = renderer.device.createCommandEncoder();
+					demoState.snapshotColorView ??
+					demoState.context.getCurrentTexture().createView();
+				const depthView = demoState.snapshotDepthView ?? demoState.depthView;
+				const encoder = demoState.device.createCommandEncoder();
 				const pass = encoder.beginRenderPass({
 					colorAttachments: [
 						{
@@ -846,25 +846,25 @@ function createHostImports(
 						depthStoreOp: "store",
 					},
 				});
-				pass.setPipeline(renderer.pipeline);
-				pass.setBindGroup(0, renderer.bindTransforms);
-				pass.setBindGroup(1, renderer.bindCamera);
-				pass.setIndexBuffer(renderer.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
+				pass.setPipeline(demoState.pipeline);
+				pass.setBindGroup(0, demoState.bindTransforms);
+				pass.setBindGroup(1, demoState.bindCamera);
+				pass.setIndexBuffer(demoState.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
 				pass.setVertexBuffer(
 					0,
-					renderer.vertexBuffer,
+					demoState.vertexBuffer,
 					0,
 					VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL,
 				);
 				pass.setVertexBuffer(
 					1,
-					renderer.instanceBuffer,
+					demoState.instanceBuffer,
 					0,
 					ENTITY_COUNT * INSTANCE_STRIDE,
 				);
 				pass.drawIndexed(INDEX_U16_COUNT, ENTITY_COUNT);
 				pass.end();
-				renderer.queue.submit([encoder.finish()]);
+				demoState.queue.submit([encoder.finish()]);
 				updatePerfOverlay(label, fps, cpuMs);
 			},
 		},
@@ -872,7 +872,7 @@ function createHostImports(
 }
 
 async function instantiateWasm(
-	renderer: Renderer,
+	demoState: DemoState,
 	wasmUrl: string,
 	label: string,
 ): Promise<WasmExports> {
@@ -885,7 +885,7 @@ async function instantiateWasm(
 	let memory: WebAssembly.Memory | undefined;
 	const { instance } = await WebAssembly.instantiate(
 		bytes,
-		createHostImports(renderer, label, () => memory),
+		createHostImports(demoState, label, () => memory),
 	);
 	const exports = instance.exports as unknown as WasmExports;
 	memory = exports.memory;
@@ -904,9 +904,9 @@ export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
 			document.body.innerHTML = "<h1>Missing WebGPU canvas.</h1>";
 			return;
 		}
-		void createRenderer(canvas)
-			.then(async (renderer) => {
-				const wasm = await instantiateWasm(renderer, wasmUrl, label);
+		void createDemoState(canvas)
+			.then(async (demoState) => {
+				const wasm = await instantiateWasm(demoState, wasmUrl, label);
 				wasm._start?.();
 				wasm.create_wasm_renderer();
 				const loop = () => {
@@ -933,27 +933,27 @@ export async function renderEcsMassCubesWasmSnapshot(
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
 	canvas.height = CANVAS_HEIGHT;
-	const renderer = await createRenderer(canvas, "rgba8unorm");
-	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	const demoState = await createDemoState(canvas, "rgba8unorm");
+	const target = createRgba8ReadbackTarget(demoState.device, CANVAS_WIDTH, CANVAS_HEIGHT);
 	try {
-		const wasm = await instantiateWasm(renderer, wasmUrl, label);
+		const wasm = await instantiateWasm(demoState, wasmUrl, label);
 		wasm._start?.();
 		wasm.create_wasm_renderer();
-		renderer.snapshotColorView = target.view;
-		renderer.snapshotDepthView = target.depthView;
+		demoState.snapshotColorView = target.view;
+		demoState.snapshotDepthView = target.depthView;
 		wasm.ecs_mass_cubes_wasm_render_tick();
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
-			renderer.device,
-			renderer.queue,
+			demoState.device,
+			demoState.queue,
 			target.texture,
 			CANVAS_WIDTH,
 			CANVAS_HEIGHT,
 		);
 	} finally {
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
 		destroyReadbackTarget(target);
 	}
 }

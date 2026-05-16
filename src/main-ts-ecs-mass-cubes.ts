@@ -42,7 +42,7 @@ type Camera = {
 	uniformBytes: () => Uint8Array;
 };
 
-type Renderer = {
+type DemoState = {
 	readonly canvas: HTMLCanvasElement;
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
@@ -377,7 +377,7 @@ function writeMassCubesTransformBlob(
 	}
 }
 
-function uploadInitialGlobalTransforms(renderer: Renderer): void {
+function uploadInitialGlobalTransforms(renderer: DemoState): void {
 	const world = renderer.scene.world();
 	uploadGlobalTransformWrites(
 		renderer.queue,
@@ -396,7 +396,7 @@ function uploadInitialGlobalTransforms(renderer: Renderer): void {
 	);
 }
 
-function updateAndDrainGlobalTransforms(renderer: Renderer, t: number): void {
+function updateAndDrainGlobalTransforms(renderer: DemoState, t: number): void {
 	const world = renderer.scene.world();
 	uploadGlobalTransformWrites(
 		renderer.queue,
@@ -459,10 +459,10 @@ fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
 	return prefix + globalTransformHelpersDefault() + suffix;
 }
 
-function createRendererForEngine(
+function createDemoStateForEngine(
 	engine: Engine,
 	renderFormat?: GPUTextureFormat,
-): Renderer {
+): DemoState {
 	const { canvas, context, device, queue, format } = engine;
 	const scene = engine.mainScene<World, Camera>();
 	const targetFormat = renderFormat ?? format;
@@ -566,7 +566,7 @@ function createRendererForEngine(
 	});
 	const depthView = depthTexture.createView();
 
-	const renderer: Renderer = {
+	const renderer: DemoState = {
 		canvas,
 		context,
 		device,
@@ -596,7 +596,7 @@ function createRendererForEngine(
 	return renderer;
 }
 
-function createApp(renderer: Renderer): App {
+function createApp(renderer: DemoState): App {
 	return new App({
 		update: (_engine, frame) => updateScene(renderer, frame),
 		render: () => {
@@ -604,7 +604,7 @@ function createApp(renderer: Renderer): App {
 				renderCurrentFrame(renderer);
 			}
 		},
-		shutdown: () => releaseRenderer(renderer),
+		shutdown: () => releaseDemoState(renderer),
 	});
 }
 
@@ -616,12 +616,12 @@ function updatePerfOverlay(fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function updateScene(renderer: Renderer, frame: FrameState): void {
+function updateScene(renderer: DemoState, frame: FrameState): void {
 	renderer.frame = frame.frameIndex;
 	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
 }
 
-function renderCurrentFrame(renderer: Renderer): void {
+function renderCurrentFrame(renderer: DemoState): void {
 	const frameStart = performance.now();
 	const fps =
 		renderer.lastFrameStartMs >= 0
@@ -636,7 +636,7 @@ function renderCurrentFrame(renderer: Renderer): void {
 }
 
 function renderScene(
-	renderer: Renderer,
+	renderer: DemoState,
 	scene: Scene<World, Camera>,
 	colorView: GPUTextureView,
 ): void {
@@ -674,7 +674,7 @@ function renderScene(
 	renderer.queue.submit([encoder.finish()]);
 }
 
-function releaseRenderer(renderer: Renderer): void {
+function releaseDemoState(renderer: DemoState): void {
 	renderer.depthTexture.destroy();
 	renderer.vertexBuffer.destroy();
 	renderer.instanceBuffer.destroy();
@@ -690,7 +690,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	const engine = await Engine.create(canvas, {
 		mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
 	});
-	const renderer = createRendererForEngine(engine, "rgba8unorm");
+	const renderer = createDemoStateForEngine(engine, "rgba8unorm");
 	const app = createApp(renderer);
 	engine.initializeApp(app);
 	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -728,7 +728,7 @@ if (!navigator.gpu) {
 			mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
 		})
 			.then((engine) => {
-				const renderer = createRendererForEngine(engine);
+				const renderer = createDemoStateForEngine(engine);
 				const app = createApp(renderer);
 				engine.initializeApp(app);
 				const loop = () => {

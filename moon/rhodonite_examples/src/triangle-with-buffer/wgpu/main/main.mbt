@@ -17,7 +17,7 @@ async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
     None => ()
     Some(session) => {
       let engine = @app.Engine::new(session.gpu_context)
-      let renderer = match @renderer.create_renderer_for_engine(engine) {
+      let renderer = match @renderer.create_demo_state_for_engine(engine) {
         Some(renderer) => renderer
         None => {
           @sdl_wgpu.release_native_demo_infrastructure(session)

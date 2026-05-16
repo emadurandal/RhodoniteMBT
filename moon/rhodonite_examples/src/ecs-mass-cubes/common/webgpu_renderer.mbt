@@ -404,8 +404,8 @@ fn update_and_drain_global_transforms(
 }
 
 ///|
-/// Defines `WebGPURenderer`.
-pub(all) struct WebGPURenderer {
+/// Defines `DemoState`.
+pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
@@ -569,18 +569,18 @@ pub fn create_engine(context : @wgpu.GPUContext) -> @app.Engine {
 }
 
 ///|
-/// Implements `create_renderer`.
-pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
+/// Implements `create_demo_state`.
+pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
   let engine = create_engine(context)
-  create_renderer_for_engine(engine)
+  create_demo_state_for_engine(engine)
 }
 
 ///|
-/// Implements `create_renderer_for_engine`.
-pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+/// Implements `create_demo_state_for_engine`.
+pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
   let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
-    create_renderer_for_scene(
+    create_demo_state_for_scene(
       engine.main_scene(),
       device,
       queue,
@@ -591,25 +591,25 @@ pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
 }
 
 ///|
-/// Implements `create_renderer_for_device`.
-pub fn create_renderer_for_device(
+/// Implements `create_demo_state_for_device`.
+pub fn create_demo_state_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
-) -> WebGPURenderer {
-  create_renderer_for_scene(create_scene(), device, queue, format, context~)
+) -> DemoState {
+  create_demo_state_for_scene(create_scene(), device, queue, format, context~)
 }
 
 ///|
-/// Implements `create_renderer_for_scene`.
-pub fn create_renderer_for_scene(
+/// Implements `create_demo_state_for_scene`.
+pub fn create_demo_state_for_scene(
   scene : @app.Scene,
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
-) -> WebGPURenderer {
+) -> DemoState {
   let shader = device.create_shader_module(ecs_mass_shader_wgsl())
   let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
     array_stride: vertex_stride_local.to_uint64(),
@@ -780,7 +780,7 @@ fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
 
 ///|
 /// Implements `render_frame`.
-pub fn render_frame(renderer : WebGPURenderer) -> Unit {
+pub fn render_frame(renderer : DemoState) -> Unit {
   let canvas_context = match renderer.context {
     Some(c) => c
     None => abort("render_frame requires a canvas context")
@@ -795,7 +795,7 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 ///|
 /// Renders the current scene state without advancing app time.
 pub fn render_current_frame(
-  renderer : WebGPURenderer,
+  renderer : DemoState,
   record_perf? : Bool = false,
 ) -> Unit {
   let canvas_context = match renderer.context {
@@ -811,8 +811,8 @@ pub fn render_current_frame(
 
 ///|
 /// Updates the wave animation and transform upload data for one app frame.
-pub fn WebGPURenderer::update_scene(
-  self : WebGPURenderer,
+pub fn DemoState::update_scene(
+  self : DemoState,
   frame : @app.FrameState,
 ) -> Unit {
   self.frame.val = frame.frame_index()
@@ -835,7 +835,7 @@ pub fn WebGPURenderer::update_scene(
 ///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
-  renderer : WebGPURenderer,
+  renderer : DemoState,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
@@ -853,7 +853,7 @@ pub fn render_frame_to_view(
 ///|
 /// Renders the current scene state to a target view without advancing the scene.
 pub fn render_current_frame_to_view(
-  renderer : WebGPURenderer,
+  renderer : DemoState,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
@@ -880,8 +880,8 @@ pub fn render_current_frame_to_view(
 
 ///|
 /// Renders a scene by uploading scene-owned camera data and issuing draw commands.
-pub fn WebGPURenderer::render_scene(
-  self : WebGPURenderer,
+pub fn DemoState::render_scene(
+  self : DemoState,
   scene : @app.Scene,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
@@ -949,7 +949,7 @@ pub fn WebGPURenderer::render_scene(
 
 ///|
 /// Builds an app lifecycle that drives this renderer from an engine tick.
-pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+pub fn create_app(renderer : DemoState) -> @app.App {
   @app.App::new(
     fn(_engine) { () },
     fn(_engine, frame) { renderer.update_scene(frame) },
@@ -963,8 +963,8 @@ pub fn create_app(renderer : WebGPURenderer) -> @app.App {
 }
 
 ///|
-/// Implements `WebGPURenderer::release`.
-pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
+/// Implements `DemoState::release`.
+pub fn DemoState::release(self : DemoState) -> Unit {
   @wgpu.bindGroup_release(self.bind_transforms)
   @wgpu.bindGroup_release(self.bind_camera)
   @wgpu.bindGroupLayout_release(self.layout_transforms)
@@ -980,7 +980,7 @@ pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
 }
 
 ///|
-/// Implements `webgpu_renderer_release`.
-pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
+/// Implements `demo_state_release`.
+pub fn demo_state_release(renderer : DemoState) -> Unit {
   renderer.release()
 }

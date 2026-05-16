@@ -11,7 +11,7 @@ let demo_app : @ref.Ref[@app.App?] = @ref.new(None)
 async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
   let engine = @app.Engine::new(ctx)
-  match @renderer.create_renderer_for_engine(engine) {
+  match @renderer.create_demo_state_for_engine(engine) {
     Some(renderer) => {
       let app = @renderer.create_app(renderer)
       engine.initialize_app(app)

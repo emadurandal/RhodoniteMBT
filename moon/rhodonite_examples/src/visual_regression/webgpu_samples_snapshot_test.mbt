@@ -189,35 +189,35 @@ fn render_native_visual_sample(
 ) -> Unit raise {
   match id {
     "basic-triangle" => {
-      let renderer = @basic_triangle.create_renderer_for_device(
+      let renderer = @basic_triangle.create_demo_state_for_device(
         device, queue, format,
       )
       @basic_triangle.render_frame_to_view(renderer, view)
       renderer.release()
     }
     "triangle-with-buffer" => {
-      let renderer = @triangle_with_buffer.create_renderer_for_device(
+      let renderer = @triangle_with_buffer.create_demo_state_for_device(
         device, queue, format,
       )
       @triangle_with_buffer.render_frame_to_view(renderer, view)
       renderer.release()
     }
     "depth-test" => {
-      let renderer = @depth_test.create_renderer_for_device(
+      let renderer = @depth_test.create_demo_state_for_device(
         device, queue, format,
       )
       @depth_test.render_frame_to_view(renderer, view)
       renderer.release()
     }
     "ecs-scene-graph" => {
-      let renderer = @ecs_scene_graph.create_renderer_for_device(
+      let renderer = @ecs_scene_graph.create_demo_state_for_device(
         device, queue, format,
       )
       @ecs_scene_graph.render_frame_to_view(renderer, view)
       renderer.release()
     }
     "ecs-mass-cubes" => {
-      let renderer = @ecs_mass_cubes.create_renderer_for_device(
+      let renderer = @ecs_mass_cubes.create_demo_state_for_device(
         device, queue, format,
       )
       @ecs_mass_cubes.render_frame_to_view(renderer, view)

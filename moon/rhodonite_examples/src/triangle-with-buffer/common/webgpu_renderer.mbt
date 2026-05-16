@@ -51,8 +51,8 @@ fn index_triangle_u16_bytes() -> FixedArray[Byte] {
 }
 
 ///|
-/// Defines `WebGPURenderer`.
-pub(all) struct WebGPURenderer {
+/// Defines `DemoState`.
+pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
@@ -62,18 +62,18 @@ pub(all) struct WebGPURenderer {
 }
 
 ///|
-/// Implements `create_renderer`.
-pub fn create_renderer(context : @wgpu.GPUContext) -> WebGPURenderer? {
+/// Implements `create_demo_state`.
+pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
   let engine = @app.Engine::new(context)
-  create_renderer_for_engine(engine)
+  create_demo_state_for_engine(engine)
 }
 
 ///|
-/// Implements `create_renderer_for_engine`.
-pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
+/// Implements `create_demo_state_for_engine`.
+pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
   let (device, canvas_context, format, queue) = engine.gpu_context().get()
   Some(
-    create_renderer_for_device(
+    create_demo_state_for_device(
       device,
       queue,
       format,
@@ -83,13 +83,13 @@ pub fn create_renderer_for_engine(engine : @app.Engine) -> WebGPURenderer? {
 }
 
 ///|
-/// Implements `create_renderer_for_device`.
-pub fn create_renderer_for_device(
+/// Implements `create_demo_state_for_device`.
+pub fn create_demo_state_for_device(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
-) -> WebGPURenderer {
+) -> DemoState {
   let vertex_bytes = vertex_triangle_interleaved_bytes()
   let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
   let vbuf = device.create_buffer(vertex_buffer_byte_length, vusage)
@@ -140,7 +140,7 @@ fn create_pipeline(
 
 ///|
 /// Implements `render_frame`.
-pub fn render_frame(renderer : WebGPURenderer) -> Unit {
+pub fn render_frame(renderer : DemoState) -> Unit {
   render_frame_with_options(
     renderer,
     clearColor={ r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
@@ -150,14 +150,14 @@ pub fn render_frame(renderer : WebGPURenderer) -> Unit {
 
 ///|
 /// Renders the current sample frame without advancing app time.
-pub fn render_current_frame(renderer : WebGPURenderer) -> Unit {
+pub fn render_current_frame(renderer : DemoState) -> Unit {
   render_frame(renderer)
 }
 
 ///|
 /// Implements `render_frame_with_options`.
 fn render_frame_with_options(
-  renderer : WebGPURenderer,
+  renderer : DemoState,
   clearColor~ : @wgpu.GPUColor,
   index_count~ : Int,
 ) -> Unit {
@@ -175,7 +175,7 @@ fn render_frame_with_options(
 ///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
-  renderer : WebGPURenderer,
+  renderer : DemoState,
   view : @wgpu.GPUTextureView,
   clearColor? : @wgpu.GPUColor = { r: 0.0, g: 0.0, b: 0.2, a: 1.0 },
   index_count? : Int = 3,
@@ -215,7 +215,7 @@ pub fn render_frame_to_view(
 
 ///|
 /// Builds an app lifecycle that drives this renderer from an engine tick.
-pub fn create_app(renderer : WebGPURenderer) -> @app.App {
+pub fn create_app(renderer : DemoState) -> @app.App {
   @app.App::new(
     fn(_engine) { () },
     fn(_engine, _frame) { () },
@@ -225,16 +225,16 @@ pub fn create_app(renderer : WebGPURenderer) -> @app.App {
 }
 
 ///|
-/// Implements `WebGPURenderer::release`.
-pub fn WebGPURenderer::release(self : WebGPURenderer) -> Unit {
+/// Implements `DemoState::release`.
+pub fn DemoState::release(self : DemoState) -> Unit {
   self.index_buffer.release()
   self.vertex_buffer.release()
   self.pipeline.release()
 }
 
 ///|
-/// Implements `webgpu_renderer_release`.
-pub fn webgpu_renderer_release(renderer : WebGPURenderer) -> Unit {
+/// Implements `demo_state_release`.
+pub fn demo_state_release(renderer : DemoState) -> Unit {
   renderer.release()
 }
 
