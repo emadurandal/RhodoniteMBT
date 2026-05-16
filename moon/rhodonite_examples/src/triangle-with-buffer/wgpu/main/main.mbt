@@ -17,14 +17,14 @@ async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
     None => ()
     Some(session) => {
       let engine = @app.Engine::new(session.gpu_context)
-      let renderer = match @renderer.create_demo_state_for_engine(engine) {
-        Some(renderer) => renderer
+      let demo_state = match @demo_state.create_demo_state_for_engine(engine) {
+        Some(demo_state) => demo_state
         None => {
           @sdl_wgpu.release_native_demo_infrastructure(session)
           return
         }
       }
-      let app = @renderer.create_app(renderer)
+      let app = @demo_state.create_app(demo_state)
       engine.initialize_app(app)
       let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
         engine.tick(app)

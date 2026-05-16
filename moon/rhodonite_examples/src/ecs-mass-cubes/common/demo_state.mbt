@@ -770,7 +770,7 @@ pub fn create_demo_state_for_scene(
 }
 
 ///|
-/// Returns the scene main camera or aborts because this renderer requires one.
+/// Returns the scene main camera or aborts because this DemoState requires one.
 fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
   match scene.main_camera() {
     Some(camera) => camera
@@ -780,14 +780,14 @@ fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
 
 ///|
 /// Implements `render_frame`.
-pub fn render_frame(renderer : DemoState) -> Unit {
-  let canvas_context = match renderer.context {
+pub fn render_frame(demo_state : DemoState) -> Unit {
+  let canvas_context = match demo_state.context {
     Some(c) => c
     None => abort("render_frame requires a canvas context")
   }
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
-  render_frame_to_view(renderer, color_view, record_perf=true)
+  render_frame_to_view(demo_state, color_view, record_perf=true)
   @wgpu.textureView_release(color_view)
   canvas_context.present()
 }
@@ -795,16 +795,16 @@ pub fn render_frame(renderer : DemoState) -> Unit {
 ///|
 /// Renders the current scene state without advancing app time.
 pub fn render_current_frame(
-  renderer : DemoState,
+  demo_state : DemoState,
   record_perf? : Bool = false,
 ) -> Unit {
-  let canvas_context = match renderer.context {
+  let canvas_context = match demo_state.context {
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
-  render_current_frame_to_view(renderer, color_view, record_perf~)
+  render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
   canvas_context.present()
 }
@@ -835,30 +835,30 @@ pub fn DemoState::update_scene(
 ///|
 /// Implements `render_frame_to_view`.
 pub fn render_frame_to_view(
-  renderer : DemoState,
+  demo_state : DemoState,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
-  renderer.frame.val = renderer.frame.val + 1
-  renderer.update_scene(
+  demo_state.frame.val = demo_state.frame.val + 1
+  demo_state.update_scene(
     @app.FrameState::new(
       (0.022 : Float),
-      renderer.frame.val,
-      renderer.frame.val.to_double() * 0.022,
+      demo_state.frame.val,
+      demo_state.frame.val.to_double() * 0.022,
     ),
   )
-  render_current_frame_to_view(renderer, color_view, record_perf~)
+  render_current_frame_to_view(demo_state, color_view, record_perf~)
 }
 
 ///|
 /// Renders the current scene state to a target view without advancing the scene.
 pub fn render_current_frame_to_view(
-  renderer : DemoState,
+  demo_state : DemoState,
   color_view : @wgpu.GPUTextureView,
   record_perf? : Bool = false,
 ) -> Unit {
   let t_frame_start = monotonic_ms()
-  let last_start = renderer.perf_last_frame_start_ms.val
+  let last_start = demo_state.perf_last_frame_start_ms.val
   let fps = if last_start >= 0.0 {
     let wall_dt = t_frame_start - last_start
     if wall_dt > 1.0e-9 {
@@ -869,12 +869,12 @@ pub fn render_current_frame_to_view(
   } else {
     0.0
   }
-  renderer.perf_last_frame_start_ms.val = t_frame_start
-  renderer.render_scene(renderer.scene, color_view)
+  demo_state.perf_last_frame_start_ms.val = t_frame_start
+  demo_state.render_scene(demo_state.scene, color_view)
   if record_perf {
     let cpu_ms = monotonic_ms() - t_frame_start
     ecs_mass_cubes_perf_overlay(fps, cpu_ms)
-    ecs_mass_cubes_perf_console_log(fps, cpu_ms, renderer.frame.val)
+    ecs_mass_cubes_perf_console_log(fps, cpu_ms, demo_state.frame.val)
   }
 }
 
@@ -948,17 +948,17 @@ pub fn DemoState::render_scene(
 }
 
 ///|
-/// Builds an app lifecycle that drives this renderer from an engine tick.
-pub fn create_app(renderer : DemoState) -> @app.App {
+/// Builds an app lifecycle that drives this DemoState from an engine tick.
+pub fn create_app(demo_state : DemoState) -> @app.App {
   @app.App::new(
     fn(_engine) { () },
-    fn(_engine, frame) { renderer.update_scene(frame) },
+    fn(_engine, frame) { demo_state.update_scene(frame) },
     fn(_engine, _frame) {
-      if renderer.scene.visible() {
-        render_current_frame(renderer, record_perf=true)
+      if demo_state.scene.visible() {
+        render_current_frame(demo_state, record_perf=true)
       }
     },
-    fn(_engine) { renderer.release() },
+    fn(_engine) { demo_state.release() },
   )
 }
 
@@ -981,6 +981,6 @@ pub fn DemoState::release(self : DemoState) -> Unit {
 
 ///|
 /// Implements `demo_state_release`.
-pub fn demo_state_release(renderer : DemoState) -> Unit {
-  renderer.release()
+pub fn demo_state_release(demo_state : DemoState) -> Unit {
+  demo_state.release()
 }

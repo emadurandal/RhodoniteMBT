@@ -377,40 +377,40 @@ function writeMassCubesTransformBlob(
 	}
 }
 
-function uploadInitialGlobalTransforms(renderer: DemoState): void {
-	const world = renderer.scene.world();
+function uploadInitialGlobalTransforms(demoState: DemoState): void {
+	const world = demoState.scene.world();
 	uploadGlobalTransformWrites(
-		renderer.queue,
-		renderer.transformStorage,
+		demoState.queue,
+		demoState.transformStorage,
 		writeGlobalTransformBlobRangeByRefs(world, {
-			refs: renderer.transformRefs,
+			refs: demoState.transformRefs,
 			count: ENTITY_COUNT,
 			range: {
-				firstWord: renderer.transformWordUploadFirst,
-				wordCount: renderer.transformWordUploadCount,
+				firstWord: demoState.transformWordUploadFirst,
+				wordCount: demoState.transformWordUploadCount,
 			},
-			denseLayout: renderer.denseTransformLayout,
+			denseLayout: demoState.denseTransformLayout,
 			write: (writer) =>
-				writeMassCubesTransformBlob(writer, renderer.perSide, 0, true),
+				writeMassCubesTransformBlob(writer, demoState.perSide, 0, true),
 		}),
 	);
 }
 
-function updateAndDrainGlobalTransforms(renderer: DemoState, t: number): void {
-	const world = renderer.scene.world();
+function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
+	const world = demoState.scene.world();
 	uploadGlobalTransformWrites(
-		renderer.queue,
-		renderer.transformStorage,
+		demoState.queue,
+		demoState.transformStorage,
 		writeGlobalTransformBlobRangeByRefs(world, {
-			refs: renderer.transformRefs,
+			refs: demoState.transformRefs,
 			count: ENTITY_COUNT,
 			range: {
-				firstWord: renderer.transformWordUploadFirst,
-				wordCount: renderer.transformWordUploadCount,
+				firstWord: demoState.transformWordUploadFirst,
+				wordCount: demoState.transformWordUploadCount,
 			},
-			denseLayout: renderer.denseTransformLayout,
+			denseLayout: demoState.denseTransformLayout,
 			write: (writer) =>
-				writeMassCubesTransformBlob(writer, renderer.perSide, t, false),
+				writeMassCubesTransformBlob(writer, demoState.perSide, t, false),
 		}),
 	);
 }
@@ -566,7 +566,7 @@ function createDemoStateForEngine(
 	});
 	const depthView = depthTexture.createView();
 
-	const renderer: DemoState = {
+	const demoState: DemoState = {
 		canvas,
 		context,
 		device,
@@ -592,19 +592,19 @@ function createDemoStateForEngine(
 		frame: 0,
 		lastFrameStartMs: -1,
 	};
-	uploadInitialGlobalTransforms(renderer);
-	return renderer;
+	uploadInitialGlobalTransforms(demoState);
+	return demoState;
 }
 
-function createApp(renderer: DemoState): App {
+function createApp(demoState: DemoState): App {
 	return new App({
-		update: (_engine, frame) => updateScene(renderer, frame),
+		update: (_engine, frame) => updateScene(demoState, frame),
 		render: () => {
-			if (renderer.scene.visible()) {
-				renderCurrentFrame(renderer);
+			if (demoState.scene.visible()) {
+				renderCurrentFrame(demoState);
 			}
 		},
-		shutdown: () => releaseDemoState(renderer),
+		shutdown: () => releaseDemoState(demoState),
 	});
 }
 
@@ -616,27 +616,27 @@ function updatePerfOverlay(fps: number, cpuMs: number): void {
 	el.textContent = `FPS ${fps.toFixed(1)}  ·  CPU ${cpuMs.toFixed(2)} ms / frame (submit まで)`;
 }
 
-function updateScene(renderer: DemoState, frame: FrameState): void {
-	renderer.frame = frame.frameIndex;
-	updateAndDrainGlobalTransforms(renderer, renderer.frame * 0.018);
+function updateScene(demoState: DemoState, frame: FrameState): void {
+	demoState.frame = frame.frameIndex;
+	updateAndDrainGlobalTransforms(demoState, demoState.frame * 0.018);
 }
 
-function renderCurrentFrame(renderer: DemoState): void {
+function renderCurrentFrame(demoState: DemoState): void {
 	const frameStart = performance.now();
 	const fps =
-		renderer.lastFrameStartMs >= 0
-			? 1000 / Math.max(frameStart - renderer.lastFrameStartMs, 1.0e-9)
+		demoState.lastFrameStartMs >= 0
+			? 1000 / Math.max(frameStart - demoState.lastFrameStartMs, 1.0e-9)
 			: 0;
-	renderer.lastFrameStartMs = frameStart;
+	demoState.lastFrameStartMs = frameStart;
 
 	const colorView =
-		renderer.snapshotColorView ?? renderer.context.getCurrentTexture().createView();
-	renderScene(renderer, renderer.scene, colorView);
+		demoState.snapshotColorView ?? demoState.context.getCurrentTexture().createView();
+	renderScene(demoState, demoState.scene, colorView);
 	updatePerfOverlay(fps, performance.now() - frameStart);
 }
 
 function renderScene(
-	renderer: DemoState,
+	demoState: DemoState,
 	scene: Scene<World, Camera>,
 	colorView: GPUTextureView,
 ): void {
@@ -644,9 +644,9 @@ function renderScene(
 	if (camera === null) {
 		throw new Error("renderScene requires Scene.mainCamera.");
 	}
-	renderer.queue.writeBuffer(renderer.cameraUniform, 0, camera.uniformBytes());
-	const depthView = renderer.snapshotDepthView ?? renderer.depthView;
-	const encoder = renderer.device.createCommandEncoder();
+	demoState.queue.writeBuffer(demoState.cameraUniform, 0, camera.uniformBytes());
+	const depthView = demoState.snapshotDepthView ?? demoState.depthView;
+	const encoder = demoState.device.createCommandEncoder();
 	const pass = encoder.beginRenderPass({
 		colorAttachments: [
 			{
@@ -663,24 +663,24 @@ function renderScene(
 			depthStoreOp: "store",
 		},
 	});
-	pass.setPipeline(renderer.pipeline);
-	pass.setBindGroup(0, renderer.bindTransforms);
-	pass.setBindGroup(1, renderer.bindCamera);
-	pass.setIndexBuffer(renderer.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
-	pass.setVertexBuffer(0, renderer.vertexBuffer, 0, VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL);
-	pass.setVertexBuffer(1, renderer.instanceBuffer, 0, ENTITY_COUNT * INSTANCE_STRIDE);
+	pass.setPipeline(demoState.pipeline);
+	pass.setBindGroup(0, demoState.bindTransforms);
+	pass.setBindGroup(1, demoState.bindCamera);
+	pass.setIndexBuffer(demoState.indexBuffer, "uint16", 0, INDEX_U16_COUNT * 2);
+	pass.setVertexBuffer(0, demoState.vertexBuffer, 0, VERTS_PER_CUBE * VERTEX_STRIDE_LOCAL);
+	pass.setVertexBuffer(1, demoState.instanceBuffer, 0, ENTITY_COUNT * INSTANCE_STRIDE);
 	pass.drawIndexed(INDEX_U16_COUNT, ENTITY_COUNT);
 	pass.end();
-	renderer.queue.submit([encoder.finish()]);
+	demoState.queue.submit([encoder.finish()]);
 }
 
-function releaseDemoState(renderer: DemoState): void {
-	renderer.depthTexture.destroy();
-	renderer.vertexBuffer.destroy();
-	renderer.instanceBuffer.destroy();
-	renderer.indexBuffer.destroy();
-	renderer.transformStorage.destroy();
-	renderer.cameraUniform.destroy();
+function releaseDemoState(demoState: DemoState): void {
+	demoState.depthTexture.destroy();
+	demoState.vertexBuffer.destroy();
+	demoState.instanceBuffer.destroy();
+	demoState.indexBuffer.destroy();
+	demoState.transformStorage.destroy();
+	demoState.cameraUniform.destroy();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -690,26 +690,26 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	const engine = await Engine.create(canvas, {
 		mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
 	});
-	const renderer = createDemoStateForEngine(engine, "rgba8unorm");
-	const app = createApp(renderer);
+	const demoState = createDemoStateForEngine(engine, "rgba8unorm");
+	const app = createApp(demoState);
 	engine.initializeApp(app);
-	const target = createRgba8ReadbackTarget(renderer.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	const target = createRgba8ReadbackTarget(demoState.device, CANVAS_WIDTH, CANVAS_HEIGHT);
 	try {
-		renderer.snapshotColorView = target.view;
-		renderer.snapshotDepthView = target.depthView;
+		demoState.snapshotColorView = target.view;
+		demoState.snapshotDepthView = target.depthView;
 		engine.tick(app);
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
-			renderer.device,
-			renderer.queue,
+			demoState.device,
+			demoState.queue,
 			target.texture,
 			CANVAS_WIDTH,
 			CANVAS_HEIGHT,
 		);
 	} finally {
-		renderer.snapshotColorView = undefined;
-		renderer.snapshotDepthView = undefined;
+		demoState.snapshotColorView = undefined;
+		demoState.snapshotDepthView = undefined;
 		engine.shutdownApp(app);
 		destroyReadbackTarget(target);
 	}
@@ -728,8 +728,8 @@ if (!navigator.gpu) {
 			mainScene: new Scene<World, Camera>("ts-ecs-mass-cubes"),
 		})
 			.then((engine) => {
-				const renderer = createDemoStateForEngine(engine);
-				const app = createApp(renderer);
+				const demoState = createDemoStateForEngine(engine);
+				const app = createApp(demoState);
 				engine.initializeApp(app);
 				const loop = () => {
 					engine.tick(app);

@@ -11,16 +11,16 @@ let demo_app : @ref.Ref[@app.App?] = @ref.new(None)
 async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
   let engine = @app.Engine::new(ctx)
-  match @renderer.create_demo_state_for_engine(engine) {
-    Some(renderer) => {
-      let app = @renderer.create_app(renderer)
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      let app = @demo_state.create_app(demo_state)
       engine.initialize_app(app)
       demo_engine.val = Some(engine)
       demo_app.val = Some(app)
       engine.tick(app)
       println("WebGPU triangle (vertex + index buffer) rendered successfully!")
     }
-    None => println("Failed to create renderer")
+    None => println("Failed to create demo_state")
   }
 }
 

@@ -9,7 +9,7 @@ pub fn ecs_mass_cubes_wasm_render_tick() -> Unit
 // Errors
 
 // Types and methods
-type WasmRenderer
+type WasmDemoState
 
 // Type aliases
 

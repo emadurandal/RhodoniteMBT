@@ -283,7 +283,7 @@ pnpm run test:examples:visual
 - `DemoState::render_scene(scene, color_view)` の形を導入する。
 - `DemoState` が `GlobalTransform` / `Camera` blob events を upload する暫定責務を持つ。
 - `Scene` の main camera を `DemoState` が参照する。
-- TypeScript wrapper でも `Scene.mainCamera()` と `renderScene(renderer, scene, colorView)` の流れに揃える。
+- TypeScript wrapper でも `Scene.mainCamera()` と `renderScene(demoState, scene, colorView)` の流れに揃える。
 - 将来の `Renderable` component のために handle-based resource ownership 方針を固める。
 
 この phase ではまだ full material system は入れていません。既存 sample の `DemoState` を共通入口へ寄せることを優先し、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `scene.main_camera()` を primary camera source として `render_scene` から描画します。TypeScript-only sample も同じく `Scene` を render source として渡します。

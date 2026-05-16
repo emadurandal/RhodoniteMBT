@@ -1,7 +1,7 @@
 import {
   "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_examples/common" @sdl_wgpu,
-  "emadurandal/rhodonite_examples/basic-triangle/common" @renderer,
+  "emadurandal/rhodonite_examples/basic-triangle/common" @demo_state,
   "moonbitlang/async" @async,
 }
 
