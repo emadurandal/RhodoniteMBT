@@ -90,6 +90,17 @@ test "orbit camera reset restores home Transform3D" {
   assert_true(
     schedule.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
   )
+  assert_eq(
+    orbit_camera_pose(world, camera, orbit),
+    (
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      (1.0 : Float),
+      (16.0 : Float),
+    ),
+  )
   match world.get_transform(camera) {
     Some(transform) =>
       assert_eq(
