@@ -469,7 +469,6 @@ function createHostImports(
 	return {
 		rhodonite_ecs_mass_cubes_host: {
 			now_ms: () => performance.now(),
-			entity_count: () => MASS_CUBES_ENTITY_COUNT,
 			initialize_demo_state: (perSide: number, transformStride: number) => {
 				demoState.perSide = perSide;
 				demoState.transformStride = transformStride;
