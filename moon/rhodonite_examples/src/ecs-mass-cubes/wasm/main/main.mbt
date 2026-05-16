@@ -79,7 +79,7 @@ fn push_camera_matrices(
   orbit_controller : @ecs.ComponentTypeId,
   count : Int,
 ) -> Unit {
-  let (yaw, pitch, pan_x, pan_y, dolly) = @orbit.orbit_camera_transform(
+  let (yaw, pitch, pan_x, pan_y, dolly) = @ecs.orbit_camera_transform(
     world, camera, orbit_controller,
   )
   let (view, proj, near, far, aspect) = @mass_shared.camera_matrices(
@@ -123,7 +123,7 @@ fn update_orbit_camera_from_host_input(
   orbit_controller : @ecs.ComponentTypeId,
 ) -> Unit {
   ignore(
-    @orbit.update_orbit_camera_controller_from_mouse_frame(
+    @ecs.update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
       orbit_controller,
@@ -181,12 +181,10 @@ pub fn create_wasm_demo_state() -> Unit {
   let stride = 24
   host_initialize_demo_state(per_side, stride)
   host_write_initial_global_transforms(per_side, 0.0)
-  let orbit_controller = @orbit.register_orbit_camera_controller_component(
-    world,
-  )
+  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
   let camera = world.create_entity()
   ignore(
-    @orbit.add_orbit_camera_controller(
+    @ecs.add_orbit_camera_controller(
       world, camera, orbit_controller, 0.0, camera_elevation_rad,
     ),
   )

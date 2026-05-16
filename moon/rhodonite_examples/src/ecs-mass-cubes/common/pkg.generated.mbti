@@ -60,6 +60,8 @@ pub(all) struct DemoState {
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
   bind_group_offsets : Array[UInt]
   orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]

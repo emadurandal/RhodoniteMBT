@@ -3,7 +3,6 @@ import {
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/components" @comp,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/shared" @mass_shared,
-  "emadurandal/rhodonite_examples/common/orbit_camera" @orbit,
   "moonbitlang/core/ref" @ref,
 }
 

@@ -83,6 +83,8 @@ pub(all) enum PhaseSlot {
 pub struct Scene {
   // private fields
 }
+pub fn Scene::add_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_orbit_camera_transform_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_transform_propagation_system(Self, @ecs.PhaseKey) -> Unit

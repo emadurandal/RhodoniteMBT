@@ -308,6 +308,8 @@ pub(all) struct DemoState {
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
   bind_group_offsets : Array[UInt]
   orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
@@ -529,8 +531,13 @@ pub fn create_demo_state_for_scene(
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
-  let orbit_controller = @orbit.register_orbit_camera_controller_component(
-    world,
+  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
+  let camera_home = @ecs.register_camera_home_transform_component(world)
+  let camera_lens = @ecs.register_camera_lens_component(world)
+  scene.add_orbit_camera_transform_system(
+    @app.phase_post_update(),
+    orbit_controller,
+    camera_home,
   )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
@@ -574,16 +581,57 @@ pub fn create_demo_state_for_scene(
   )
   let camera = world.create_entity()
   ignore(
-    @orbit.add_orbit_camera_controller(
-      world, camera, orbit_controller, 0.0, camera_elevation_rad,
+    world.set_transform_trs(
+      camera,
+      (0.0 : Float),
+      (0.0 : Float),
+      (16.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
     ),
   )
-  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @orbit.orbit_camera_transform(
+  ignore(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  ignore(
+    @ecs.add_orbit_camera_controller_with_distance(
+      world,
+      camera,
+      orbit_controller,
+      0.0,
+      camera_elevation_rad,
+      (16.0 : Float),
+    ),
+  )
+  ignore(
+    @ecs.set_camera_home_from_current_transform(world, camera, camera_home),
+  )
+  ignore(
+    @ecs.add_camera_lens_orthographic(
+      world,
+      camera,
+      camera_lens,
+      (0.1 : Float),
+      (80.0 : Float),
+      Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @ecs.orbit_camera_transform(
     world, camera, orbit_controller,
   )
   let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
     camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
   )
+  match camera_view.inverse() {
+    Some(camera_global) =>
+      ignore(world.set_global_transform(camera, camera_global))
+    None => ()
+  }
   ignore(
     world.set_camera_matrices(
       camera,
@@ -592,7 +640,7 @@ pub fn create_demo_state_for_scene(
       camera_near,
       camera_far,
       camera_aspect,
-      (1.0 : Float),
+      @ecs.camera_projection_orthographic(),
       (0.0 : Float),
     ),
   )
@@ -632,8 +680,7 @@ pub fn create_demo_state_for_scene(
     true,
   )
   queue.upload_global_transform_writes(transform_storage, writes0)
-  queue.drain_and_upload_camera_writes(camera_storage, world)
-  {
+  let demo_state : DemoState = {
     context,
     device,
     queue,
@@ -658,10 +705,21 @@ pub fn create_demo_state_for_scene(
     dense_transform_layout,
     bind_group_offsets: [],
     orbit_controller,
+    camera_home,
+    camera_lens,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
     perf_frame_start_ms: @ref.new(-1.0),
   }
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_post_update(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
+  demo_state.sync_mass_cubes_camera_blob()
+  queue.drain_and_upload_camera_writes(camera_storage, world)
+  demo_state
 }
 
 ///|
@@ -678,6 +736,37 @@ fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
     Some(camera) => camera
     None => abort("render_scene requires Scene.main_camera")
   }
+}
+
+///|
+/// Updates the scene camera GlobalTransform and Camera blob through the MassCubes camera solver.
+fn DemoState::sync_mass_cubes_camera_blob(self : DemoState) -> Unit {
+  let world = self.scene.world()
+  let camera = scene_main_camera_or_abort(self.scene)
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @ecs.orbit_camera_transform(
+    world,
+    camera,
+    self.orbit_controller,
+  )
+  let (camera_view0, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
+    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
+  )
+  match camera_view0.inverse() {
+    Some(global) => ignore(world.set_global_transform(camera, global))
+    None => ()
+  }
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      camera_view0,
+      camera_proj,
+      camera_near,
+      camera_far,
+      camera_aspect,
+      @ecs.camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
 }
 
 ///|
@@ -752,6 +841,17 @@ pub fn render_frame_to_view(
       demo_state.frame.val.to_double() * 0.022,
     ),
   )
+  ignore(
+    demo_state.scene.run_schedule_phase(
+      @app.phase_post_update(),
+      @app.FrameState::new(
+        (0.022 : Float),
+        demo_state.frame.val,
+        demo_state.frame.val.to_double() * 0.022,
+      ),
+    ),
+  )
+  demo_state.sync_mass_cubes_camera_blob()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
 }
 
@@ -780,6 +880,7 @@ pub fn render_current_frame_to_view(
     0.0
   }
   demo_state.perf_last_frame_start_ms.val = t_frame_start
+  demo_state.sync_mass_cubes_camera_blob()
   demo_state.render_scene(demo_state.scene, color_view)
   if record_perf {
     let cpu_ms = monotonic_ms() - t_frame_start
@@ -797,27 +898,6 @@ pub fn DemoState::render_scene(
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   let world = scene.world()
-  let camera = scene_main_camera_or_abort(scene)
-  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @orbit.orbit_camera_transform(
-    world,
-    camera,
-    self.orbit_controller,
-  )
-  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
-    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
-  )
-  ignore(
-    world.set_camera_matrices(
-      camera,
-      camera_view,
-      camera_proj,
-      camera_near,
-      camera_far,
-      camera_aspect,
-      (1.0 : Float),
-      (0.0 : Float),
-    ),
-  )
   self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
   let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -872,18 +952,28 @@ pub fn register_engine_handlers(
   demo_state : DemoState,
 ) -> Unit {
   engine.on_phase(@app.phase_input(), fn(engine, _frame) {
+    let input = engine.input()
     ignore(
-      @orbit.update_orbit_camera_controller_from_input(
+      @ecs.update_orbit_camera_controller_from_mouse_frame(
         demo_state.scene.world(),
         scene_main_camera_or_abort(demo_state.scene),
         demo_state.orbit_controller,
-        engine.input(),
+        input.mouse_down(Left),
+        input.mouse_pressed(Left),
+        input.mouse_down(Middle),
+        input.mouse_pressed(Middle),
+        input.pointer_delta_x(),
+        input.pointer_delta_y(),
+        input.wheel_delta_y(),
       ),
     )
   })
   engine.on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
+  })
+  engine.on_phase(@app.phase_render_extract(), fn(_engine, _frame) {
+    demo_state.sync_mass_cubes_camera_blob()
   })
   engine.on_phase(
     @app.phase_render(),

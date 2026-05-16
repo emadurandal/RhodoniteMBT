@@ -47,6 +47,18 @@ flowchart LR
 | 2 | `ChildOf` | CPU SoA | Parent `EntityId` index/generation. |
 | 3 | `Camera` | CPU SoA ref + packed blob | CPU row stores `{ word_offset }`; camera bytes live in the Camera blob. |
 
+## Camera Control
+
+Camera control is split into source, transform, lens, and GPU blob stages:
+
+- `OrbitCameraController` is a user-registered CPU component created with `register_orbit_camera_controller_component`. It stores yaw/pitch, pan, dolly, distance, sensitivities, clamps, and a one-shot reset request flag.
+- `CameraHomeTransform` is a user-registered CPU component created with `register_camera_home_transform_component`. It stores a 48-byte local `Transform3D` snapshot used as the reset target.
+- `CameraLens` is a user-registered CPU component created with `register_camera_lens_component`. It stores projection kind, near/far, aspect, FOV or orthographic half-height, and flags.
+- `orbit_camera_transform_system` applies `OrbitCameraController` to the camera entity's `Transform3D` and mirrors the parentless result into `GlobalTransform`. If `request_orbit_camera_reset` was called, the system restores `Transform3D` from `CameraHomeTransform` and clears the request.
+- `camera_blob_sync_system` reads `GlobalTransform + CameraLens`, builds `view = inverse(GlobalTransform)` and a perspective or orthographic projection, then writes the builtin `Camera` blob with `World::set_camera_matrices`.
+
+The recommended frame order is input/controller update, `orbit_camera_transform_system`, transform propagation if the camera participates in a parent hierarchy, then `camera_blob_sync_system` during render extraction. Render preparation still drains and uploads `Camera` blob writes through `drain_camera_blob_write_views`.
+
 ## Queries
 
 `Query::new(required)` yields `QueryRow` values. `QueryRow::read(component, f)` and `QueryRow::write(component, f)` borrow the CPU row bytes only for the closure body.

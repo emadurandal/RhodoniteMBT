@@ -399,6 +399,36 @@ pub fn Scene::add_transform_propagation_system(
 }
 
 ///|
+/// Adds the orbit camera transform system for one engine phase.
+pub fn Scene::add_orbit_camera_transform_system(
+  self : Scene,
+  phase : PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  home_component : @ecs.ComponentTypeId,
+) -> Unit {
+  self.add_ecs_system(
+    @ecs.orbit_camera_transform_system(
+      self.world,
+      phase,
+      orbit_component,
+      home_component,
+    ),
+  )
+}
+
+///|
+/// Adds the Camera blob synchronization system for one engine phase.
+pub fn Scene::add_camera_blob_sync_system(
+  self : Scene,
+  phase : PhaseKey,
+  lens_component : @ecs.ComponentTypeId,
+) -> Unit {
+  self.add_ecs_system(
+    @ecs.camera_blob_sync_system(self.world, phase, lens_component),
+  )
+}
+
+///|
 /// Implements `Scene::set_main_camera`.
 pub fn Scene::set_main_camera(self : Scene, camera : @ecs.EntityId?) -> Unit {
   self.main_camera = camera

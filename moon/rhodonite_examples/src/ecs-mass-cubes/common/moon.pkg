@@ -6,7 +6,6 @@ import {
   "emadurandal/rhodonite_core/ecs/components" @comp,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/shared" @mass_shared,
-  "emadurandal/rhodonite_examples/common/orbit_camera" @orbit,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,

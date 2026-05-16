@@ -7,15 +7,49 @@ import {
 }
 
 // Values
+pub fn add_camera_lens_orthographic(World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
+pub fn add_camera_lens_perspective(World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
+pub fn add_orbit_camera_controller(World, EntityId, ComponentTypeId, Double, Double) -> Bool
+
+pub fn add_orbit_camera_controller_with_distance(World, EntityId, ComponentTypeId, Double, Double, Float) -> Bool
+
+pub fn camera_blob_sync_system(World, PhaseKey, ComponentTypeId) -> System
+
+pub fn camera_lens_projection_from_view(ArrayView[Byte]) -> (@matrix44.Matrix44[Float], Float, Float, Float, Float, Float)
+
+pub fn camera_projection_orthographic() -> Float
+
+pub fn camera_projection_perspective() -> Float
+
 pub fn compute_global_transform_upload_range(FixedArray[Byte], Int, GlobalTransformDenseLayout?) -> GlobalTransformUploadRange
 
 pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTransformDenseLayout?
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
+pub fn orbit_camera_pose(World, EntityId, ComponentTypeId) -> (Float, Float, Float, Float, Float, Float)
+
+pub fn orbit_camera_transform(World, EntityId, ComponentTypeId) -> (Double, Double, Double, Double, Double)
+
+pub fn orbit_camera_transform_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
+
 pub fn phase_array_contains(Array[PhaseKey], PhaseKey) -> Bool
 
+pub fn register_camera_home_transform_component(World) -> ComponentTypeId
+
+pub fn register_camera_lens_component(World) -> ComponentTypeId
+
+pub fn register_orbit_camera_controller_component(World) -> ComponentTypeId
+
+pub fn request_orbit_camera_reset(World, EntityId, ComponentTypeId) -> Bool
+
+pub fn set_camera_home_from_current_transform(World, EntityId, ComponentTypeId) -> Bool
+
 pub fn transform_propagation_system(World, PhaseKey) -> System
+
+pub fn update_orbit_camera_controller_from_mouse_frame(World, EntityId, ComponentTypeId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 

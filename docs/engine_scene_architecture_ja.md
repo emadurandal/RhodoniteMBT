@@ -187,13 +187,15 @@ Renderer
   Camera upload buffer
 ```
 
-既存 ECS の `GlobalTransform` / `Camera` packed blob store は当面そのまま使います。Phase 4 時点では sample-local な `DemoState` が scene の world から blob resize/write events を drain し、対応する GPU buffer へ upload します。Phase 5 で engine-owned な汎用 `Renderer` を導入し、この責務を resource table と `Renderable` component と一緒に移します。
+既存 ECS の `GlobalTransform` / `Camera` packed blob store は当面そのまま使います。Camera 行列は `OrbitCameraController -> Transform3D -> GlobalTransform -> Camera blob` の流れに寄せ、標準 camera では `CameraLens` と `camera_blob_sync_system` が `GlobalTransform` から view/projection を生成します。Phase 4 時点では sample-local な `DemoState` が scene の world から blob resize/write events を drain し、対応する GPU buffer へ upload します。Phase 5 で engine-owned な汎用 `Renderer` を導入し、この責務を resource table と `Renderable` component と一緒に移します。
 
 重要な境界:
 
 - `World` は `GPUDevice`、`GPUQueue`、`GPURenderPipeline` を持たない。
 - `Scene` は render source であり、GPU resource owner ではない。
 - Phase 4 の `DemoState` は scene の ECS data を query/extract して描画する暫定実装である。
+- `OrbitCameraController` は Camera blob を直接更新せず、camera entity の `Transform3D` を更新する。reset は `CameraHomeTransform` の local TRS snapshot に戻す one-shot request として扱う。
+- `Camera` blob 更新は `GlobalTransform + CameraLens` から行う。MassCubes のように sample 固有の framing が必要な場合も、render path ではなく render-extract 相当の custom camera solver に閉じ込める。
 - Phase 5 の汎用 `Renderer` は `MeshHandle` / `MaterialHandle` / `TextureHandle` / `Renderable` を通じて scene を描画する。
 - 将来の `Mesh` / `Material` / `Renderable` は ECS component 側に handle を置き、GPU 実体は renderer resource table に置く。
 
@@ -217,7 +219,7 @@ Phase 3 で `Engine` / `Scene` は public facade の [`moon/rhodonite/src/app/`]
 
 `Engine::initialize()` は `phase_startup()` handler を実行し、その実行中だけ phase group の編集を許可します。標準 group として `phase_group_render_frame()` と `phase_group_fixed_step()` があり、必要なら `Engine::add_phase_group(group)` で custom group を追加できます。phase の追加は `append_phase_to_group(group, phase)`、`insert_phase_before_in_group(group, anchor, phase)`、`insert_phase_after_in_group(group, anchor, phase)` で行います。`phase_startup()` / `phase_shutdown()` は OneShot Phase なので、どの phase group にも追加できず、anchor にも使えません。render-frame group の先頭に独自 phase を置きたい場合は、startup handler 内で `insert_phase_before_in_group(phase_group_render_frame(), phase_update(), custom_phase)` を使います。その後、登録 handler が `phase_startup()`、`phase_shutdown()`、またはいずれかの phase group に含まれる phase だけを使っているか検証します。未登録 phase を `Engine::on_phase` に渡した場合は `Engine::initialize()` で error になります。`Engine::run_render_frame()`、`Engine::run_phase_group(group, frame)`、`Engine::run_phase(phase, frame)`、`Engine::shutdown()` は `Engine::initialize()` 済みであることを要求します。
 
-WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::run_render_frame()` から render-frame group を駆動します。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `register_engine_handlers(engine, demo_state)` を公開します。`DemoState` 側の処理は `Engine::on_phase` で `phase_update()`、`phase_render()`、`phase_shutdown()` に登録します。
+WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::run_render_frame()` から render-frame group を駆動します。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `register_engine_handlers(engine, demo_state)` を公開します。`DemoState` 側の処理は `Engine::on_phase` で `phase_update()`、`phase_render_extract()`、`phase_render()`、`phase_shutdown()` に登録します。
 
 Browser JS export も sample-local state の名前に合わせ、`create_webgpu_demo_state(canvas)` を入口にします。WASM host-driven sample も `create_wasm_demo_state`、`initialize_demo_state`、`render_demo_frame` を ABI 名として使い、sample-local state と将来の engine-owned `Renderer` を名前で混同しないようにします。
 
