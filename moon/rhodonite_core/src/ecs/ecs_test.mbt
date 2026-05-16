@@ -5,6 +5,24 @@ fn bytes4(a : Byte, b : Byte, c : Byte, d : Byte) -> FixedArray[Byte] {
 }
 
 ///|
+/// Test phase used for ordinary update systems.
+fn update_phase() -> SystemPhase {
+  SystemPhase::new(1)
+}
+
+///|
+/// Test phase used for systems that run after update systems.
+fn post_update_phase() -> SystemPhase {
+  SystemPhase::new(2)
+}
+
+///|
+/// Phase order used by schedule tests.
+fn test_phases() -> Array[SystemPhase] {
+  [update_phase(), post_update_phase()]
+}
+
+///|
 /// Implements `u16_le`.
 fn u16_le(bytes : ArrayView[Byte], offset : Int) -> UInt {
   bytes[offset].to_uint() | (bytes[offset + 1].to_uint() << 8)
@@ -645,7 +663,7 @@ test "CommandBuffer applies queued structural changes after query" {
   schedule.add_system(
     System::new_with_structural_write(
       "queue-structural-after-query",
-      Update,
+      update_phase(),
       [],
       [qa, qb],
       (w, _ctx, commands) => {
@@ -659,7 +677,9 @@ test "CommandBuffer applies queued structural changes after query" {
       },
     ),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_true(saw_qa_before_apply)
   assert_true(!saw_qb_before_apply)
   assert_eq(queued_count, 2)
@@ -705,7 +725,7 @@ test "CommandBuffer applies queued component writes and reports failed commands"
   schedule.add_system(
     System::new_with_structural_write(
       "queue-component-write-and-failed-destroy",
-      Update,
+      update_phase(),
       [],
       [qa],
       (_w, _ctx, commands) => {
@@ -715,7 +735,9 @@ test "CommandBuffer applies queued component writes and reports failed commands"
       },
     ),
   )
-  assert_true(!schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    !schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_eq(queued_count, 2)
   match world.component_bytes(e, qa) {
     Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
@@ -731,11 +753,13 @@ test "Schedule permits set_component_bytes without structural write" {
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("set-a", Update, [], [qa], (_world, _ctx, commands) => {
+    System::new("set-a", update_phase(), [], [qa], (_world, _ctx, commands) => {
       commands.set_component_bytes(e, qa, bytes4(8, 7, 6, 5))
     }),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   match world.component_bytes(e, qa) {
     Some(bytes) => assert_eq(bytes, bytes4(8, 7, 6, 5))
     None => abort("expected ScheduleSetComponentA bytes")
@@ -751,7 +775,7 @@ test "Schedule permits set_global_transform update with GlobalTransform write" {
   let _ = world.drain_global_transform_blob_write_views()
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("set-gt", Update, [], [gt], (w, _ctx, _commands) => {
+    System::new("set-gt", update_phase(), [], [gt], (w, _ctx, _commands) => {
       let m = @m44.Matrix44::new_col_major(
         (1.0 : Float),
         (0.0 : Float),
@@ -775,7 +799,9 @@ test "Schedule permits set_global_transform update with GlobalTransform write" {
       }
     }),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   match world.get_global_transform(e) {
     Some(m) => assert_eq(m.at(0, 3), (4.0 : Float))
     None => abort("expected scheduled GlobalTransform")
@@ -803,7 +829,7 @@ test "Schedule convenience setters return false for missing components without s
   schedule.add_system(
     System::new(
       "missing-convenience-setters",
-      Update,
+      update_phase(),
       [],
       [tf_id, gt_id, co_id],
       (w, _ctx, _commands) => {
@@ -826,7 +852,9 @@ test "Schedule convenience setters return false for missing components without s
       },
     ),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_true(!transform_ok)
   assert_true(!trs_ok)
   assert_true(!child_ok)
@@ -846,12 +874,12 @@ test "Schedule runs systems by phase and applies commands after conflict-free ba
   let order : Array[Int] = []
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("post", PostUpdate, [], [], (_world, _ctx, _commands) => {
+    System::new("post", post_update_phase(), [], [], (_world, _ctx, _commands) => {
       order.push(3)
     }),
   )
   schedule.add_system(
-    System::new_with_structural_write("add-b", Update, [qa], [qb], (
+    System::new_with_structural_write("add-b", update_phase(), [qa], [qb], (
       system_world,
       ctx,
       commands,
@@ -864,7 +892,11 @@ test "Schedule runs systems by phase and applies commands after conflict-free ba
     }),
   )
   schedule.add_system(
-    System::new("see-b", Update, [qb], [], (system_world, _ctx, _commands) => {
+    System::new("see-b", update_phase(), [qb], [], (
+      system_world,
+      _ctx,
+      _commands,
+    ) => {
       if system_world.has_component(e, qb) {
         order.push(2)
       } else {
@@ -874,7 +906,7 @@ test "Schedule runs systems by phase and applies commands after conflict-free ba
   )
   let ctx = SystemContext::new((0.016 : Float), 1)
   assert_eq(schedule.len(), 3)
-  assert_true(schedule.run(world, ctx))
+  assert_true(schedule.run(world, ctx, test_phases()))
   assert_eq(order.length(), 3)
   assert_eq(order[0], 1)
   assert_eq(order[1], 2)
@@ -889,11 +921,13 @@ test "Schedule run temporarily locks component registration" {
   let mut locked_during_run = false
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("observe-lock", Update, [], [], (w, _ctx, _cmds) => {
+    System::new("observe-lock", update_phase(), [], [], (w, _ctx, _cmds) => {
       locked_during_run = w.component_registration_locked()
     }),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_true(locked_during_run)
   assert_true(!world.component_registration_locked())
   let late = world.register_cpu_component("RegisteredAfterScheduleRun", 4)
@@ -917,8 +951,10 @@ test "transform_propagation_system updates GlobalTransform in a schedule" {
   assert_true(world.set_global_transform(e, @m44.Matrix44F::identity()))
   let _ = world.drain_global_transform_blob_write_views()
   let schedule = Schedule::new()
-  schedule.add_system(transform_propagation_system(world))
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  schedule.add_system(transform_propagation_system(world, post_update_phase()))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   match world.get_global_transform(e) {
     Some(m) => assert_eq(m.at(0, 3), (3.0 : Float))
     None => abort("expected Matrix44F")
@@ -932,13 +968,15 @@ test "System access arrays are copied" {
   let qb = world.register_cpu_component("SystemAccessB", 4)
   let reads : Array[ComponentTypeId] = [qa]
   let writes : Array[ComponentTypeId] = [qb]
-  let system = System::new("copy-access", Update, reads, writes, (_w, _c, _b) => {
-    ()
-  })
+  let system = System::new("copy-access", update_phase(), reads, writes, (
+    _w,
+    _c,
+    _b,
+  ) => ())
   reads[0] = qb
   writes[0] = qa
   assert_eq(system.name(), "copy-access")
-  assert_true(system.phase() == Update)
+  assert_true(system.phase() == update_phase())
   assert_true(system.reads()[0] == qa)
   assert_true(system.writes()[0] == qb)
   assert_true(!system.structural_write())
@@ -949,14 +987,22 @@ test "System conflict helpers detect same-phase access overlaps" {
   let world = World::new()
   let qa = world.register_cpu_component("SystemConflictA", 4)
   let qb = world.register_cpu_component("SystemConflictB", 4)
-  let read_a = System::new("read-a", Update, [qa], [], (_w, _c, _b) => ())
-  let write_a = System::new("write-a", Update, [], [qa], (_w, _c, _b) => ())
-  let write_b = System::new("write-b", Update, [], [qb], (_w, _c, _b) => ())
-  let later_write_a = System::new("later-write-a", PostUpdate, [], [qa], (
-    _w,
-    _c,
-    _b,
-  ) => ())
+  let read_a = System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => {
+    ()
+  })
+  let write_a = System::new("write-a", update_phase(), [], [qa], (_w, _c, _b) => {
+    ()
+  })
+  let write_b = System::new("write-b", update_phase(), [], [qb], (_w, _c, _b) => {
+    ()
+  })
+  let later_write_a = System::new(
+    "later-write-a",
+    post_update_phase(),
+    [],
+    [qa],
+    (_w, _c, _b) => (),
+  )
   assert_true(read_a.conflicts_with(write_a))
   assert_true(!read_a.conflicts_with(write_b))
   let same_phase = Schedule::new()
@@ -978,14 +1024,16 @@ test "System writes declaration also permits reads during schedule run" {
   let mut saw_first = (0 : Byte)
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("write-can-read", Update, [], [qa], (w, _ctx, _cmds) => {
+    System::new("write-can-read", update_phase(), [], [qa], (w, _ctx, _cmds) => {
       match w.component_bytes(e, qa) {
         Some(bytes) => saw_first = bytes[0]
         None => abort("expected SystemWriteCanReadA bytes")
       }
     }),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_eq(saw_first, (1 : Byte))
 }
 
@@ -999,7 +1047,7 @@ test "Nested Schedule::run restores outer system access declarations" {
   assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
   let inner = Schedule::new()
   inner.add_system(
-    System::new("inner-write-b", Update, [], [qb], (w, _ctx, _cmds) => {
+    System::new("inner-write-b", update_phase(), [], [qb], (w, _ctx, _cmds) => {
       if !w.set_component_bytes(e, qb, bytes4(2, 2, 2, 2)) {
         abort("expected nested inner component write")
       }
@@ -1007,8 +1055,8 @@ test "Nested Schedule::run restores outer system access declarations" {
   )
   let outer = Schedule::new()
   outer.add_system(
-    System::new("outer-write-a", Update, [], [qa], (w, ctx, _cmds) => {
-      if !inner.run(w, ctx) {
+    System::new("outer-write-a", update_phase(), [], [qa], (w, ctx, _cmds) => {
+      if !inner.run(w, ctx, test_phases()) {
         abort("expected nested inner schedule to succeed")
       }
       if !w.set_component_bytes(e, qa, bytes4(3, 3, 3, 3)) {
@@ -1016,7 +1064,9 @@ test "Nested Schedule::run restores outer system access declarations" {
       }
     }),
   )
-  assert_true(outer.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    outer.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   match world.component_bytes(e, qa) {
     Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
     None => abort("expected NestedScheduleOuterA bytes")
@@ -1034,13 +1084,15 @@ test "System Query preserves read and write access separation during schedule ru
   let query = Query::new([qa, qb])
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new("query-read-write", Update, [qa], [qb], (w, _ctx, _cmds) => {
+    System::new("query-read-write", update_phase(), [qa], [qb], (w, _ctx, _cmds) => {
       query.for_each(w, row => {
         row.read(qa, src => row.write(qb, dst => dst[0] = src[0]))
       })
     }),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   match world.component_bytes(e, qb) {
     Some(bytes) => assert_eq(bytes[0], (1 : Byte))
     None => abort("expected SystemQueryWriteB bytes")
@@ -1053,14 +1105,18 @@ test "System structural write declaration permits entity creation" {
   let mut spawned = EntityId::new(-1, 0)
   let schedule = Schedule::new()
   schedule.add_system(
-    System::new_with_structural_write("spawn", Update, [], [], (w, _ctx, _cmds) => {
-      spawned = w.create_entity()
-    }),
+    System::new_with_structural_write("spawn", update_phase(), [], [], (
+      w,
+      _ctx,
+      _cmds,
+    ) => spawned = w.create_entity()),
   )
   schedule.add_system(
-    System::new("observe", Update, [], [], (_w, _ctx, _cmds) => ()),
+    System::new("observe", update_phase(), [], [], (_w, _ctx, _cmds) => ()),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_true(world.is_alive(spawned))
   assert_true(schedule.has_parallel_access_conflicts())
 }
@@ -1080,7 +1136,7 @@ test "CommandBuffer create_entity reserves id and applies components after query
   schedule.add_system(
     System::new_with_structural_write(
       "command-create-entity",
-      Update,
+      update_phase(),
       [qa],
       [qb],
       (w, _ctx, commands) => {
@@ -1093,7 +1149,9 @@ test "CommandBuffer create_entity reserves id and applies components after query
       },
     ),
   )
-  assert_true(schedule.run(world, SystemContext::new((0.016 : Float), 1)))
+  assert_true(
+    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+  )
   assert_eq(queued_count, 2)
   assert_true(!alive_before_apply)
   assert_true(world.is_alive(spawned))

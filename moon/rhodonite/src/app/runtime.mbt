@@ -7,6 +7,31 @@ pub(all) struct FrameState {
 }
 
 ///|
+/// Engine-level lifecycle phase supplied to scene schedules and app handlers.
+pub(all) enum AppPhase {
+  Startup
+  Update
+  Extract
+  Render
+  Shutdown
+} derive(Eq)
+
+///|
+/// Execution slot inside an app phase.
+pub(all) enum PhaseSlot {
+  BeforeSchedule
+  AfterSchedule
+} derive(Eq)
+
+///|
+/// Function registered by an app to run inside a phase slot.
+priv struct PhaseHandler {
+  phase : AppPhase
+  slot : PhaseSlot
+  run : (Engine, FrameState) -> Unit
+}
+
+///|
 /// Mutable fixed-step clock used by the engine runner.
 pub struct TimeState {
   priv mut frame_index : Int
@@ -26,12 +51,9 @@ pub struct Scene {
 }
 
 ///|
-/// Callback-backed application lifecycle.
+/// Application phase handler registry.
 pub struct App {
-  priv on_init : (Engine) -> Unit
-  priv on_update : (Engine, FrameState) -> Unit
-  priv on_render : (Engine, FrameState) -> Unit
-  priv on_shutdown : (Engine) -> Unit
+  priv phase_handlers : Array[PhaseHandler]
 }
 
 ///|
@@ -75,6 +97,30 @@ pub fn FrameState::elapsed_seconds(self : FrameState) -> Double {
 /// Converts the app frame state to an ECS system context.
 pub fn FrameState::system_context(self : FrameState) -> @ecs.SystemContext {
   @ecs.SystemContext::new(self.delta_seconds, self.frame_index)
+}
+
+///|
+/// Converts this app phase to the ECS schedule phase used by scenes.
+pub fn AppPhase::system_phase(self : AppPhase) -> @ecs.SystemPhase {
+  match self {
+    Startup => @ecs.SystemPhase::new(0)
+    Update => @ecs.SystemPhase::new(1)
+    Extract => @ecs.SystemPhase::new(2)
+    Render => @ecs.SystemPhase::new(3)
+    Shutdown => @ecs.SystemPhase::new(4)
+  }
+}
+
+///|
+/// Returns the default per-frame app phases in engine execution order.
+pub fn app_frame_phases() -> Array[AppPhase] {
+  [Update, Extract, Render]
+}
+
+///|
+/// Builds a frame state for lifecycle phases that do not advance time.
+fn zero_frame_state() -> FrameState {
+  FrameState::new((0.0 : Float), 0, 0.0)
 }
 
 ///|
@@ -176,53 +222,84 @@ pub fn Scene::visible(self : Scene) -> Bool {
 }
 
 ///|
-/// Runs this scene's schedule against this scene's world.
-pub fn Scene::run_schedule(self : Scene, frame : FrameState) -> Bool {
-  self.schedule.run(self.world, frame.system_context())
+/// Runs this scene's schedule for one app phase.
+pub fn Scene::run_schedule_phase(
+  self : Scene,
+  phase : AppPhase,
+  frame : FrameState,
+) -> Bool {
+  self.schedule.run_phase(
+    self.world,
+    frame.system_context(),
+    phase.system_phase(),
+  )
 }
 
 ///|
-/// Runs this scene's schedule with an explicit ECS system context.
-pub fn Scene::run_schedule_with_context(
+/// Runs this scene's schedule for one explicit ECS system phase.
+pub fn Scene::run_schedule_system_phase(
   self : Scene,
+  phase : @ecs.SystemPhase,
   ctx : @ecs.SystemContext,
 ) -> Bool {
-  self.schedule.run(self.world, ctx)
+  self.schedule.run_phase(self.world, ctx, phase)
 }
 
 ///|
 /// Implements `App::new`.
-pub fn App::new(
-  on_init : (Engine) -> Unit,
-  on_update : (Engine, FrameState) -> Unit,
-  on_render : (Engine, FrameState) -> Unit,
-  on_shutdown : (Engine) -> Unit,
-) -> App {
-  { on_init, on_update, on_render, on_shutdown }
+pub fn App::new() -> App {
+  let phase_handlers : Array[PhaseHandler] = []
+  { phase_handlers, }
 }
 
 ///|
-/// Calls the app initialization callback.
-pub fn App::init(self : App, engine : Engine) -> Unit {
-  (self.on_init)(engine)
+/// Registers a function to run in an app phase slot.
+pub fn App::register_phase(
+  self : App,
+  phase : AppPhase,
+  handler : (Engine, FrameState) -> Unit,
+  slot? : PhaseSlot = BeforeSchedule,
+) -> Unit {
+  self.phase_handlers.push({ phase, slot, run: handler })
 }
 
 ///|
-/// Calls the app update callback.
-pub fn App::update(self : App, engine : Engine, frame : FrameState) -> Unit {
-  (self.on_update)(engine, frame)
+/// Runs handlers registered for a phase slot.
+pub fn App::run_phase_handlers(
+  self : App,
+  phase : AppPhase,
+  slot : PhaseSlot,
+  engine : Engine,
+  frame : FrameState,
+) -> Unit {
+  for i = 0; i < self.phase_handlers.length(); i = i + 1 {
+    let handler = self.phase_handlers[i]
+    if handler.phase == phase && handler.slot == slot {
+      (handler.run)(engine, frame)
+    }
+  }
 }
 
 ///|
-/// Calls the app render callback.
-pub fn App::render(self : App, engine : Engine, frame : FrameState) -> Unit {
-  (self.on_render)(engine, frame)
+/// Runs handlers registered before a phase's scene schedules.
+pub fn App::run_before_schedule(
+  self : App,
+  phase : AppPhase,
+  engine : Engine,
+  frame : FrameState,
+) -> Unit {
+  self.run_phase_handlers(phase, BeforeSchedule, engine, frame)
 }
 
 ///|
-/// Calls the app shutdown callback.
-pub fn App::shutdown(self : App, engine : Engine) -> Unit {
-  (self.on_shutdown)(engine)
+/// Runs handlers registered after a phase's scene schedules.
+pub fn App::run_after_schedule(
+  self : App,
+  phase : AppPhase,
+  engine : Engine,
+  frame : FrameState,
+) -> Unit {
+  self.run_phase_handlers(phase, AfterSchedule, engine, frame)
 }
 
 ///|
@@ -260,27 +337,54 @@ pub fn Engine::main_scene(self : Engine) -> Scene {
 }
 
 ///|
-/// Implements `Engine::initialize_app`.
-pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
-  app.init(self)
-}
-
-///|
 /// Implements `Engine::shutdown_app`.
 pub fn Engine::shutdown_app(self : Engine, app : App) -> Unit {
-  app.shutdown(self)
+  self.run_phase(app, Shutdown, zero_frame_state())
 }
 
 ///|
-/// Advances the engine one frame and runs update, scene schedules, and render.
-pub fn Engine::tick(self : Engine, app : App) -> Unit {
-  let frame = self.time_state.next_frame()
-  app.update(self, frame)
+/// Runs one app phase, including app handlers and matching scene schedules.
+pub fn Engine::run_phase(
+  self : Engine,
+  app : App,
+  phase : AppPhase,
+  frame : FrameState,
+) -> Unit {
+  app.run_before_schedule(phase, self, frame)
   for i = 0; i < self.scenes.length(); i = i + 1 {
     let scene = self.scenes[i]
-    if scene.enabled() {
-      ignore(scene.run_schedule(frame))
+    if self.scene_participates_in_phase(scene, phase) {
+      ignore(scene.run_schedule_phase(phase, frame))
     }
   }
-  app.render(self, frame)
+  app.run_after_schedule(phase, self, frame)
+}
+
+///|
+/// Reports whether a scene should run schedule systems for a phase.
+fn Engine::scene_participates_in_phase(
+  _self : Engine,
+  scene : Scene,
+  phase : AppPhase,
+) -> Bool {
+  match phase {
+    Render => scene.visible()
+    _ => scene.enabled()
+  }
+}
+
+///|
+/// Implements `Engine::initialize_app`.
+pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
+  self.run_phase(app, Startup, zero_frame_state())
+}
+
+///|
+/// Advances the engine one frame and runs the default frame phases.
+pub fn Engine::tick(self : Engine, app : App) -> Unit {
+  let frame = self.time_state.next_frame()
+  let phases = app_frame_phases()
+  for i = 0; i < phases.length(); i = i + 1 {
+    self.run_phase(app, phases[i], frame)
+  }
 }

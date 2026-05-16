@@ -227,7 +227,10 @@ pub fn create_demo_state_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  scene.add_system(@ecs.transform_propagation_system(world))
+  let update_phase = @app.AppPhase::Update
+  scene.add_system(
+    @ecs.transform_propagation_system(world, update_phase.system_phase()),
+  )
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -300,7 +303,10 @@ pub fn create_demo_state_for_scene(
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
   ignore(
-    scene.run_schedule_with_context(@ecs.SystemContext::new((0.0 : Float), 0)),
+    scene.run_schedule_system_phase(
+      update_phase.system_phase(),
+      @ecs.SystemContext::new((0.0 : Float), 0),
+    ),
   )
   queue.drain_and_upload_global_transform_writes(transform_storage, world)
   queue.drain_and_upload_camera_writes(camera_storage, world)
@@ -485,7 +491,7 @@ pub fn render_frame_to_view(
     demo_state.frame.val.to_double() * 0.022,
   )
   demo_state.update_scene(frame)
-  ignore(demo_state.scene.run_schedule(frame))
+  ignore(demo_state.scene.run_schedule_phase(@app.AppPhase::Update, frame))
   render_current_frame_to_view(demo_state, color_view)
 }
 
@@ -561,16 +567,23 @@ pub fn DemoState::render_scene(
 ///|
 /// Builds an app lifecycle that drives this DemoState from an engine tick.
 pub fn create_app(demo_state : DemoState) -> @app.App {
-  @app.App::new(
-    fn(_engine) { () },
-    fn(_engine, frame) { demo_state.update_scene(frame) },
+  let app = @app.App::new()
+  app.register_phase(@app.AppPhase::Update, fn(_engine, frame) {
+    demo_state.update_scene(frame)
+  })
+  app.register_phase(
+    @app.AppPhase::Render,
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
         render_current_frame(demo_state)
       }
     },
-    fn(_engine) { demo_state.release() },
+    slot=@app.PhaseSlot::AfterSchedule,
   )
+  app.register_phase(@app.AppPhase::Shutdown, fn(_engine, _frame) {
+    demo_state.release()
+  })
+  app
 }
 
 ///|

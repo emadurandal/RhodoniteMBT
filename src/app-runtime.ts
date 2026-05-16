@@ -1,11 +1,37 @@
 export type AppCallback = (engine: Engine, frame: FrameState) => void;
 
-export type AppInitCallback = (engine: Engine) => void;
-
 export type SceneScheduleCallback<TWorld> = (
 	world: TWorld,
 	frame: FrameState,
 ) => void;
+
+export const AppPhase = {
+	Startup: "Startup",
+	Update: "Update",
+	Extract: "Extract",
+	Render: "Render",
+	Shutdown: "Shutdown",
+} as const;
+
+export type AppPhase = (typeof AppPhase)[keyof typeof AppPhase];
+
+export const PhaseSlot = {
+	BeforeSchedule: "BeforeSchedule",
+	AfterSchedule: "AfterSchedule",
+} as const;
+
+export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
+
+type PhaseHandler = {
+	phase: AppPhase;
+	slot: PhaseSlot;
+	callback: AppCallback;
+};
+
+type SceneScheduleHandler<TWorld> = {
+	phase: AppPhase;
+	callback: SceneScheduleCallback<TWorld>;
+};
 
 export class FrameState {
 	readonly deltaSeconds: number;
@@ -43,7 +69,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	readonly name: string;
 	private worldValue: TWorld | null;
 	private mainCameraValue: TMainCamera | null = null;
-	private scheduleCallback: SceneScheduleCallback<TWorld> | null = null;
+	private readonly scheduleHandlers: SceneScheduleHandler<TWorld>[] = [];
 	private enabledValue = true;
 	private visibleValue = true;
 
@@ -71,8 +97,11 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		return this.mainCameraValue;
 	}
 
-	setSchedule(schedule: SceneScheduleCallback<TWorld>): void {
-		this.scheduleCallback = schedule;
+	setSchedule(
+		schedule: SceneScheduleCallback<TWorld>,
+		phase: AppPhase = AppPhase.Update,
+	): void {
+		this.scheduleHandlers.push({ phase, callback: schedule });
 	}
 
 	setEnabled(enabled: boolean): void {
@@ -91,53 +120,48 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		return this.visibleValue;
 	}
 
-	runSchedule(frame: FrameState): boolean {
-		if (this.worldValue === null || this.scheduleCallback === null) {
+	runSchedulePhase(phase: AppPhase, frame: FrameState): boolean {
+		if (this.worldValue === null) {
 			return true;
 		}
-		this.scheduleCallback(this.worldValue, frame);
+		for (const handler of this.scheduleHandlers) {
+			if (handler.phase === phase) {
+				handler.callback(this.worldValue, frame);
+			}
+		}
 		return true;
 	}
 }
 
 export class App {
-	private readonly onInit: AppInitCallback;
-	private readonly onUpdate: AppCallback;
-	private readonly onRender: AppCallback;
-	private readonly onShutdown: AppInitCallback;
+	private readonly phaseHandlers: PhaseHandler[] = [];
 
-	constructor(callbacks: {
-		init?: AppInitCallback;
-		update?: AppCallback;
-		render?: AppCallback;
-		shutdown?: AppInitCallback;
-	}) {
-		this.onInit = callbacks.init ?? (() => {});
-		this.onUpdate = callbacks.update ?? (() => {});
-		this.onRender = callbacks.render ?? (() => {});
-		this.onShutdown = callbacks.shutdown ?? (() => {});
+	registerPhase(
+		phase: AppPhase,
+		callback: AppCallback,
+		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
+	): void {
+		this.phaseHandlers.push({ phase, slot, callback });
 	}
 
-	init(engine: Engine): void {
-		this.onInit(engine);
-	}
-
-	update(engine: Engine, frame: FrameState): void {
-		this.onUpdate(engine, frame);
-	}
-
-	render(engine: Engine, frame: FrameState): void {
-		this.onRender(engine, frame);
-	}
-
-	shutdown(engine: Engine): void {
-		this.onShutdown(engine);
+	runPhaseHandlers(
+		phase: AppPhase,
+		slot: PhaseSlot,
+		engine: Engine,
+		frame: FrameState,
+	): void {
+		for (const handler of this.phaseHandlers) {
+			if (handler.phase === phase && handler.slot === slot) {
+				handler.callback(engine, frame);
+			}
+		}
 	}
 }
 
 type RuntimeScene = {
 	enabled: () => boolean;
-	runSchedule: (frame: FrameState) => boolean;
+	visible: () => boolean;
+	runSchedulePhase: (phase: AppPhase, frame: FrameState) => boolean;
 };
 
 export class Engine {
@@ -202,21 +226,34 @@ export class Engine {
 	}
 
 	initializeApp(app: App): void {
-		app.init(this);
+		this.runPhase(app, AppPhase.Startup, new FrameState(0, 0, 0));
 	}
 
 	shutdownApp(app: App): void {
-		app.shutdown(this);
+		this.runPhase(app, AppPhase.Shutdown, new FrameState(0, 0, 0));
+	}
+
+	runPhase(app: App, phase: AppPhase, frame: FrameState): void {
+		app.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, this, frame);
+		for (const scene of this.scenes) {
+			if (this.sceneParticipatesInPhase(scene, phase)) {
+				scene.runSchedulePhase(phase, frame);
+			}
+		}
+		app.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, this, frame);
 	}
 
 	tick(app: App): void {
 		const frame = this.timeState.nextFrame();
-		app.update(this, frame);
-		for (const scene of this.scenes) {
-			if (scene.enabled()) {
-				scene.runSchedule(frame);
-			}
+		for (const phase of [AppPhase.Update, AppPhase.Extract, AppPhase.Render]) {
+			this.runPhase(app, phase, frame);
 		}
-		app.render(this, frame);
+	}
+
+	private sceneParticipatesInPhase(scene: RuntimeScene, phase: AppPhase): boolean {
+		if (phase === AppPhase.Render) {
+			return scene.visible();
+		}
+		return scene.enabled();
 	}
 }

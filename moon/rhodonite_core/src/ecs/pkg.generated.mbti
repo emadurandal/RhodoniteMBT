@@ -13,7 +13,7 @@ pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTran
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
-pub fn transform_propagation_system(World) -> System
+pub fn transform_propagation_system(World, SystemPhase) -> System
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 
@@ -177,7 +177,8 @@ pub fn Schedule::add_system(Self, System) -> Unit
 pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
 pub fn Schedule::len(Self) -> Int
 pub fn Schedule::new() -> Self
-pub fn Schedule::run(Self, World, SystemContext) -> Bool
+pub fn Schedule::run(Self, World, SystemContext, Array[SystemPhase]) -> Bool
+pub fn Schedule::run_phase(Self, World, SystemContext, SystemPhase) -> Bool
 
 pub struct SpawnBatchRow {
   // private fields
@@ -204,13 +205,11 @@ pub(all) struct SystemContext {
 }
 pub fn SystemContext::new(Float, Int) -> Self
 
-pub(all) enum SystemPhase {
-  PreUpdate
-  Update
-  PostUpdate
-  PreRender
-  RenderExtract
+pub(all) struct SystemPhase {
+  id : Int
 } derive(Eq)
+pub fn SystemPhase::id(Self) -> Int
+pub fn SystemPhase::new(Int) -> Self
 
 pub struct World {
   // private fields

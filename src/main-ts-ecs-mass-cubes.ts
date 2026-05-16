@@ -18,7 +18,14 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
-import { App, Engine, Scene, type FrameState } from "./app-runtime";
+import {
+	App,
+	AppPhase,
+	Engine,
+	PhaseSlot,
+	Scene,
+	type FrameState,
+} from "./app-runtime";
 
 const ENTITY_COUNT = 800_000;
 type GlobalTransformPrecisionMode =
@@ -597,15 +604,21 @@ function createDemoStateForEngine(
 }
 
 function createApp(demoState: DemoState): App {
-	return new App({
-		update: (_engine, frame) => updateScene(demoState, frame),
-		render: () => {
+	const app = new App();
+	app.registerPhase(AppPhase.Update, (_engine, frame) =>
+		updateScene(demoState, frame),
+	);
+	app.registerPhase(
+		AppPhase.Render,
+		() => {
 			if (demoState.scene.visible()) {
 				renderCurrentFrame(demoState);
 			}
 		},
-		shutdown: () => releaseDemoState(demoState),
-	});
+		PhaseSlot.AfterSchedule,
+	);
+	app.registerPhase(AppPhase.Shutdown, () => releaseDemoState(demoState));
+	return app;
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {

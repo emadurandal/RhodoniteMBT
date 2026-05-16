@@ -65,9 +65,9 @@ Scene
 - `ComponentTypeId` が world 間で同じ意味を持つ保証が必要になる。
 - `CommandBuffer` の flush 先が曖昧になる。
 - query 中 mutation guard を world ごとに分離する必要が出る。
-- render extraction や synchronization の責務が通常 system に混ざる。
+- render extraction や synchronization の責務が scene-local system と engine-level task のどちらに属するか曖昧になる。
 
-複数 scene / 複数 world 間の処理が必要になった場合は、通常の `Schedule` ではなく、`EngineTask`、`SceneTransfer`、`RenderExtract` のような engine-level 処理として扱います。
+複数 scene / 複数 world 間の処理が必要になった場合は、scene-local `Schedule` ではなく、`AppPhase` / `PhaseSlot` 上の engine-level task として扱います。
 
 ## Scene
 
@@ -90,11 +90,14 @@ Scene
 ```moonbit
 let scene = Scene::new("main")
 let entity = scene.world().create_entity()
-scene.schedule().add_system(@ecs.transform_propagation_system(scene.world()))
+let phase = AppPhase::Update
+scene.schedule().add_system(
+  @ecs.transform_propagation_system(scene.world(), phase.system_phase())
+)
 scene.set_main_camera(camera)
 ```
 
-ただし `world()` と `schedule()` を無制限に分離して公開すると 1:1 の意図が薄れるため、最終 API では `Scene::run_schedule()` や `Scene::world_mut()` のように scene 経由の操作を優先します。
+ただし `world()` と `schedule()` を無制限に分離して公開すると 1:1 の意図が薄れるため、最終 API では `Scene::run_schedule_phase()` や `Scene::world_mut()` のように scene 経由の操作を優先します。
 
 ## Engine
 
@@ -124,34 +127,37 @@ frame の標準順序:
 ```text
 Engine::tick
   update time/frame state
-  app.update(engine, frame)
-  for each enabled scene:
-    scene.schedule.run(scene.world)
-  app.render(engine, frame)
-  renderer.begin_frame()
-  for each visible scene:
-    renderer.render_scene(scene)
-  renderer.end_frame()
+  run AppPhase::Update
+    app handlers in PhaseSlot::BeforeSchedule
+    enabled scene schedules for Update
+    app handlers in PhaseSlot::AfterSchedule
+  run AppPhase::Extract
+    same slot/schedule structure
+  run AppPhase::Render
+    app handlers in PhaseSlot::BeforeSchedule
+    visible scene schedules for Render
+    app handlers in PhaseSlot::AfterSchedule
 ```
 
 初期実装では scene は 1 つだけでもよいです。`Engine` の内部 field や命名だけを `scenes` / `main_scene_index` にしておくと、後で複数 scene を追加しやすくなります。
 
 ## App
 
-`App` はユーザーが実装する application lifecycle です。MoonBit の trait / interface 表現が扱いづらい場合は、初期段階では callbacks を保持する runner でも構いません。
+`App` はユーザー実装を phase lifecycle に登録する handler registry です。`App::update` / `App::render` のような固定 per-frame callback は持たず、処理は `AppPhase` と `PhaseSlot` に明示的に載せます。
 
 目標 API:
 
 ```moonbit
-trait App {
-  init(Self, engine : Engine) -> Unit
-  update(Self, engine : Engine, frame : FrameState) -> Unit
-  render(Self, engine : Engine, frame : FrameState) -> Unit
-  shutdown(Self, engine : Engine) -> Unit
-}
+let app = App::new()
+app.register_phase(AppPhase::Update, fn(engine, frame) { ... })
+app.register_phase(
+  AppPhase::Render,
+  fn(engine, frame) { ... },
+  slot=PhaseSlot::AfterSchedule,
+)
 ```
 
-最初の sample migration では、既存 sample の `DemoState` を `App` 実装へ包むだけでよいです。ここでの `DemoState` は sample 固有の pipeline、buffer、animation state をまとめるための枠組みであり、engine-owned な汎用 `Renderer` ではありません。renderer abstraction や material system を同時に入れすぎないようにします。
+sample migration では、既存 sample の `DemoState` が持っていた update/render/shutdown 処理を、それぞれ `Update` / `Render` / `Shutdown` phase handler として登録します。ここでの `DemoState` は sample 固有の pipeline、buffer、animation state をまとめるための枠組みであり、engine-owned な汎用 `Renderer` ではありません。renderer abstraction や material system を同時に入れすぎないようにします。
 
 ## WebGPU Renderer との関係
 
@@ -193,18 +199,20 @@ Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/sr
 | 型 | 現在の内容 |
 |----|------------|
 | `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
+| `AppPhase` | `Startup`、`Update`、`Extract`、`Render`、`Shutdown`。`SystemPhase` へ変換して scene schedule に渡す。 |
+| `PhaseSlot` | phase 内の `BeforeSchedule` / `AfterSchedule` 実行帯。schedule 外処理や将来の renderer task を phase lifecycle 内に置く。 |
 | `TimeState` | 固定 delta の frame counter。初期値は既存 ECS samples に合わせて 0.022 秒。 |
 | `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
-| `App` | callback-backed lifecycle。`init`、`update`、`render`、`shutdown` を呼び出す。 |
-| `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で update、scene schedule、render を実行する。 |
+| `App` | phase handler registry。`register_phase` で `AppPhase` / `PhaseSlot` に処理を登録する。 |
+| `Engine` | `GPUContext`、scene collection、main scene index、time state を持ち、`tick(app)` で `Update`、`Extract`、`Render` phase を順に実行する。 |
 
-WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の `App` callback が animation input update と render を担当します。
+WebGPU sample の browser/native entry point は `emadurandal/rhodonite/app` へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::tick(app)` から駆動されます。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `create_app(demo_state)` を公開します。`DemoState` 側の処理は `App::register_phase` で `Update`、`Render`、`Shutdown` に登録します。
 
 Browser JS export も sample-local state の名前に合わせ、`create_webgpu_demo_state(canvas)` を入口にします。WASM host-driven sample も `create_wasm_demo_state`、`initialize_demo_state`、`render_demo_frame` を ABI 名として使い、sample-local state と将来の engine-owned `Renderer` を名前で混同しないようにします。
 
-ECS sample の `DemoState` は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `App::update` で animated cube vertices を更新し、`App::render` でその frame の描画だけを行います。
+ECS sample の `DemoState` は `World` と `Schedule` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `Update` handler で animated cube vertices を更新し、`Render` handler でその frame の描画だけを行います。
 
-TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`createApp(demo_state)`、`engine.tick(app)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と lifecycle callback は同じです。
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`AppPhase`、`PhaseSlot`、`Scene`、`App`、`Engine` を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`createApp(demo_state)`、`engine.tick(app)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、frame order と phase lifecycle は同じです。
 
 [`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
@@ -244,7 +252,7 @@ pnpm run test:examples:visual
 目的は `Scene` を ECS access の自然な入口にすることです。
 
 - `Scene::world()` / `Scene::schedule()` の公開範囲を見直す。
-- `Scene::run_schedule()` を追加する。
+- `Scene::run_schedule_phase()` を追加する。
 - `Scene::set_main_camera()` / `Scene::main_camera()` を追加する。
 - `Scene` の enabled/visible state を renderer loop に反映する。
 - `ecs-scene-graph` と `ecs-mass-cubes` を `Scene` runtime に寄せる。
@@ -308,11 +316,11 @@ pnpm run test:examples:visual
 - `Scene::world()` をどの程度公開するか。
 - browser/native の platform runner を facade に公開するか、examples/common に置くか。
 - `FrameState` に wall-clock time と fixed-step time の両方を初期から入れるか。
-- `Renderer::render_scene` が直接 ECS query するか、将来の `RenderExtract` layer を最初から薄く用意するか。
+- `Renderer::render_scene` が直接 ECS query するか、`AppPhase::Extract` / `PhaseSlot` 上の renderer task として extraction layer を用意するか。
 
 Resolved in Phase 3:
 
-- `App` は callback-backed struct として実装する。
+- `App` は `AppPhase` / `PhaseSlot` handler registry として実装する。
 - `Engine` は `Scene` values の array と `main_scene_index` を所有する。
 
 ## 最初の推奨 PR

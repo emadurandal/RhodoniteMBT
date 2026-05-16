@@ -260,13 +260,10 @@ pub(all) struct SystemContext {
 }
 
 ///|
-/// Coarse single-thread execution phase. Schedules run phases in declaration order.
-pub(all) enum SystemPhase {
-  PreUpdate
-  Update
-  PostUpdate
-  PreRender
-  RenderExtract
+/// Externally defined schedule phase token. The scheduler only compares phase ids; lifecycle
+/// meaning and execution order are supplied by the caller.
+pub(all) struct SystemPhase {
+  id : Int
 } derive(Eq)
 
 ///|
