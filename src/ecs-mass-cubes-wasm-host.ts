@@ -500,7 +500,7 @@ function createHostImports(
 				);
 				writeMassCubesCameraUniform(
 					demoState.queue,
-					demoState.render.cameraUniform,
+					demoState.render.cameraBuffer,
 					demoState.orbitController,
 				);
 				const colorView =

@@ -2,10 +2,13 @@ import "./style.css";
 import {
 	World,
 	computeGlobalTransformUploadRange,
+	createCameraWordsBuffer,
 	createGlobalTransformWordsBuffer,
 	detectDenseGlobalTransformLayout,
+	drainAndUploadCameraWrites,
 	uploadGlobalTransformWrites,
 	writeGlobalTransformBlobRangeByRefs,
+	type EntityId,
 	type GlobalTransformBlobWriter,
 	type GlobalTransformDenseLayout,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -30,16 +33,15 @@ import {
 	MASS_CUBES_ENTITY_COUNT,
 	MASS_CUBES_GRID_SPACING,
 	MASS_CUBES_INSTANCE_STRIDE,
-	createMassCubesCamera,
 	createMassCubesOrbitCameraController,
-	createMassCubesRenderResources,
+	createMassCubesRenderResourcesFromCameraStorage,
 	gridSideLen,
 	instanceColorRgb,
+	massCubesCameraMatrices,
 	releaseMassCubesRenderResources,
 	renderMassCubesScene,
 	updateOrbitCameraControllerFromInput,
 	writeF32,
-	type MassCubesCamera,
 	type MassCubesRenderResources,
 	type OrbitCameraController,
 } from "./ecs-mass-cubes-renderer";
@@ -58,7 +60,7 @@ type DemoState = {
 	readonly queue: GPUQueue;
 	readonly render: MassCubesRenderResources;
 	readonly transformStorage: GPUBuffer;
-	readonly scene: Scene<World, MassCubesCamera>;
+	readonly scene: Scene<World, EntityId>;
 	readonly orbitController: OrbitCameraController;
 	readonly transformRefs: Uint32Array;
 	readonly transformWordUploadFirst: number;
@@ -183,6 +185,28 @@ function writeMassCubesTransformBlob(
 	}
 }
 
+function pushCameraMatrices(
+	world: World,
+	camera: EntityId,
+	orbitController: OrbitCameraController,
+): void {
+	const matrices = massCubesCameraMatrices(orbitController);
+	if (
+		!world.setCameraMatrices(
+			camera,
+			matrices.view,
+			matrices.proj,
+			matrices.near,
+			matrices.far,
+			matrices.aspect,
+			matrices.projectionKind,
+			matrices.flags,
+		)
+	) {
+		throw new Error("Failed to update Camera matrices.");
+	}
+}
+
 function uploadInitialGlobalTransforms(demoState: DemoState): void {
 	const world = demoState.scene.world();
 	uploadGlobalTransformWrites(
@@ -226,7 +250,7 @@ function createDemoStateForEngine(
 	renderFormat?: GPUTextureFormat,
 ): DemoState {
 	const { canvas, context, device, queue, format } = engine;
-	const scene = engine.mainScene<World, MassCubesCamera>();
+	const scene = engine.mainScene<World, EntityId>();
 	const targetFormat = renderFormat ?? format;
 
 	const world = globalTransformDefaultIsF16()
@@ -253,16 +277,18 @@ function createDemoStateForEngine(
 	);
 	const transformStorage = createGlobalTransformWordsBuffer(device, world);
 	const orbitController = createMassCubesOrbitCameraController();
-	const camera = createMassCubesCamera();
+	const camera = world.createEntity();
+	pushCameraMatrices(world, camera, orbitController);
 	scene.setMainCamera(camera);
+	const cameraStorage = createCameraWordsBuffer(device, world);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
-	const render = createMassCubesRenderResources({
+	const render = createMassCubesRenderResourcesFromCameraStorage({
 		device,
 		queue,
 		targetFormat,
 		transformStorage,
+		cameraStorage,
 		instanceData,
-		orbitController,
 	});
 
 	const demoState: DemoState = {
@@ -286,6 +312,7 @@ function createDemoStateForEngine(
 		cpuFrameStartMs: -1,
 	};
 	uploadInitialGlobalTransforms(demoState);
+	drainAndUploadCameraWrites(queue, render.cameraBuffer, world);
 	return demoState;
 }
 
@@ -345,17 +372,19 @@ function renderCurrentFrame(demoState: DemoState): void {
 
 function renderScene(
 	demoState: DemoState,
-	scene: Scene<World, MassCubesCamera>,
+	scene: Scene<World, EntityId>,
 	colorView: GPUTextureView,
 ): void {
 	const camera = scene.mainCamera();
 	if (camera === null) {
 		throw new Error("renderScene requires Scene.mainCamera.");
 	}
-	demoState.queue.writeBuffer(
-		demoState.render.cameraUniform,
-		0,
-		camera.uniformBytes(demoState.orbitController),
+	const world = scene.world();
+	pushCameraMatrices(world, camera, demoState.orbitController);
+	drainAndUploadCameraWrites(
+		demoState.queue,
+		demoState.render.cameraBuffer,
+		world,
 	);
 	renderMassCubesScene({
 		device: demoState.device,
@@ -377,7 +406,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	canvas.width = MASS_CUBES_CANVAS_WIDTH;
 	canvas.height = MASS_CUBES_CANVAS_HEIGHT;
 	const engine = await Engine.create(canvas, {
-		mainScene: new Scene<World, MassCubesCamera>("ts-ecs-mass-cubes"),
+		mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
 	});
 	const demoState = createDemoStateForEngine(engine, "rgba8unorm");
 	registerEngineHandlers(engine, demoState);
@@ -414,7 +443,7 @@ if (!navigator.gpu) {
 			return;
 		}
 		void Engine.create(canvas, {
-			mainScene: new Scene<World, MassCubesCamera>("ts-ecs-mass-cubes"),
+			mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
 		})
 			.then((engine) => {
 				const demoState = createDemoStateForEngine(engine);

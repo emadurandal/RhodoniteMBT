@@ -223,6 +223,57 @@ pub fn world_set_transform_trs(
 }
 
 ///|
+/// Builds a Matrix44F from 16 column-major floats passed through the JS bridge.
+fn matrix44f_from_col_major_array(data : FixedArray[Float]) -> @m44.Matrix44F {
+  if data.length() != 16 {
+    abort("matrix44f_from_col_major_array: length mismatch")
+  }
+  @m44.Matrix44::new_col_major(
+    data[0],
+    data[1],
+    data[2],
+    data[3],
+    data[4],
+    data[5],
+    data[6],
+    data[7],
+    data[8],
+    data[9],
+    data[10],
+    data[11],
+    data[12],
+    data[13],
+    data[14],
+    data[15],
+  )
+}
+
+///|
+/// Implements `world_set_camera_matrices_col_major`.
+pub fn world_set_camera_matrices_col_major(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  view_col_major : FixedArray[Float],
+  proj_col_major : FixedArray[Float],
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Bool {
+  world.set_camera_matrices(
+    entity,
+    matrix44f_from_col_major_array(view_col_major),
+    matrix44f_from_col_major_array(proj_col_major),
+    near,
+    far,
+    aspect,
+    projection_kind,
+    flags,
+  )
+}
+
+///|
 /// Implements `world_update_global_transforms_from_transforms`.
 pub fn world_update_global_transforms_from_transforms(
   world : @ecs.World,

@@ -1,4 +1,7 @@
 import {
+	cameraHelpersDefault,
+	cameraWordsBindGroup,
+	cameraWordsBindingDefault,
 	globalTransformHelpersDefault,
 	globalTransformRefInstanceVertexBufferLayout,
 	globalTransformWordsBindGroup,
@@ -25,10 +28,6 @@ export const MASS_CUBES_CUBE_SCALE = 0.055;
 
 type Mat4 = Float32Array;
 
-export type MassCubesCamera = {
-	uniformBytes: (orbit: OrbitCameraController) => Uint8Array;
-};
-
 export type MassCubesRenderResources = {
 	readonly pipeline: GPURenderPipeline;
 	readonly depthTexture: GPUTexture;
@@ -36,7 +35,7 @@ export type MassCubesRenderResources = {
 	readonly vertexBuffer: GPUBuffer;
 	readonly instanceBuffer: GPUBuffer;
 	readonly indexBuffer: GPUBuffer;
-	readonly cameraUniform: GPUBuffer;
+	readonly cameraBuffer: GPUBuffer;
 	readonly bindTransforms: GPUBindGroup;
 	readonly bindCamera: GPUBindGroup;
 };
@@ -73,18 +72,12 @@ export function createMassCubesOrbitCameraController(): OrbitCameraController {
 	return createOrbitCameraController(MASS_CUBES_CAMERA_ELEVATION_RAD);
 }
 
-export function createMassCubesCamera(): MassCubesCamera {
-	return {
-		uniformBytes: (orbit) => cameraUniformBytes(orbit),
-	};
-}
-
 export function writeMassCubesCameraUniform(
 	queue: GPUQueue,
-	cameraUniform: GPUBuffer,
+	cameraBuffer: GPUBuffer,
 	orbit: OrbitCameraController,
 ): void {
-	queue.writeBuffer(cameraUniform, 0, cameraUniformBytes(orbit));
+	queue.writeBuffer(cameraBuffer, 0, cameraUniformBytes(orbit));
 }
 
 export function createMassCubesInstanceBytesFromRefs(
@@ -104,6 +97,23 @@ export function createMassCubesInstanceBytesFromRefs(
 	return bytes;
 }
 
+type MassCubesRenderResourceOptions = {
+	readonly device: GPUDevice;
+	readonly queue: GPUQueue;
+	readonly targetFormat: GPUTextureFormat;
+	readonly transformStorage: GPUBuffer;
+	readonly instanceData: Uint8Array;
+} & (
+	| {
+			readonly orbitController: OrbitCameraController;
+			readonly cameraStorage?: undefined;
+	  }
+	| {
+			readonly orbitController?: undefined;
+			readonly cameraStorage: GPUBuffer;
+	  }
+);
+
 export function createMassCubesRenderResources(options: {
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
@@ -112,9 +122,28 @@ export function createMassCubesRenderResources(options: {
 	readonly instanceData: Uint8Array;
 	readonly orbitController: OrbitCameraController;
 }): MassCubesRenderResources {
-	const { device, queue, targetFormat, transformStorage, instanceData, orbitController } =
-		options;
-	const shader = device.createShaderModule({ code: shaderWgsl() });
+	return createMassCubesRenderResourcesInternal(options);
+}
+
+export function createMassCubesRenderResourcesFromCameraStorage(options: {
+	readonly device: GPUDevice;
+	readonly queue: GPUQueue;
+	readonly targetFormat: GPUTextureFormat;
+	readonly transformStorage: GPUBuffer;
+	readonly cameraStorage: GPUBuffer;
+	readonly instanceData: Uint8Array;
+}): MassCubesRenderResources {
+	return createMassCubesRenderResourcesInternal(options);
+}
+
+function createMassCubesRenderResourcesInternal(
+	options: MassCubesRenderResourceOptions,
+): MassCubesRenderResources {
+	const { device, queue, targetFormat, transformStorage, instanceData } = options;
+	const usesCameraStorage = options.cameraStorage !== undefined;
+	const shader = device.createShaderModule({
+		code: shaderWgsl(usesCameraStorage ? "storage" : "uniform"),
+	});
 	const pipeline = device.createRenderPipeline({
 		layout: "auto",
 		vertex: {
@@ -145,20 +174,26 @@ export function createMassCubesRenderResources(options: {
 			depthCompare: "less",
 		},
 	});
-	const cameraUniform = device.createBuffer({
-		size: 256,
-		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-	});
-	writeMassCubesCameraUniform(queue, cameraUniform, orbitController);
+	const cameraBuffer =
+		options.cameraStorage ??
+		device.createBuffer({
+			size: 256,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+	if (!usesCameraStorage) {
+		writeMassCubesCameraUniform(queue, cameraBuffer, options.orbitController);
+	}
 	const bindTransforms = globalTransformWordsBindGroup(
 		device,
 		pipeline,
 		transformStorage,
 	);
-	const bindCamera = device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(1),
-		entries: [{ binding: 0, resource: { buffer: cameraUniform } }],
-	});
+	const bindCamera = usesCameraStorage
+		? cameraWordsBindGroup(device, pipeline, cameraBuffer)
+		: device.createBindGroup({
+				layout: pipeline.getBindGroupLayout(1),
+				entries: [{ binding: 0, resource: { buffer: cameraBuffer } }],
+			});
 	const vertexBuffer = device.createBuffer({
 		size: MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -187,7 +222,7 @@ export function createMassCubesRenderResources(options: {
 		vertexBuffer,
 		instanceBuffer,
 		indexBuffer,
-		cameraUniform,
+		cameraBuffer,
 		bindTransforms,
 		bindCamera,
 	};
@@ -252,7 +287,7 @@ export function releaseMassCubesRenderResources(
 	render.vertexBuffer.destroy();
 	render.instanceBuffer.destroy();
 	render.indexBuffer.destroy();
-	render.cameraUniform.destroy();
+	render.cameraBuffer.destroy();
 }
 
 export function instanceColorRgb(index: number): [number, number, number] {
@@ -382,7 +417,19 @@ function viewSpaceRangeCorners(
 	return [min, max];
 }
 
-function cameraUniformBytes(orbit: OrbitCameraController): Uint8Array {
+export type MassCubesCameraMatrices = {
+	readonly view: Float32Array;
+	readonly proj: Float32Array;
+	readonly near: number;
+	readonly far: number;
+	readonly aspect: number;
+	readonly projectionKind: number;
+	readonly flags: number;
+};
+
+export function massCubesCameraMatrices(
+	orbit: OrbitCameraController,
+): MassCubesCameraMatrices {
 	const viewBase = mat4Mul(
 		mat4Mul(mat4RotationX(orbit.pitch), mat4RotationY(orbit.yaw)),
 		mat4Translation(0, 0, -16),
@@ -421,6 +468,19 @@ function cameraUniformBytes(orbit: OrbitCameraController): Uint8Array {
 		0.1,
 		farClip,
 	);
+	return {
+		view,
+		proj,
+		near: 0.1,
+		far: farClip,
+		aspect,
+		projectionKind: 1,
+		flags: 0,
+	};
+}
+
+function cameraUniformBytes(orbit: OrbitCameraController): Uint8Array {
+	const { view, proj } = massCubesCameraMatrices(orbit);
 	const vp = mat4Mul(proj, view);
 	const bytes = new Uint8Array(256);
 	new Float32Array(bytes.buffer, 0, 16).set(vp);
@@ -463,7 +523,46 @@ function indexCubeU16Bytes(): Uint8Array {
 	return bytes;
 }
 
-function shaderWgsl(): string {
+function shaderWgsl(cameraBinding: "uniform" | "storage"): string {
+	if (cameraBinding === "storage") {
+		const prefix =
+			globalTransformWordsBindingDefault() + cameraWordsBindingDefault();
+		const suffix = `
+struct VertexOut {
+  @builtin(position) position: vec4<f32>,
+  @location(0) color: vec3<f32>,
+};
+
+@vertex
+fn vertexMain(
+  @location(0) local_pos: vec3<f32>,
+  @location(1) transform_ref: vec2<u32>,
+  @location(2) color: vec3<f32>,
+) -> VertexOut {
+  let world_pos = rn_transform_point(
+    rn_load_global_transform(transform_ref),
+    local_pos,
+  );
+  let camera = rn_load_camera(0u);
+  let clip = camera.view_proj * world_pos;
+  var o: VertexOut;
+  o.position = clip;
+  o.color = color;
+  return o;
+}
+
+@fragment
+fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
+  return vec4<f32>(color, 1.0);
+}
+`;
+		return (
+			prefix +
+			globalTransformHelpersDefault() +
+			cameraHelpersDefault() +
+			suffix
+		);
+	}
 	const prefix =
 		`
 struct CameraUniform {

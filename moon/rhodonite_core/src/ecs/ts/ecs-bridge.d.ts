@@ -120,6 +120,17 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		sy: number,
 		sz: number,
 	): MoonBool;
+	export function world_set_camera_matrices_col_major(
+		world: MoonWorld,
+		entity: MoonEntityId,
+		viewColMajor: number[],
+		projColMajor: number[],
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): MoonBool;
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
