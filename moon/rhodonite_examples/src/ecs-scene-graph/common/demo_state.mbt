@@ -93,6 +93,8 @@ pub(all) struct DemoState {
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 
@@ -231,8 +233,12 @@ pub fn create_demo_state_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  scene.add_transform_propagation_system(@app.phase_update())
-  scene.add_orbit_camera_systems(orbit_controller, camera_home, camera_lens)
+  scene.add_common_systems(
+    transform_propagation=true,
+    orbit_component=Some(orbit_controller),
+    home_component=Some(camera_home),
+    lens_component=Some(camera_lens),
+  )
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -405,6 +411,8 @@ pub fn create_demo_state_for_scene(
     bodies,
     gt,
     orbit_controller,
+    camera_home,
+    camera_lens,
     frame: @ref.new(0),
   }
 }
@@ -619,9 +627,12 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.add_orbit_camera_controller_input_handler(
+  engine.add_common_handlers(
     demo_state.scene,
-    demo_state.orbit_controller,
+    transform_propagation=true,
+    orbit_component=Some(demo_state.orbit_controller),
+    home_component=Some(demo_state.camera_home),
+    lens_component=Some(demo_state.camera_lens),
   )
   engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)

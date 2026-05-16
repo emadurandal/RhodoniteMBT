@@ -42,6 +42,7 @@ pub fn phase_update() -> @ecs.PhaseKey
 pub struct Engine {
   // private fields
 }
+pub fn Engine::add_common_handlers(Self, Scene, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
 pub fn Engine::add_handler_on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
@@ -85,6 +86,7 @@ pub struct Scene {
   // private fields
 }
 pub fn Scene::add_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
 pub fn Scene::add_orbit_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_orbit_camera_systems(Self, @ecs.ComponentTypeId, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_orbit_camera_transform_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit

@@ -534,10 +534,9 @@ pub fn create_demo_state_for_scene(
   let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
   let camera_home = @ecs.register_camera_home_transform_component(world)
   let camera_lens = @ecs.register_camera_lens_component(world)
-  scene.add_orbit_camera_transform_system(
-    @app.phase_post_update(),
-    orbit_controller,
-    camera_home,
+  scene.add_common_systems(
+    orbit_component=Some(orbit_controller),
+    home_component=Some(camera_home),
   )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
@@ -951,9 +950,10 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.add_orbit_camera_controller_input_handler(
+  engine.add_common_handlers(
     demo_state.scene,
-    demo_state.orbit_controller,
+    orbit_component=Some(demo_state.orbit_controller),
+    home_component=Some(demo_state.camera_home),
   )
   engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()

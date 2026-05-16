@@ -39,6 +39,28 @@ priv struct PhaseGroup {
 }
 
 ///|
+/// Registration key for the builtin transform propagation system.
+priv struct TransformPropagationRegistration {
+  phase : PhaseKey
+}
+
+///|
+/// Registration key for the builtin orbit camera transform system.
+priv struct OrbitCameraTransformRegistration {
+  phase : PhaseKey
+  orbit_component : @ecs.ComponentTypeId
+  home_component : @ecs.ComponentTypeId
+}
+
+///|
+/// Registration key for the builtin orbit camera Camera blob sync system.
+priv struct OrbitCameraBlobSyncRegistration {
+  phase : PhaseKey
+  orbit_component : @ecs.ComponentTypeId
+  lens_component : @ecs.ComponentTypeId
+}
+
+///|
 /// Mutable fixed-step clock used by the engine runner.
 pub struct TimeState {
   priv mut frame_index : Int
@@ -55,6 +77,15 @@ pub struct Scene {
   priv mut main_camera : @ecs.EntityId?
   priv mut enabled : Bool
   priv mut visible : Bool
+  priv transform_propagation_registrations : Array[
+    TransformPropagationRegistration,
+  ]
+  priv orbit_camera_transform_registrations : Array[
+    OrbitCameraTransformRegistration,
+  ]
+  priv orbit_camera_blob_sync_registrations : Array[
+    OrbitCameraBlobSyncRegistration,
+  ]
 }
 
 ///|
@@ -340,6 +371,9 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     main_camera: None,
     enabled: true,
     visible: true,
+    transform_propagation_registrations: [],
+    orbit_camera_transform_registrations: [],
+    orbit_camera_blob_sync_registrations: [],
   }
 }
 
@@ -390,12 +424,49 @@ pub fn Scene::add_structural_system(
 }
 
 ///|
+/// Reports whether transform propagation has already been registered for a phase.
+fn Scene::has_transform_propagation_registration(
+  self : Scene,
+  phase : PhaseKey,
+) -> Bool {
+  for i = 0; i < self.transform_propagation_registrations.length(); i = i + 1 {
+    if self.transform_propagation_registrations[i].phase == phase {
+      return true
+    }
+  }
+  false
+}
+
+///|
 /// Adds the builtin transform propagation system for one engine phase.
 pub fn Scene::add_transform_propagation_system(
   self : Scene,
   phase : PhaseKey,
 ) -> Unit {
+  if self.has_transform_propagation_registration(phase) {
+    return
+  }
+  self.transform_propagation_registrations.push({ phase, })
   self.add_ecs_system(@ecs.transform_propagation_system(self.world, phase))
+}
+
+///|
+/// Reports whether orbit camera transform has already been registered.
+fn Scene::has_orbit_camera_transform_registration(
+  self : Scene,
+  phase : PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  home_component : @ecs.ComponentTypeId,
+) -> Bool {
+  for i = 0; i < self.orbit_camera_transform_registrations.length(); i = i + 1 {
+    let reg = self.orbit_camera_transform_registrations[i]
+    if reg.phase == phase &&
+      reg.orbit_component == orbit_component &&
+      reg.home_component == home_component {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -406,6 +477,16 @@ pub fn Scene::add_orbit_camera_transform_system(
   orbit_component : @ecs.ComponentTypeId,
   home_component : @ecs.ComponentTypeId,
 ) -> Unit {
+  if self.has_orbit_camera_transform_registration(
+      phase, orbit_component, home_component,
+    ) {
+    return
+  }
+  self.orbit_camera_transform_registrations.push({
+    phase,
+    orbit_component,
+    home_component,
+  })
   self.add_ecs_system(
     @ecs.orbit_camera_transform_system(
       self.world,
@@ -414,6 +495,25 @@ pub fn Scene::add_orbit_camera_transform_system(
       home_component,
     ),
   )
+}
+
+///|
+/// Reports whether orbit camera Camera blob sync has already been registered.
+fn Scene::has_orbit_camera_blob_sync_registration(
+  self : Scene,
+  phase : PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  lens_component : @ecs.ComponentTypeId,
+) -> Bool {
+  for i = 0; i < self.orbit_camera_blob_sync_registrations.length(); i = i + 1 {
+    let reg = self.orbit_camera_blob_sync_registrations[i]
+    if reg.phase == phase &&
+      reg.orbit_component == orbit_component &&
+      reg.lens_component == lens_component {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -436,6 +536,16 @@ pub fn Scene::add_orbit_camera_blob_sync_system(
   orbit_component : @ecs.ComponentTypeId,
   lens_component : @ecs.ComponentTypeId,
 ) -> Unit {
+  if self.has_orbit_camera_blob_sync_registration(
+      phase, orbit_component, lens_component,
+    ) {
+    return
+  }
+  self.orbit_camera_blob_sync_registrations.push({
+    phase,
+    orbit_component,
+    lens_component,
+  })
   self.add_ecs_system(
     @ecs.orbit_camera_blob_sync_system(
       self.world,
@@ -464,6 +574,61 @@ pub fn Scene::add_orbit_camera_systems(
     orbit_component,
     lens_component,
   )
+}
+
+///|
+/// Adds standard scene systems shared by ECS samples.
+///
+/// Builtin scene systems are deduplicated by phase and component ids, so this
+/// may be called both during scene setup and engine handler setup.
+pub fn Scene::add_common_systems(
+  self : Scene,
+  transform_propagation? : Bool = false,
+  orbit_component? : @ecs.ComponentTypeId? = None,
+  home_component? : @ecs.ComponentTypeId? = None,
+  lens_component? : @ecs.ComponentTypeId? = None,
+) -> Unit {
+  if transform_propagation {
+    self.add_transform_propagation_system(phase_update())
+  }
+  match orbit_component {
+    Some(orbit) => {
+      match home_component {
+        Some(home) =>
+          self.add_orbit_camera_transform_system(
+            phase_post_update(),
+            orbit,
+            home,
+          )
+        None => ()
+      }
+      match lens_component {
+        Some(lens) =>
+          self.add_orbit_camera_blob_sync_system(
+            phase_render_extract(),
+            orbit,
+            lens,
+          )
+        None => ()
+      }
+    }
+    None => {
+      match home_component {
+        Some(_) =>
+          abort(
+            "Scene::add_common_systems: home_component requires orbit_component",
+          )
+        None => ()
+      }
+      match lens_component {
+        Some(_) =>
+          abort(
+            "Scene::add_common_systems: lens_component requires orbit_component",
+          )
+        None => ()
+      }
+    }
+  }
 }
 
 ///|
@@ -627,6 +792,28 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
     },
     slot~,
   )
+}
+
+///|
+/// Adds standard engine handlers and scene systems shared by ECS samples.
+pub fn Engine::add_common_handlers(
+  self : Engine,
+  scene : Scene,
+  transform_propagation? : Bool = false,
+  orbit_component? : @ecs.ComponentTypeId? = None,
+  home_component? : @ecs.ComponentTypeId? = None,
+  lens_component? : @ecs.ComponentTypeId? = None,
+) -> Unit {
+  scene.add_common_systems(
+    transform_propagation~,
+    orbit_component~,
+    home_component~,
+    lens_component~,
+  )
+  match orbit_component {
+    Some(orbit) => self.add_orbit_camera_controller_input_handler(scene, orbit)
+    None => ()
+  }
 }
 
 ///|
