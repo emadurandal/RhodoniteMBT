@@ -2,7 +2,7 @@
 package "emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main"
 
 // Values
-pub fn create_wasm_renderer() -> Unit
+pub fn create_wasm_demo_state() -> Unit
 
 pub fn ecs_mass_cubes_wasm_render_tick() -> Unit
 

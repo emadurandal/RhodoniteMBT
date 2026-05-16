@@ -5,7 +5,9 @@ let demo_engine : @ref.Ref[@app.Engine?] = @ref.new(None)
 let demo_app : @ref.Ref[@app.App?] = @ref.new(None)
 
 ///|
-async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+async fn create_webgpu_demo_state_async(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
   let engine = @demo_state.create_engine(ctx)
   match @demo_state.create_demo_state_for_engine(engine) {
@@ -21,11 +23,11 @@ async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit 
 }
 
 ///|
-/// Implements `create_webgpu_renderer`.
-pub fn create_webgpu_renderer(
+/// Implements `create_webgpu_demo_state`.
+pub fn create_webgpu_demo_state(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
+  @js_async.Promise::from_async(() => create_webgpu_demo_state_async(canvas))
 }
 
 ///|

@@ -13,7 +13,7 @@ options(
   "is-main": true,
   link: {
     "js": {
-      "exports": [ "create_webgpu_renderer", "depth_test_render_tick" ],
+      "exports": [ "create_webgpu_demo_state", "depth_test_render_tick" ],
       "format": "esm",
     },
   },

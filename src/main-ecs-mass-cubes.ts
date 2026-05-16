@@ -1,6 +1,6 @@
 import "./style.css";
 import {
-	create_webgpu_renderer,
+	create_webgpu_demo_state,
 	ecs_mass_cubes_render_tick,
 } from "../_build/js/debug/build/emadurandal/rhodonite_examples/ecs-mass-cubes/js/main/main.js";
 
@@ -13,7 +13,7 @@ if (!navigator.gpu) {
 				"webgpu-canvas",
 			) as HTMLCanvasElement;
 
-			await create_webgpu_renderer(canvas);
+			await create_webgpu_demo_state(canvas);
 
 			const loop = () => {
 				ecs_mass_cubes_render_tick();

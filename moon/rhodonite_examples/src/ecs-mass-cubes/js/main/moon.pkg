@@ -13,7 +13,7 @@ options(
   "is-main": true,
   link: {
     "js": {
-      "exports": [ "create_webgpu_renderer", "ecs_mass_cubes_render_tick" ],
+      "exports": [ "create_webgpu_demo_state", "ecs_mass_cubes_render_tick" ],
       "format": "esm",
     },
   },

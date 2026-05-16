@@ -11,6 +11,6 @@ supported_targets = "js"
 
 options(
   "is-main": true,
-  link: { "js": { "exports": [ "create_webgpu_renderer" ], "format": "esm" } },
+  link: { "js": { "exports": [ "create_webgpu_demo_state" ], "format": "esm" } },
   overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
 )

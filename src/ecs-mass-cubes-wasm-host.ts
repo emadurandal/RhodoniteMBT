@@ -128,7 +128,7 @@ for (let i = 0; i < 256; i += 1) {
 type WasmExports = {
 	_start?: () => void;
 	memory?: WebAssembly.Memory;
-	create_wasm_renderer: () => void;
+	create_wasm_demo_state: () => void;
 	ecs_mass_cubes_wasm_render_tick: () => void;
 };
 
@@ -796,7 +796,7 @@ function createHostImports(
 		rhodonite_ecs_mass_cubes_host: {
 			now_ms: () => performance.now(),
 			entity_count: () => ENTITY_COUNT,
-			initialize_renderer: (perSide: number, transformStride: number) => {
+			initialize_demo_state: (perSide: number, transformStride: number) => {
 				demoState.perSide = perSide;
 				demoState.transformStride = transformStride;
 			},
@@ -824,7 +824,7 @@ function createHostImports(
 			write_global_transform_bytes: (ptr: number, byteLength: number) => {
 				writeTransformBytesFromWasmMemory(demoState, getMemory(), ptr, byteLength);
 			},
-			render_frame: (fps: number, cpuMs: number) => {
+			render_demo_frame: (fps: number, cpuMs: number) => {
 				const colorView =
 					demoState.snapshotColorView ??
 					demoState.context.getCurrentTexture().createView();
@@ -908,7 +908,7 @@ export function runEcsMassCubesWasmDemo(wasmUrl: string, label: string): void {
 			.then(async (demoState) => {
 				const wasm = await instantiateWasm(demoState, wasmUrl, label);
 				wasm._start?.();
-				wasm.create_wasm_renderer();
+				wasm.create_wasm_demo_state();
 				const loop = () => {
 					wasm.ecs_mass_cubes_wasm_render_tick();
 					requestAnimationFrame(loop);
@@ -938,7 +938,7 @@ export async function renderEcsMassCubesWasmSnapshot(
 	try {
 		const wasm = await instantiateWasm(demoState, wasmUrl, label);
 		wasm._start?.();
-		wasm.create_wasm_renderer();
+		wasm.create_wasm_demo_state();
 		demoState.snapshotColorView = target.view;
 		demoState.snapshotDepthView = target.depthView;
 		wasm.ecs_mass_cubes_wasm_render_tick();

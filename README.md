@@ -40,7 +40,7 @@ pnpm install
 pnpm run dev:js:basic-triangle
 ```
 
-The browser demos also include a TypeScript-only WebGPU renderer using the ECS
+The browser demos also include a TypeScript-only WebGPU DemoState using the ECS
 TypeScript wrapper:
 
 ```bash

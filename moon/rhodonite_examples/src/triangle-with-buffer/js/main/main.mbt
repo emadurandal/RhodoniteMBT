@@ -8,7 +8,9 @@ let demo_app : @ref.Ref[@app.App?] = @ref.new(None)
 
 ///|
 /// Initializes the browser WebGPU sample and renders the first engine tick.
-async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+async fn create_webgpu_demo_state_async(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Unit {
   let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
   let engine = @app.Engine::new(ctx)
   match @demo_state.create_demo_state_for_engine(engine) {
@@ -20,16 +22,16 @@ async fn create_webgpu_renderer_async(canvas : @wgpu.HTMLCanvasElement) -> Unit 
       engine.tick(app)
       println("WebGPU triangle (vertex + index buffer) rendered successfully!")
     }
-    None => println("Failed to create demo_state")
+    None => println("Failed to create DemoState")
   }
 }
 
 ///|
-/// Implements `create_webgpu_renderer`.
-pub fn create_webgpu_renderer(
+/// Implements `create_webgpu_demo_state`.
+pub fn create_webgpu_demo_state(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() => create_webgpu_renderer_async(canvas))
+  @js_async.Promise::from_async(() => create_webgpu_demo_state_async(canvas))
 }
 
 ///|
