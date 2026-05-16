@@ -153,13 +153,30 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 
 export class App {
 	private readonly phaseHandlers: PhaseHandler[] = [];
+	private phaseRegistrationLocked = false;
 
 	onPhase(
 		phase: PhaseKey,
 		callback: AppCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
 	): void {
+		if (this.phaseRegistrationLocked) {
+			throw new Error(
+				"App.onPhase cannot register phase handlers after app initialization.",
+			);
+		}
 		this.phaseHandlers.push({ phase, slot, callback });
+	}
+
+	prepareForEngine(phaseCanRun: (phase: PhaseKey) => boolean): void {
+		for (const handler of this.phaseHandlers) {
+			if (!phaseCanRun(handler.phase)) {
+				throw new Error(
+					`App phase '${handler.phase}' is not registered in this engine.`,
+				);
+			}
+		}
+		this.phaseRegistrationLocked = true;
 	}
 
 	runPhaseHandlers(
@@ -192,6 +209,7 @@ export class Engine {
 	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
 	private readonly phaseOrderValue: PhaseKey[];
+	private phaseOrderLocked = false;
 	private mainSceneIndex = 0;
 
 	private constructor(
@@ -266,6 +284,10 @@ export class Engine {
 	}
 
 	runPhase(app: App, phase: PhaseKey, frame: FrameState): void {
+		this.prepareAppForRun(app);
+		if (!this.phaseCanRun(phase)) {
+			throw new Error(`Phase '${phase}' is not registered in this engine.`);
+		}
 		app.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, this, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
@@ -276,6 +298,7 @@ export class Engine {
 	}
 
 	tick(app: App): void {
+		this.prepareAppForRun(app);
 		const frame = this.timeState.nextFrame();
 		for (const phase of this.phaseOrderValue) {
 			this.runPhase(app, phase, frame);
@@ -290,6 +313,9 @@ export class Engine {
 	}
 
 	private insertPhase(anchor: PhaseKey, phaseKey: PhaseKey, offset: number): void {
+		if (this.phaseOrderLocked) {
+			throw new Error("Engine phase order cannot change after app initialization.");
+		}
 		if (this.phaseOrderValue.includes(phaseKey)) {
 			throw new Error(`Frame phase '${phaseKey}' already exists.`);
 		}
@@ -298,6 +324,19 @@ export class Engine {
 			throw new Error(`Anchor frame phase '${anchor}' was not found.`);
 		}
 		this.phaseOrderValue.splice(anchorIndex + offset, 0, phaseKey);
+	}
+
+	private phaseCanRun(phase: PhaseKey): boolean {
+		return (
+			phase === Phase.Startup ||
+			phase === Phase.Shutdown ||
+			this.phaseOrderValue.includes(phase)
+		);
+	}
+
+	private prepareAppForRun(app: App): void {
+		app.prepareForEngine((phaseKey) => this.phaseCanRun(phaseKey));
+		this.phaseOrderLocked = true;
 	}
 }
 

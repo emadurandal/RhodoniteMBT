@@ -48,6 +48,7 @@ pub struct Scene {
 /// Application phase handler registry.
 pub struct App {
   priv phase_handlers : Array[PhaseHandler]
+  priv mut phase_registration_locked : Bool
 }
 
 ///|
@@ -58,6 +59,7 @@ pub struct Engine {
   priv main_scene_index : Int
   priv time_state : TimeState
   priv phase_order : Array[PhaseKey]
+  priv mut phase_order_locked : Bool
 }
 
 ///|
@@ -370,7 +372,7 @@ pub fn Scene::run_schedule_phase(
 /// Implements `App::new`.
 pub fn App::new() -> App {
   let phase_handlers : Array[PhaseHandler] = []
-  { phase_handlers, }
+  { phase_handlers, phase_registration_locked: false }
 }
 
 ///|
@@ -381,7 +383,18 @@ pub fn App::on_phase(
   handler : (Engine, FrameState) -> Unit,
   slot? : PhaseSlot = BeforeSchedule,
 ) -> Unit {
+  if self.phase_registration_locked {
+    abort(
+      "App::on_phase: phase handlers cannot be registered after app initialization",
+    )
+  }
   self.phase_handlers.push({ phase, slot, run: handler })
+}
+
+///|
+/// Prevents additional phase handler registration.
+fn App::lock_phase_registration(self : App) -> Unit {
+  self.phase_registration_locked = true
 }
 
 ///|
@@ -443,6 +456,7 @@ pub fn Engine::new_with_main_scene(
     main_scene_index: 0,
     time_state: TimeState::new((0.022 : Float)),
     phase_order: default_frame_phases(),
+    phase_order_locked: false,
   }
 }
 
@@ -471,6 +485,11 @@ pub fn Engine::insert_phase_before(
   anchor : PhaseKey,
   phase_key : PhaseKey,
 ) -> Unit {
+  if self.phase_order_locked {
+    abort(
+      "Engine::insert_phase_before: phase order cannot change after app initialization",
+    )
+  }
   if phase_array_contains(self.phase_order, phase_key) {
     abort("Engine::insert_phase_before: phase already exists")
   }
@@ -488,6 +507,11 @@ pub fn Engine::insert_phase_after(
   anchor : PhaseKey,
   phase_key : PhaseKey,
 ) -> Unit {
+  if self.phase_order_locked {
+    abort(
+      "Engine::insert_phase_after: phase order cannot change after app initialization",
+    )
+  }
   if phase_array_contains(self.phase_order, phase_key) {
     abort("Engine::insert_phase_after: phase already exists")
   }
@@ -496,6 +520,36 @@ pub fn Engine::insert_phase_after(
     abort("Engine::insert_phase_after: anchor phase not found")
   }
   phase_array_insert(self.phase_order, index + 1, phase_key)
+}
+
+///|
+/// Reports whether a phase is valid for this engine's lifecycle.
+fn Engine::can_run_phase(self : Engine, phase : PhaseKey) -> Bool {
+  phase == phase_startup() ||
+  phase == phase_shutdown() ||
+  phase_array_contains(self.phase_order, phase)
+}
+
+///|
+/// Verifies that all app handlers target phases owned by this engine.
+fn Engine::validate_app_phases(self : Engine, app : App) -> Unit {
+  for i = 0; i < app.phase_handlers.length(); i = i + 1 {
+    let handler = app.phase_handlers[i]
+    if !self.can_run_phase(handler.phase) {
+      abort(
+        "Engine::initialize_app: app handler phase is not registered in this engine: " +
+        handler.phase.name(),
+      )
+    }
+  }
+}
+
+///|
+/// Locks phase definitions and validates an app before execution.
+fn Engine::prepare_app_for_run(self : Engine, app : App) -> Unit {
+  self.validate_app_phases(app)
+  app.lock_phase_registration()
+  self.phase_order_locked = true
 }
 
 ///|
@@ -512,6 +566,13 @@ pub fn Engine::run_phase(
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
+  self.prepare_app_for_run(app)
+  if !self.can_run_phase(phase) {
+    abort(
+      "Engine::run_phase: phase is not registered in this engine: " +
+      phase.name(),
+    )
+  }
   app.run_before_schedule(phase, self, frame)
   for i = 0; i < self.scenes.length(); i = i + 1 {
     let scene = self.scenes[i]
@@ -545,6 +606,7 @@ pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
 ///|
 /// Advances the engine one frame and runs the default frame phases.
 pub fn Engine::tick(self : Engine, app : App) -> Unit {
+  self.prepare_app_for_run(app)
   let frame = self.time_state.next_frame()
   for i = 0; i < self.phase_order.length(); i = i + 1 {
     self.run_phase(app, self.phase_order[i], frame)
