@@ -61,6 +61,7 @@ pub struct Scene {
 /// Runtime that owns platform context, time state, and scenes.
 pub struct Engine {
   priv gpu_context : @wgpu.GPUContext
+  priv input_state : @input.InputState
   priv scenes : Array[Scene]
   priv main_scene_index : Int
   priv time_state : TimeState
@@ -142,6 +143,12 @@ pub fn phase_startup() -> PhaseKey {
 }
 
 ///|
+/// Standard input phase. Platform adapters finalize queued input before this phase.
+pub fn phase_input() -> PhaseKey {
+  phase("rhodonite/input")
+}
+
+///|
 /// Standard gameplay update phase.
 pub fn phase_update() -> PhaseKey {
   phase("rhodonite/update")
@@ -187,6 +194,7 @@ pub fn phase_shutdown() -> PhaseKey {
 /// Returns the default render-frame phases in engine execution order.
 pub fn default_render_frame_phases() -> Array[PhaseKey] {
   [
+    phase_input(),
     phase_update(),
     phase_post_update(),
     phase_render_extract(),
@@ -453,6 +461,7 @@ pub fn Engine::new_with_main_scene(
   scenes.push(main_scene)
   {
     gpu_context,
+    input_state: @input.InputState::new(),
     scenes,
     main_scene_index: 0,
     time_state: TimeState::new((0.022 : Float)),
@@ -468,6 +477,12 @@ pub fn Engine::new_with_main_scene(
 /// Implements `Engine::gpu_context`.
 pub fn Engine::gpu_context(self : Engine) -> @wgpu.GPUContext {
   self.gpu_context
+}
+
+///|
+/// Returns the engine-owned input state shared by platform adapters and systems.
+pub fn Engine::input(self : Engine) -> @input.InputState {
+  self.input_state
 }
 
 ///|
@@ -822,6 +837,7 @@ pub fn Engine::run_phase_group(
 /// Advances the render-frame clock and runs the standard render-frame phase group.
 pub fn Engine::run_render_frame(self : Engine) -> Unit {
   self.ensure_initialized("Engine::run_render_frame")
+  self.input_state.begin_frame()
   let frame = self.time_state.next_frame()
   self.run_phase_group(phase_group_render_frame(), frame)
 }

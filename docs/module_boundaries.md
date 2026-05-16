@@ -7,7 +7,7 @@ RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitla
 | Moon module (`moon.mod.json` `name`) | Directory | Role |
 |--------------------------------------|-----------|------|
 | `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | Public facade; aggregates lower modules and exposes high-level app/runtime helpers. |
-| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), little-endian buffer writes (`src/binary/writes`), ECS ([`docs/ecs.md`](ecs.md)), and the ECS microbench package (`src/ecs_bench`). |
+| `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), little-endian buffer writes (`src/binary/writes`), ECS ([`docs/ecs.md`](ecs.md)), platform-independent input state ([`docs/input_architecture_ja.md`](input_architecture_ja.md)), and the ECS microbench package (`src/ecs_bench`). |
 | `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU abstraction (browser and native). |
 | `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | Runnable samples (demo module). |
 
@@ -40,6 +40,7 @@ flowchart LR
 
 - **Allowed**: `rhodonite_examples` may depend on `emadurandal/rhodonite` for high-level app/runtime samples while still importing lower libraries directly for focused low-level WebGPU and ECS examples.
 - **Disallowed**: `rhodonite_webgpu` depending on `rhodonite_examples`.
+- **Input adapters**: platform-independent input state lives in `rhodonite_core/input`; browser and SDL3 adapters are currently close to runtime/examples while their API stabilizes. See [`docs/input_architecture_ja.md`](input_architecture_ja.md) for the intended promotion path into library packages.
 
 During development, link workspace members with [`path` dependencies](https://docs.moonbitlang.com/en/stable/toolchain/moon/module.html#dependency-management). Before publishing, replace `path` entries in dependents’ `moon.mod.json` with **semver** strings (use `moon work sync` if needed).
 

@@ -3,6 +3,7 @@ package "emadurandal/rhodonite/app"
 
 import {
   "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
 }
 
@@ -16,6 +17,8 @@ pub fn phase_group(String) -> PhaseGroupKey
 pub fn phase_group_fixed_step() -> PhaseGroupKey
 
 pub fn phase_group_render_frame() -> PhaseGroupKey
+
+pub fn phase_input() -> @ecs.PhaseKey
 
 pub fn phase_post_update() -> @ecs.PhaseKey
 
@@ -43,6 +46,7 @@ pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize(Self) -> Unit
+pub fn Engine::input(Self) -> @input.InputState
 pub fn Engine::insert_phase_after_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::main_scene(Self) -> Scene

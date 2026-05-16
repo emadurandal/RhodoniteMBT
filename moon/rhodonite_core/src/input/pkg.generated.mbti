@@ -1,0 +1,75 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/input"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum InputEvent {
+  KeyDown(KeyCode, Modifiers, Bool)
+  KeyUp(KeyCode, Modifiers)
+  TextInput(String)
+  PointerMove(Float, Float)
+  MouseDown(MouseButton, Float, Float)
+  MouseUp(MouseButton, Float, Float)
+  Wheel(Float, Float)
+  FocusLost
+}
+
+pub struct InputState {
+  // private fields
+}
+pub fn InputState::apply_event(Self, InputEvent) -> Unit
+pub fn InputState::begin_frame(Self) -> Unit
+pub fn InputState::enqueue_event(Self, InputEvent) -> Unit
+pub fn InputState::events(Self) -> Array[InputEvent]
+pub fn InputState::key_down(Self, KeyCode) -> Bool
+pub fn InputState::key_pressed(Self, KeyCode) -> Bool
+pub fn InputState::key_released(Self, KeyCode) -> Bool
+pub fn InputState::keys_down(Self) -> Array[KeyCode]
+pub fn InputState::mouse_buttons_down(Self) -> Array[MouseButton]
+pub fn InputState::mouse_down(Self, MouseButton) -> Bool
+pub fn InputState::mouse_pressed(Self, MouseButton) -> Bool
+pub fn InputState::mouse_released(Self, MouseButton) -> Bool
+pub fn InputState::new() -> Self
+pub fn InputState::pointer_delta_x(Self) -> Float
+pub fn InputState::pointer_delta_y(Self) -> Float
+pub fn InputState::pointer_x(Self) -> Float
+pub fn InputState::pointer_y(Self) -> Float
+pub fn InputState::queued_event_count(Self) -> Int
+pub fn InputState::wheel_delta_x(Self) -> Float
+pub fn InputState::wheel_delta_y(Self) -> Float
+
+pub(all) struct KeyCode {
+  name : String
+} derive(Eq)
+pub fn KeyCode::name(Self) -> String
+pub fn KeyCode::new(String) -> Self
+
+pub(all) struct Modifiers {
+  shift : Bool
+  ctrl : Bool
+  alt : Bool
+  meta : Bool
+} derive(Eq)
+pub fn Modifiers::alt(Self) -> Bool
+pub fn Modifiers::ctrl(Self) -> Bool
+pub fn Modifiers::meta(Self) -> Bool
+pub fn Modifiers::new(Bool, Bool, Bool, Bool) -> Self
+pub fn Modifiers::none() -> Self
+pub fn Modifiers::shift(Self) -> Bool
+
+pub(all) enum MouseButton {
+  Left
+  Middle
+  Right
+  Back
+  Forward
+  Other(Int)
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+
