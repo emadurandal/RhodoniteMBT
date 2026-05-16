@@ -59,7 +59,8 @@ pub struct Engine {
   priv main_scene_index : Int
   priv time_state : TimeState
   priv phase_order : Array[PhaseKey]
-  priv mut phase_order_locked : Bool
+  priv mut initializing_app : Bool
+  priv mut app_initialized : Bool
 }
 
 ///|
@@ -227,6 +228,12 @@ fn phase_array_insert(
     i = i - 1
   }
   phases[index] = phase_key
+}
+
+///|
+/// Reports whether a phase is a non-frame lifecycle phase.
+fn phase_is_lifecycle_only(phase_key : PhaseKey) -> Bool {
+  phase_key == phase_startup() || phase_key == phase_shutdown()
 }
 
 ///|
@@ -456,7 +463,8 @@ pub fn Engine::new_with_main_scene(
     main_scene_index: 0,
     time_state: TimeState::new((0.022 : Float)),
     phase_order: default_frame_phases(),
-    phase_order_locked: false,
+    initializing_app: false,
+    app_initialized: false,
   }
 }
 
@@ -479,24 +487,61 @@ pub fn Engine::phase_order(self : Engine) -> Array[PhaseKey] {
 }
 
 ///|
+/// Validates a phase can be inserted into the per-frame phase order.
+fn Engine::ensure_insertable_frame_phase(
+  _self : Engine,
+  caller : String,
+  phase_key : PhaseKey,
+) -> Unit {
+  if phase_is_lifecycle_only(phase_key) {
+    abort(
+      caller +
+      ": startup/shutdown phases cannot be inserted into frame phase order",
+    )
+  }
+}
+
+///|
+/// Finds a frame phase anchor or reports why it cannot be used.
+fn Engine::find_frame_phase_anchor(
+  self : Engine,
+  caller : String,
+  anchor : PhaseKey,
+) -> Int {
+  if phase_is_lifecycle_only(anchor) {
+    abort(
+      caller + ": startup/shutdown phases cannot be used as frame phase anchors",
+    )
+  }
+  let index = phase_array_index(self.phase_order, anchor)
+  if index < 0 {
+    abort(
+      caller +
+      ": anchor phase is not registered in frame phase order: " +
+      anchor.name(),
+    )
+  }
+  index
+}
+
+///|
 /// Inserts a custom frame phase before an existing anchor phase.
 pub fn Engine::insert_phase_before(
   self : Engine,
   anchor : PhaseKey,
   phase_key : PhaseKey,
 ) -> Unit {
-  if self.phase_order_locked {
+  let caller = "Engine::insert_phase_before"
+  if !self.initializing_app {
     abort(
-      "Engine::insert_phase_before: phase order cannot change after app initialization",
+      caller + ": phases can only be inserted during Engine::initialize_app",
     )
   }
+  self.ensure_insertable_frame_phase(caller, phase_key)
   if phase_array_contains(self.phase_order, phase_key) {
-    abort("Engine::insert_phase_before: phase already exists")
+    abort(caller + ": phase already exists")
   }
-  let index = phase_array_index(self.phase_order, anchor)
-  if index < 0 {
-    abort("Engine::insert_phase_before: anchor phase not found")
-  }
+  let index = self.find_frame_phase_anchor(caller, anchor)
   phase_array_insert(self.phase_order, index, phase_key)
 }
 
@@ -507,18 +552,17 @@ pub fn Engine::insert_phase_after(
   anchor : PhaseKey,
   phase_key : PhaseKey,
 ) -> Unit {
-  if self.phase_order_locked {
+  let caller = "Engine::insert_phase_after"
+  if !self.initializing_app {
     abort(
-      "Engine::insert_phase_after: phase order cannot change after app initialization",
+      caller + ": phases can only be inserted during Engine::initialize_app",
     )
   }
+  self.ensure_insertable_frame_phase(caller, phase_key)
   if phase_array_contains(self.phase_order, phase_key) {
-    abort("Engine::insert_phase_after: phase already exists")
+    abort(caller + ": phase already exists")
   }
-  let index = phase_array_index(self.phase_order, anchor)
-  if index < 0 {
-    abort("Engine::insert_phase_after: anchor phase not found")
-  }
+  let index = self.find_frame_phase_anchor(caller, anchor)
   phase_array_insert(self.phase_order, index + 1, phase_key)
 }
 
@@ -545,17 +589,39 @@ fn Engine::validate_app_phases(self : Engine, app : App) -> Unit {
 }
 
 ///|
-/// Locks phase definitions and validates an app before execution.
-fn Engine::prepare_app_for_run(self : Engine, app : App) -> Unit {
-  self.validate_app_phases(app)
-  app.lock_phase_registration()
-  self.phase_order_locked = true
+/// Requires the app lifecycle to have been initialized.
+fn Engine::ensure_app_initialized(self : Engine, caller : String) -> Unit {
+  if !self.app_initialized {
+    abort(
+      caller +
+      ": app must be initialized with Engine::initialize_app before execution",
+    )
+  }
 }
 
 ///|
 /// Implements `Engine::shutdown_app`.
 pub fn Engine::shutdown_app(self : Engine, app : App) -> Unit {
+  self.ensure_app_initialized("Engine::shutdown_app")
   self.run_phase(app, phase_shutdown(), zero_frame_state())
+}
+
+///|
+/// Runs one app phase without lifecycle initialization checks.
+fn Engine::run_phase_unchecked(
+  self : Engine,
+  app : App,
+  phase : PhaseKey,
+  frame : FrameState,
+) -> Unit {
+  app.run_before_schedule(phase, self, frame)
+  for i = 0; i < self.scenes.length(); i = i + 1 {
+    let scene = self.scenes[i]
+    if self.scene_participates_in_phase(scene, phase) {
+      ignore(scene.run_schedule_phase(phase, frame))
+    }
+  }
+  app.run_after_schedule(phase, self, frame)
 }
 
 ///|
@@ -566,21 +632,14 @@ pub fn Engine::run_phase(
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  self.prepare_app_for_run(app)
+  self.ensure_app_initialized("Engine::run_phase")
   if !self.can_run_phase(phase) {
     abort(
       "Engine::run_phase: phase is not registered in this engine: " +
       phase.name(),
     )
   }
-  app.run_before_schedule(phase, self, frame)
-  for i = 0; i < self.scenes.length(); i = i + 1 {
-    let scene = self.scenes[i]
-    if self.scene_participates_in_phase(scene, phase) {
-      ignore(scene.run_schedule_phase(phase, frame))
-    }
-  }
-  app.run_after_schedule(phase, self, frame)
+  self.run_phase_unchecked(app, phase, frame)
 }
 
 ///|
@@ -600,13 +659,21 @@ fn Engine::scene_participates_in_phase(
 ///|
 /// Implements `Engine::initialize_app`.
 pub fn Engine::initialize_app(self : Engine, app : App) -> Unit {
-  self.run_phase(app, phase_startup(), zero_frame_state())
+  if self.initializing_app || self.app_initialized {
+    abort("Engine::initialize_app: app is already initialized")
+  }
+  app.lock_phase_registration()
+  self.initializing_app = true
+  self.run_phase_unchecked(app, phase_startup(), zero_frame_state())
+  self.initializing_app = false
+  self.validate_app_phases(app)
+  self.app_initialized = true
 }
 
 ///|
 /// Advances the engine one frame and runs the default frame phases.
 pub fn Engine::tick(self : Engine, app : App) -> Unit {
-  self.prepare_app_for_run(app)
+  self.ensure_app_initialized("Engine::tick")
   let frame = self.time_state.next_frame()
   for i = 0; i < self.phase_order.length(); i = i + 1 {
     self.run_phase(app, self.phase_order[i], frame)

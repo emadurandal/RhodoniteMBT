@@ -168,7 +168,11 @@ export class App {
 		this.phaseHandlers.push({ phase, slot, callback });
 	}
 
-	prepareForEngine(phaseCanRun: (phase: PhaseKey) => boolean): void {
+	lockPhaseRegistration(): void {
+		this.phaseRegistrationLocked = true;
+	}
+
+	validateForEngine(phaseCanRun: (phase: PhaseKey) => boolean): void {
 		for (const handler of this.phaseHandlers) {
 			if (!phaseCanRun(handler.phase)) {
 				throw new Error(
@@ -176,7 +180,6 @@ export class App {
 				);
 			}
 		}
-		this.phaseRegistrationLocked = true;
 	}
 
 	runPhaseHandlers(
@@ -209,7 +212,8 @@ export class Engine {
 	private readonly scenes: RuntimeScene[];
 	private readonly timeState: TimeState;
 	private readonly phaseOrderValue: PhaseKey[];
-	private phaseOrderLocked = false;
+	private initializingApp = false;
+	private appInitialized = false;
 	private mainSceneIndex = 0;
 
 	private constructor(
@@ -264,10 +268,19 @@ export class Engine {
 	}
 
 	initializeApp(app: App): void {
-		this.runPhase(app, Phase.Startup, new FrameState(0, 0, 0));
+		if (this.initializingApp || this.appInitialized) {
+			throw new Error("Engine app is already initialized.");
+		}
+		app.lockPhaseRegistration();
+		this.initializingApp = true;
+		this.runPhaseUnchecked(app, Phase.Startup, new FrameState(0, 0, 0));
+		this.initializingApp = false;
+		app.validateForEngine((phaseKey) => this.phaseCanRun(phaseKey));
+		this.appInitialized = true;
 	}
 
 	shutdownApp(app: App): void {
+		this.ensureAppInitialized("Engine.shutdownApp");
 		this.runPhase(app, Phase.Shutdown, new FrameState(0, 0, 0));
 	}
 
@@ -284,10 +297,14 @@ export class Engine {
 	}
 
 	runPhase(app: App, phase: PhaseKey, frame: FrameState): void {
-		this.prepareAppForRun(app);
+		this.ensureAppInitialized("Engine.runPhase");
 		if (!this.phaseCanRun(phase)) {
 			throw new Error(`Phase '${phase}' is not registered in this engine.`);
 		}
+		this.runPhaseUnchecked(app, phase, frame);
+	}
+
+	private runPhaseUnchecked(app: App, phase: PhaseKey, frame: FrameState): void {
 		app.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, this, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
@@ -298,7 +315,7 @@ export class Engine {
 	}
 
 	tick(app: App): void {
-		this.prepareAppForRun(app);
+		this.ensureAppInitialized("Engine.tick");
 		const frame = this.timeState.nextFrame();
 		for (const phase of this.phaseOrderValue) {
 			this.runPhase(app, phase, frame);
@@ -313,15 +330,27 @@ export class Engine {
 	}
 
 	private insertPhase(anchor: PhaseKey, phaseKey: PhaseKey, offset: number): void {
-		if (this.phaseOrderLocked) {
-			throw new Error("Engine phase order cannot change after app initialization.");
+		if (!this.initializingApp) {
+			throw new Error("Engine phases can only be inserted during initializeApp.");
+		}
+		if (phaseIsLifecycleOnly(phaseKey)) {
+			throw new Error(
+				"Startup/shutdown phases cannot be inserted into frame phase order.",
+			);
 		}
 		if (this.phaseOrderValue.includes(phaseKey)) {
 			throw new Error(`Frame phase '${phaseKey}' already exists.`);
 		}
+		if (phaseIsLifecycleOnly(anchor)) {
+			throw new Error(
+				"Startup/shutdown phases cannot be used as frame phase anchors.",
+			);
+		}
 		const anchorIndex = this.phaseOrderValue.indexOf(anchor);
 		if (anchorIndex < 0) {
-			throw new Error(`Anchor frame phase '${anchor}' was not found.`);
+			throw new Error(
+				`Anchor phase '${anchor}' is not registered in frame phase order.`,
+			);
 		}
 		this.phaseOrderValue.splice(anchorIndex + offset, 0, phaseKey);
 	}
@@ -334,10 +363,17 @@ export class Engine {
 		);
 	}
 
-	private prepareAppForRun(app: App): void {
-		app.prepareForEngine((phaseKey) => this.phaseCanRun(phaseKey));
-		this.phaseOrderLocked = true;
+	private ensureAppInitialized(caller: string): void {
+		if (!this.appInitialized) {
+			throw new Error(
+				`${caller} requires Engine.initializeApp(app) to run first.`,
+			);
+		}
 	}
+}
+
+function phaseIsLifecycleOnly(phaseKey: PhaseKey): boolean {
+	return phaseKey === Phase.Startup || phaseKey === Phase.Shutdown;
 }
 
 function phaseIsRenderPath(phaseKey: PhaseKey): boolean {
