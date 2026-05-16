@@ -227,10 +227,7 @@ pub fn create_demo_state_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  let update_phase = @app.AppPhase::Update
-  scene.add_system(
-    @ecs.transform_propagation_system(world, update_phase.system_phase()),
-  )
+  scene.add_transform_propagation_system(@app.AppPhase::Update)
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -303,9 +300,9 @@ pub fn create_demo_state_for_scene(
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
   ignore(
-    scene.run_schedule_system_phase(
-      update_phase.system_phase(),
-      @ecs.SystemContext::new((0.0 : Float), 0),
+    scene.run_schedule_phase(
+      @app.AppPhase::Update,
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
   queue.drain_and_upload_global_transform_writes(transform_storage, world)

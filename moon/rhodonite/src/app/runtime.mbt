@@ -101,7 +101,7 @@ pub fn FrameState::system_context(self : FrameState) -> @ecs.SystemContext {
 
 ///|
 /// Converts this app phase to the ECS schedule phase used by scenes.
-pub fn AppPhase::system_phase(self : AppPhase) -> @ecs.SystemPhase {
+fn AppPhase::system_phase(self : AppPhase) -> @ecs.SystemPhase {
   match self {
     Startup => @ecs.SystemPhase::new(0)
     Update => @ecs.SystemPhase::new(1)
@@ -174,15 +174,56 @@ pub fn Scene::world(self : Scene) -> @ecs.World {
 }
 
 ///|
-/// Implements `Scene::schedule`.
-pub fn Scene::schedule(self : Scene) -> @ecs.Schedule {
-  self.schedule
-}
-
-///|
 /// Adds a system to this scene's schedule.
 pub fn Scene::add_system(self : Scene, system : @ecs.System) -> Unit {
   self.schedule.add_system(system)
+}
+
+///|
+/// Builds and adds a non-structural ECS system for one app phase.
+pub fn Scene::add_system_on_phase(
+  self : Scene,
+  phase : AppPhase,
+  name : String,
+  reads : Array[@ecs.ComponentTypeId],
+  writes : Array[@ecs.ComponentTypeId],
+  run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
+) -> Unit {
+  self.add_system(
+    @ecs.System::new(name, phase.system_phase(), reads, writes, run),
+  )
+}
+
+///|
+/// Builds and adds a structural-write ECS system for one app phase.
+pub fn Scene::add_structural_system_on_phase(
+  self : Scene,
+  phase : AppPhase,
+  name : String,
+  reads : Array[@ecs.ComponentTypeId],
+  writes : Array[@ecs.ComponentTypeId],
+  run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
+) -> Unit {
+  self.add_system(
+    @ecs.System::new_with_structural_write(
+      name,
+      phase.system_phase(),
+      reads,
+      writes,
+      run,
+    ),
+  )
+}
+
+///|
+/// Adds the builtin transform propagation system for one app phase.
+pub fn Scene::add_transform_propagation_system(
+  self : Scene,
+  phase : AppPhase,
+) -> Unit {
+  self.add_system(
+    @ecs.transform_propagation_system(self.world, phase.system_phase()),
+  )
 }
 
 ///|
@@ -233,16 +274,6 @@ pub fn Scene::run_schedule_phase(
     frame.system_context(),
     phase.system_phase(),
   )
-}
-
-///|
-/// Runs this scene's schedule for one explicit ECS system phase.
-pub fn Scene::run_schedule_system_phase(
-  self : Scene,
-  phase : @ecs.SystemPhase,
-  ctx : @ecs.SystemContext,
-) -> Bool {
-  self.schedule.run_phase(self.world, ctx, phase)
 }
 
 ///|

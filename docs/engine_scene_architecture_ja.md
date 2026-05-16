@@ -90,14 +90,11 @@ Scene
 ```moonbit
 let scene = Scene::new("main")
 let entity = scene.world().create_entity()
-let phase = AppPhase::Update
-scene.schedule().add_system(
-  @ecs.transform_propagation_system(scene.world(), phase.system_phase())
-)
+scene.add_transform_propagation_system(AppPhase::Update)
 scene.set_main_camera(camera)
 ```
 
-ただし `world()` と `schedule()` を無制限に分離して公開すると 1:1 の意図が薄れるため、最終 API では `Scene::run_schedule_phase()` や `Scene::world_mut()` のように scene 経由の操作を優先します。
+`Schedule` は `Scene` 内部に隠し、system 登録や schedule 実行は `Scene` method 経由に寄せます。ECS component 登録や sample 固有の setup ではまだ `world()` への直接 access が必要なため、`World` は公開したままにします。
 
 ## Engine
 
@@ -199,7 +196,7 @@ Phase 3 で `App` / `Engine` / `Scene` は public facade の [`moon/rhodonite/sr
 | 型 | 現在の内容 |
 |----|------------|
 | `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
-| `AppPhase` | `Startup`、`Update`、`Extract`、`Render`、`Shutdown`。`SystemPhase` へ変換して scene schedule に渡す。 |
+| `AppPhase` | `Startup`、`Update`、`Extract`、`Render`、`Shutdown`。facade 内部で core scheduler 用 token に変換される。 |
 | `PhaseSlot` | phase 内の `BeforeSchedule` / `AfterSchedule` 実行帯。schedule 外処理や将来の renderer task を phase lifecycle 内に置く。 |
 | `TimeState` | 固定 delta の frame counter。初期値は既存 ECS samples に合わせて 0.022 秒。 |
 | `Scene` | 1 つの `World` と 1 つの `Schedule`、`main_camera`、enabled/visible state を持つ。 |
@@ -221,12 +218,12 @@ TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-
 Phase 2 では `Scene` API を少し整理し、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) も runtime に寄せました。
 
 - `Scene::new_with_world(name, world)` を追加し、sample ごとの特殊な `World` 初期化を `Scene` に束ねられるようにする。
-- `Scene::add_system(system)` を追加し、`scene.schedule().add_system(...)` より scene 経由の操作を優先する。
+- `Scene::add_system(system)` を追加し、system 登録を scene 経由に寄せる。
 - `Engine::new_with_main_scene(context, scene)` を追加し、main scene を明示的に指定できるようにする。
 - `ecs-scene-graph` は `Scene::add_system` と `Scene::visible` を使う形に寄せる。
 - `ecs-mass-cubes` は fp16 global transform 用の `World` を `Scene::new_with_world` で包み、browser/native entry point を `Engine::tick(app)` 経由へ移行する。
 
-この段階でも `Scene::world()` と `Scene::schedule()` は残します。ECS component の登録や sample 固有の setup ではまだ直接 access が必要なためです。ただし system 登録や schedule 実行のように scene の境界を強く出せる操作は `Scene` method へ寄せます。
+この段階でも `Scene::world()` は残します。ECS component の登録や sample 固有の setup ではまだ直接 access が必要なためです。ただし `Schedule` は公開せず、system 登録や schedule 実行のように scene の境界を強く出せる操作は `Scene` method へ寄せます。
 
 ### Phase 1: examples 内 prototype（完了済み）
 
@@ -251,7 +248,7 @@ pnpm run test:examples:visual
 
 目的は `Scene` を ECS access の自然な入口にすることです。
 
-- `Scene::world()` / `Scene::schedule()` の公開範囲を見直す。
+- `Scene::world()` の公開範囲を見直し、`Schedule` は scene 内部に隠す。
 - `Scene::run_schedule_phase()` を追加する。
 - `Scene::set_main_camera()` / `Scene::main_camera()` を追加する。
 - `Scene` の enabled/visible state を renderer loop に反映する。
