@@ -84,6 +84,36 @@ pub fn webgpu_canvas_context_configure(
 }
 
 ///|
+/// Resizes the native surface and reconfigures it with the supplied device and format hint.
+pub fn webgpu_canvas_context_resize(
+  context : WebGPUCanvasContext,
+  device : GPUDevice,
+  format : String,
+  width : Int,
+  height : Int,
+) -> Unit {
+  if width <= 0 || height <= 0 {
+    return
+  }
+  let new_width = width.reinterpret_as_uint()
+  let new_height = height.reinterpret_as_uint()
+  if context.context.width == new_width && context.context.height == new_height {
+    return
+  }
+  match context.context.currentTexture.val {
+    Some(texture) => {
+      texture.release()
+      context.context.currentTexture.val = None
+    }
+    None => ()
+  }
+  context.context.surface.unconfigure()
+  context.context.width = new_width
+  context.context.height = new_height
+  webgpu_canvas_context_configure(context, device, format)
+}
+
+///|
 /// Implements `webgpu_canvas_context_get_format`.
 pub fn webgpu_canvas_context_get_format(
   context : WebGPUCanvasContext,

@@ -552,6 +552,18 @@ pub fn GPUCanvasContext::get_format(self : GPUCanvasContext) -> String {
 }
 
 ///|
+/// Resizes and reconfigures the platform surface backing this canvas context.
+pub fn GPUCanvasContext::resize(
+  self : GPUCanvasContext,
+  device : GPUDevice,
+  format : String,
+  width : Int,
+  height : Int,
+) -> Unit {
+  webgpu_canvas_context_resize(self, device, format, width, height)
+}
+
+///|
 /// Implements `GPUCanvasContext::get_current_texture`.
 pub fn GPUCanvasContext::get_current_texture(
   self : GPUCanvasContext,

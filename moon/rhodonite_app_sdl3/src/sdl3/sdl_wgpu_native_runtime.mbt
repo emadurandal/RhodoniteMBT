@@ -1,17 +1,34 @@
 ///| Shared SDL3 + Metal (`CAMetalLayer`) + native wgpu app bootstrap and loop.
 
 ///|
+/// Initialization and runtime failures reported by the SDL3 native app adapter.
+pub(all) suberror Sdl3AppError {
+  CreateContextFailed
+  InvalidSurfaceSize(Int, Int)
+  CreateWindowFailed(String)
+  CreateMetalViewFailed(String)
+  GetMetalLayerFailed(String)
+  CreateWebGpuInstanceFailed
+  RequestAdapterFailed
+  RequestDeviceFailed
+  QueryWindowSizeInPixelsFailed(String)
+} derive(Eq, Debug)
+
+///|
 /// Owns native SDL3, Metal, WebGPU surface, device, and Rhodonite GPU context resources.
-pub(all) struct SdlMetalWebGpuNativeSession {
-  ctx : @sdl3_pkg.Context
-  sdl_win : @lib.SDL_Window
-  metal_view : @c.OpaquePtr
-  instance : @wgpu.GPUInstance
-  webgpu_canvas_context : @wgpu.GPUCanvasContext
-  adapter : @wgpu.GPUAdapter
-  device : @wgpu.GPUDevice
-  queue : @wgpu.GPUQueue
-  gpu_context : @wgpu.GPUContext
+pub struct SdlMetalWebGpuNativeSession {
+  priv ctx : @sdl3_pkg.Context
+  priv sdl_win : @lib.SDL_Window
+  priv metal_view : @c.OpaquePtr
+  priv instance : @wgpu.GPUInstance
+  priv webgpu_canvas_context : @wgpu.GPUCanvasContext
+  priv adapter : @wgpu.GPUAdapter
+  priv device : @wgpu.GPUDevice
+  priv queue : @wgpu.GPUQueue
+  priv gpu_context : @wgpu.GPUContext
+  priv mut surface_width : Int
+  priv mut surface_height : Int
+  priv mut surface_format : String
 }
 
 ///|
@@ -27,6 +44,36 @@ priv struct SdlMouseWheelEvent {
   direction : @lib.SDL_MouseWheelDirection
   mouse_x : Float
   mouse_y : Float
+}
+
+///|
+/// Mirrors the SDL window event layout needed for resize handling.
+priv struct SdlWindowEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  data1 : Int
+  data2 : Int
+}
+
+///|
+/// Keeps the private SDL window mirror visible to MoonBit's field checks.
+fn _touch_sdl_window_event_struct() -> Unit {
+  let event = SdlWindowEvent::{
+    event_type: SDL_EVENT_WINDOW_RESIZED,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    data1: 0,
+    data2: 0,
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.data1)
+  ignore(event.data2)
 }
 
 ///|
@@ -57,15 +104,84 @@ fn _touch_sdl_mouse_wheel_event_struct() -> Unit {
 }
 
 ///|
+/// Returns the Rhodonite GPU context owned by a native SDL3 session.
+pub fn SdlMetalWebGpuNativeSession::gpu_context(
+  self : SdlMetalWebGpuNativeSession,
+) -> @wgpu.GPUContext {
+  self.gpu_context
+}
+
+///|
+/// Returns the current native drawable width in pixels.
+pub fn SdlMetalWebGpuNativeSession::surface_width(
+  self : SdlMetalWebGpuNativeSession,
+) -> Int {
+  self.surface_width
+}
+
+///|
+/// Returns the current native drawable height in pixels.
+pub fn SdlMetalWebGpuNativeSession::surface_height(
+  self : SdlMetalWebGpuNativeSession,
+) -> Int {
+  self.surface_height
+}
+
+///|
+/// Returns the current native surface texture format.
+pub fn SdlMetalWebGpuNativeSession::surface_format(
+  self : SdlMetalWebGpuNativeSession,
+) -> String {
+  self.surface_format
+}
+
+///|
+/// Returns the native window drawable size in physical pixels.
+#borrow(width, height)
+extern "C" fn sdl_get_window_size_in_pixels(
+  window : @lib.SDL_Window,
+  width : FixedArray[Int],
+  height : FixedArray[Int],
+) -> Bool = "SDL_GetWindowSizeInPixels"
+
+///|
+/// Raises a structured error if a drawable size cannot be used for WebGPU.
+fn ensure_valid_surface_size(
+  width : Int,
+  height : Int,
+) -> Unit raise Sdl3AppError {
+  if width <= 0 || height <= 0 {
+    raise Sdl3AppError::InvalidSurfaceSize(width, height)
+  }
+}
+
+///|
+/// Queries the SDL window drawable size in physical pixels.
+fn query_sdl_window_size_in_pixels(
+  window : @lib.SDL_Window,
+) -> (Int, Int) raise Sdl3AppError {
+  let width = FixedArray::make(1, 0)
+  let height = FixedArray::make(1, 0)
+  if !sdl_get_window_size_in_pixels(window, width, height) {
+    raise Sdl3AppError::QueryWindowSizeInPixelsFailed(@lib.sdl_GetError())
+  }
+  ensure_valid_surface_size(width[0], height[0])
+  (width[0], height[0])
+}
+
+///|
 /// Initializes SDL3, creates a Metal-backed WebGPU surface, and returns a native session.
 pub async fn init_sdl_metal_webgpu_native(
   window_title : String,
   width : Int,
   height : Int,
   init_log : String,
-) -> SdlMetalWebGpuNativeSession? raise Error {
+) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
+  ensure_valid_surface_size(width, height)
   println(init_log)
-  let ctx = @sdl3_pkg.Context::new()
+  let ctx = @sdl3_pkg.Context::new() catch {
+    _ => raise Sdl3AppError::CreateContextFailed
+  }
   println("native: creating SDL Metal window")
   let sdl_win = @lib.sdl_CreateWindow(
     window_title,
@@ -75,19 +191,18 @@ pub async fn init_sdl_metal_webgpu_native(
   )
   if sdl_win.is_null() {
     ctx.quit()
-    println("SDL_CreateWindow failed (check SDL3 installation)")
-    return None
+    raise Sdl3AppError::CreateWindowFailed(@lib.sdl_GetError())
   }
   let _ = @lib.sdl_ShowWindow(sdl_win)
   let _ = @lib.sdl_RaiseWindow(sdl_win)
   let _ = @lib.sdl_SyncWindow(sdl_win)
+  let (surface_width, surface_height) = query_sdl_window_size_in_pixels(sdl_win)
   println("native: creating SDL Metal view")
   let metal_view = sdl_metal_create_view(sdl_win)
   if @c.opaque_ptr_is_null(metal_view) {
     @lib.sdl_DestroyWindow(sdl_win)
     ctx.quit()
-    println("SDL_Metal_CreateView failed")
-    return None
+    raise Sdl3AppError::CreateMetalViewFailed(@lib.sdl_GetError())
   }
   println("native: retrieving CAMetalLayer")
   let cametal_ptr = sdl_metal_get_layer_ptr(metal_view)
@@ -95,18 +210,43 @@ pub async fn init_sdl_metal_webgpu_native(
     sdl_metal_destroy_view(metal_view)
     @lib.sdl_DestroyWindow(sdl_win)
     ctx.quit()
-    println("SDL_Metal_GetLayer failed")
-    return None
+    raise Sdl3AppError::GetMetalLayerFailed(@lib.sdl_GetError())
   }
   let cametal = sdl_metal_get_layer(metal_view)
   println("native: creating WebGPU instance and surface")
-  let instance = @wgpu.create_native_webgpu_instance()
+  let instance = @wgpu.create_native_webgpu_instance() catch {
+    _ => {
+      sdl_metal_destroy_view(metal_view)
+      @lib.sdl_DestroyWindow(sdl_win)
+      ctx.quit()
+      raise Sdl3AppError::CreateWebGpuInstanceFailed
+    }
+  }
   let webgpu_canvas_context = @wgpu.create_metal_canvas_context(
-    instance, cametal, width, height,
+    instance, cametal, surface_width, surface_height,
   )
   println("native: requesting adapter and device")
-  let adapter = instance.request_adapter()
-  let device = adapter.request_device()
+  let adapter = instance.request_adapter() catch {
+    _ => {
+      webgpu_canvas_context.release()
+      instance.release()
+      sdl_metal_destroy_view(metal_view)
+      @lib.sdl_DestroyWindow(sdl_win)
+      ctx.quit()
+      raise Sdl3AppError::RequestAdapterFailed
+    }
+  }
+  let device = adapter.request_device() catch {
+    _ => {
+      webgpu_canvas_context.release()
+      adapter.release()
+      instance.release()
+      sdl_metal_destroy_view(metal_view)
+      @lib.sdl_DestroyWindow(sdl_win)
+      ctx.quit()
+      raise Sdl3AppError::RequestDeviceFailed
+    }
+  }
   let format = instance.get_preferred_canvas_format_for_surface(
     adapter, webgpu_canvas_context,
   )
@@ -119,7 +259,7 @@ pub async fn init_sdl_metal_webgpu_native(
   let gpu_context = @wgpu.create_webgpu_context(
     device, webgpu_canvas_context, swap_format, queue,
   )
-  Some({
+  {
     ctx,
     sdl_win,
     metal_view,
@@ -129,7 +269,10 @@ pub async fn init_sdl_metal_webgpu_native(
     device,
     queue,
     gpu_context,
-  })
+    surface_width,
+    surface_height,
+    surface_format: swap_format,
+  }
 }
 
 ///|
@@ -152,7 +295,7 @@ pub fn release_sdl_metal_webgpu_native(
 pub fn run_sdl_metal_webgpu_render_loop(
   session : SdlMetalWebGpuNativeSession,
   render_frame : (Float) -> Unit,
-) -> SdlMetalWebGpuNativeSession {
+) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
   let input = @input.InputState::new()
   run_sdl_metal_webgpu_input_render_loop(session, input, render_frame)
 }
@@ -309,12 +452,55 @@ fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
 }
 
 ///|
+/// Reports whether an SDL event means the native drawable size may have changed.
+fn sdl_event_is_resize(event_type : @lib.SDL_EventType) -> Bool {
+  match event_type {
+    SDL_EVENT_WINDOW_RESIZED
+    | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+    | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => true
+    _ => false
+  }
+}
+
+///|
+/// Reconfigures the WebGPU surface if an SDL window resize changed the drawable size.
+fn handle_sdl_window_resize_event(
+  session : SdlMetalWebGpuNativeSession,
+  event : @lib.SDL_Event,
+) -> Unit raise Sdl3AppError {
+  let event_type = event.get_type()
+  if !sdl_event_is_resize(event_type) {
+    return
+  }
+  let window_event : SdlWindowEvent = @lib.unsafe_from_sdl_event(event)
+  let (width, height) = match event_type {
+    SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => {
+      ensure_valid_surface_size(window_event.data1, window_event.data2)
+      (window_event.data1, window_event.data2)
+    }
+    _ => query_sdl_window_size_in_pixels(session.sdl_win)
+  }
+  if width == session.surface_width && height == session.surface_height {
+    return
+  }
+  session.webgpu_canvas_context.resize(
+    session.device,
+    session.surface_format,
+    width,
+    height,
+  )
+  session.surface_width = width
+  session.surface_height = height
+  session.surface_format = session.webgpu_canvas_context.get_format()
+}
+
+///|
 /// Polls SDL3 input, advances the caller-provided input state, and runs frame callbacks.
 pub fn run_sdl_metal_webgpu_input_render_loop(
   session : SdlMetalWebGpuNativeSession,
   input : @input.InputState,
   render_frame : (Float) -> Unit,
-) -> SdlMetalWebGpuNativeSession {
+) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
   println("native: entering render loop")
   let quit = @ref.new(false)
   let mut previous_ticks = sdl_get_ticks()
@@ -327,6 +513,10 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
         SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP =>
           enqueue_sdl_keyboard_event(input, event)
         SDL_EVENT_MOUSE_WHEEL => enqueue_sdl_mouse_wheel_event(input, event)
+        SDL_EVENT_WINDOW_RESIZED
+        | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+        | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED =>
+          handle_sdl_window_resize_event(session, event)
         _ => ()
       }
     }
@@ -351,25 +541,29 @@ pub async fn run_sdl_metal_webgpu_app(
   height : Int,
   init_log : String,
   setup : (@wgpu.GPUContext) -> @app.Engine?,
-) -> Unit raise Error {
-  match init_sdl_metal_webgpu_native(window_title, width, height, init_log) {
-    None => ()
-    Some(session) => {
-      let engine = match setup(session.gpu_context) {
-        Some(engine) => engine
-        None => {
-          release_sdl_metal_webgpu_native(session)
-          return
-        }
-      }
-      engine.initialize()
-      let session = run_sdl_metal_webgpu_input_render_loop(
-        session,
-        engine.input(),
-        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
-      )
-      engine.shutdown()
+) -> Unit raise Sdl3AppError {
+  let session = init_sdl_metal_webgpu_native(
+    window_title, width, height, init_log,
+  )
+  let engine = match setup(session.gpu_context()) {
+    Some(engine) => engine
+    None => {
       release_sdl_metal_webgpu_native(session)
+      return
     }
   }
+  engine.initialize()
+  let session = run_sdl_metal_webgpu_input_render_loop(
+    session,
+    engine.input(),
+    fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
+  ) catch {
+    error => {
+      engine.shutdown()
+      release_sdl_metal_webgpu_native(session)
+      raise error
+    }
+  }
+  engine.shutdown()
+  release_sdl_metal_webgpu_native(session)
 }

@@ -23,6 +23,7 @@ pub fn webgpu_device_get_queue(WebGPUDevice) -> WebGPUQueue
 pub fn webgpu_device_poll(WebGPUDevice, wait? : Bool) -> Bool
 pub fn webgpu_device_release(WebGPUDevice) -> Unit
 pub fn webgpu_canvas_context_configure(WebGPUCanvasContext, GPUDevice, String) -> Unit
+pub fn webgpu_canvas_context_resize(WebGPUCanvasContext, GPUDevice, String, Int, Int) -> Unit
 pub fn webgpu_canvas_context_get_format(WebGPUCanvasContext) -> String
 pub fn webgpu_canvas_context_release(WebGPUCanvasContext) -> Unit
 pub fn webgpu_queue_release(WebGPUQueue) -> Unit

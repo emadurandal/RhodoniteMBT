@@ -73,6 +73,24 @@ pub fn webgpu_canvas_context_get_format(context : GPUCanvasContext) -> String {
 }
 
 ///|
+/// Resizes and reconfigures a canvas context when the platform surface size changes.
+pub fn webgpu_canvas_context_resize(
+  context : GPUCanvasContext,
+  device : GPUDevice,
+  format : String,
+  width : Int,
+  height : Int,
+) -> Unit {
+  @raw.webgpu_canvas_context_resize(
+    context.raw,
+    @raw.webgpu_device_get(device.raw),
+    format,
+    width,
+    height,
+  )
+}
+
+///|
 /// Implements `webgpu_canvas_context_release`.
 pub fn webgpu_canvas_context_release(context : GPUCanvasContext) -> Unit {
   @raw.webgpu_canvas_context_release(context.raw)

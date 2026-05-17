@@ -2,38 +2,44 @@
 package "emadurandal/rhodonite_app_sdl3/sdl3"
 
 import {
-  "Kaida-Amethyst/sdl3/lib",
-  "Milky2018/wgpu_mbt/c",
   "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
+  "moonbitlang/core/debug",
 }
 
 // Values
-pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession?
+pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
 
-pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit
+pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
 
-pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
+pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
-pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
+pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 // Errors
+pub(all) suberror Sdl3AppError {
+  CreateContextFailed
+  InvalidSurfaceSize(Int, Int)
+  CreateWindowFailed(String)
+  CreateMetalViewFailed(String)
+  GetMetalLayerFailed(String)
+  CreateWebGpuInstanceFailed
+  RequestAdapterFailed
+  RequestDeviceFailed
+  QueryWindowSizeInPixelsFailed(String)
+} derive(Eq, @debug.Debug)
 
 // Types and methods
-pub(all) struct SdlMetalWebGpuNativeSession {
-  ctx : @Kaida-Amethyst/sdl3.Context
-  sdl_win : @lib.SDL_Window
-  metal_view : @c.OpaquePtr
-  instance : @webgpu.GPUInstance
-  webgpu_canvas_context : @webgpu.GPUCanvasContext
-  adapter : @webgpu.GPUAdapter
-  device : @webgpu.GPUDevice
-  queue : @webgpu.GPUQueue
-  gpu_context : @webgpu.GPUContext
+pub struct SdlMetalWebGpuNativeSession {
+  // private fields
 }
+pub fn SdlMetalWebGpuNativeSession::gpu_context(Self) -> @webgpu.GPUContext
+pub fn SdlMetalWebGpuNativeSession::surface_format(Self) -> String
+pub fn SdlMetalWebGpuNativeSession::surface_height(Self) -> Int
+pub fn SdlMetalWebGpuNativeSession::surface_width(Self) -> Int
 
 // Type aliases
 
