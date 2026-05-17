@@ -25,6 +25,7 @@ export const MASS_CUBES_INDEX_U16_COUNT = 36;
 export const MASS_CUBES_CAMERA_ELEVATION_RAD = 0.42;
 export const MASS_CUBES_GRID_SPACING = 0.14;
 export const MASS_CUBES_CUBE_SCALE = 0.055;
+export const MASS_CUBES_MIN_INTERACTIVE_GRID_PITCH_PX = 0.56;
 
 type Mat4 = Float32Array;
 
@@ -448,6 +449,13 @@ export function massCubesCameraMatrices(
 	if (halfW / halfH < aspect) {
 		halfW = halfH * aspect;
 	} else {
+		halfH = halfW / aspect;
+	}
+	const maxHalfWForGridPitch =
+		(MASS_CUBES_GRID_SPACING * MASS_CUBES_CANVAS_WIDTH) /
+		(2 * MASS_CUBES_MIN_INTERACTIVE_GRID_PITCH_PX);
+	if (halfW > maxHalfWForGridPitch) {
+		halfW = maxHalfWForGridPitch;
 		halfH = halfW / aspect;
 	}
 	const [zLo, zHi] = viewSpaceRangeCorners(viewBase, extentXz, waveY, 2);

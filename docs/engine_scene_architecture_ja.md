@@ -201,7 +201,7 @@ Renderer
 - `Scene` は render source であり、GPU resource owner ではない。
 - Phase 4 の `DemoState` は scene の ECS data を query/extract して描画する暫定実装である。
 - `OrbitCameraController` は Camera blob を直接更新せず、camera entity の `Transform3D` を更新する。reset は `CameraHomeTransform` の local TRS snapshot に戻す one-shot request として扱う。
-- `Camera` blob 更新は `GlobalTransform + CameraLens` から行う。MassCubes のように sample 固有の framing が必要な場合も、render path ではなく render-extract 相当の custom camera solver に閉じ込める。
+- `Camera` blob 更新は `GlobalTransform + CameraLens` から行う。MassCubes のように sample 固有の framing が必要な場合も、render path ではなく render-extract 相当の custom camera solver に閉じ込める。MassCubes の custom solver は高 Entity 数で格子間隔がサブピクセルに潰れて orbit rotation が視認しづらくなることを避けるため、auto-fit 時の画面上 XZ grid pitch に下限を置く。
 - Phase 5 の汎用 `Renderer` は `MeshHandle` / `MaterialHandle` / `TextureHandle` / `Renderable` を通じて scene を描画する。
 - 将来の `Mesh` / `Material` / `Renderable` は ECS component 側に handle を置き、GPU 実体は renderer resource table に置く。
 

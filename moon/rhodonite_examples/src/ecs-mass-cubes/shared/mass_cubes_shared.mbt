@@ -59,6 +59,12 @@ pub fn cube_scale() -> Float {
 }
 
 ///|
+/// Returns the minimum on-screen XZ grid spacing kept by the MassCubes auto-fit camera.
+fn min_interactive_grid_pitch_px() -> Double {
+  0.56
+}
+
+///|
 /// Returns the smallest `s` with `s * s >= n` for a roughly square XZ grid.
 pub fn grid_side_len(n : Int) -> Int {
   let mut s = 1
@@ -189,6 +195,13 @@ pub fn camera_matrices(
   if half_w / half_h < aspect {
     half_w = half_h * aspect
   } else {
+    half_h = half_w / aspect
+  }
+  let max_half_w_for_grid_pitch = grid_spacing() *
+    canvas_width().to_double() /
+    (2.0 * min_interactive_grid_pitch_px())
+  if half_w > max_half_w_for_grid_pitch {
+    half_w = max_half_w_for_grid_pitch
     half_h = half_w / aspect
   }
   let scaled_half_w = half_w * dolly
