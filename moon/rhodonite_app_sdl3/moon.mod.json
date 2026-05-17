@@ -1,12 +1,9 @@
 {
-  "name": "emadurandal/rhodonite_examples",
+  "name": "emadurandal/rhodonite_app_sdl3",
   "version": "0.1.3",
   "deps": {
     "emadurandal/rhodonite": {
       "path": "../rhodonite"
-    },
-    "emadurandal/rhodonite_app_sdl3": {
-      "path": "../rhodonite_app_sdl3"
     },
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"
@@ -14,16 +11,13 @@
     "emadurandal/rhodonite_webgpu": {
       "path": "../rhodonite_webgpu"
     },
-    "mizchi/image": "0.3.0",
-    "mizchi/pixelmatch": "0.4.1",
-    "moonbitlang/async": "0.18.1",
     "Milky2018/wgpu_mbt": "0.12.11",
     "Kaida-Amethyst/sdl3": "0.1.1"
   },
-  "readme": "README.mbt.md",
+  "readme": "README.md",
   "repository": "https://github.com/emadurandal/RhodoniteMBT",
   "license": "Apache-2.0",
-  "keywords": ["rhodonite", "moonbit", "webgpu", "examples"],
-  "description": "Runnable WebGPU samples for RhodoniteMBT (browser + native).",
+  "keywords": ["rhodonite", "moonbit", "webgpu", "sdl3", "native"],
+  "description": "SDL3 native app runtime helpers for RhodoniteMBT.",
   "source": "src"
 }

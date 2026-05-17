@@ -10,31 +10,22 @@
 
 ///|
 async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
-  match
-    @sdl_wgpu.init_sdl_metal_webgpu_native(
-      "MoonBit wgpu + SDL3 (vertex + index buffer)", 800, 600, "native: initializing SDL3 (triangle-with-buffer demo)",
-    ) {
-    None => ()
-    Some(session) => {
-      let engine = @app.Engine::new(session.gpu_context)
-      let demo_state = match @demo_state.create_demo_state_for_engine(engine) {
-        Some(demo_state) => demo_state
-        None => {
-          @sdl_wgpu.release_native_demo_infrastructure(session)
-          return
+  @sdl_app.run_sdl_metal_webgpu_app(
+    "MoonBit wgpu + SDL3 (vertex + index buffer)",
+    800,
+    600,
+    "native: initializing SDL3 (triangle-with-buffer demo)",
+    fn(gpu_context) {
+      let engine = @app.Engine::new(gpu_context)
+      match @demo_state.create_demo_state_for_engine(engine) {
+        Some(demo_state) => {
+          @demo_state.register_engine_handlers(engine, demo_state)
+          Some(engine)
         }
+        None => None
       }
-      @demo_state.register_engine_handlers(engine, demo_state)
-      engine.initialize()
-      let session = @sdl_wgpu.run_sdl_metal_webgpu_input_render_loop(
-        session,
-        engine.input(),
-        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
-      )
-      engine.shutdown()
-      @sdl_wgpu.release_native_demo_infrastructure(session)
-    }
-  }
+    },
+  )
 }
 
 ///|

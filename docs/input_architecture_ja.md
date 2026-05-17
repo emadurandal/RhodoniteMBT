@@ -84,9 +84,9 @@ Browser adapter はライブラリ側へ昇格済みで、MoonBit JS target と 
 
 - MoonBit browser runtime: `emadurandal/rhodonite/app/browser` の `gpu_context_from_html_canvas(canvas)`、`start_browser_engine_loop(engine)`、`install_browser_input(engine, canvas)`。
 - Browser TypeScript runtime: [`src/app-runtime.ts`](../src/app-runtime.ts) の `runBrowserWebGpuCanvasDemo(...)`、`startBrowserEngineRuntime(engine)`、`installBrowserInputCallbacks(...)`、`installBrowserInput(engine)`。
-- Native SDL3 samples: [`moon/rhodonite_examples/src/common/sdl_wgpu_native_demo.mbt`](../moon/rhodonite_examples/src/common/sdl_wgpu_native_demo.mbt) の `run_sdl_metal_webgpu_input_render_loop`。
+- Native SDL3 runtime: `emadurandal/rhodonite_app_sdl3/sdl3` の `run_sdl_metal_webgpu_app(...)`、`init_sdl_metal_webgpu_native(...)`、`run_sdl_metal_webgpu_input_render_loop(...)`。
 
-SDL3 adapter はまだ examples/common に残す。安定後の移動先は `emadurandal/rhodonite/app/sdl3` のような target/platform 専用 package を候補にする。browser / SDL3 adapter は `rhodonite_webgpu` へ入れない。入力は WebGPU ではなく window/event source の責務だからである。
+SDL3 adapter は `emadurandal/rhodonite_app_sdl3` に分離する。browser / SDL3 adapter は `rhodonite_webgpu` へ入れない。入力は WebGPU ではなく window/event source の責務だからである。
 
 ## Key naming
 

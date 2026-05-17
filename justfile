@@ -33,7 +33,7 @@ update-visual-snapshots-native:
 update-visual-snapshots-browser:
 	pnpm run test:examples:visual:update:browser
 
-# Publish rhodonite_core → rhodonite_webgpu → rhodonite to mooncakes (not rhodonite_examples).
+# Publish rhodonite_core → rhodonite_webgpu → rhodonite → rhodonite_app_sdl3 to mooncakes (not rhodonite_examples).
 # Prerequisites: `moon login`; network for registry.
 publish-mooncakes:
 	bash scripts/publish-rhodonite-mooncakes.sh

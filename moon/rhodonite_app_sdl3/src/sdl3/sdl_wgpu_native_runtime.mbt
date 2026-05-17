@@ -1,9 +1,9 @@
-///| Shared SDL3 + Metal (`CAMetalLayer`) + native wgpu bootstrap and render loop.
+///| Shared SDL3 + Metal (`CAMetalLayer`) + native wgpu app bootstrap and loop.
 
 ///|
-/// Defines `SdlMetalWebGpuNativeSession`.
+/// Owns native SDL3, Metal, WebGPU surface, device, and Rhodonite GPU context resources.
 pub(all) struct SdlMetalWebGpuNativeSession {
-  ctx : @sdl3.Context
+  ctx : @sdl3_pkg.Context
   sdl_win : @lib.SDL_Window
   metal_view : @c.OpaquePtr
   instance : @wgpu.GPUInstance
@@ -57,6 +57,7 @@ fn _touch_sdl_mouse_wheel_event_struct() -> Unit {
 }
 
 ///|
+/// Initializes SDL3, creates a Metal-backed WebGPU surface, and returns a native session.
 pub async fn init_sdl_metal_webgpu_native(
   window_title : String,
   width : Int,
@@ -64,7 +65,7 @@ pub async fn init_sdl_metal_webgpu_native(
   init_log : String,
 ) -> SdlMetalWebGpuNativeSession? raise Error {
   println(init_log)
-  let ctx = @sdl3.Context::new()
+  let ctx = @sdl3_pkg.Context::new()
   println("native: creating SDL Metal window")
   let sdl_win = @lib.sdl_CreateWindow(
     window_title,
@@ -132,8 +133,8 @@ pub async fn init_sdl_metal_webgpu_native(
 }
 
 ///|
-/// Implements `release_native_demo_infrastructure`.
-pub fn release_native_demo_infrastructure(
+/// Releases WebGPU, Metal, and SDL3 resources owned by a native session.
+pub fn release_sdl_metal_webgpu_native(
   session : SdlMetalWebGpuNativeSession,
 ) -> Unit {
   session.webgpu_canvas_context.release()
@@ -147,7 +148,7 @@ pub fn release_native_demo_infrastructure(
 }
 
 ///|
-/// Implements `run_sdl_metal_webgpu_render_loop`.
+/// Runs a native render loop with an engine-independent frame callback.
 pub fn run_sdl_metal_webgpu_render_loop(
   session : SdlMetalWebGpuNativeSession,
   render_frame : (Float) -> Unit,
@@ -308,7 +309,7 @@ fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
 }
 
 ///|
-/// Implements `run_sdl_metal_webgpu_input_render_loop`.
+/// Polls SDL3 input, advances the caller-provided input state, and runs frame callbacks.
 pub fn run_sdl_metal_webgpu_input_render_loop(
   session : SdlMetalWebGpuNativeSession,
   input : @input.InputState,
@@ -340,4 +341,35 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
     @wgpu.webgpu_instance_process_events(session.instance)
   }
   session
+}
+
+///|
+/// Runs the standard SDL3 native Rhodonite engine lifecycle for a Metal WebGPU window.
+pub async fn run_sdl_metal_webgpu_app(
+  window_title : String,
+  width : Int,
+  height : Int,
+  init_log : String,
+  setup : (@wgpu.GPUContext) -> @app.Engine?,
+) -> Unit raise Error {
+  match init_sdl_metal_webgpu_native(window_title, width, height, init_log) {
+    None => ()
+    Some(session) => {
+      let engine = match setup(session.gpu_context) {
+        Some(engine) => engine
+        None => {
+          release_sdl_metal_webgpu_native(session)
+          return
+        }
+      }
+      engine.initialize()
+      let session = run_sdl_metal_webgpu_input_render_loop(
+        session,
+        engine.input(),
+        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
+      )
+      engine.shutdown()
+      release_sdl_metal_webgpu_native(session)
+    }
+  }
 }

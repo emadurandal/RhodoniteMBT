@@ -9,6 +9,7 @@ Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 | Module (`moon.mod.json` name) | Directory | Role |
 |-------------------------------|-----------|------|
 | `emadurandal/rhodonite` | `moon/rhodonite/` | Public facade |
+| `emadurandal/rhodonite_app_sdl3` | `moon/rhodonite_app_sdl3/` | SDL3 native app runtime helpers |
 | `emadurandal/rhodonite_core` | `moon/rhodonite_core/` | Core (vectors, JS bridge, binary buffer writes, etc.) |
 | `emadurandal/rhodonite_webgpu` | `moon/rhodonite_webgpu/` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | `moon/rhodonite_examples/` | Samples and demos |
@@ -21,7 +22,7 @@ Keep **source code and everything under [`docs/`](docs/) in sync at all times**.
 
 ## Publish (mooncakes)
 
-After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, and `emadurandal/rhodonite` only ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing core and webgpu so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep and the facade’s core/webgpu path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry and only the facade step must be retried, use `PUBLISH_MOON_FACADE_ONLY=1 pnpm run publish:moon`.
+After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, `emadurandal/rhodonite`, and `emadurandal/rhodonite_app_sdl3` ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing dependencies so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep, the facade’s core/webgpu path deps, and app_sdl3’s core/webgpu/facade path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry, use `PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon`; if only the SDL3 app module must be retried, use `PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon`.
 
 ## Workspace development
 
