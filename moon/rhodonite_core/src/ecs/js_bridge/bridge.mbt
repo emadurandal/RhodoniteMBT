@@ -384,6 +384,16 @@ pub fn world_spawn_transform_global_batch_identity(
 }
 
 ///|
+/// Implements `world_reserve_batch_capacity`.
+pub fn world_reserve_batch_capacity(
+  world : @ecs.World,
+  components : Array[@ecs.ComponentTypeId],
+  additional_rows : Int,
+) -> Bool {
+  world.reserve_batch_capacity(components, additional_rows)
+}
+
+///|
 /// Implements `world_spawn_batch`.
 pub fn world_spawn_batch(
   world : @ecs.World,

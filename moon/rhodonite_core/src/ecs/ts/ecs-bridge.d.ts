@@ -169,6 +169,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		count: number,
 	): MoonEntityId[];
+	export function world_reserve_batch_capacity(
+		world: MoonWorld,
+		components: MoonComponentTypeId[],
+		additionalRows: number,
+	): MoonBool;
 	export function world_spawn_batch(
 		world: MoonWorld,
 		components: MoonComponentTypeId[],

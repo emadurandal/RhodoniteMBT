@@ -51,6 +51,7 @@ options(
         "world_camera_blob_word_capacity",
         "world_extract_global_transform_refs",
         "world_spawn_transform_global_batch_identity",
+        "world_reserve_batch_capacity",
         "world_spawn_batch",
         "spawn_batch_row_entity",
         "spawn_batch_row_write",

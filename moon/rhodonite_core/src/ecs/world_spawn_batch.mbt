@@ -31,6 +31,45 @@ fn World::allocate_entity_slot_for_batch(self : World) -> EntityId {
 }
 
 ///|
+/// Reserves CPU SoA row capacity for appending entities with the given component signature.
+///
+/// This does not create entities. It only ensures the matching archetype and its component
+/// columns are large enough for `additional_rows` more rows, so a following spawn path can
+/// avoid capacity growth and existing payload copies.
+pub fn World::reserve_batch_capacity(
+  self : World,
+  components : Array[ComponentTypeId],
+  additional_rows : Int,
+) -> Bool {
+  self.assert_not_querying("World::reserve_batch_capacity")
+  self.assert_system_structural_write("World::reserve_batch_capacity")
+  if additional_rows < 0 {
+    abort("World::reserve_batch_capacity: additional_rows must be non-negative")
+  }
+  if component_array_has_duplicates(components) {
+    abort("World::reserve_batch_capacity: duplicate component")
+  }
+  let signature = sorted_component_signature(components)
+  for i = 0; i < signature.length(); i = i + 1 {
+    let component = signature[i]
+    self.assert_system_component_write(
+      component, "World::reserve_batch_capacity",
+    )
+    match self.registry.get(component) {
+      Some(_) => ()
+      None => return false
+    }
+  }
+  if additional_rows == 0 {
+    return true
+  }
+  let arch_index = self.ensure_archetype(signature)
+  let arch = self.archetypes[arch_index]
+  arch.ensure_row_capacity(arch.entities.length() + additional_rows)
+  true
+}
+
+///|
 /// Creates `count` entities directly in the archetype described by `components`.
 ///
 /// This avoids spawning into the empty archetype and then migrating once per added component.

@@ -122,6 +122,7 @@ describe("ECS TypeScript wrapper", () => {
 		const world = World.new();
 		const cpuA = world.registerCpuComponent("SpawnBatchTsCpuA", 16);
 		const cpuB = world.registerCpuComponent("SpawnBatchTsCpuB", 16);
+		expect(world.reserveBatchCapacity([cpuB, cpuA], 2)).toBe(true);
 
 		const entities = world.spawnBatch([cpuB, cpuA], 2, (index, entity, row) => {
 			expect(row.entity().index()).toBe(entity.index());

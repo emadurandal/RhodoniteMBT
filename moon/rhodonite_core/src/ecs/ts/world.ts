@@ -41,6 +41,7 @@ import {
 	spawn_batch_row_entity,
 	spawn_batch_row_write,
 	spawn_batch_row_write_view,
+	world_reserve_batch_capacity,
 	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
 	world_transform_component,
@@ -366,6 +367,19 @@ export class World {
 	spawnTransformGlobalBatchIdentity(count: number): EntityId[] {
 		return world_spawn_transform_global_batch_identity(this.inner, count).map(
 			(entity) => new EntityId(entity),
+		);
+	}
+
+	reserveBatchCapacity(
+		components: ComponentTypeId[],
+		additionalRows: number,
+	): boolean {
+		return moonBool(
+			world_reserve_batch_capacity(
+				this.inner,
+				components.map((component) => component.inner),
+				additionalRows,
+			),
 		);
 	}
 

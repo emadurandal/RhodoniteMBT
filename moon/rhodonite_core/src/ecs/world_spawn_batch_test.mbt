@@ -42,3 +42,26 @@ test "spawn_batch allocates builtin GlobalTransform refs" {
     None => abort("expected blob-backed transform")
   }
 }
+
+///|
+test "reserve_batch_capacity prepares rows before spawn_batch" {
+  let world = World::new()
+  let cpu_a = world.register_cpu_component("ReserveBatchCpuA", 4)
+  let cpu_b = world.register_cpu_component("ReserveBatchCpuB", 4)
+  assert_true(world.reserve_batch_capacity([cpu_b, cpu_a], 4))
+  let entities = world.spawn_batch([cpu_a, cpu_b], 4, fn(i, _e, row) {
+    row.write(cpu_a, c => c[0] = (30 + i).to_byte())
+    row.write(cpu_b, c => c[0] = (40 + i).to_byte())
+  })
+  assert_eq(entities.length(), 4)
+  for i = 0; i < entities.length(); i = i + 1 {
+    match world.component_bytes(entities[i], cpu_a) {
+      Some(bytes) => assert_eq(bytes[0], (30 + i).to_byte())
+      None => abort("expected cpu_a bytes")
+    }
+    match world.component_bytes(entities[i], cpu_b) {
+      Some(bytes) => assert_eq(bytes[0], (40 + i).to_byte())
+      None => abort("expected cpu_b bytes")
+    }
+  }
+}

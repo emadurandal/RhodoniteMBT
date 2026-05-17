@@ -727,6 +727,7 @@ pub fn create_demo_state_for_scene(
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
+  ignore(world.reserve_batch_capacity([tf, gt], entity_count))
   let entities = world.spawn_transform_global_batch(entity_count, fn(
     i,
     e,

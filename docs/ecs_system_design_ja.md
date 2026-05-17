@@ -14,7 +14,7 @@ ECS component storage は CPU-only です。user 登録 component は `Registere
 
 component 所有の追加は `add_component` または `add_component_bytes` を使います。`add_component` は通常 component を zero bytes で初期化し、builtin `GlobalTransform` / `Camera` の場合は blob slot を確保して CPU ref bytes を書きます。`remove_component` は archetype 移動を起こし、builtin ref component の場合は対応する blob allocation を解放します。
 
-`spawn_batch(components, count, write)` は任意の CPU component signature の archetype に直接 append します。callback 中は row view を貸し出しているため、通常 query callback と同じく構造変更 API は拒否されます。
+`reserve_batch_capacity(components, additional_rows)` は任意の CPU component signature の archetype に対して、今後 append する row 数を事前確保します。大量 entity を作る sample やアプリでは、既知の batch spawn 前に呼ぶことで spawn/write hot path 中の capacity 拡張と既存 payload コピーを避けます。`spawn_batch(components, count, write)` は同じ signature の archetype に直接 append します。callback 中は row view を貸し出しているため、通常 query callback と同じく構造変更 API は拒否されます。
 
 ## Schedule Access Rules
 
@@ -24,7 +24,7 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 |-----|-----------------|
 | `has_component`, `component_bytes`, query prepare/iteration | `reads` または `writes` |
 | `set_component_bytes`, `QueryRow::write`, `RawQueryRow::write_view`, column writes | `writes` |
-| `create_entity`, `destroy_entity`, `add_component*`, `remove_component`, `spawn_batch` | `structural_write` と対象 component の `writes` |
+| `create_entity`, `destroy_entity`, `add_component*`, `remove_component`, `reserve_batch_capacity`, `spawn_batch` | `structural_write` と対象 component の `writes` |
 | `register_cpu_component` | schedule execution 外 |
 | builtin blob resize event drain | `structural_write` |
 

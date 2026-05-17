@@ -287,6 +287,7 @@ pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
+pub fn World::reserve_batch_capacity(Self, Array[ComponentTypeId], Int) -> Bool
 pub fn World::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn World::set_child_of(Self, EntityId, EntityId) -> Bool
 pub fn World::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
