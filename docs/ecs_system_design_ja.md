@@ -20,6 +20,8 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 
 `Schedule` は固定の update/render lifecycle を持ちません。`PhaseKey` は外部から渡される文字列名付き id で、phase の意味と実行順序は `Schedule::run(world, ctx, phases)` または `Schedule::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では標準 phase を `phase_update()` / `phase_render_extract()` / `phase_render()` などの関数で提供し、`Engine::run_phase_group` が `PhaseGroupKey` ごとの順序で `PhaseSlot::BeforeSchedule`、scene schedule、`PhaseSlot::AfterSchedule` の順に処理します。
 
+このため、ここでの `Schedule` は lifecycle owner ではなく、1 つの `World` に対する system set / runner として扱います。どの phase をどの順で走らせるかは caller / runtime が所有し、`Schedule` は渡された phase に属する system を access declaration に従って実行します。
+
 | API | Required access |
 |-----|-----------------|
 | `has_component`, `component_bytes`, query prepare/iteration | `reads` または `writes` |
