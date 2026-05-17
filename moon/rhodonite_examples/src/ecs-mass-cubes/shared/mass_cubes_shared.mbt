@@ -1,7 +1,7 @@
 ///|
 /// Returns the root entity count used by the mass-cubes samples.
 pub fn entity_count() -> Int {
-  2200_000
+  800_000
 }
 
 ///|

@@ -35,6 +35,7 @@ flowchart LR
 - user 登録の ECS component はすべて CPU SoA component です。
 - `World::register_cpu_component(name, cpu_stride)` は component を登録し、component-to-archetype index 用の slot を追加します。
 - `add_component`、`add_component_bytes`、`remove_component`、`set_component_bytes`、`component_bytes` は archetype SoA row だけを扱います。
+- CPU SoA column の payload は固定長の byte buffer に置き、拡張時は backing buffer を差し替えます。1 byte ずつ `Array` に append しないため、大きな JS build で汎用 `Array` の length / push limit に当たりにくくなります。
 - entity が archetype 間を移動すると、重複する CPU column は `copy_row_to` でコピーされます。row index は変わりますが、`EntityId` は安定しています。
 - `GlobalTransform` と `Camera` は CPU ref component です。GPU matrix bytes は `GlobalTransformBlobStore` / `CameraBlobStore` に置きます。
 - 低レベルの GlobalTransform fp16 helper として、f32 値を little-endian の packed fp16 lane へ書く `global_transform_put_f16_le_mut_view` があります。byte store を手書きせずに使います。

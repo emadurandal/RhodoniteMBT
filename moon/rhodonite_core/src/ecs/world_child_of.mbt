@@ -39,7 +39,7 @@ pub fn World::get_child_of(self : World, entity : EntityId) -> EntityId? {
 
 ///|
 /// Implements `get_u32_array_le`.
-fn get_u32_array_le(bytes : Array[Byte], off : Int) -> UInt {
+fn get_u32_array_le(bytes : FixedArray[Byte], off : Int) -> UInt {
   bytes[off].to_uint() |
   (bytes[off + 1].to_uint() << 8) |
   (bytes[off + 2].to_uint() << 16) |

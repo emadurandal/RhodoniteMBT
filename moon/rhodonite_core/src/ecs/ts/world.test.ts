@@ -58,7 +58,7 @@ describe("ECS TypeScript wrapper", () => {
 			expect(row.entity().index()).toBe(entity.index());
 			row.write(cpu, (bytes) => {
 				expect(bytes.length).toBe(16);
-				expect(bytes.asUint8Array()).toBeNull();
+				expect(bytes.asUint8Array()).not.toBeNull();
 				expect(bytes.getF32(0)).toBeCloseTo(1);
 				bytes.setF32(0, 9);
 				bytes.set(12, 7);

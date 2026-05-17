@@ -4,7 +4,7 @@
 
 ## Storage
 
-ECS component storage は CPU-only です。user 登録 component は `RegisteredComponent { id, name, cpu_stride }` として登録され、payload は archetype ごとの `ComponentColumn` に `row * stride` で packed されます。
+ECS component storage は CPU-only です。user 登録 component は `RegisteredComponent { id, name, cpu_stride }` として登録され、payload は archetype ごとの `ComponentColumn` に `row * stride` で packed されます。`ComponentColumn` は固定長の byte buffer を backing storage とし、capacity 拡張時は buffer を一括確保して既存 payload をコピーします。JS backend でも byte 単位の `Array.push` では拡張しません。
 
 `GlobalTransform` と `Camera` は例外的に renderer upload 用の dedicated blob を持ちます。ECS component row には `{ format, word_offset }` などの CPU ref だけを保持し、matrix bytes は `GlobalTransformBlobStore` / `CameraBlobStore` が管理します。
 

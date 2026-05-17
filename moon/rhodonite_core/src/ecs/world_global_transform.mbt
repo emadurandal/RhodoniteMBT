@@ -510,7 +510,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 ///|
 /// Implements `put_f32_array_le`.
 #cfg(not(target="js"))
-fn put_f32_array_le(bytes : Array[Byte], off : Int, v : Float) -> Unit {
+fn put_f32_array_le(bytes : FixedArray[Byte], off : Int, v : Float) -> Unit {
   let u = v.reinterpret_as_uint()
   bytes[off] = (u & 0xFFU).to_byte()
   bytes[off + 1] = ((u >> 8) & 0xFFU).to_byte()

@@ -1,7 +1,7 @@
 ///|
-/// Implements `copy_fixed_into_array`.
-fn copy_fixed_into_array(
-  dst : Array[Byte],
+/// Implements `copy_fixed_into_fixed`.
+fn copy_fixed_into_fixed(
+  dst : FixedArray[Byte],
   offset : Int,
   src : FixedArray[Byte],
 ) -> Unit {
@@ -11,9 +11,9 @@ fn copy_fixed_into_array(
 }
 
 ///|
-/// Implements `copy_array_range_to_fixed`.
-fn copy_array_range_to_fixed(
-  src : Array[Byte],
+/// Implements `copy_fixed_range_to_fixed_array`.
+fn copy_fixed_range_to_fixed_array(
+  src : FixedArray[Byte],
   offset : Int,
   len : Int,
 ) -> FixedArray[Byte] {
@@ -39,15 +39,6 @@ fn copy_fixed_range_to_fixed(
 }
 
 ///|
-/// Implements `append_zero_bytes`.
-fn append_zero_bytes(dst : Array[Byte], count : Int) -> Unit {
-  for i = 0; i < count; i = i + 1 {
-    ignore(i)
-    dst.push((0 : Byte))
-  }
-}
-
-///|
 /// Implements `ComponentColumn::ensure_row_capacity`.
 fn ComponentColumn::ensure_row_capacity(
   self : ComponentColumn,
@@ -60,7 +51,11 @@ fn ComponentColumn::ensure_row_capacity(
   while next < required_rows {
     next = next * 2
   }
-  append_zero_bytes(self.bytes, (next - self.row_capacity) * self.stride)
+  let next_bytes = FixedArray::make(next * self.stride, (0 : Byte))
+  for i = 0; i < self.row_capacity * self.stride; i = i + 1 {
+    next_bytes[i] = self.bytes[i]
+  }
+  self.bytes = next_bytes
   self.row_capacity = next
 }
 
@@ -92,7 +87,7 @@ fn Archetype::new(
 ) -> Archetype {
   let columns : Array[ComponentColumn] = []
   for i = 0; i < components.length(); i = i + 1 {
-    let bytes : Array[Byte] = []
+    let bytes = FixedArray::make(0, (0 : Byte))
     columns.push({
       component: components[i],
       stride: registry.stride(components[i]),
@@ -163,7 +158,7 @@ fn Archetype::set_component_bytes(
   if bytes.length() != col.stride {
     abort("component byte length does not match component stride")
   }
-  copy_fixed_into_array(col.bytes, row * col.stride, bytes)
+  copy_fixed_into_fixed(col.bytes, row * col.stride, bytes)
 }
 
 ///|
@@ -178,7 +173,9 @@ fn Archetype::component_bytes(
     None
   } else {
     let col = self.columns[col_index]
-    Some(copy_array_range_to_fixed(col.bytes, row * col.stride, col.stride))
+    Some(
+      copy_fixed_range_to_fixed_array(col.bytes, row * col.stride, col.stride),
+    )
   }
 }
 
