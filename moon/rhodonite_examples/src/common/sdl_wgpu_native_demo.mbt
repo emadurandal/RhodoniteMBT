@@ -307,7 +307,6 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
   render_frame : () -> Unit,
 ) -> SdlMetalWebGpuNativeSession {
   println("native: entering render loop")
-  let timer = session.ctx.getTimer()
   let quit = @ref.new(false)
   while !quit.val {
     let event = @lib.new_sdl_event()
@@ -325,7 +324,6 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
     render_frame()
     let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
     @wgpu.webgpu_instance_process_events(session.instance)
-    timer.delay(16)
   }
   session
 }

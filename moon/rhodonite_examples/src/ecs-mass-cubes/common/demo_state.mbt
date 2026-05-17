@@ -498,6 +498,7 @@ pub(all) struct DemoState {
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
+  perf_excluded_wait_ms : @ref.Ref[Double]
 }
 
 ///|
@@ -894,6 +895,7 @@ pub fn create_demo_state_for_scene(
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
     perf_frame_start_ms: @ref.new(-1.0),
+    perf_excluded_wait_ms: @ref.new(0.0),
   }
   demo_state.add_mass_cubes_camera_sync_system()
   ignore(
@@ -917,6 +919,15 @@ pub fn create_demo_state_for_scene(
 fn DemoState::begin_perf_frame(self : DemoState) -> Unit {
   let t_frame_start = monotonic_ms()
   self.perf_frame_start_ms.val = t_frame_start
+  self.perf_excluded_wait_ms.val = 0.0
+}
+
+///|
+/// Excludes external frame pacing waits from the per-frame CPU timing.
+fn DemoState::exclude_perf_wait(self : DemoState, wait_ms : Double) -> Unit {
+  if self.perf_frame_start_ms.val >= 0.0 {
+    self.perf_excluded_wait_ms.val = self.perf_excluded_wait_ms.val + wait_ms
+  }
 }
 
 ///|
@@ -996,7 +1007,11 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
+  let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
+  if record_perf {
+    demo_state.exclude_perf_wait(monotonic_ms() - t_acquire_start)
+  }
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
@@ -1094,7 +1109,10 @@ pub fn render_current_frame_to_view(
   demo_state.perf_last_frame_start_ms.val = t_frame_start
   demo_state.render_scene(demo_state.scene, color_view)
   if record_perf {
-    let cpu_ms = monotonic_ms() - t_frame_start
+    let raw_cpu_ms = monotonic_ms() -
+      t_frame_start -
+      demo_state.perf_excluded_wait_ms.val
+    let cpu_ms = if raw_cpu_ms > 0.0 { raw_cpu_ms } else { 0.0 }
     ecs_mass_cubes_perf_overlay(fps, cpu_ms)
     ecs_mass_cubes_perf_console_log(fps, cpu_ms, demo_state.frame.val)
   }

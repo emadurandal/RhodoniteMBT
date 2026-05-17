@@ -67,6 +67,8 @@ render loop
 
 この順序により、DOM の非同期イベントと SDL の polling はどちらも同じ queue に合流し、app 側は `key_down`, `key_pressed`, `mouse_down`, `pointer_delta_x` などの状態 API だけを読む。
 
+Native SDL3 の render loop は WebGPU surface の vsync 設定に frame pacing を任せ、追加の固定 sleep は入れない。CPU 計測は submit までの処理時間であり、FPS は前フレーム開始から次フレーム開始までの wall-clock 間隔で見る。`get_current_texture()` が surface / vblank を待つ時間は frame pacing 由来なので、MassCubes の CPU 計測からは除外する。
+
 ## Adapter placement
 
 現在の adapter は実験段階として、利用箇所に近い場所に置く。
