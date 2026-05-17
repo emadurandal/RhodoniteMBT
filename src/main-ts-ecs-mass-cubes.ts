@@ -44,6 +44,7 @@ import {
 	writeF32,
 	type MassCubesRenderResources,
 } from "./ecs-mass-cubes-renderer";
+import { writeMassCubesDenseYTransformWaveToByteView } from "./ecs-mass-cubes-transform-writer";
 import {
 	addCameraLensOrthographic,
 	addOrbitCameraControllerWithDistance,
@@ -302,6 +303,27 @@ function uploadInitialGlobalTransforms(demoState: DemoState): void {
 
 function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
 	const world = demoState.scene.world();
+	if (demoState.denseTransformLayout !== null) {
+		const denseLayout = demoState.denseTransformLayout;
+		uploadGlobalTransformWrites(
+			demoState.queue,
+			demoState.transformStorage,
+			world.writeGlobalTransformBlobRangeViews(
+				demoState.transformWordUploadFirst,
+				demoState.transformWordUploadCount,
+				(bytes) =>
+					writeMassCubesDenseYTransformWaveToByteView(
+						bytes,
+						MASS_CUBES_ENTITY_COUNT,
+						demoState.transformWordUploadFirst,
+						denseLayout.wordsPerEntity,
+						denseLayout.format,
+						t * 1.8,
+					),
+			),
+		);
+		return;
+	}
 	uploadGlobalTransformWrites(
 		demoState.queue,
 		demoState.transformStorage,

@@ -22,6 +22,11 @@ import {
 	renderMassCubesScene,
 	type MassCubesRenderResources,
 } from "./ecs-mass-cubes-renderer";
+import {
+	createMassCubesHalfArray,
+	writeHalf,
+	writeMassCubesDenseYTransformWaveToArrays,
+} from "./ecs-mass-cubes-transform-writer";
 
 type GlobalTransformPrecisionMode =
 	| "all-f32"
@@ -34,26 +39,6 @@ const GLOBAL_TRANSFORM_FORMAT_F16 = 1;
 const TRANSFORM_WORDS_PER_ENTITY_F16 = 6;
 const TRANSFORM_WORDS_PER_ENTITY_F32 = 12;
 const CAMERA_WORD_COUNT = 72;
-const F16_SCRATCH_F32 = new Float32Array(1);
-const F16_SCRATCH_U32 = new Uint32Array(F16_SCRATCH_F32.buffer);
-const F32_TO_F16_BASE = new Uint16Array(512);
-const F32_TO_F16_SHIFT = new Uint8Array(512);
-type Float16ArrayLike = {
-	readonly length: number;
-	[index: number]: number;
-};
-type Float16ArrayConstructorLike = {
-	new (
-		buffer: ArrayBufferLike,
-		byteOffset?: number,
-		length?: number,
-	): Float16ArrayLike;
-};
-const Float16ArrayCtor = (
-	globalThis as typeof globalThis & {
-		Float16Array?: Float16ArrayConstructorLike;
-	}
-).Float16Array;
 
 type TransformLayout = {
 	readonly refs: Uint32Array;
@@ -73,7 +58,7 @@ type DemoState = {
 	readonly transformBytes: Uint8Array;
 	readonly transformWords: Uint32Array;
 	readonly transformFloats: Float32Array;
-	readonly transformHalves: Float16ArrayLike | Uint16Array;
+	readonly transformHalves: ReturnType<typeof createMassCubesHalfArray>;
 	readonly cameraBytes: Uint8Array;
 	readonly cameraWords: Uint32Array;
 	readonly transformWordUploadFirst: number;
@@ -87,39 +72,6 @@ type DemoState = {
 	wasmTransformUploadByteLength?: number;
 	wasmTransformUploadView?: Uint8Array;
 };
-
-for (let i = 0; i < 256; i += 1) {
-	const e = i - 127;
-	if (e < -24) {
-		F32_TO_F16_BASE[i] = 0x0000;
-		F32_TO_F16_BASE[i | 0x100] = 0x8000;
-		F32_TO_F16_SHIFT[i] = 24;
-		F32_TO_F16_SHIFT[i | 0x100] = 24;
-	} else if (e < -14) {
-		const base = 0x0400 >> (-e - 14);
-		const shift = -e - 1;
-		F32_TO_F16_BASE[i] = base;
-		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
-		F32_TO_F16_SHIFT[i] = shift;
-		F32_TO_F16_SHIFT[i | 0x100] = shift;
-	} else if (e <= 15) {
-		const base = (e + 15) << 10;
-		F32_TO_F16_BASE[i] = base;
-		F32_TO_F16_BASE[i | 0x100] = base | 0x8000;
-		F32_TO_F16_SHIFT[i] = 13;
-		F32_TO_F16_SHIFT[i | 0x100] = 13;
-	} else if (e < 128) {
-		F32_TO_F16_BASE[i] = 0x7c00;
-		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
-		F32_TO_F16_SHIFT[i] = 24;
-		F32_TO_F16_SHIFT[i | 0x100] = 24;
-	} else {
-		F32_TO_F16_BASE[i] = 0x7c00;
-		F32_TO_F16_BASE[i | 0x100] = 0xfc00;
-		F32_TO_F16_SHIFT[i] = 13;
-		F32_TO_F16_SHIFT[i | 0x100] = 13;
-	}
-}
 
 type WasmExports = {
 	_start?: () => void;
@@ -195,21 +147,6 @@ function createTransformLayout(): TransformLayout {
 	};
 }
 
-function f32ToF16Bits(value: number): number {
-	F16_SCRATCH_F32[0] = Math.fround(value);
-	const bits = F16_SCRATCH_U32[0] ?? 0;
-	const index = (bits >>> 23) & 0x1ff;
-	return (F32_TO_F16_BASE[index] ?? 0) + ((bits & 0x007fffff) >>> (F32_TO_F16_SHIFT[index] ?? 24));
-}
-
-function writeHalf(halves: Float16ArrayLike | Uint16Array, index: number, value: number): void {
-	if (Float16ArrayCtor !== undefined) {
-		halves[index] = value;
-	} else {
-		halves[index] = f32ToF16Bits(value);
-	}
-}
-
 function writeMassCubesFullTransformData(
 	demoState: DemoState,
 	perSide: number,
@@ -278,15 +215,39 @@ function writeMassCubesFullTransformData(
 }
 
 function writeMassCubesYTransformData(demoState: DemoState, waveTime: number): void {
-	const refs = demoState.transformRefs;
 	const floats = demoState.transformFloats;
 	const halves = demoState.transformHalves;
+	if (GLOBAL_TRANSFORM_PRECISION_MODE === "all-f16") {
+		writeMassCubesDenseYTransformWaveToArrays(
+			floats,
+			halves,
+			MASS_CUBES_ENTITY_COUNT,
+			demoState.transformWordUploadFirst,
+			TRANSFORM_WORDS_PER_ENTITY_F16,
+			GLOBAL_TRANSFORM_FORMAT_F16,
+			waveTime,
+		);
+		return;
+	}
+	if (GLOBAL_TRANSFORM_PRECISION_MODE === "all-f32") {
+		writeMassCubesDenseYTransformWaveToArrays(
+			floats,
+			halves,
+			MASS_CUBES_ENTITY_COUNT,
+			demoState.transformWordUploadFirst,
+			TRANSFORM_WORDS_PER_ENTITY_F32,
+			GLOBAL_TRANSFORM_FORMAT_F32,
+			waveTime,
+		);
+		return;
+	}
+	const refs = demoState.transformRefs;
 	const uploadFirstWord = demoState.transformWordUploadFirst;
 	const sinStep = Math.sin(0.09);
 	const cosStep = Math.cos(0.09);
-	let localIndex = 0;
 	let waveSin = Math.sin(waveTime);
 	let waveCos = Math.cos(waveTime);
+	let localIndex = 0;
 	while (localIndex < MASS_CUBES_ENTITY_COUNT) {
 		const refBase = localIndex * 2;
 		const format = refs[refBase] ?? 0;
@@ -415,18 +376,7 @@ async function createDemoState(
 		transformBytes.byteOffset,
 		transformBytes.byteLength >>> 2,
 	);
-	const transformHalves =
-		Float16ArrayCtor !== undefined
-			? new Float16ArrayCtor(
-					transformBytes.buffer,
-					transformBytes.byteOffset,
-					transformBytes.byteLength >>> 1,
-				)
-			: new Uint16Array(
-					transformBytes.buffer,
-					transformBytes.byteOffset,
-					transformBytes.byteLength >>> 1,
-				);
+	const transformHalves = createMassCubesHalfArray(transformBytes);
 	const cameraBytes = new Uint8Array(CAMERA_WORD_COUNT * 4);
 	const cameraWords = new Uint32Array(
 		cameraBytes.buffer,
