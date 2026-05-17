@@ -49,9 +49,11 @@ ECS component に入力状態を反映して、その component を後続の upd
 Browser:
 
 ```text
-DOM event listener
+emadurandal/rhodonite/app/browser install_browser_input
+または src/app-runtime.ts installBrowserInputCallbacks
   -> engine.input().enqueue_event(...)
-requestAnimationFrame
+app/browser start_browser_engine_loop
+または startBrowserEngineRuntime
   -> engine.run_frame(delta_seconds)
      -> input.begin_frame()
      -> rhodonite/input
@@ -78,12 +80,13 @@ Native SDL3 の render loop は WebGPU surface の vsync 設定に frame pacing 
 
 ## Adapter placement
 
-現在の adapter は実験段階として、利用箇所に近い場所に置く。
+Browser adapter はライブラリ側へ昇格済みで、MoonBit JS target と TypeScript runtime の両方から使える。
 
-- Browser TypeScript runtime: [`src/app-runtime.ts`](../src/app-runtime.ts) の `installBrowserInput(engine)`。
+- MoonBit browser runtime: `emadurandal/rhodonite/app/browser` の `gpu_context_from_html_canvas(canvas)`、`start_browser_engine_loop(engine)`、`install_browser_input(engine, canvas)`。
+- Browser TypeScript runtime: [`src/app-runtime.ts`](../src/app-runtime.ts) の `runBrowserWebGpuCanvasDemo(...)`、`startBrowserEngineRuntime(engine)`、`installBrowserInputCallbacks(...)`、`installBrowserInput(engine)`。
 - Native SDL3 samples: [`moon/rhodonite_examples/src/common/sdl_wgpu_native_demo.mbt`](../moon/rhodonite_examples/src/common/sdl_wgpu_native_demo.mbt) の `run_sdl_metal_webgpu_input_render_loop`。
 
-adapter API と key mapping が安定したら、examples ではなくライブラリ側へ移す。移動先の候補は、DOM/SDL3 依存を公開 facade に閉じ込めたい場合は `emadurandal/rhodonite/app`、platform adapter を個別に公開したい場合は `rhodonite_input_browser` / `rhodonite_input_sdl3` のような専用 package である。`rhodonite_webgpu` へは入れない。入力は WebGPU ではなく window/event source の責務だからである。
+SDL3 adapter はまだ examples/common に残す。安定後の移動先は `emadurandal/rhodonite/app/sdl3` のような target/platform 専用 package を候補にする。browser / SDL3 adapter は `rhodonite_webgpu` へ入れない。入力は WebGPU ではなく window/event source の責務だからである。
 
 ## Key naming
 
@@ -109,6 +112,6 @@ MoonBit 実装の `ecs-mass-cubes` と `ecs-scene-graph` は `rhodonite_core/ecs
 
 camera matrix の生成側は DOM や SDL3 を見ず、camera entity の `Transform3D` / `GlobalTransform` / `CameraLens` を読む。標準経路では `Engine::add_common_handlers` が `Scene::add_common_systems` を通じて `TransformPropagation`、`orbit_camera_transform_system`、`orbit_camera_blob_sync_system` を必要に応じて登録し、`OrbitCameraController + CameraHomeTransform` から `Transform3D` を更新してから `GlobalTransform + CameraLens + OrbitCameraController.dolly` から builtin `Camera` packed blob を更新する。engine handler を使わない直接 scene setup や test は `Scene::add_common_systems` を呼ぶ。reset は入力 binding には固定せず、ユーザーまたは sample が `request_orbit_camera_reset` を呼ぶ one-shot request として扱う。
 
-TypeScript 実装の `ts-ecs-mass-cubes` は [`src/orbit-camera-controller.ts`](../src/orbit-camera-controller.ts) で MoonBit 側と同じ byte layout の `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` component を登録し、camera entity に保持する。`Engine.addCommonHandlers` が `Phase.Input` handler で `Engine.input` から `OrbitCameraController` component を更新し、`Phase.PostUpdate` scene systems で `OrbitCameraController + CameraHomeTransform` から `Transform3D` / `GlobalTransform` を更新する。MassCubes 固有の camera solver は `Phase.RenderExtract` scene systems で builtin `Camera` blob を更新し、render 側は `drainAndUploadCameraWrites` と draw に集中する。WASM host は host 側で所有する `InputState` の集約済み mouse frame 値だけを WASM import として渡し、WASM 側の `World` が camera entity と `OrbitCameraController` component を所有する。どちらも [`installBrowserInputState`](../src/app-runtime.ts) で browser pointer event を同じ入力モデルへ正規化する。MoonBit native / JS 版の MassCubes は render path ではなく `phase_render_extract()` の sample-local ECS system で MassCubes 固有の framing を `GlobalTransform` と `Camera` blob に反映し、render では camera writes の upload と draw だけを行う。WASM / WASM-GC 版は host-driven のままだが、WASM export を update / render-extract / render に分け、render-extract で view/proj 生成、`World::set_camera_matrices`、packed camera blob row upload まで行う。host の render phase は WebGPU の render pass を発行する。
+TypeScript 実装の `ts-ecs-mass-cubes` は [`src/orbit-camera-controller.ts`](../src/orbit-camera-controller.ts) で MoonBit 側と同じ byte layout の `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` component を登録し、camera entity に保持する。`Engine.addCommonHandlers` が `Phase.Input` handler で `Engine.input` から `OrbitCameraController` component を更新し、`Phase.PostUpdate` scene systems で `OrbitCameraController + CameraHomeTransform` から `Transform3D` / `GlobalTransform` を更新する。MassCubes 固有の camera solver は `Phase.RenderExtract` scene systems で builtin `Camera` blob を更新し、render 側は `drainAndUploadCameraWrites` と draw に集中する。WASM host は host 側で所有する `InputState` の集約済み mouse frame 値だけを WASM import として渡し、WASM 側の `World` が camera entity と `OrbitCameraController` component を所有する。TypeScript runtime は [`installBrowserInputCallbacks`](../src/app-runtime.ts) を共通入口にして browser pointer event を同じ入力モデルへ正規化する。MoonBit native / JS 版の MassCubes は render path ではなく `phase_render_extract()` の sample-local ECS system で MassCubes 固有の framing を `GlobalTransform` と `Camera` blob に反映し、render では camera writes の upload と draw だけを行う。WASM / WASM-GC 版は host-driven のままだが、WASM export を update / render-extract / render に分け、render-extract で view/proj 生成、`World::set_camera_matrices`、packed camera blob row upload まで行う。host の render phase は WebGPU の render pass を発行する。
 
 controller の操作は、左 button drag が yaw / pitch の orbit、中 button drag が view-space の左右上下 pan、wheel が dolly scale である。中 button drag は右へ動かすと camera view を右へ、下へ動かすと camera view を下へ移動する。既定の dolly scale は `0.01` から `4.0` に clamp され、初期値 `1.0` から 100 倍相当まで寄れる。mass-cubes と scene-graph はどちらも orthographic projection を使うため、wheel の dolly は view-space camera state に加えて ortho 表示範囲にも反映し、前後移動として見た目に分かるようにする。

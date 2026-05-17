@@ -3,7 +3,7 @@
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
+  let ctx = @app_browser.gpu_context_from_html_canvas(canvas)
   let engine = @app.Engine::new(ctx)
   match @demo_state.create_demo_state_for_engine(engine) {
     Some(demo_state) => {

@@ -1,19 +1,14 @@
 ///|
-/// Holds the browser demo engine between the async setup and the page lifetime.
-let demo_engine : @ref.Ref[@app.Engine?] = @ref.new(None)
-
-///|
 /// Initializes the browser WebGPU sample and renders the first engine tick.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let ctx = @html_ctx.gpu_context_from_html_canvas(canvas)
+  let ctx = @app_browser.gpu_context_from_html_canvas(canvas)
   let engine = @app.Engine::new(ctx)
   match @demo_state.create_demo_state_for_engine(engine) {
     Some(demo_state) => {
       @demo_state.register_engine_handlers(engine, demo_state)
       engine.initialize()
-      demo_engine.val = Some(engine)
       ignore(engine.run_frame((0.0 : Float)))
       println("WebGPU triangle (vertex + index buffer) rendered successfully!")
     }

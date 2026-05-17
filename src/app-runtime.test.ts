@@ -5,14 +5,70 @@ import {
 	Phase,
 	PhaseGroup,
 	Scene,
+	installBrowserInputCallbacks,
+	startBrowserEngineRuntime,
+	startBrowserFrameLoop,
 } from "./app-runtime";
 
-function fakeCanvas(): HTMLCanvasElement {
+type FakeEventTarget = {
+	addEventListener: ReturnType<typeof vi.fn>;
+	removeEventListener: ReturnType<typeof vi.fn>;
+	dispatch: (type: string, event?: Record<string, unknown>) => void;
+};
+
+function fakeEventTarget(): FakeEventTarget {
+	const listeners = new Map<string, EventListener[]>();
 	return {
+		addEventListener: vi.fn((type: string, listener: EventListener) => {
+			listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+		}),
+		removeEventListener: vi.fn((type: string, listener: EventListener) => {
+			listeners.set(
+				type,
+				(listeners.get(type) ?? []).filter((item) => item !== listener),
+			);
+		}),
+		dispatch: (type, event = {}) => {
+			for (const listener of listeners.get(type) ?? []) {
+				listener(event as unknown as Event);
+			}
+		},
+	};
+}
+
+function fakeCanvas(): HTMLCanvasElement & FakeEventTarget {
+	const target = fakeEventTarget();
+	return Object.assign(target, {
+		width: 800,
+		height: 600,
 		getContext: vi.fn(() => ({
 			configure: vi.fn(),
 		})),
-	} as unknown as HTMLCanvasElement;
+		getBoundingClientRect: vi.fn(() => ({
+			left: 10,
+			top: 20,
+			width: 400,
+			height: 300,
+		})),
+		setPointerCapture: vi.fn(),
+	}) as unknown as HTMLCanvasElement & FakeEventTarget;
+}
+
+function stubAnimationFrame(): {
+	callbacks: FrameRequestCallback[];
+	cancel: ReturnType<typeof vi.fn>;
+} {
+	const callbacks: FrameRequestCallback[] = [];
+	vi.stubGlobal(
+		"requestAnimationFrame",
+		vi.fn((callback: FrameRequestCallback) => {
+			callbacks.push(callback);
+			return callbacks.length;
+		}),
+	);
+	const cancel = vi.fn();
+	vi.stubGlobal("cancelAnimationFrame", cancel);
+	return { callbacks, cancel };
 }
 
 function stubWebGpu(): void {
@@ -107,5 +163,100 @@ describe("app-runtime Engine", () => {
 			Phase.Render,
 			Phase.Present,
 		]);
+	});
+
+	it("starts a browser frame loop with zero first delta and stoppable rAF", () => {
+		const { callbacks, cancel } = stubAnimationFrame();
+		const deltas: number[] = [];
+
+		const loop = startBrowserFrameLoop((deltaSeconds) => {
+			deltas.push(deltaSeconds);
+		});
+		callbacks[0]?.(100);
+		callbacks[1]?.(125);
+		loop.stop();
+		callbacks[2]?.(150);
+
+		expect(deltas).toEqual([0, 0.025]);
+		expect(cancel).toHaveBeenCalledWith(3);
+	});
+
+	it("normalizes browser input callbacks from canvas and window events", () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		const calls: unknown[] = [];
+		const binding = installBrowserInputCallbacks(canvas, {
+			keyDown: (key, modifiers, repeat) => {
+				calls.push(["keyDown", key, modifiers.shift, repeat]);
+			},
+			pointerMove: (x, y) => {
+				calls.push(["pointerMove", x, y]);
+			},
+			mouseDown: (button, x, y) => {
+				calls.push(["mouseDown", button, x, y]);
+			},
+			wheel: (deltaX, deltaY) => {
+				calls.push(["wheel", deltaX, deltaY]);
+			},
+			focusLost: () => {
+				calls.push(["focusLost"]);
+			},
+		});
+
+		windowTarget.dispatch("keydown", {
+			code: "KeyW",
+			shiftKey: true,
+			ctrlKey: false,
+			altKey: false,
+			metaKey: false,
+			repeat: false,
+		});
+		canvas.dispatch("pointermove", { clientX: 210, clientY: 170 });
+		canvas.dispatch("pointerdown", {
+			button: 2,
+			clientX: 410,
+			clientY: 320,
+			pointerId: 7,
+			preventDefault: vi.fn(),
+		});
+		canvas.dispatch("wheel", {
+			deltaX: 1,
+			deltaY: -2,
+			preventDefault: vi.fn(),
+		});
+		windowTarget.dispatch("blur");
+		binding.dispose();
+
+		expect(calls).toEqual([
+			["keyDown", "KeyW", true, false],
+			["pointerMove", 400, 300],
+			["mouseDown", 2, 800, 600],
+			["wheel", 1, -2],
+			["focusLost"],
+		]);
+		expect(canvas.removeEventListener).toHaveBeenCalledWith(
+			"pointermove",
+			expect.any(Function),
+		);
+	});
+
+	it("starts and disposes a browser engine runtime", async () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		const { cancel } = stubAnimationFrame();
+		stubWebGpu();
+		const engine = await Engine.create(canvas, { mainScene: new Scene("test") });
+		engine.initialize();
+
+		const runtime = startBrowserEngineRuntime(engine);
+		runtime.dispose();
+
+		expect(cancel).toHaveBeenCalled();
+		expect(canvas.removeEventListener).toHaveBeenCalledWith(
+			"pointermove",
+			expect.any(Function),
+		);
 	});
 });

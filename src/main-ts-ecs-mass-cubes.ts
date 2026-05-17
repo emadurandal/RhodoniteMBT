@@ -23,8 +23,9 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
-	installBrowserInput,
-	type BrowserInputBinding,
+	runBrowserWebGpuCanvasDemo,
+	startBrowserEngineRuntime,
+	type BrowserEngineRuntime,
 	type FrameState,
 } from "./app-runtime";
 import {
@@ -86,7 +87,7 @@ type DemoState = {
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
-	browserInputBinding?: BrowserInputBinding;
+	browserRuntime?: BrowserEngineRuntime;
 };
 
 function globalTransformDefaultIsF16(): boolean {
@@ -569,7 +570,7 @@ function renderScene(
 function releaseDemoState(demoState: DemoState): void {
 	releaseMassCubesRenderResources(demoState.render);
 	demoState.transformStorage.destroy();
-	demoState.browserInputBinding?.dispose();
+	demoState.browserRuntime?.dispose();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -604,39 +605,14 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	}
 }
 
-if (!navigator.gpu) {
-	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
-} else {
-	window.addEventListener("load", () => {
-		const canvas = document.getElementById("webgpu-canvas");
-		if (!(canvas instanceof HTMLCanvasElement)) {
-			document.body.innerHTML = "<h1>Missing WebGPU canvas.</h1>";
-			return;
-		}
-		void Engine.create(canvas, {
+runBrowserWebGpuCanvasDemo({
+	initialize: async (canvas) => {
+		const engine = await Engine.create(canvas, {
 			mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
-		})
-			.then((engine) => {
-				const demoState = createDemoStateForEngine(engine);
-				demoState.browserInputBinding = installBrowserInput(engine);
-				registerEngineHandlers(engine, demoState);
-				engine.initialize();
-				let previousTimestamp: number | null = null;
-				const loop = (timestamp: number) => {
-					const deltaSeconds =
-						previousTimestamp === null
-							? 0
-							: (timestamp - previousTimestamp) / 1000;
-					previousTimestamp = timestamp;
-					engine.runFrame(deltaSeconds);
-					requestAnimationFrame(loop);
-				};
-				requestAnimationFrame(loop);
-			})
-			.catch((error: unknown) => {
-				console.error("Failed to initialize WebGPU:", error);
-				document.body.innerHTML =
-					"<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
-			});
-	});
-}
+		});
+		const demoState = createDemoStateForEngine(engine);
+		registerEngineHandlers(engine, demoState);
+		engine.initialize();
+		demoState.browserRuntime = startBrowserEngineRuntime(engine);
+	},
+});

@@ -416,6 +416,16 @@ export type BrowserInputBinding = {
 	dispose: () => void;
 };
 
+export type BrowserFrameLoop = {
+	stop: () => void;
+};
+
+export type BrowserEngineRuntime = {
+	readonly inputBinding: BrowserInputBinding;
+	readonly frameLoop: BrowserFrameLoop;
+	dispose: () => void;
+};
+
 function keyboardModifiers(event: KeyboardEvent): Modifiers {
 	return {
 		shift: event.shiftKey,
@@ -455,63 +465,88 @@ function pointerButton(button: number): MouseButton {
 	}
 }
 
-export function installBrowserInputState(
-	input: InputState,
+export type BrowserInputCallbacks = {
+	readonly keyDown?: (
+		key: KeyCode,
+		modifiers: Modifiers,
+		repeat: boolean,
+	) => void;
+	readonly keyUp?: (key: KeyCode, modifiers: Modifiers) => void;
+	readonly pointerMove?: (x: number, y: number) => void;
+	readonly mouseDown?: (button: number, x: number, y: number) => void;
+	readonly mouseUp?: (button: number, x: number, y: number) => void;
+	readonly wheel?: (deltaX: number, deltaY: number) => void;
+	readonly focusLost?: () => void;
+};
+
+export function startBrowserFrameLoop(
+	onFrame: (deltaSeconds: number) => void,
+): BrowserFrameLoop {
+	let stopped = false;
+	let previousTimestamp: number | null = null;
+	let requestId = 0;
+	const loop = (timestamp: number): void => {
+		if (stopped) {
+			return;
+		}
+		const deltaSeconds =
+			previousTimestamp === null ? 0 : (timestamp - previousTimestamp) / 1000;
+		previousTimestamp = timestamp;
+		onFrame(deltaSeconds);
+		if (!stopped) {
+			requestId = requestAnimationFrame(loop);
+		}
+	};
+	requestId = requestAnimationFrame(loop);
+	return {
+		stop: (): void => {
+			stopped = true;
+			if (requestId !== 0) {
+				cancelAnimationFrame(requestId);
+				requestId = 0;
+			}
+		},
+	};
+}
+
+export function installBrowserInputCallbacks(
 	canvas: HTMLCanvasElement,
+	callbacks: BrowserInputCallbacks,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
 	const keyboardTarget = options.keyboardTarget ?? window;
 	const onKeyDown: EventListener = (event): void => {
 		const keyboardEvent = event as KeyboardEvent;
-		input.enqueueEvent({
-			type: "KeyDown",
-			key: keyboardEvent.code,
-			modifiers: keyboardModifiers(keyboardEvent),
-			repeat: keyboardEvent.repeat,
-		});
+		callbacks.keyDown?.(
+			keyboardEvent.code,
+			keyboardModifiers(keyboardEvent),
+			keyboardEvent.repeat,
+		);
 	};
 	const onKeyUp: EventListener = (event): void => {
 		const keyboardEvent = event as KeyboardEvent;
-		input.enqueueEvent({
-			type: "KeyUp",
-			key: keyboardEvent.code,
-			modifiers: keyboardModifiers(keyboardEvent),
-		});
+		callbacks.keyUp?.(keyboardEvent.code, keyboardModifiers(keyboardEvent));
 	};
 	const onPointerMove = (event: PointerEvent): void => {
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({ type: "PointerMove", x, y });
+		callbacks.pointerMove?.(x, y);
 	};
 	const onPointerDown = (event: PointerEvent): void => {
 		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({
-			type: "MouseDown",
-			button: pointerButton(event.button),
-			x,
-			y,
-		});
+		callbacks.mouseDown?.(event.button, x, y);
 	};
 	const onPointerUp = (event: PointerEvent): void => {
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({
-			type: "MouseUp",
-			button: pointerButton(event.button),
-			x,
-			y,
-		});
+		callbacks.mouseUp?.(event.button, x, y);
 	};
 	const onWheel = (event: WheelEvent): void => {
 		event.preventDefault();
-		input.enqueueEvent({
-			type: "Wheel",
-			deltaX: event.deltaX,
-			deltaY: event.deltaY,
-		});
+		callbacks.wheel?.(event.deltaX, event.deltaY);
 	};
 	const onBlur = (): void => {
-		input.enqueueEvent({ type: "FocusLost" });
+		callbacks.focusLost?.();
 	};
 	keyboardTarget.addEventListener("keydown", onKeyDown);
 	keyboardTarget.addEventListener("keyup", onKeyUp);
@@ -533,11 +568,104 @@ export function installBrowserInputState(
 	};
 }
 
+export function installBrowserInputState(
+	input: InputState,
+	canvas: HTMLCanvasElement,
+	options: { keyboardTarget?: Window | HTMLElement } = {},
+): BrowserInputBinding {
+	return installBrowserInputCallbacks(
+		canvas,
+		{
+			keyDown: (key, modifiers, repeat) => {
+				input.enqueueEvent({ type: "KeyDown", key, modifiers, repeat });
+			},
+			keyUp: (key, modifiers) => {
+				input.enqueueEvent({ type: "KeyUp", key, modifiers });
+			},
+			pointerMove: (x, y) => {
+				input.enqueueEvent({ type: "PointerMove", x, y });
+			},
+			mouseDown: (button, x, y) => {
+				input.enqueueEvent({
+					type: "MouseDown",
+					button: pointerButton(button),
+					x,
+					y,
+				});
+			},
+			mouseUp: (button, x, y) => {
+				input.enqueueEvent({
+					type: "MouseUp",
+					button: pointerButton(button),
+					x,
+					y,
+				});
+			},
+			wheel: (deltaX, deltaY) => {
+				input.enqueueEvent({ type: "Wheel", deltaX, deltaY });
+			},
+			focusLost: () => {
+				input.enqueueEvent({ type: "FocusLost" });
+			},
+		},
+		options,
+	);
+}
+
 export function installBrowserInput(
 	engine: Engine,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
 	return installBrowserInputState(engine.input, engine.canvas, options);
+}
+
+export function startBrowserEngineRuntime(
+	engine: Engine,
+	options: { keyboardTarget?: Window | HTMLElement } = {},
+): BrowserEngineRuntime {
+	const inputBinding = installBrowserInput(engine, options);
+	const frameLoop = startBrowserFrameLoop((deltaSeconds) => {
+		engine.runFrame(deltaSeconds);
+	});
+	return {
+		inputBinding,
+		frameLoop,
+		dispose: (): void => {
+			frameLoop.stop();
+			inputBinding.dispose();
+		},
+	};
+}
+
+export function runBrowserWebGpuCanvasDemo(options: {
+	readonly initialize: (canvas: HTMLCanvasElement) => void | Promise<void>;
+	readonly canvasId?: string;
+	readonly unsupportedMessage?: string;
+	readonly missingCanvasMessage?: string;
+	readonly failureMessage?: string;
+}): void {
+	const {
+		initialize,
+		canvasId = "webgpu-canvas",
+		unsupportedMessage = "WebGPU is not supported in this browser.",
+		missingCanvasMessage = "Missing WebGPU canvas.",
+		failureMessage = "Failed to initialize WebGPU. Check the console for errors.",
+	} = options;
+	if (!navigator.gpu) {
+		document.body.innerHTML = `<h1>${unsupportedMessage}</h1>`;
+		return;
+	}
+	window.addEventListener("load", () => {
+		const canvas = document.getElementById(canvasId);
+		if (!(canvas instanceof HTMLCanvasElement)) {
+			document.body.innerHTML = `<h1>${missingCanvasMessage}</h1>`;
+			return;
+		}
+		Promise.resolve(initialize(canvas)).catch((error: unknown) => {
+			console.error("Failed to initialize WebGPU:", error);
+			document.body.innerHTML = `<h1>${failureMessage}</h1>`;
+		});
+	});
 }
 
 export type CommonOrbitCameraHandlers<TWorld, TMainCamera, TComponent> = {

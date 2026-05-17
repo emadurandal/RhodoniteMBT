@@ -1,6 +1,6 @@
 import {
   "emadurandal/rhodonite/app" @app,
-  "emadurandal/rhodonite_examples/common/browser" @html_ctx,
+  "emadurandal/rhodonite/app/browser" @app_browser,
   "emadurandal/rhodonite_examples/depth-test/common" @demo_state,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/async/js_async",
@@ -11,11 +11,6 @@ supported_targets = "js"
 
 options(
   "is-main": true,
-  link: {
-    "js": {
-      "exports": [ "create_webgpu_demo_state", "depth_test_render_tick" ],
-      "format": "esm",
-    },
-  },
+  link: { "js": { "exports": [ "create_webgpu_demo_state" ], "format": "esm" } },
   overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
 )
