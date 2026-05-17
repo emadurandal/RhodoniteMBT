@@ -10,7 +10,3 @@ import {
   "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,
 }
-
-options(
-  "native-stub": [ "mass_cubes_dense_transform_native.c" ],
-)

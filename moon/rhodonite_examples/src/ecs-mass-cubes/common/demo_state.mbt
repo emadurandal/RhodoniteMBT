@@ -184,50 +184,76 @@ extern "js" fn write_mass_cubes_dense_y_transform_wave(
   #|   if (!ArrayBuffer.isView(src)) {
   #|     throw new Error("MassCubes dense transform writer requires typed byte storage.");
   #|   }
-  #|   const words = new Uint32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
   #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
-  #|   let scratch = globalThis.__rhodonite_mass_cubes_f32_to_f16_scratch;
-  #|   if (!scratch) {
-  #|     const scratchF32 = new Float32Array(1);
-  #|     const scratchU32 = new Uint32Array(scratchF32.buffer);
-  #|     scratch = globalThis.__rhodonite_mass_cubes_f32_to_f16_scratch = {
-  #|       scratchF32,
-  #|       scratchU32,
-  #|     };
-  #|   }
-  #|   const f32ToF16Bits = (value) => {
-  #|     scratch.scratchF32[0] = Math.fround(value);
-  #|     const bits = scratch.scratchU32[0] >>> 0;
-  #|     const sign = (bits >>> 16) & 0x8000;
-  #|     const exp = (bits >>> 23) & 0xff;
-  #|     const mant = bits & 0x007fffff;
-  #|     if (exp === 255) {
-  #|       return mant === 0 ? sign | 0x7c00 : sign | 0x7e00;
-  #|     }
-  #|     const halfExp = exp - 127 + 15;
-  #|     if (halfExp >= 31) return sign | 0x7c00;
-  #|     if (halfExp <= 0) {
-  #|       if (halfExp < -10) return sign;
-  #|       const mantissa = mant | 0x00800000;
-  #|       const shift = 14 - halfExp;
-  #|       let halfMant = mantissa >>> shift;
-  #|       if (((mantissa >>> (shift - 1)) & 1) !== 0) halfMant += 1;
-  #|       return sign | halfMant;
-  #|     }
-  #|     let half = sign | (halfExp << 10) | (mant >>> 13);
-  #|     if (((mant >>> 12) & 1) !== 0) half += 1;
-  #|     return half;
-  #|   };
   #|   const sinStep = Math.sin(0.09);
   #|   const cosStep = Math.cos(0.09);
   #|   let waveSin = Math.sin(waveTime);
   #|   let waveCos = Math.cos(waveTime);
   #|   if (formatCode === 1) {
-  #|     const baseWord = 3 - firstWord;
+  #|     const halfIndexBase = (3 - firstWord) * 2 + 1;
+  #|     const Float16ArrayCtor = globalThis.Float16Array;
+  #|     if (typeof Float16ArrayCtor === "function") {
+  #|       const halfFloats = new Float16ArrayCtor(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|       for (let i = 0; i < count; i++) {
+  #|         halfFloats[i * wordsPerEntity * 2 + halfIndexBase] = waveSin * 0.12;
+  #|         const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|         waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|         waveSin = nextSin;
+  #|       }
+  #|       return;
+  #|     }
+  #|     let cache = globalThis.__rhodonite_mass_cubes_f32_to_f16_table;
+  #|     if (!cache) {
+  #|       const base = new Uint16Array(512);
+  #|       const shift = new Uint8Array(512);
+  #|       for (let i = 0; i < 256; i++) {
+  #|         const e = i - 127;
+  #|         if (e < -24) {
+  #|           base[i] = 0x0000;
+  #|           base[i | 0x100] = 0x8000;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else if (e < -14) {
+  #|           const b = 0x0400 >> (-e - 14);
+  #|           const s = -e - 1;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = s;
+  #|           shift[i | 0x100] = s;
+  #|         } else if (e <= 15) {
+  #|           const b = (e + 15) << 10;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         } else if (e < 128) {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         }
+  #|       }
+  #|       const scratchF32 = new Float32Array(1);
+  #|       const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|       cache = globalThis.__rhodonite_mass_cubes_f32_to_f16_table = {
+  #|         base,
+  #|         shift,
+  #|         scratchF32,
+  #|         scratchU32,
+  #|       };
+  #|     }
+  #|     const halfBits = new Uint16Array(src.buffer, src.byteOffset + start, byteLength >> 1);
   #|     for (let i = 0; i < count; i++) {
-  #|       const word = i * wordsPerEntity + baseWord;
-  #|       const half = f32ToF16Bits(waveSin * 0.12);
-  #|       words[word] = (words[word] & 0x0000ffff) | (half << 16);
+  #|       cache.scratchF32[0] = Math.fround(waveSin * 0.12);
+  #|       const bits = cache.scratchU32[0] >>> 0;
+  #|       const index = (bits >>> 23) & 0x1ff;
+  #|       halfBits[i * wordsPerEntity * 2 + halfIndexBase] =
+  #|         cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
   #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
   #|       waveCos = waveCos * cosStep - waveSin * sinStep;
   #|       waveSin = nextSin;
@@ -244,21 +270,36 @@ extern "js" fn write_mass_cubes_dense_y_transform_wave(
   #| }
 
 ///|
-/// Writes the animated Y translation for a dense GlobalTransform blob in native builds.
-#cfg(target="native")
-#borrow(bytes)
-extern "C" fn write_mass_cubes_dense_y_transform_wave(
-  bytes : MutArrayView[Byte],
-  count : Int,
-  first_word : Int,
-  words_per_entity : Int,
-  format_code : Int,
-  wave_time : Double,
-) -> Unit = "rhodonite_mass_cubes_write_dense_y_transform_wave"
+/// Converts the bounded MassCubes wave range to fp16 bits with fewer checks than the generic helper.
+#cfg(not(target="js"))
+fn mass_cubes_wave_f32_to_f16_bits(value : Float) -> UInt {
+  let bits = value.reinterpret_as_uint()
+  let sign = (bits >> 16) & 0x8000U
+  let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
+  let mant = bits & 0x7FFFFFU
+  let half_exp = exp - 127 + 15
+  if half_exp <= 0 {
+    if half_exp < -10 {
+      return sign
+    }
+    let mantissa = mant | 0x800000U
+    let shift = 14 - half_exp
+    let mut half_mant = mantissa >> shift
+    if ((mantissa >> (shift - 1)) & 1U) != 0U {
+      half_mant = half_mant + 1U
+    }
+    return sign | half_mant
+  }
+  let mut half = sign | (half_exp.reinterpret_as_uint() << 10) | (mant >> 13)
+  if ((mant >> 12) & 1U) != 0U {
+    half = half + 1U
+  }
+  half
+}
 
 ///|
 /// Writes the animated Y translation for a dense GlobalTransform blob.
-#cfg(not(any(target="js", target="native")))
+#cfg(not(target="js"))
 fn write_mass_cubes_dense_y_transform_wave(
   bytes : MutArrayView[Byte],
   count : Int,
@@ -276,16 +317,10 @@ fn write_mass_cubes_dense_y_transform_wave(
     let base_word = 3 - first_word
     while i < count {
       let word = i * words_per_entity + base_word
-      let byte_offset = word * 4
-      let old = @writes.get_u32_le_mut_view(bytes, byte_offset)
-      let half = @comp.global_transform_f32_to_f16_bits(
+      let half = mass_cubes_wave_f32_to_f16_bits(
         Float::from_double(wave_sin * 0.12),
       )
-      @writes.put_u32_le_mut_view(
-        bytes,
-        byte_offset,
-        (old & 0x0000FFFFU) | (half << 16),
-      )
+      @writes.put_u32_le_mut_view(bytes, word * 4, half << 16)
       let next_sin = wave_sin * cos_step + wave_cos * sin_step
       wave_cos = wave_cos * cos_step - wave_sin * sin_step
       wave_sin = next_sin
