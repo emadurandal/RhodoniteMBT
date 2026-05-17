@@ -20,7 +20,7 @@ async fn create_webgpu_demo_state_async(
         None => ()
       }
       browser_frame_loop.val = Some(
-        @app_browser.start_browser_engine_loop(engine),
+        @app_browser.start_browser_engine_canvas_loop(engine, canvas),
       )
       println("depth-test: DemoState ready")
     }

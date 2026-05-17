@@ -44,6 +44,8 @@ pub fn phase_shutdown() -> @ecs.PhaseKey
 
 pub fn phase_startup() -> @ecs.PhaseKey
 
+pub fn phase_surface() -> @ecs.PhaseKey
+
 pub fn phase_update() -> @ecs.PhaseKey
 
 // Errors
@@ -69,17 +71,30 @@ pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
 pub fn Engine::run_frame(Self, Float) -> Int
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
+pub fn Engine::set_surface_active(Self, Int, Int, String) -> Unit
+pub fn Engine::set_surface_suspended(Self) -> Unit
 pub fn Engine::shutdown(Self) -> Unit
+pub fn Engine::surface_active(Self) -> Bool
+pub fn Engine::surface_state(Self) -> SurfaceState
 
 pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
   elapsed_seconds : Double
+  surface : SurfaceState
+  surface_changed : Bool
 }
 pub fn FrameState::delta_seconds(Self) -> Float
 pub fn FrameState::elapsed_seconds(Self) -> Double
 pub fn FrameState::frame_index(Self) -> Int
-pub fn FrameState::new(Float, Int, Double) -> Self
+pub fn FrameState::new(Float, Int, Double, surface? : SurfaceState, surface_changed? : Bool) -> Self
+pub fn FrameState::surface(Self) -> SurfaceState
+pub fn FrameState::surface_active(Self) -> Bool
+pub fn FrameState::surface_changed(Self) -> Bool
+pub fn FrameState::surface_format(Self) -> String
+pub fn FrameState::surface_generation(Self) -> Int
+pub fn FrameState::surface_height(Self) -> Int
+pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 
 pub(all) struct PhaseGroupKey {
@@ -114,6 +129,21 @@ pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
+
+pub(all) struct SurfaceState {
+  width : Int
+  height : Int
+  format : String
+  active : Bool
+  generation : Int
+} derive(Eq)
+pub fn SurfaceState::active(Self) -> Bool
+pub fn SurfaceState::format(Self) -> String
+pub fn SurfaceState::generation(Self) -> Int
+pub fn SurfaceState::height(Self) -> Int
+pub fn SurfaceState::new_active(Int, Int, String, Int) -> Self
+pub fn SurfaceState::suspended(Int) -> Self
+pub fn SurfaceState::width(Self) -> Int
 
 pub struct TimeState {
   // private fields

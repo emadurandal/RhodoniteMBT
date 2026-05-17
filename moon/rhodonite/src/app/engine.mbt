@@ -3,6 +3,8 @@
 pub struct Engine {
   priv gpu_context : @wgpu.GPUContext
   priv input_state : @input.InputState
+  priv mut surface_state : SurfaceState
+  priv mut surface_changed : Bool
   priv scenes : Array[Scene]
   priv main_scene_index : Int
   priv time_state : TimeState
@@ -25,12 +27,15 @@ pub fn Engine::new_with_main_scene(
   gpu_context : @wgpu.GPUContext,
   main_scene : Scene,
 ) -> Engine {
+  let (_device, _canvas_context, format, _queue) = gpu_context.get()
   let scenes : Array[Scene] = []
   let phase_handlers : Array[PhaseHandler] = []
   scenes.push(main_scene)
   {
     gpu_context,
     input_state: @input.InputState::new(),
+    surface_state: SurfaceState::new_active(800, 600, format, 0),
+    surface_changed: true,
     scenes,
     main_scene_index: 0,
     time_state: TimeState::new(default_fixed_delta_seconds()),
@@ -52,6 +57,54 @@ pub fn Engine::gpu_context(self : Engine) -> @wgpu.GPUContext {
 /// Returns the engine-owned input state shared by platform adapters and systems.
 pub fn Engine::input(self : Engine) -> @input.InputState {
   self.input_state
+}
+
+///|
+/// Returns the latest engine surface state.
+pub fn Engine::surface_state(self : Engine) -> SurfaceState {
+  self.surface_state
+}
+
+///|
+/// Reports whether the current surface can be rendered to.
+pub fn Engine::surface_active(self : Engine) -> Bool {
+  self.surface_state.active()
+}
+
+///|
+/// Marks the engine surface active with the latest drawable size and format.
+pub fn Engine::set_surface_active(
+  self : Engine,
+  width : Int,
+  height : Int,
+  format : String,
+) -> Unit {
+  if width <= 0 || height <= 0 {
+    self.set_surface_suspended()
+    return
+  }
+  if self.surface_state.active() &&
+    self.surface_state.width() == width &&
+    self.surface_state.height() == height &&
+    self.surface_state.format() == format {
+    return
+  }
+  let generation = self.surface_state.generation() + 1
+  self.surface_state = SurfaceState::new_active(
+    width, height, format, generation,
+  )
+  self.surface_changed = true
+}
+
+///|
+/// Marks the engine surface suspended because it has no drawable pixel extent.
+pub fn Engine::set_surface_suspended(self : Engine) -> Unit {
+  if !self.surface_state.active() {
+    return
+  }
+  let generation = self.surface_state.generation() + 1
+  self.surface_state = SurfaceState::suspended(generation)
+  self.surface_changed = true
 }
 
 ///|
@@ -470,12 +523,38 @@ pub fn Engine::run_phase_group(
 }
 
 ///|
+/// Runs render-frame phases, skipping surface-dependent phases while suspended.
+fn Engine::run_render_frame_group_for_surface(
+  self : Engine,
+  frame : FrameState,
+) -> Unit {
+  let group_index = self.find_phase_group(
+    "Engine::run_render_frame_group_for_surface",
+    phase_group_render_frame(),
+  )
+  let phases = self.phase_groups[group_index].phases
+  for i = 0; i < phases.length(); i = i + 1 {
+    let phase = phases[i]
+    if frame.surface_active() || !phase_is_render_path(phase) {
+      self.run_phase(phase, frame)
+    }
+  }
+}
+
+///|
 /// Runs each ready fixed-step frame after real elapsed time has accumulated.
-fn Engine::run_ready_fixed_steps(self : Engine, elapsed_seconds : Float) -> Int {
+fn Engine::run_ready_fixed_steps(
+  self : Engine,
+  elapsed_seconds : Float,
+  surface : SurfaceState,
+  surface_changed : Bool,
+) -> Int {
   self.time_state.push_fixed_elapsed(elapsed_seconds)
   let mut count = 0
   while self.time_state.can_step_fixed() {
-    let frame = self.time_state.next_fixed_frame()
+    let frame = self.time_state
+      .next_fixed_frame()
+      .with_surface(surface, surface_changed)
     self.run_phase_group(phase_group_fixed_step(), frame)
     count = count + 1
   }
@@ -487,9 +566,16 @@ fn Engine::run_ready_fixed_steps(self : Engine, elapsed_seconds : Float) -> Int 
 pub fn Engine::run_frame(self : Engine, elapsed_seconds : Float) -> Int {
   self.ensure_initialized("Engine::run_frame")
   self.input_state.begin_frame()
-  let frame = self.time_state.next_render_frame(elapsed_seconds)
+  let surface = self.surface_state
+  let surface_changed = self.surface_changed
+  let frame = self.time_state
+    .next_render_frame(elapsed_seconds)
+    .with_surface(surface, surface_changed)
   self.run_phase_group(phase_group_frame_begin(), frame)
-  let fixed_steps = self.run_ready_fixed_steps(elapsed_seconds)
-  self.run_phase_group(phase_group_render_frame(), frame)
+  let fixed_steps = self.run_ready_fixed_steps(
+    elapsed_seconds, surface, surface_changed,
+  )
+  self.run_render_frame_group_for_surface(frame)
+  self.surface_changed = false
   fixed_steps
 }

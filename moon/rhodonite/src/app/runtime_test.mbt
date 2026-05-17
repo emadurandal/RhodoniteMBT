@@ -1,6 +1,6 @@
 ///|
 test "default phase groups split frame begin fixed step and render frame" {
-  assert_true(default_frame_begin_phases() == [phase_input()])
+  assert_true(default_frame_begin_phases() == [phase_surface(), phase_input()])
   assert_true(
     default_fixed_step_phases() ==
     [phase_fixed_update(), phase_fixed_post_update()],

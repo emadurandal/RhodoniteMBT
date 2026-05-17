@@ -78,8 +78,8 @@ pub(all) struct DemoState {
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
-  depth_texture : @wgpu.GPUTexture
-  depth_view : @wgpu.GPUTextureView
+  mut depth_texture : @wgpu.GPUTexture
+  mut depth_view : @wgpu.GPUTextureView
   vertex_buffer : @wgpu.GPUBuffer
   instance_buffer : @wgpu.GPUBuffer
   index_buffer : @wgpu.GPUBuffer
@@ -96,6 +96,38 @@ pub(all) struct DemoState {
   camera_home : @ecs.ComponentTypeId
   camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
+}
+
+///|
+/// Recreates the depth attachment for the current drawable size.
+fn DemoState::resize_depth_attachment(
+  self : DemoState,
+  width : Int,
+  height : Int,
+) -> Unit {
+  if width <= 0 || height <= 0 {
+    return
+  }
+  @wgpu.textureView_release(self.depth_view)
+  self.depth_texture.release()
+  self.depth_texture = self.device.create_texture(
+    width.reinterpret_as_uint(),
+    height.reinterpret_as_uint(),
+    "depth24plus",
+    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+  )
+  self.depth_view = self.depth_texture.create_view()
+}
+
+///|
+/// Applies surface changes to sample-owned render resources.
+fn DemoState::handle_surface_frame(
+  self : DemoState,
+  frame : @app.FrameState,
+) -> Unit {
+  if frame.surface_changed() && frame.surface_active() {
+    self.resize_depth_attachment(frame.surface_width(), frame.surface_height())
+  }
 }
 
 ///|
@@ -629,6 +661,9 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
+  engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
+    demo_state.handle_surface_frame(frame)
+  })
   engine.add_common_handlers(
     demo_state.scene,
     transform_propagation=true,

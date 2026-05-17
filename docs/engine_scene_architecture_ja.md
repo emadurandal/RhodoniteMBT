@@ -126,8 +126,12 @@ ignore(engine.run_frame(delta_seconds))
 ```text
 Engine::run_frame
   input.begin_frame()
-  update render time/frame state from caller-supplied delta_seconds
+  update render time/frame state and capture the current surface snapshot
   run phase_group_frame_begin()
+    run phase_surface()
+    engine handlers in PhaseSlot::BeforeSystems
+    enabled scene systems for Surface
+    engine handlers in PhaseSlot::AfterSystems
     run phase_input()
     engine handlers in PhaseSlot::BeforeSystems
     enabled scene systems for Input
@@ -145,19 +149,19 @@ Engine::run_frame
     engine handlers in PhaseSlot::AfterSystems
     run phase_post_update()
     same slot/system-runner structure
-    run phase_render_extract()
+    if surface is active: run phase_render_extract()
     same slot/system-runner structure
-    run phase_render_prepare()
+    if surface is active: run phase_render_prepare()
     same slot/system-runner structure
-    run phase_render()
+    if surface is active: run phase_render()
     engine handlers in PhaseSlot::BeforeSystems
     visible scene systems for Render
     engine handlers in PhaseSlot::AfterSystems
-    run phase_present()
+    if surface is active: run phase_present()
     same slot/system-runner structure
 ```
 
-`Engine::run_frame(elapsed_seconds)` は frame-begin、fixed-step、render-frame group に total order を与える標準 runner です。platform loop は SDL tick 差分や browser `requestAnimationFrame(timestamp)` 差分を秒に変換して `run_frame` に渡します。engine は内部 accumulator に経過時間を積み、固定 delta ごとに `phase_group_fixed_step()` を 0 回以上実行してから、その tick の render-frame group を 1 回実行します。`run_phase_group` / `run_phase` は特殊用途や test 用の低レベル API として残します。
+`Engine::run_frame(elapsed_seconds)` は frame-begin、fixed-step、render-frame group に total order を与える標準 runner です。platform loop は SDL tick 差分や browser `requestAnimationFrame(timestamp)` 差分を秒に変換して `run_frame` に渡します。engine は内部 accumulator に経過時間を積み、固定 delta ごとに `phase_group_fixed_step()` を 0 回以上実行してから、その tick の render-frame group を 1 回実行します。`Engine::set_surface_active(width, height, format)` / `Engine::set_surface_suspended()` は platform runtime から surface 状態を通知する入口です。`FrameState` はその frame の surface snapshot と `surface_changed` を持ち、`phase_surface()` handler は depth texture や renderer-owned resource を再作成できます。surface が suspended の間、engine は update/post-update までは進めますが `render_extract` / `render_prepare` / `render` / `present` を skip します。`run_phase_group` / `run_phase` は特殊用途や test 用の低レベル API として残します。
 
 `Engine` の内部 field や命名は `scenes` / `main_scene_index` にし、複数 scene へ拡張できるようにします。
 
@@ -223,8 +227,9 @@ Phase 3 で `Engine` / `Scene` は public facade の [`moon/rhodonite/src/app/`]
 
 | 型 | 現在の内容 |
 |----|------------|
-| `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`。`SystemContext` へ変換できる。 |
-| `PhaseKey` | 文字列名を持つ open phase id。`phase("user/foo")` で追加でき、標準 phase は `phase_update()`、`phase_render_extract()`、`phase_render()` などで取得する。 |
+| `SurfaceState` | drawable surface の `width`、`height`、`format`、`active`、`generation`。 |
+| `FrameState` | `delta_seconds`、`frame_index`、`elapsed_seconds`、surface snapshot、`surface_changed`。`SystemContext` へ変換できる。 |
+| `PhaseKey` | 文字列名を持つ open phase id。`phase("user/foo")` で追加でき、標準 phase は `phase_surface()`、`phase_update()`、`phase_render_extract()`、`phase_render()` などで取得する。 |
 | `PhaseGroupKey` | 文字列名を持つ open phase group id。`phase_group("user/simulation")` で追加でき、標準 group は `phase_group_frame_begin()`、`phase_group_fixed_step()`、`phase_group_render_frame()` で取得する。 |
 | `PhaseSlot` | phase 内の `BeforeSystems` / `AfterSystems` 実行帯。system runner 外処理や将来の renderer task を phase lifecycle 内に置く。 |
 | `TimeState` | render-frame clock と fixed-step clock を持つ。render は caller-supplied delta、fixed は accumulator と固定 delta で進む。 |
@@ -233,13 +238,13 @@ Phase 3 で `Engine` / `Scene` は public facade の [`moon/rhodonite/src/app/`]
 
 `Engine::initialize()` は `phase_startup()` handler を実行し、その実行中だけ phase group の編集を許可します。標準 group として `phase_group_frame_begin()`、`phase_group_fixed_step()`、`phase_group_render_frame()` があり、必要なら `Engine::add_phase_group(group)` で custom group を追加できます。phase の追加は `append_phase_to_group(group, phase)`、`insert_phase_before_in_group(group, anchor, phase)`、`insert_phase_after_in_group(group, anchor, phase)` で行います。`phase_startup()` / `phase_shutdown()` は OneShot Phase なので、どの phase group にも追加できず、anchor にも使えません。render-frame group の先頭に独自 phase を置きたい場合は、startup handler 内で `insert_phase_before_in_group(phase_group_render_frame(), phase_update(), custom_phase)` を使います。その後、登録 handler が `phase_startup()`、`phase_shutdown()`、またはいずれかの phase group に含まれる phase だけを使っているか検証します。未登録 phase を `Engine::add_phase_handler` に渡した場合は `Engine::initialize()` で error になります。`Engine::run_frame(delta_seconds)`、`Engine::run_phase_group(group, frame)`、`Engine::run_phase(phase, frame)`、`Engine::shutdown()` は `Engine::initialize()` 済みであることを要求します。
 
-WebGPU sample の browser/native entry point は library runtime へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::run_frame(delta_seconds)` から標準 frame tick を駆動します。native は `emadurandal/rhodonite_app_sdl3/sdl3` の `run_sdl_metal_webgpu_app(...)` が SDL tick 差分を秒に変換して渡し、browser は `emadurandal/rhodonite/app/browser` の `start_browser_engine_loop(engine)` が `requestAnimationFrame(timestamp)` 差分を秒に変換して渡します。native runtime は SDL window resize を受けて WebGPU surface を再 configure し、初期化や resize 中の失敗を `Sdl3AppError` として報告します。native session は opaque で、利用側は GPU context と現在の surface 情報を accessor 経由で読むだけです。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `register_engine_handlers(engine, demo_state)` を公開します。`DemoState` 側の処理は `Engine::add_phase_handler` で `phase_update()`、`phase_render()`、`phase_shutdown()` に追加登録します。`TransformPropagation`、標準 orbit camera 入力、標準 `OrbitCameraController -> Transform3D -> Camera blob` 経路のような共有処理は `Engine::add_common_handlers` で登録し、engine handler を使わない直接 scene setup や test は `Scene::add_common_systems` を使います。MassCubes の framing のように sample 固有でも ECS component を読む/書く camera solver は sample 側の render-extract system として登録します。
+WebGPU sample の browser/native entry point は library runtime へ移行済みです。[`basic-triangle`](../moon/rhodonite_examples/src/basic-triangle/)、[`triangle-with-buffer`](../moon/rhodonite_examples/src/triangle-with-buffer/)、[`depth-test`](../moon/rhodonite_examples/src/depth-test/)、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/)、[`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) は `Engine::run_frame(delta_seconds)` から標準 frame tick を駆動します。native は `emadurandal/rhodonite_app_sdl3/sdl3` の `run_sdl_metal_webgpu_app(...)` が SDL tick 差分を秒に変換して渡し、browser は `emadurandal/rhodonite/app/browser` の `start_browser_engine_canvas_loop(engine, canvas)` が `requestAnimationFrame(timestamp)` 差分を秒に変換して渡します。native runtime は SDL window resize を受けて WebGPU surface を再 configure し、0x0/minimize は fatal error ではなく `Engine::set_surface_suspended()` として伝播します。native session は opaque で、利用側は GPU context と現在の surface 情報を accessor 経由で読むだけです。sample-local state は `DemoState` という名前に統一し、`create_demo_state_for_engine(engine)` と `register_engine_handlers(engine, demo_state)` を公開します。`DemoState` 側の処理は `Engine::add_phase_handler` で `phase_surface()`、`phase_update()`、`phase_render()`、`phase_shutdown()` に追加登録します。`depth-test`、`ecs-scene-graph`、`ecs-mass-cubes` は `phase_surface()` で depth attachment を drawable size に合わせて再作成します。`TransformPropagation`、標準 orbit camera 入力、標準 `OrbitCameraController -> Transform3D -> Camera blob` 経路のような共有処理は `Engine::add_common_handlers` で登録し、engine handler を使わない直接 scene setup や test は `Scene::add_common_systems` を使います。MassCubes の framing のように sample 固有でも ECS component を読む/書く camera solver は sample 側の render-extract system として登録します。
 
 Browser JS export も sample-local state の名前に合わせ、`create_webgpu_demo_state(canvas)` を入口にします。MoonBit JS sample はこの入口で `app/browser` の WebGPU context 作成、DOM input binding、RAF loop helper を起動し、sample 固有の tick/input export は持ちません。WASM host-driven sample も `create_wasm_demo_state`、`initialize_demo_state`、`render_demo_frame` を ABI 名として使い、sample-local state と将来の engine-owned `Renderer` を名前で混同しないようにします。
 
 ECS sample の `DemoState` は `World` と `SystemRunner` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` と `triangle-with-buffer` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`depth-test` は `phase_update()` handler で animated cube vertices を更新し、`phase_render()` handler でその frame の描画だけを行います。
 
-TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`Engine`、browser runtime helper を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`registerEngineHandlers(engine, demo_state)`、`startBrowserEngineRuntime(engine)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、camera entity は `Transform3D` / `GlobalTransform` / `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` / builtin `Camera` を所有します。`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、phase group と phase lifecycle は同じです。handler 登録 API は `addPhaseHandler` です。TypeScript 側も `Engine.addCommonHandlers` で orbit camera 入力 handler と post-update scene systems をまとめ、MassCubes 固有 camera solver は render-extract scene systems に置きます。
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) も同じ作法に寄せています。[`src/app-runtime.ts`](../src/app-runtime.ts) が TypeScript 用の lightweight wrapper として `SurfaceState`、`FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`Engine`、browser runtime helper を提供し、sample は `Engine.create(canvas)`、`createDemoStateForEngine(engine)`、`registerEngineHandlers(engine, demo_state)`、`startBrowserEngineRuntime(engine)` の順に書きます。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、camera entity は `Transform3D` / `GlobalTransform` / `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` / builtin `Camera` を所有します。`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、phase group、surface snapshot、phase lifecycle は同じです。handler 登録 API は `addPhaseHandler` です。TypeScript 側も `Engine.addCommonHandlers` で orbit camera 入力 handler と post-update scene systems をまとめ、MassCubes 固有 camera solver は render-extract scene systems に置きます。
 
 [`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。WASM ABI は update / render-extract / render に分け、MoonBit JS/native 版と同じく MassCubes camera solver を render-extract 相当に閉じ込めます。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 

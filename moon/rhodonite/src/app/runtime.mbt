@@ -22,6 +22,12 @@ pub fn phase_startup() -> PhaseKey {
 }
 
 ///|
+/// Standard surface phase. Platform runtimes finalize resize/suspend state before input.
+pub fn phase_surface() -> PhaseKey {
+  phase("rhodonite/surface")
+}
+
+///|
 /// Standard input phase. Platform adapters finalize queued input before this phase.
 pub fn phase_input() -> PhaseKey {
   phase("rhodonite/input")
@@ -84,7 +90,7 @@ pub fn phase_shutdown() -> PhaseKey {
 ///|
 /// Returns the default frame-begin phases in engine execution order.
 pub fn default_frame_begin_phases() -> Array[PhaseKey] {
-  [phase_input()]
+  [phase_surface(), phase_input()]
 }
 
 ///|

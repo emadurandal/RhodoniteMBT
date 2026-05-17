@@ -9,6 +9,7 @@ async fn create_webgpu_demo_state_async(
     Some(demo_state) => {
       @demo_state.register_engine_handlers(engine, demo_state)
       engine.initialize()
+      @app_browser.sync_browser_engine_surface(engine, canvas)
       ignore(engine.run_frame((0.0 : Float)))
       println("WebGPU triangle (vertex + index buffer) rendered successfully!")
     }

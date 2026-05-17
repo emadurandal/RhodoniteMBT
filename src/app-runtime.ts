@@ -12,6 +12,7 @@ export type PhaseGroupKey = string;
 
 export const Phase = {
 	Startup: "rhodonite/startup",
+	Surface: "rhodonite/surface",
 	Input: "rhodonite/input",
 	FixedUpdate: "rhodonite/fixed_update",
 	FixedPostUpdate: "rhodonite/fixed_post_update",
@@ -50,7 +51,7 @@ export function defaultRenderFramePhases(): PhaseKey[] {
 }
 
 export function defaultFrameBeginPhases(): PhaseKey[] {
-	return [Phase.Input];
+	return [Phase.Surface, Phase.Input];
 }
 
 export function defaultFixedStepPhases(): PhaseKey[] {
@@ -92,11 +93,66 @@ export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
 	readonly elapsedSeconds: number;
+	readonly surface: SurfaceState;
+	readonly surfaceChanged: boolean;
 
-	constructor(deltaSeconds: number, frameIndex: number, elapsedSeconds: number) {
+	constructor(
+		deltaSeconds: number,
+		frameIndex: number,
+		elapsedSeconds: number,
+		surface: SurfaceState = SurfaceState.active(800, 600, "", 0),
+		surfaceChanged = false,
+	) {
 		this.deltaSeconds = deltaSeconds;
 		this.frameIndex = frameIndex;
 		this.elapsedSeconds = elapsedSeconds;
+		this.surface = surface;
+		this.surfaceChanged = surfaceChanged;
+	}
+
+	withSurface(surface: SurfaceState, surfaceChanged: boolean): FrameState {
+		return new FrameState(
+			this.deltaSeconds,
+			this.frameIndex,
+			this.elapsedSeconds,
+			surface,
+			surfaceChanged,
+		);
+	}
+}
+
+export class SurfaceState {
+	readonly width: number;
+	readonly height: number;
+	readonly format: string;
+	readonly active: boolean;
+	readonly generation: number;
+
+	private constructor(
+		width: number,
+		height: number,
+		format: string,
+		active: boolean,
+		generation: number,
+	) {
+		this.width = width;
+		this.height = height;
+		this.format = format;
+		this.active = active;
+		this.generation = generation;
+	}
+
+	static active(
+		width: number,
+		height: number,
+		format: string,
+		generation: number,
+	): SurfaceState {
+		return new SurfaceState(width, height, format, true, generation);
+	}
+
+	static suspended(generation: number): SurfaceState {
+		return new SurfaceState(0, 0, "", false, generation);
 	}
 }
 
@@ -625,6 +681,7 @@ export function startBrowserEngineRuntime(
 ): BrowserEngineRuntime {
 	const inputBinding = installBrowserInput(engine, options);
 	const frameLoop = startBrowserFrameLoop((deltaSeconds) => {
+		syncBrowserEngineSurface(engine);
 		engine.runFrame(deltaSeconds);
 	});
 	return {
@@ -635,6 +692,14 @@ export function startBrowserEngineRuntime(
 			inputBinding.dispose();
 		},
 	};
+}
+
+export function syncBrowserEngineSurface(engine: Engine): void {
+	if (engine.canvas.width <= 0 || engine.canvas.height <= 0) {
+		engine.setSurfaceSuspended();
+		return;
+	}
+	engine.setSurfaceActive(engine.canvas.width, engine.canvas.height, engine.format);
 }
 
 export function runBrowserWebGpuCanvasDemo(options: {
@@ -701,6 +766,8 @@ export class Engine {
 	private initializing = false;
 	private initialized = false;
 	private mainSceneIndex = 0;
+	private surfaceStateValue: SurfaceState;
+	private surfaceChangedValue = true;
 
 	private constructor(
 		canvas: HTMLCanvasElement,
@@ -720,6 +787,12 @@ export class Engine {
 		this.scenes = [mainScene];
 		this.timeState = new TimeState();
 		this.phaseGroupsValue = defaultPhaseGroups();
+		this.surfaceStateValue = SurfaceState.active(
+			Math.max(canvas.width, 1),
+			Math.max(canvas.height, 1),
+			format,
+			0,
+		);
 	}
 
 	static async create(
@@ -752,6 +825,46 @@ export class Engine {
 		TMainCamera
 	> {
 		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
+	}
+
+	surfaceState(): SurfaceState {
+		return this.surfaceStateValue;
+	}
+
+	surfaceActive(): boolean {
+		return this.surfaceStateValue.active;
+	}
+
+	setSurfaceActive(width: number, height: number, format: string): void {
+		if (width <= 0 || height <= 0) {
+			this.setSurfaceSuspended();
+			return;
+		}
+		if (
+			this.surfaceStateValue.active &&
+			this.surfaceStateValue.width === width &&
+			this.surfaceStateValue.height === height &&
+			this.surfaceStateValue.format === format
+		) {
+			return;
+		}
+		this.surfaceStateValue = SurfaceState.active(
+			width,
+			height,
+			format,
+			this.surfaceStateValue.generation + 1,
+		);
+		this.surfaceChangedValue = true;
+	}
+
+	setSurfaceSuspended(): void {
+		if (!this.surfaceStateValue.active) {
+			return;
+		}
+		this.surfaceStateValue = SurfaceState.suspended(
+			this.surfaceStateValue.generation + 1,
+		);
+		this.surfaceChangedValue = true;
 	}
 
 	addPhaseHandler(
@@ -907,11 +1020,18 @@ export class Engine {
 		}
 	}
 
-	private runReadyFixedSteps(elapsedSeconds: number): number {
+	private runReadyFixedSteps(
+		elapsedSeconds: number,
+		surface: SurfaceState,
+		surfaceChanged: boolean,
+	): number {
 		this.timeState.pushFixedElapsed(elapsedSeconds);
 		let count = 0;
 		while (this.timeState.canStepFixed()) {
-			const frame = this.timeState.nextFixedFrame();
+			const frame = this.timeState.nextFixedFrame().withSurface(
+				surface,
+				surfaceChanged,
+			);
 			this.runPhaseGroup(PhaseGroup.FixedStep, frame);
 			count += 1;
 		}
@@ -921,11 +1041,32 @@ export class Engine {
 	runFrame(elapsedSeconds: number): number {
 		this.ensureInitialized("Engine.runFrame");
 		this.input.beginFrame();
-		const frame = this.timeState.nextRenderFrame(elapsedSeconds);
+		const surface = this.surfaceStateValue;
+		const surfaceChanged = this.surfaceChangedValue;
+		const frame = this.timeState
+			.nextRenderFrame(elapsedSeconds)
+			.withSurface(surface, surfaceChanged);
 		this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
-		const fixedSteps = this.runReadyFixedSteps(elapsedSeconds);
-		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
+		const fixedSteps = this.runReadyFixedSteps(
+			elapsedSeconds,
+			surface,
+			surfaceChanged,
+		);
+		this.runRenderFrameGroupForSurface(frame);
+		this.surfaceChangedValue = false;
 		return fixedSteps;
+	}
+
+	private runRenderFrameGroupForSurface(frame: FrameState): void {
+		const phaseGroup = this.findPhaseGroup(
+			"Engine.runRenderFrameGroupForSurface",
+			PhaseGroup.RenderFrame,
+		);
+		for (const phase of phaseGroup.phases) {
+			if (frame.surface.active || !phaseIsRenderPath(phase)) {
+				this.runPhase(phase, frame);
+			}
+		}
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {

@@ -64,9 +64,52 @@ pub extern "js" fn BrowserFrameLoop::stop(self : BrowserFrameLoop) -> Unit =
   #| (self) => self.stop()
 
 ///|
+/// Returns the canvas backing width in pixels.
+pub extern "js" fn browser_canvas_width(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Int =
+  #| (canvas) => canvas.width | 0
+
+///|
+/// Returns the canvas backing height in pixels.
+pub extern "js" fn browser_canvas_height(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Int =
+  #| (canvas) => canvas.height | 0
+
+///|
+/// Synchronizes the engine surface state with a browser canvas backing size.
+pub fn sync_browser_engine_surface(
+  engine : @app.Engine,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Unit {
+  let width = browser_canvas_width(canvas)
+  let height = browser_canvas_height(canvas)
+  if width <= 0 || height <= 0 {
+    engine.set_surface_suspended()
+  } else {
+    let (_device, _context, format, _queue) = engine.gpu_context().get()
+    engine.set_surface_active(width, height, format)
+  }
+}
+
+///|
 /// Starts the standard browser frame loop for an initialized engine.
 pub fn start_browser_engine_loop(engine : @app.Engine) -> BrowserFrameLoop {
   start_browser_frame_loop(fn(delta_seconds) {
+    ignore(engine.run_frame(Float::from_double(delta_seconds)))
+  })
+}
+
+///|
+/// Starts the browser frame loop and propagates canvas backing-size changes to the engine.
+pub fn start_browser_engine_canvas_loop(
+  engine : @app.Engine,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> BrowserFrameLoop {
+  sync_browser_engine_surface(engine, canvas)
+  start_browser_frame_loop(fn(delta_seconds) {
+    sync_browser_engine_surface(engine, canvas)
     ignore(engine.run_frame(Float::from_double(delta_seconds)))
   })
 }

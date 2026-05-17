@@ -15,7 +15,7 @@ pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
 
 pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
 
-pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
@@ -37,6 +37,7 @@ pub struct SdlMetalWebGpuNativeSession {
   // private fields
 }
 pub fn SdlMetalWebGpuNativeSession::gpu_context(Self) -> @webgpu.GPUContext
+pub fn SdlMetalWebGpuNativeSession::surface_active(Self) -> Bool
 pub fn SdlMetalWebGpuNativeSession::surface_format(Self) -> String
 pub fn SdlMetalWebGpuNativeSession::surface_height(Self) -> Int
 pub fn SdlMetalWebGpuNativeSession::surface_width(Self) -> Int

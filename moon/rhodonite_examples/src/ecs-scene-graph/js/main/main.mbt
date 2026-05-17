@@ -40,7 +40,7 @@ async fn create_webgpu_demo_state_async(
       @demo_state.register_engine_handlers(engine, demo_state)
       engine.initialize()
       replace_browser_runtime(
-        @app_browser.start_browser_engine_loop(engine),
+        @app_browser.start_browser_engine_canvas_loop(engine, canvas),
         @app_browser.install_browser_input(engine, canvas),
       )
       println("ecs-scene-graph: DemoState ready")
