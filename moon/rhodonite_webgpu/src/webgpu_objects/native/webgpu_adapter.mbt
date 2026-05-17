@@ -22,8 +22,13 @@ pub async fn webgpu_adapter_request_device(
 pub fn native_webgpu_adapter_request_device(
   adapter : WebGPUAdapter,
 ) -> WebGPUDevice raise Error {
+  let max_storage_buffer_binding_size = adapter.adapter.raw.limits_max_storage_buffer_binding_size_u64()
   WebGPUDevice::new(GPUDevice::{
-    raw: adapter.adapter.raw.request_device_sync(adapter.adapter.instance),
+    raw: adapter.adapter.raw.request_device_sync_with_features_and_limits(
+      adapter.adapter.instance,
+      [],
+      max_storage_buffer_binding_size~,
+    ),
     adapter: adapter.adapter.raw,
     instance: adapter.adapter.instance,
   })

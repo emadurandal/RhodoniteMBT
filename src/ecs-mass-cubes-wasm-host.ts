@@ -27,6 +27,7 @@ import {
 	writeHalf,
 	writeMassCubesDenseYTransformWaveToArrays,
 } from "./ecs-mass-cubes-transform-writer";
+import { requestLargeStorageBufferDevice } from "./webgpu-device-limits";
 
 type GlobalTransformPrecisionMode =
 	| "all-f32"
@@ -340,7 +341,7 @@ async function createDemoState(
 	if (adapter === null) {
 		throw new Error("WebGPU adapter is not available.");
 	}
-	const device = await adapter.requestDevice();
+	const device = await requestLargeStorageBufferDevice(adapter);
 	const queue = device.queue;
 	const context = canvas.getContext("webgpu");
 	if (context === null) {

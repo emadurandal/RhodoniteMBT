@@ -176,6 +176,8 @@ sample migration では、既存 sample の `DemoState` が持っていた updat
 
 WebGPU context、device、queue、surface、GPU resources は最終的には `Engine` が所有する汎用 `Renderer` 側に置きます。`Scene` / `World` は GPU resource の所有者にしません。
 
+MassCubes のように大きな `GlobalTransform` storage buffer を丸ごと bind する sample があるため、browser / native の device creation では adapter が公開する最大の `maxStorageBufferBindingSize` を required limit として要求します。browser / TypeScript host では同時に `maxBufferSize` も最大値へ引き上げます。それでも必要 buffer size が adapter limit を超える場合は、単一 storage buffer ではなく buffer / binding を分割する設計が必要です。
+
 ```text
 World
   Transform3D

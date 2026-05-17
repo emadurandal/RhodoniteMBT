@@ -1,3 +1,5 @@
+import { requestLargeStorageBufferDevice } from "./webgpu-device-limits";
+
 export type EngineCallback = (engine: Engine, frame: FrameState) => void;
 
 export type SceneScheduleCallback<TWorld> = (
@@ -567,7 +569,7 @@ export class Engine {
 		if (adapter === null) {
 			throw new Error("WebGPU adapter is not available.");
 		}
-		const device = await adapter.requestDevice();
+		const device = await requestLargeStorageBufferDevice(adapter);
 		const context = canvas.getContext("webgpu");
 		if (context === null) {
 			throw new Error("WebGPU canvas context is not available.");
