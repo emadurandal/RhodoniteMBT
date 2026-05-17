@@ -11,20 +11,6 @@ fn copy_fixed_into_fixed(
 }
 
 ///|
-/// Implements `copy_fixed_range_to_fixed_array`.
-fn copy_fixed_range_to_fixed_array(
-  src : FixedArray[Byte],
-  offset : Int,
-  len : Int,
-) -> FixedArray[Byte] {
-  let out = FixedArray::make(len, (0 : Byte))
-  for i = 0; i < len; i = i + 1 {
-    out[i] = src[offset + i]
-  }
-  out
-}
-
-///|
 /// Implements `copy_fixed_range_to_fixed`.
 fn copy_fixed_range_to_fixed(
   src : FixedArray[Byte],
@@ -173,9 +159,7 @@ fn Archetype::component_bytes(
     None
   } else {
     let col = self.columns[col_index]
-    Some(
-      copy_fixed_range_to_fixed_array(col.bytes, row * col.stride, col.stride),
-    )
+    Some(copy_fixed_range_to_fixed(col.bytes, row * col.stride, col.stride))
   }
 }
 
