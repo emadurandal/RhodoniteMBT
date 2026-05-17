@@ -778,13 +778,13 @@ fn Engine::ensure_phase_handler_registration_open(
 
 ///|
 /// Appends a function to run in an engine phase slot.
-pub fn Engine::add_handler_on_phase(
+pub fn Engine::add_phase_handler(
   self : Engine,
   phase : PhaseKey,
   handler : (Engine, FrameState) -> Unit,
   slot? : PhaseSlot = BeforeSchedule,
 ) -> Unit {
-  self.ensure_phase_handler_registration_open("Engine::add_handler_on_phase")
+  self.ensure_phase_handler_registration_open("Engine::add_phase_handler")
   self.phase_handlers.push({ phase, slot, run: handler })
 }
 
@@ -797,7 +797,7 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
   phase? : PhaseKey = phase_input(),
   slot? : PhaseSlot = BeforeSchedule,
 ) -> Unit {
-  self.add_handler_on_phase(
+  self.add_phase_handler(
     phase,
     fn(engine, _frame) {
       let camera = scene_main_camera_or_abort(

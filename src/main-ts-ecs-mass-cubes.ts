@@ -496,11 +496,11 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 			updateOrbitCameraControllerComponentFromInput,
 		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
 	});
-	engine.addHandlerOnPhase(Phase.Update, (_engine, frame) => {
+	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
-	engine.addHandlerOnPhase(
+	engine.addPhaseHandler(
 		Phase.Render,
 		() => {
 			if (demoState.scene.visible()) {
@@ -509,7 +509,7 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 		},
 		PhaseSlot.AfterSchedule,
 	);
-	engine.addHandlerOnPhase(Phase.Shutdown, () => releaseDemoState(demoState));
+	engine.addPhaseHandler(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {

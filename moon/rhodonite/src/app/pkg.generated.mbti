@@ -43,9 +43,9 @@ pub struct Engine {
   // private fields
 }
 pub fn Engine::add_common_handlers(Self, Scene, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
-pub fn Engine::add_handler_on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
+pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize(Self) -> Unit

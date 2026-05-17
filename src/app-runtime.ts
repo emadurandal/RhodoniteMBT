@@ -593,25 +593,17 @@ export class Engine {
 		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
 	}
 
-	addHandlerOnPhase(
+	addPhaseHandler(
 		phase: PhaseKey,
 		callback: EngineCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
-				"Engine.addHandlerOnPhase cannot register phase handlers after engine initialization.",
+				"Engine.addPhaseHandler cannot register phase handlers after engine initialization.",
 			);
 		}
 		this.phaseHandlers.push({ phase, slot, callback });
-	}
-
-	onPhase(
-		phase: PhaseKey,
-		callback: EngineCallback,
-		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
-	): void {
-		this.addHandlerOnPhase(phase, callback, slot);
 	}
 
 	addCommonHandlers<TWorld, TMainCamera, TComponent>(
@@ -637,7 +629,7 @@ export class Engine {
 				"Engine.addCommonHandlers: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
 			);
 		}
-		this.addHandlerOnPhase(Phase.Input, (engine) => {
+		this.addPhaseHandler(Phase.Input, (engine) => {
 			const camera = scene.mainCamera();
 			if (camera === null) {
 				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");

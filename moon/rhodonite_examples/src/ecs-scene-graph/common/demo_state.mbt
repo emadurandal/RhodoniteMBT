@@ -634,10 +634,10 @@ pub fn register_engine_handlers(
     home_component=Some(demo_state.camera_home),
     lens_component=Some(demo_state.camera_lens),
   )
-  engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
+  engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })
-  engine.add_handler_on_phase(
+  engine.add_phase_handler(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
@@ -646,7 +646,7 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }
