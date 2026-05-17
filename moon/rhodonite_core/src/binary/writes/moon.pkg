@@ -1,2 +1,6 @@
 import {
 }
+
+options(
+  "native-stub": [ "writes_native.c" ],
+)

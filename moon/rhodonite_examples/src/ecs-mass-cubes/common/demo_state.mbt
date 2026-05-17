@@ -270,34 +270,6 @@ extern "js" fn write_mass_cubes_dense_y_transform_wave(
   #| }
 
 ///|
-/// Converts the bounded MassCubes wave range to fp16 bits with fewer checks than the generic helper.
-#cfg(not(target="js"))
-fn mass_cubes_wave_f32_to_f16_bits(value : Float) -> UInt {
-  let bits = value.reinterpret_as_uint()
-  let sign = (bits >> 16) & 0x8000U
-  let exp = ((bits >> 23) & 0xFFU).reinterpret_as_int()
-  let mant = bits & 0x7FFFFFU
-  let half_exp = exp - 127 + 15
-  if half_exp <= 0 {
-    if half_exp < -10 {
-      return sign
-    }
-    let mantissa = mant | 0x800000U
-    let shift = 14 - half_exp
-    let mut half_mant = mantissa >> shift
-    if ((mantissa >> (shift - 1)) & 1U) != 0U {
-      half_mant = half_mant + 1U
-    }
-    return sign | half_mant
-  }
-  let mut half = sign | (half_exp.reinterpret_as_uint() << 10) | (mant >> 13)
-  if ((mant >> 12) & 1U) != 0U {
-    half = half + 1U
-  }
-  half
-}
-
-///|
 /// Writes the animated Y translation for a dense GlobalTransform blob.
 #cfg(not(target="js"))
 fn write_mass_cubes_dense_y_transform_wave(
@@ -313,32 +285,31 @@ fn write_mass_cubes_dense_y_transform_wave(
   let mut i = 0
   let mut wave_sin = @math.sin(wave_time)
   let mut wave_cos = @math.cos(wave_time)
+  let stride_bytes = words_per_entity * 4
   if format_code == 1 {
-    let base_word = 3 - first_word
+    let mut byte_offset = (3 - first_word) * 4 + 2
     while i < count {
-      let word = i * words_per_entity + base_word
-      let half = mass_cubes_wave_f32_to_f16_bits(
+      let half = @comp.global_transform_f32_to_f16_bits(
         Float::from_double(wave_sin * 0.12),
       )
-      @writes.put_u32_le_mut_view(bytes, word * 4, half << 16)
+      @writes.put_u16_le_mut_view(bytes, byte_offset, half)
       let next_sin = wave_sin * cos_step + wave_cos * sin_step
       wave_cos = wave_cos * cos_step - wave_sin * sin_step
       wave_sin = next_sin
       i = i + 1
+      byte_offset = byte_offset + stride_bytes
     }
     return
   }
-  let base_word = 7 - first_word
+  let mut byte_offset = (7 - first_word) * 4
   while i < count {
-    @writes.put_u32_le_mut_view(
-      bytes,
-      (i * words_per_entity + base_word) * 4,
-      Float::from_double(wave_sin * 0.12).reinterpret_as_uint(),
-    )
+    let bits = Float::from_double(wave_sin * 0.12).reinterpret_as_uint()
+    @writes.put_u32_le_mut_view(bytes, byte_offset, bits)
     let next_sin = wave_sin * cos_step + wave_cos * sin_step
     wave_cos = wave_cos * cos_step - wave_sin * sin_step
     wave_sin = next_sin
     i = i + 1
+    byte_offset = byte_offset + stride_bytes
   }
 }
 

@@ -198,6 +198,46 @@ pub fn get_u32_le_mut_view(buf : MutArrayView[Byte], off : Int) -> UInt {
 ///|
 /// Same as [`put_u32_le`] into a [`MutArrayView`].
 #cfg(target="js")
+pub extern "js" fn put_u16_le_mut_view(
+  buf : MutArrayView[Byte],
+  off : Int,
+  u : UInt,
+) -> Unit =
+  #| (buf, off, u) => {
+  #|   const bytes = buf.buf;
+  #|   const i = buf.start + off;
+  #|   bytes[i] = u & 0xff;
+  #|   bytes[i + 1] = (u >>> 8) & 0xff;
+  #| }
+
+///|
+/// Same as [`put_u16_le`] into a [`MutArrayView`].
+#cfg(target="native")
+#borrow(buf)
+pub extern "C" fn put_u16_le_mut_view(
+  buf : MutArrayView[Byte],
+  off : Int,
+  u : UInt,
+) -> Unit = "rhodonite_binary_put_u16_le_mut_view"
+
+///|
+/// Same as [`put_u16_le`] into a [`MutArrayView`].
+
+///|
+/// Implements `put_u16_le_mut_view`.
+#cfg(not(any(target="js", target="native")))
+pub fn put_u16_le_mut_view(
+  buf : MutArrayView[Byte],
+  off : Int,
+  u : UInt,
+) -> Unit {
+  buf[off] = (u & 0xFFU).to_byte()
+  buf[off + 1] = ((u >> 8) & 0xFFU).to_byte()
+}
+
+///|
+/// Same as [`put_u32_le`] into a [`MutArrayView`].
+#cfg(target="js")
 pub extern "js" fn put_u32_le_mut_view(
   buf : MutArrayView[Byte],
   off : Int,
@@ -214,10 +254,20 @@ pub extern "js" fn put_u32_le_mut_view(
 
 ///|
 /// Same as [`put_u32_le`] into a [`MutArrayView`].
+#cfg(target="native")
+#borrow(buf)
+pub extern "C" fn put_u32_le_mut_view(
+  buf : MutArrayView[Byte],
+  off : Int,
+  u : UInt,
+) -> Unit = "rhodonite_binary_put_u32_le_mut_view"
+
+///|
+/// Same as [`put_u32_le`] into a [`MutArrayView`].
 
 ///|
 /// Implements `put_u32_le_mut_view`.
-#cfg(not(target="js"))
+#cfg(not(any(target="js", target="native")))
 pub fn put_u32_le_mut_view(
   buf : MutArrayView[Byte],
   off : Int,

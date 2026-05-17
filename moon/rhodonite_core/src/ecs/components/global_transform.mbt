@@ -272,12 +272,17 @@ fn put_gpu_u16_mut_view(
   offset : Int,
   value : UInt,
 ) -> Unit {
-  buf[offset] = (value & 0xFFU).to_byte()
-  buf[offset + 1] = ((value >> 8) & 0xFFU).to_byte()
+  @writes.put_u16_le_mut_view(buf, offset, value)
 }
 
 ///|
 /// Implements `global_transform_f32_to_f16_bits`.
+#cfg(target="native")
+pub extern "C" fn global_transform_f32_to_f16_bits(value : Float) -> UInt = "rhodonite_global_transform_f32_to_f16_bits"
+
+///|
+/// Implements `global_transform_f32_to_f16_bits`.
+#cfg(not(target="native"))
 pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
   let bits = value.reinterpret_as_uint()
   let sign = (bits >> 16) & 0x8000U
