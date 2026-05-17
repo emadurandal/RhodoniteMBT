@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_app_sdl3/sdl3"
+
+import {
+  "Kaida-Amethyst/sdl3/lib",
+  "Milky2018/wgpu_mbt/c",
+  "emadurandal/rhodonite/app",
+  "emadurandal/rhodonite_core/input",
+  "emadurandal/rhodonite_webgpu/webgpu",
+}
+
+// Values
+pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession?
+
+pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
+
+pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit
+
+pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
+
+pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
+
+// Errors
+
+// Types and methods
+pub(all) struct SdlMetalWebGpuNativeSession {
+  ctx : @Kaida-Amethyst/sdl3.Context
+  sdl_win : @lib.SDL_Window
+  metal_view : @c.OpaquePtr
+  instance : @webgpu.GPUInstance
+  webgpu_canvas_context : @webgpu.GPUCanvasContext
+  adapter : @webgpu.GPUAdapter
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
+  gpu_context : @webgpu.GPUContext
+}
+
+// Type aliases
+
+// Traits
+

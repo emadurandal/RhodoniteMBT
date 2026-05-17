@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite_app_sdl3",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "deps": {
     "emadurandal/rhodonite": {
       "path": "../rhodonite"
@@ -19,5 +19,6 @@
   "license": "Apache-2.0",
   "keywords": ["rhodonite", "moonbit", "webgpu", "sdl3", "native"],
   "description": "SDL3 native app runtime helpers for RhodoniteMBT.",
-  "source": "src"
+  "source": "src",
+  "preferred-target": "native"
 }
