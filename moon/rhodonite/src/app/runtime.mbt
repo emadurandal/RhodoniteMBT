@@ -45,6 +45,13 @@ priv struct TransformPropagationRegistration {
 }
 
 ///|
+/// Registration key for the builtin Camera blob sync system.
+priv struct CameraBlobSyncRegistration {
+  phase : PhaseKey
+  lens_component : @ecs.ComponentTypeId
+}
+
+///|
 /// Registration key for the builtin orbit camera transform system.
 priv struct OrbitCameraTransformRegistration {
   phase : PhaseKey
@@ -80,6 +87,7 @@ pub struct Scene {
   priv transform_propagation_registrations : Array[
     TransformPropagationRegistration,
   ]
+  priv camera_blob_sync_registrations : Array[CameraBlobSyncRegistration]
   priv orbit_camera_transform_registrations : Array[
     OrbitCameraTransformRegistration,
   ]
@@ -372,6 +380,7 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     enabled: true,
     visible: true,
     transform_propagation_registrations: [],
+    camera_blob_sync_registrations: [],
     orbit_camera_transform_registrations: [],
     orbit_camera_blob_sync_registrations: [],
   }
@@ -517,12 +526,32 @@ fn Scene::has_orbit_camera_blob_sync_registration(
 }
 
 ///|
+/// Reports whether Camera blob sync has already been registered.
+fn Scene::has_camera_blob_sync_registration(
+  self : Scene,
+  phase : PhaseKey,
+  lens_component : @ecs.ComponentTypeId,
+) -> Bool {
+  for i = 0; i < self.camera_blob_sync_registrations.length(); i = i + 1 {
+    let reg = self.camera_blob_sync_registrations[i]
+    if reg.phase == phase && reg.lens_component == lens_component {
+      return true
+    }
+  }
+  false
+}
+
+///|
 /// Adds the Camera blob synchronization system for one engine phase.
 pub fn Scene::add_camera_blob_sync_system(
   self : Scene,
   phase : PhaseKey,
   lens_component : @ecs.ComponentTypeId,
 ) -> Unit {
+  if self.has_camera_blob_sync_registration(phase, lens_component) {
+    return
+  }
+  self.camera_blob_sync_registrations.push({ phase, lens_component })
   self.add_ecs_system(
     @ecs.camera_blob_sync_system(self.world, phase, lens_component),
   )
