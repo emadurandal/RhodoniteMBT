@@ -17,12 +17,6 @@ fn post_update_phase() -> PhaseKey {
 }
 
 ///|
-/// Phase order used by schedule tests.
-fn test_phases() -> Array[PhaseKey] {
-  [update_phase(), post_update_phase()]
-}
-
-///|
 /// Implements `u16_le`.
 fn u16_le(bytes : ArrayView[Byte], offset : Int) -> UInt {
   bytes[offset].to_uint() | (bytes[offset + 1].to_uint() << 8)

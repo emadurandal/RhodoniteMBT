@@ -507,7 +507,7 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 				renderCurrentFrame(demoState);
 			}
 		},
-		PhaseSlot.AfterSchedule,
+		PhaseSlot.AfterSystems,
 	);
 	engine.addPhaseHandler(Phase.Shutdown, () => releaseDemoState(demoState));
 }

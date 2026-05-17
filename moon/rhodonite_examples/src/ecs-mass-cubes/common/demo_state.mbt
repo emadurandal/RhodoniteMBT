@@ -900,13 +900,13 @@ pub fn create_demo_state_for_scene(
   }
   demo_state.add_mass_cubes_camera_sync_system()
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_post_update(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_render_extract(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
@@ -1061,7 +1061,7 @@ pub fn render_frame_to_view(
     ),
   )
   ignore(
-    demo_state.scene.run_schedule_phase(
+    demo_state.scene.run_systems_for_phase(
       @app.phase_post_update(),
       @app.FrameState::new(
         (0.022 : Float),
@@ -1071,7 +1071,7 @@ pub fn render_frame_to_view(
     ),
   )
   ignore(
-    demo_state.scene.run_schedule_phase(
+    demo_state.scene.run_systems_for_phase(
       @app.phase_render_extract(),
       @app.FrameState::new(
         (0.022 : Float),
@@ -1197,7 +1197,7 @@ pub fn register_engine_handlers(
         render_current_frame(demo_state, record_perf=true)
       }
     },
-    slot=@app.PhaseSlot::AfterSchedule,
+    slot=@app.PhaseSlot::AfterSystems,
   )
   engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()

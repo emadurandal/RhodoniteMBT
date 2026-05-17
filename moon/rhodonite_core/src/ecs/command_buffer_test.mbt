@@ -9,8 +9,8 @@ test "CommandBuffer applies queued structural changes after query" {
   let mut queued_count = 0
   let mut saw_qa_before_apply = false
   let mut saw_qb_before_apply = true
-  let schedule = Schedule::new()
-  schedule.add_system(
+  let runner = SystemRunner::new()
+  runner.add_system(
     System::new_with_structural_write(
       "queue-structural-after-query",
       update_phase(),
@@ -28,7 +28,11 @@ test "CommandBuffer applies queued structural changes after query" {
     ),
   )
   assert_true(
-    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+    ),
   )
   assert_true(saw_qa_before_apply)
   assert_true(!saw_qb_before_apply)
@@ -45,8 +49,8 @@ test "CommandBuffer applies queued component writes and reports failed commands"
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let missing = EntityId::new(e.index + 100, 0)
   let mut queued_count = 0
-  let schedule = Schedule::new()
-  schedule.add_system(
+  let runner = SystemRunner::new()
+  runner.add_system(
     System::new_with_structural_write(
       "queue-component-write-and-failed-destroy",
       update_phase(),
@@ -60,7 +64,11 @@ test "CommandBuffer applies queued component writes and reports failed commands"
     ),
   )
   assert_true(
-    !schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+    !runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+    ),
   )
   assert_eq(queued_count, 2)
   match world.component_bytes(e, qa) {
@@ -80,8 +88,8 @@ test "CommandBuffer create_entity reserves id and applies components after query
   let mut spawned = EntityId::new(-1, 0)
   let mut alive_before_apply = true
   let mut queued_count = 0
-  let schedule = Schedule::new()
-  schedule.add_system(
+  let runner = SystemRunner::new()
+  runner.add_system(
     System::new_with_structural_write(
       "command-create-entity",
       update_phase(),
@@ -98,7 +106,11 @@ test "CommandBuffer create_entity reserves id and applies components after query
     ),
   )
   assert_true(
-    schedule.run(world, SystemContext::new((0.016 : Float), 1), test_phases()),
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+    ),
   )
   assert_eq(queued_count, 2)
   assert_true(!alive_before_apply)

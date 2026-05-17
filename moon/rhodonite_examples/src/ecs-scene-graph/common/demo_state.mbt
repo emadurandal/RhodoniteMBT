@@ -372,19 +372,19 @@ pub fn create_demo_state_for_scene(
   let depth_view = depth_texture.create_view()
   push_local_transforms(world, bodies, 0.0)
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_update(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_post_update(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_render_extract(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
@@ -506,7 +506,7 @@ pub fn render_frame(demo_state : DemoState) -> Unit {
 }
 
 ///|
-/// Renders the current scene state without advancing app time or running schedules.
+/// Renders the current scene state without advancing app time or running systems.
 pub fn render_current_frame(demo_state : DemoState) -> Unit {
   let canvas_context = match demo_state.context {
     Some(c) => c
@@ -520,7 +520,7 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
 }
 
 ///|
-/// Updates sample animation inputs before the owning engine runs the scene schedule.
+/// Updates sample animation inputs before the owning engine runs the scene system_runner.
 pub fn DemoState::update_scene(
   self : DemoState,
   frame : @app.FrameState,
@@ -545,10 +545,12 @@ pub fn render_frame_to_view(
     demo_state.frame.val.to_double() * 0.022,
   )
   demo_state.update_scene(frame)
-  ignore(demo_state.scene.run_schedule_phase(@app.phase_update(), frame))
-  ignore(demo_state.scene.run_schedule_phase(@app.phase_post_update(), frame))
+  ignore(demo_state.scene.run_systems_for_phase(@app.phase_update(), frame))
   ignore(
-    demo_state.scene.run_schedule_phase(@app.phase_render_extract(), frame),
+    demo_state.scene.run_systems_for_phase(@app.phase_post_update(), frame),
+  )
+  ignore(
+    demo_state.scene.run_systems_for_phase(@app.phase_render_extract(), frame),
   )
   render_current_frame_to_view(demo_state, color_view)
 }
@@ -644,7 +646,7 @@ pub fn register_engine_handlers(
         render_current_frame(demo_state)
       }
     },
-    slot=@app.PhaseSlot::AfterSchedule,
+    slot=@app.PhaseSlot::AfterSystems,
   )
   engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()

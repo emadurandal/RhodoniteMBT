@@ -7,7 +7,7 @@ pub(all) struct FrameState {
 }
 
 ///|
-/// Open lifecycle phase identifier shared by engine tasks, engine handlers, and scene schedules.
+/// Open lifecycle phase identifier shared by engine tasks, engine handlers, and scene systems.
 pub type PhaseKey = @ecs.PhaseKey
 
 ///|
@@ -19,8 +19,8 @@ pub(all) struct PhaseGroupKey {
 ///|
 /// Execution slot inside an engine phase.
 pub(all) enum PhaseSlot {
-  BeforeSchedule
-  AfterSchedule
+  BeforeSystems
+  AfterSystems
 } derive(Eq)
 
 ///|
@@ -76,11 +76,11 @@ pub struct TimeState {
 }
 
 ///|
-/// Runtime scene instance that binds one ECS world to one schedule.
+/// Runtime scene instance that binds one ECS world to one system runner.
 pub struct Scene {
   priv name : String
   priv world : @ecs.World
-  priv schedule : @ecs.Schedule
+  priv system_runner : @ecs.SystemRunner
   priv mut main_camera : @ecs.EntityId?
   priv mut enabled : Bool
   priv mut visible : Bool
@@ -375,7 +375,7 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
   {
     name,
     world,
-    schedule: @ecs.Schedule::new(),
+    system_runner: @ecs.SystemRunner::new(),
     main_camera: None,
     enabled: true,
     visible: true,
@@ -399,9 +399,9 @@ pub fn Scene::world(self : Scene) -> @ecs.World {
 }
 
 ///|
-/// Adds an already-built ECS system to this scene's schedule.
+/// Adds an already-built ECS system to this scene's system runner.
 fn Scene::add_ecs_system(self : Scene, system : @ecs.System) -> Unit {
-  self.schedule.add_system(system)
+  self.system_runner.add_system(system)
 }
 
 ///|
@@ -697,13 +697,13 @@ pub fn Scene::visible(self : Scene) -> Bool {
 }
 
 ///|
-/// Runs this scene's schedule for one engine phase.
-pub fn Scene::run_schedule_phase(
+/// Runs this scene's systems for one engine phase.
+pub fn Scene::run_systems_for_phase(
   self : Scene,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Bool {
-  self.schedule.run_phase(self.world, frame.system_context(), phase)
+  self.system_runner.run_phase(self.world, frame.system_context(), phase)
 }
 
 ///|
@@ -782,7 +782,7 @@ pub fn Engine::add_phase_handler(
   self : Engine,
   phase : PhaseKey,
   handler : (Engine, FrameState) -> Unit,
-  slot? : PhaseSlot = BeforeSchedule,
+  slot? : PhaseSlot = BeforeSystems,
 ) -> Unit {
   self.ensure_phase_handler_registration_open("Engine::add_phase_handler")
   self.phase_handlers.push({ phase, slot, run: handler })
@@ -795,7 +795,7 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
   scene : Scene,
   orbit_component : @ecs.ComponentTypeId,
   phase? : PhaseKey = phase_input(),
-  slot? : PhaseSlot = BeforeSchedule,
+  slot? : PhaseSlot = BeforeSystems,
 ) -> Unit {
   self.add_phase_handler(
     phase,
@@ -868,23 +868,23 @@ fn Engine::run_phase_handlers(
 }
 
 ///|
-/// Runs handlers registered before a phase's scene schedules.
-fn Engine::run_before_schedule(
+/// Runs handlers registered before a phase's scene systems.
+fn Engine::run_before_systems(
   self : Engine,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  self.run_phase_handlers(phase, BeforeSchedule, frame)
+  self.run_phase_handlers(phase, BeforeSystems, frame)
 }
 
 ///|
-/// Runs handlers registered after a phase's scene schedules.
-fn Engine::run_after_schedule(
+/// Runs handlers registered after a phase's scene systems.
+fn Engine::run_after_systems(
   self : Engine,
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  self.run_phase_handlers(phase, AfterSchedule, frame)
+  self.run_phase_handlers(phase, AfterSystems, frame)
 }
 
 ///|
@@ -1101,18 +1101,18 @@ fn Engine::run_phase_unchecked(
   phase : PhaseKey,
   frame : FrameState,
 ) -> Unit {
-  self.run_before_schedule(phase, frame)
+  self.run_before_systems(phase, frame)
   for i = 0; i < self.scenes.length(); i = i + 1 {
     let scene = self.scenes[i]
     if self.scene_participates_in_phase(scene, phase) {
-      ignore(scene.run_schedule_phase(phase, frame))
+      ignore(scene.run_systems_for_phase(phase, frame))
     }
   }
-  self.run_after_schedule(phase, frame)
+  self.run_after_systems(phase, frame)
 }
 
 ///|
-/// Runs one engine phase, including handlers and matching scene schedules.
+/// Runs one engine phase, including handlers and matching scene systems.
 pub fn Engine::run_phase(
   self : Engine,
   phase : PhaseKey,
@@ -1129,7 +1129,7 @@ pub fn Engine::run_phase(
 }
 
 ///|
-/// Reports whether a scene should run schedule systems for a phase.
+/// Reports whether a scene should run systems for a phase.
 fn Engine::scene_participates_in_phase(
   _self : Engine,
   scene : Scene,

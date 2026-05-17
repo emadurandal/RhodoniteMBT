@@ -279,7 +279,7 @@ fn World::assert_component_registration_open(
   if self.component_registration_lock_depth > 0 {
     abort(
       operation +
-      " cannot be called while schedule execution is active. Hint: register component types before Schedule::run starts, or between schedule runs; systems should use already-registered ComponentTypeId values.",
+      " cannot be called while system runner execution is active. Hint: register component types before SystemRunner::run_phase starts, or between runner calls; systems should use already-registered ComponentTypeId values.",
     )
   }
 }
@@ -505,7 +505,7 @@ pub fn World::component_cpu_stride(
 }
 
 ///|
-/// Temporarily closes component registration. Schedule execution calls this before running systems.
+/// Temporarily closes component registration. SystemRunner execution calls this before running systems.
 fn World::lock_component_registration(self : World) -> Unit {
   self.component_registration_lock_depth = self.component_registration_lock_depth +
     1

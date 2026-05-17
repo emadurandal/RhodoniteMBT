@@ -60,8 +60,8 @@ function defaultPhaseGroups(): PhaseGroupRecord[] {
 }
 
 export const PhaseSlot = {
-	BeforeSchedule: "BeforeSchedule",
-	AfterSchedule: "AfterSchedule",
+	BeforeSystems: "BeforeSystems",
+	AfterSystems: "AfterSystems",
 } as const;
 
 export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
@@ -596,7 +596,7 @@ export class Engine {
 	addPhaseHandler(
 		phase: PhaseKey,
 		callback: EngineCallback,
-		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
+		slot: PhaseSlot = PhaseSlot.BeforeSystems,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
@@ -729,13 +729,13 @@ export class Engine {
 	}
 
 	private runPhaseUnchecked(phase: PhaseKey, frame: FrameState): void {
-		this.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, frame);
+		this.runPhaseHandlers(phase, PhaseSlot.BeforeSystems, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
 				scene.runSchedulePhase(phase, frame);
 			}
 		}
-		this.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, frame);
+		this.runPhaseHandlers(phase, PhaseSlot.AfterSystems, frame);
 	}
 
 	runPhaseGroup(group: PhaseGroupKey, frame: FrameState): void {

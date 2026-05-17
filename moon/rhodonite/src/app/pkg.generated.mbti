@@ -78,8 +78,8 @@ pub(all) struct PhaseGroupKey {
 pub fn PhaseGroupKey::name(Self) -> String
 
 pub(all) enum PhaseSlot {
-  BeforeSchedule
-  AfterSchedule
+  BeforeSystems
+  AfterSystems
 } derive(Eq)
 
 pub struct Scene {
@@ -98,7 +98,7 @@ pub fn Scene::main_camera(Self) -> @ecs.EntityId?
 pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
-pub fn Scene::run_schedule_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
+pub fn Scene::run_systems_for_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit

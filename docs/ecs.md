@@ -76,9 +76,9 @@ Queries reject duplicate required components. Structural mutation and direct pay
 
 ## Mutation And Scheduling
 
-`Schedule` does not own a fixed update/render lifecycle. Callers supply named `PhaseKey` values and either run one phase with `Schedule::run_phase` or pass an explicit phase order to `Schedule::run`; the facade runtime groups those phases with `PhaseGroupKey` before running scene schedules. `World` mutation APIs are guarded by `System` access declarations during schedule execution:
+`SystemRunner` does not own a fixed update/render lifecycle. Callers supply named `PhaseKey` values and run one phase at a time with `SystemRunner::run_phase`; the facade runtime owns phase-group ordering and calls scene systems phase by phase. `World` mutation APIs are guarded by `System` access declarations during system runner execution:
 
-In this API, `Schedule` means a system list/runner with phase filtering, not an object that owns the global frame timeline. Phase meaning and ordering live at the caller/runtime boundary.
+In this API, `SystemRunner` means a system list/runner with phase filtering, not an object that owns the global frame timeline. Phase meaning and ordering live at the caller/runtime boundary.
 
 | Operation | Required declaration |
 |-----------|----------------------|

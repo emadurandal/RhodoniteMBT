@@ -10,14 +10,14 @@
 
 ただし `RawQueryArchetype::write_column` は archetype column 全体を mutable view として貸し出す expert API です。callback 中の構造変更は `World::assert_not_querying` で拒否されますが、利用側は同じ component の別 mutable view を同時に作らないように query required set の duplicate check に依存します。
 
-### Schedule access declaration
+### SystemRunner access declaration
 
-現行実装は single-thread 実行ですが、`System` は `reads` / `writes` / `structural_write` を宣言します。この宣言は schedule 実行中の API guard と conflict detection に使います。
+現行実装は single-thread 実行ですが、`System` は `reads` / `writes` / `structural_write` を宣言します。この宣言は system runner 実行中の API guard と conflict detection に使います。
 
 - `writes` は同じ component の read も許可します。
 - entity/archetype 構造を変える API は `structural_write` を要求します。
 - `CommandBuffer` は queue 時点で component write と structural write を検証します。
-- component 登録は schedule 実行中に lock されます。
+- component 登録は system runner 実行中に lock されます。
 
 ### Builtin packed blob
 
@@ -42,6 +42,6 @@
 
 - archetype move 時の CPU column copy
 - query / raw query の row and column view
-- schedule access guard と `CommandBuffer`
+- system runner access guard と `CommandBuffer`
 - `GlobalTransform` / `Camera` blob の allocation、resize event、write drain
 - TypeScript wrapper の ByteView と builtin blob upload helper
