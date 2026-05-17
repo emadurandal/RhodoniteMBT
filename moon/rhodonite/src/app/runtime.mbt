@@ -34,6 +34,18 @@ pub fn phase_update() -> PhaseKey {
 }
 
 ///|
+/// Standard fixed-step gameplay update phase.
+pub fn phase_fixed_update() -> PhaseKey {
+  phase("rhodonite/fixed_update")
+}
+
+///|
+/// Standard fixed-step post-update phase.
+pub fn phase_fixed_post_update() -> PhaseKey {
+  phase("rhodonite/fixed_post_update")
+}
+
+///|
 /// Standard post-update phase.
 pub fn phase_post_update() -> PhaseKey {
   phase("rhodonite/post_update")
@@ -70,10 +82,21 @@ pub fn phase_shutdown() -> PhaseKey {
 }
 
 ///|
+/// Returns the default frame-begin phases in engine execution order.
+pub fn default_frame_begin_phases() -> Array[PhaseKey] {
+  [phase_input()]
+}
+
+///|
+/// Returns the default fixed-step phases in engine execution order.
+pub fn default_fixed_step_phases() -> Array[PhaseKey] {
+  [phase_fixed_update(), phase_fixed_post_update()]
+}
+
+///|
 /// Returns the default render-frame phases in engine execution order.
 pub fn default_render_frame_phases() -> Array[PhaseKey] {
   [
-    phase_input(),
     phase_update(),
     phase_post_update(),
     phase_render_extract(),

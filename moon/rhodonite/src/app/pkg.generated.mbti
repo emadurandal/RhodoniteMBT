@@ -8,13 +8,23 @@ import {
 }
 
 // Values
+pub fn default_fixed_step_phases() -> Array[@ecs.PhaseKey]
+
+pub fn default_frame_begin_phases() -> Array[@ecs.PhaseKey]
+
 pub fn default_render_frame_phases() -> Array[@ecs.PhaseKey]
 
 pub fn phase(String) -> @ecs.PhaseKey
 
+pub fn phase_fixed_post_update() -> @ecs.PhaseKey
+
+pub fn phase_fixed_update() -> @ecs.PhaseKey
+
 pub fn phase_group(String) -> PhaseGroupKey
 
 pub fn phase_group_fixed_step() -> PhaseGroupKey
+
+pub fn phase_group_frame_begin() -> PhaseGroupKey
 
 pub fn phase_group_render_frame() -> PhaseGroupKey
 
@@ -56,10 +66,9 @@ pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
-pub fn Engine::run_fixed_steps(Self, Float) -> Int
+pub fn Engine::run_frame(Self, Float) -> Int
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
-pub fn Engine::run_render_frame(Self, Float) -> Unit
 pub fn Engine::shutdown(Self) -> Unit
 
 pub(all) struct FrameState {

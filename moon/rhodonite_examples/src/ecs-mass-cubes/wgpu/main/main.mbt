@@ -21,7 +21,7 @@ async fn run_ecs_mass_cubes_native() -> Unit raise Error {
       let session = @sdl_wgpu.run_sdl_metal_webgpu_input_render_loop(
         session,
         engine.input(),
-        fn(delta_seconds) { engine.run_render_frame(delta_seconds) },
+        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
       )
       engine.shutdown()
       @sdl_wgpu.release_native_demo_infrastructure(session)

@@ -9,7 +9,7 @@ async fn create_webgpu_demo_state_async(
     Some(demo_state) => {
       @demo_state.register_engine_handlers(engine, demo_state)
       engine.initialize()
-      engine.run_render_frame((0.0 : Float))
+      ignore(engine.run_frame((0.0 : Float)))
       println("WebGPU triangle rendered successfully!")
     }
     None => println("Failed to create DemoState")

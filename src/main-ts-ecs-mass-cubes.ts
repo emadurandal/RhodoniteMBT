@@ -586,7 +586,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	try {
 		demoState.snapshotColorView = target.view;
 		demoState.snapshotDepthView = target.depthView;
-		engine.runRenderFrame(0);
+		engine.runFrame(0);
 		demoState.snapshotColorView = undefined;
 		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
@@ -628,7 +628,7 @@ if (!navigator.gpu) {
 							? 0
 							: (timestamp - previousTimestamp) / 1000;
 					previousTimestamp = timestamp;
-					engine.runRenderFrame(deltaSeconds);
+					engine.runFrame(deltaSeconds);
 					requestAnimationFrame(loop);
 				};
 				requestAnimationFrame(loop);

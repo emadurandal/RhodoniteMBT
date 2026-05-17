@@ -13,6 +13,8 @@ export type PhaseGroupKey = string;
 export const Phase = {
 	Startup: "rhodonite/startup",
 	Input: "rhodonite/input",
+	FixedUpdate: "rhodonite/fixed_update",
+	FixedPostUpdate: "rhodonite/fixed_post_update",
 	Update: "rhodonite/update",
 	PostUpdate: "rhodonite/post_update",
 	RenderExtract: "rhodonite/render_extract",
@@ -23,6 +25,7 @@ export const Phase = {
 } as const;
 
 export const PhaseGroup = {
+	FrameBegin: "rhodonite/frame_begin",
 	RenderFrame: "rhodonite/render_frame",
 	FixedStep: "rhodonite/fixed_step",
 } as const;
@@ -37,7 +40,6 @@ export function phaseGroup(name: string): PhaseGroupKey {
 
 export function defaultRenderFramePhases(): PhaseKey[] {
 	return [
-		Phase.Input,
 		Phase.Update,
 		Phase.PostUpdate,
 		Phase.RenderExtract,
@@ -47,6 +49,14 @@ export function defaultRenderFramePhases(): PhaseKey[] {
 	];
 }
 
+export function defaultFrameBeginPhases(): PhaseKey[] {
+	return [Phase.Input];
+}
+
+export function defaultFixedStepPhases(): PhaseKey[] {
+	return [Phase.FixedUpdate, Phase.FixedPostUpdate];
+}
+
 type PhaseGroupRecord = {
 	key: PhaseGroupKey;
 	phases: PhaseKey[];
@@ -54,8 +64,9 @@ type PhaseGroupRecord = {
 
 function defaultPhaseGroups(): PhaseGroupRecord[] {
 	return [
+		{ key: PhaseGroup.FrameBegin, phases: defaultFrameBeginPhases() },
+		{ key: PhaseGroup.FixedStep, phases: defaultFixedStepPhases() },
 		{ key: PhaseGroup.RenderFrame, phases: defaultRenderFramePhases() },
-		{ key: PhaseGroup.FixedStep, phases: [] },
 	];
 }
 
@@ -768,15 +779,7 @@ export class Engine {
 		}
 	}
 
-	runRenderFrame(deltaSeconds: number): void {
-		this.ensureInitialized("Engine.runRenderFrame");
-		this.input.beginFrame();
-		const frame = this.timeState.nextRenderFrame(deltaSeconds);
-		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
-	}
-
-	runFixedSteps(elapsedSeconds: number): number {
-		this.ensureInitialized("Engine.runFixedSteps");
+	private runReadyFixedSteps(elapsedSeconds: number): number {
 		this.timeState.pushFixedElapsed(elapsedSeconds);
 		let count = 0;
 		while (this.timeState.canStepFixed()) {
@@ -785,6 +788,16 @@ export class Engine {
 			count += 1;
 		}
 		return count;
+	}
+
+	runFrame(elapsedSeconds: number): number {
+		this.ensureInitialized("Engine.runFrame");
+		this.input.beginFrame();
+		const frame = this.timeState.nextRenderFrame(elapsedSeconds);
+		this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
+		const fixedSteps = this.runReadyFixedSteps(elapsedSeconds);
+		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
+		return fixedSteps;
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {

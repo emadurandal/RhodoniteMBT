@@ -10,10 +10,17 @@ priv struct PhaseGroup {
 fn default_phase_groups() -> Array[PhaseGroup] {
   let groups : Array[PhaseGroup] = []
   groups.push({
+    key: phase_group_frame_begin(),
+    phases: default_frame_begin_phases(),
+  })
+  groups.push({
+    key: phase_group_fixed_step(),
+    phases: default_fixed_step_phases(),
+  })
+  groups.push({
     key: phase_group_render_frame(),
     phases: default_render_frame_phases(),
   })
-  groups.push({ key: phase_group_fixed_step(), phases: [] })
   groups
 }
 

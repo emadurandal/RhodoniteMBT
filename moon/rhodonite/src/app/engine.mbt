@@ -470,18 +470,8 @@ pub fn Engine::run_phase_group(
 }
 
 ///|
-/// Advances the render-frame clock with real elapsed time and runs its phase group.
-pub fn Engine::run_render_frame(self : Engine, delta_seconds : Float) -> Unit {
-  self.ensure_initialized("Engine::run_render_frame")
-  self.input_state.begin_frame()
-  let frame = self.time_state.next_render_frame(delta_seconds)
-  self.run_phase_group(phase_group_render_frame(), frame)
-}
-
-///|
-/// Advances the fixed-step accumulator and runs each ready fixed-step frame.
-pub fn Engine::run_fixed_steps(self : Engine, elapsed_seconds : Float) -> Int {
-  self.ensure_initialized("Engine::run_fixed_steps")
+/// Runs each ready fixed-step frame after real elapsed time has accumulated.
+fn Engine::run_ready_fixed_steps(self : Engine, elapsed_seconds : Float) -> Int {
   self.time_state.push_fixed_elapsed(elapsed_seconds)
   let mut count = 0
   while self.time_state.can_step_fixed() {
@@ -490,4 +480,16 @@ pub fn Engine::run_fixed_steps(self : Engine, elapsed_seconds : Float) -> Int {
     count = count + 1
   }
   count
+}
+
+///|
+/// Advances one standard engine tick and runs frame-begin, fixed, and render phases.
+pub fn Engine::run_frame(self : Engine, elapsed_seconds : Float) -> Int {
+  self.ensure_initialized("Engine::run_frame")
+  self.input_state.begin_frame()
+  let frame = self.time_state.next_render_frame(elapsed_seconds)
+  self.run_phase_group(phase_group_frame_begin(), frame)
+  let fixed_steps = self.run_ready_fixed_steps(elapsed_seconds)
+  self.run_phase_group(phase_group_render_frame(), frame)
+  fixed_steps
 }

@@ -17,6 +17,12 @@ pub fn PhaseGroupKey::name(self : PhaseGroupKey) -> String {
 }
 
 ///|
+/// Standard frame-begin group run once at the start of each engine tick.
+pub fn phase_group_frame_begin() -> PhaseGroupKey {
+  phase_group("rhodonite/frame_begin")
+}
+
+///|
 /// Standard render-frame group driven by display frame callbacks.
 pub fn phase_group_render_frame() -> PhaseGroupKey {
   phase_group("rhodonite/render_frame")
