@@ -16,6 +16,8 @@ pub fn put_f32_le_mut_view(MutArrayView[Byte], Int, Double) -> Unit
 
 pub fn put_u16_le(FixedArray[Byte], Int, UInt) -> Unit
 
+pub fn put_u16_le_mut_view(MutArrayView[Byte], Int, UInt) -> Unit
+
 pub fn put_u32_le(FixedArray[Byte], Int, UInt) -> Unit
 
 pub fn put_u32_le_mut_view(MutArrayView[Byte], Int, UInt) -> Unit

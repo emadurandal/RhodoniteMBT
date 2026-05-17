@@ -8,6 +8,10 @@ function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	return bytes;
 }
 
+function identityMat4ColMajor(): number[] {
+	return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+}
+
 describe("ECS TypeScript wrapper", () => {
 	it("creates entities and invalidates stale handles", () => {
 		const world = World.new();
@@ -54,7 +58,7 @@ describe("ECS TypeScript wrapper", () => {
 			expect(row.entity().index()).toBe(entity.index());
 			row.write(cpu, (bytes) => {
 				expect(bytes.length).toBe(16);
-				expect(bytes.asUint8Array()).toBeNull();
+				expect(bytes.asUint8Array()).not.toBeNull();
 				expect(bytes.getF32(0)).toBeCloseTo(1);
 				bytes.setF32(0, 9);
 				bytes.set(12, 7);
@@ -118,6 +122,7 @@ describe("ECS TypeScript wrapper", () => {
 		const world = World.new();
 		const cpuA = world.registerCpuComponent("SpawnBatchTsCpuA", 16);
 		const cpuB = world.registerCpuComponent("SpawnBatchTsCpuB", 16);
+		expect(world.reserveBatchCapacity([cpuB, cpuA], 2)).toBe(true);
 
 		const entities = world.spawnBatch([cpuB, cpuA], 2, (index, entity, row) => {
 			expect(row.entity().index()).toBe(entity.index());
@@ -155,5 +160,25 @@ describe("ECS TypeScript wrapper", () => {
 		const second = world.spawnTransformGlobalBatchIdentity(1);
 		expect(second).toHaveLength(1);
 		expect(world.isAlive(second[0])).toBe(true);
+	});
+
+	it("updates builtin camera matrices through the packed camera blob", () => {
+		const world = World.new();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 50, 1.333, 1, 0),
+		).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		expect(world.cameraBlobWordCapacity()).toBeGreaterThanOrEqual(72);
+
+		const writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		const row = writes[0]?.bytes().asUint8Array();
+		expect(row).toBeInstanceOf(Uint8Array);
+		expect(row?.byteLength).toBe(72 * 4);
+		expect(getF32(row ?? new Uint8Array(), 0)).toBeCloseTo(1);
+		expect(getF32(row ?? new Uint8Array(), 20)).toBeCloseTo(1);
 	});
 });

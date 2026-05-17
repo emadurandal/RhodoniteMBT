@@ -59,9 +59,13 @@ pub(all) struct DemoState {
   transform_upload_range : @ecs.GlobalTransformUploadRange
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
   bind_group_offsets : Array[UInt]
+  orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
+  perf_excluded_wait_ms : @ref.Ref[Double]
 }
 pub fn DemoState::release(Self) -> Unit
 pub fn DemoState::render_scene(Self, @app.Scene, @webgpu_objects.GPUTextureView) -> Unit

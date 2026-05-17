@@ -272,12 +272,17 @@ fn put_gpu_u16_mut_view(
   offset : Int,
   value : UInt,
 ) -> Unit {
-  buf[offset] = (value & 0xFFU).to_byte()
-  buf[offset + 1] = ((value >> 8) & 0xFFU).to_byte()
+  @writes.put_u16_le_mut_view(buf, offset, value)
 }
 
 ///|
 /// Implements `global_transform_f32_to_f16_bits`.
+#cfg(target="native")
+pub extern "C" fn global_transform_f32_to_f16_bits(value : Float) -> UInt = "rhodonite_global_transform_f32_to_f16_bits"
+
+///|
+/// Implements `global_transform_f32_to_f16_bits`.
+#cfg(not(target="native"))
 pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
   let bits = value.reinterpret_as_uint()
   let sign = (bits >> 16) & 0x8000U
@@ -310,6 +315,31 @@ pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
     half = half + 1U
   }
   half
+}
+
+///|
+/// Writes a f32 value as little-endian fp16 bits into a byte view.
+#cfg(target="native")
+#borrow(buf)
+pub extern "C" fn global_transform_put_f16_le_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : Float,
+) -> Unit = "rhodonite_global_transform_put_f16_le_mut_view"
+
+///|
+/// Writes a f32 value as little-endian fp16 bits into a byte view.
+#cfg(not(target="native"))
+pub fn global_transform_put_f16_le_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : Float,
+) -> Unit {
+  @writes.put_u16_le_mut_view(
+    buf,
+    offset,
+    global_transform_f32_to_f16_bits(value),
+  )
 }
 
 ///|
@@ -449,6 +479,7 @@ extern "js" fn write_affine3x4_to_gpu_row_js(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+
 ///|
 /// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(target="js")
@@ -519,6 +550,7 @@ pub fn global_transform_write_identity_row_format(
 
 ///|
 /// Writes column-major [`@m44.Matrix44F`] into one affine 3x4 GPU row.
+
 ///|
 /// Implements `matrix44f_write_affine3x4_to_gpu_row`.
 #cfg(not(target="js"))

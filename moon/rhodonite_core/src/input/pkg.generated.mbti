@@ -1,0 +1,152 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_core/input"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum InputEvent {
+  KeyDown(KeyCode, Modifiers, Bool)
+  KeyUp(KeyCode, Modifiers)
+  TextInput(String)
+  PointerMove(Float, Float)
+  MouseDown(MouseButton, Float, Float)
+  MouseUp(MouseButton, Float, Float)
+  Wheel(Float, Float)
+  FocusLost
+}
+
+pub struct InputState {
+  // private fields
+}
+pub fn InputState::apply_event(Self, InputEvent) -> Unit
+pub fn InputState::begin_frame(Self) -> Unit
+pub fn InputState::enqueue_event(Self, InputEvent) -> Unit
+pub fn InputState::events(Self) -> Array[InputEvent]
+pub fn InputState::key_down(Self, KeyCode) -> Bool
+pub fn InputState::key_pressed(Self, KeyCode) -> Bool
+pub fn InputState::key_released(Self, KeyCode) -> Bool
+pub fn InputState::keys_down(Self) -> Array[KeyCode]
+pub fn InputState::mouse_buttons_down(Self) -> Array[MouseButton]
+pub fn InputState::mouse_down(Self, MouseButton) -> Bool
+pub fn InputState::mouse_pressed(Self, MouseButton) -> Bool
+pub fn InputState::mouse_released(Self, MouseButton) -> Bool
+pub fn InputState::new() -> Self
+pub fn InputState::pointer_delta_x(Self) -> Float
+pub fn InputState::pointer_delta_y(Self) -> Float
+pub fn InputState::pointer_x(Self) -> Float
+pub fn InputState::pointer_y(Self) -> Float
+pub fn InputState::queued_event_count(Self) -> Int
+pub fn InputState::wheel_delta_x(Self) -> Float
+pub fn InputState::wheel_delta_y(Self) -> Float
+
+pub(all) struct KeyCode {
+  name : String
+} derive(Eq)
+pub fn KeyCode::alt_left() -> Self
+pub fn KeyCode::alt_right() -> Self
+pub fn KeyCode::arrow_down() -> Self
+pub fn KeyCode::arrow_left() -> Self
+pub fn KeyCode::arrow_right() -> Self
+pub fn KeyCode::arrow_up() -> Self
+pub fn KeyCode::backquote() -> Self
+pub fn KeyCode::backslash() -> Self
+pub fn KeyCode::backspace() -> Self
+pub fn KeyCode::bracket_left() -> Self
+pub fn KeyCode::bracket_right() -> Self
+pub fn KeyCode::caps_lock() -> Self
+pub fn KeyCode::comma() -> Self
+pub fn KeyCode::control_left() -> Self
+pub fn KeyCode::control_right() -> Self
+pub fn KeyCode::digit_0() -> Self
+pub fn KeyCode::digit_1() -> Self
+pub fn KeyCode::digit_2() -> Self
+pub fn KeyCode::digit_3() -> Self
+pub fn KeyCode::digit_4() -> Self
+pub fn KeyCode::digit_5() -> Self
+pub fn KeyCode::digit_6() -> Self
+pub fn KeyCode::digit_7() -> Self
+pub fn KeyCode::digit_8() -> Self
+pub fn KeyCode::digit_9() -> Self
+pub fn KeyCode::enter() -> Self
+pub fn KeyCode::equal() -> Self
+pub fn KeyCode::escape() -> Self
+pub fn KeyCode::f1() -> Self
+pub fn KeyCode::f10() -> Self
+pub fn KeyCode::f11() -> Self
+pub fn KeyCode::f12() -> Self
+pub fn KeyCode::f2() -> Self
+pub fn KeyCode::f3() -> Self
+pub fn KeyCode::f4() -> Self
+pub fn KeyCode::f5() -> Self
+pub fn KeyCode::f6() -> Self
+pub fn KeyCode::f7() -> Self
+pub fn KeyCode::f8() -> Self
+pub fn KeyCode::f9() -> Self
+pub fn KeyCode::key_a() -> Self
+pub fn KeyCode::key_b() -> Self
+pub fn KeyCode::key_c() -> Self
+pub fn KeyCode::key_d() -> Self
+pub fn KeyCode::key_e() -> Self
+pub fn KeyCode::key_f() -> Self
+pub fn KeyCode::key_g() -> Self
+pub fn KeyCode::key_h() -> Self
+pub fn KeyCode::key_i() -> Self
+pub fn KeyCode::key_j() -> Self
+pub fn KeyCode::key_k() -> Self
+pub fn KeyCode::key_l() -> Self
+pub fn KeyCode::key_m() -> Self
+pub fn KeyCode::key_n() -> Self
+pub fn KeyCode::key_o() -> Self
+pub fn KeyCode::key_p() -> Self
+pub fn KeyCode::key_q() -> Self
+pub fn KeyCode::key_r() -> Self
+pub fn KeyCode::key_s() -> Self
+pub fn KeyCode::key_t() -> Self
+pub fn KeyCode::key_u() -> Self
+pub fn KeyCode::key_v() -> Self
+pub fn KeyCode::key_w() -> Self
+pub fn KeyCode::key_x() -> Self
+pub fn KeyCode::key_y() -> Self
+pub fn KeyCode::key_z() -> Self
+pub fn KeyCode::meta_left() -> Self
+pub fn KeyCode::meta_right() -> Self
+pub fn KeyCode::minus() -> Self
+pub fn KeyCode::name(Self) -> String
+pub fn KeyCode::new(String) -> Self
+pub fn KeyCode::period() -> Self
+pub fn KeyCode::quote() -> Self
+pub fn KeyCode::semicolon() -> Self
+pub fn KeyCode::shift_left() -> Self
+pub fn KeyCode::shift_right() -> Self
+pub fn KeyCode::slash() -> Self
+pub fn KeyCode::space() -> Self
+pub fn KeyCode::tab() -> Self
+
+pub(all) struct Modifiers {
+  shift : Bool
+  ctrl : Bool
+  alt : Bool
+  meta : Bool
+} derive(Eq)
+pub fn Modifiers::alt(Self) -> Bool
+pub fn Modifiers::ctrl(Self) -> Bool
+pub fn Modifiers::meta(Self) -> Bool
+pub fn Modifiers::new(Bool, Bool, Bool, Bool) -> Self
+pub fn Modifiers::none() -> Self
+pub fn Modifiers::shift(Self) -> Bool
+
+pub(all) enum MouseButton {
+  Left
+  Middle
+  Right
+  Back
+  Forward
+  Other(Int)
+} derive(Eq)
+
+// Type aliases
+
+// Traits
+

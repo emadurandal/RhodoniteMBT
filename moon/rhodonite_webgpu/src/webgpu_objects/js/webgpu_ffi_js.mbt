@@ -31,7 +31,19 @@ extern "js" fn gpu_requestAdapter(gpu : GPU) -> @js_async.Promise[GPUAdapter] =
 extern "js" fn gpu_requestDevice(
   adapter : GPUAdapter,
 ) -> @js_async.Promise[GPUDevice] =
-  #| (adapter) => adapter.requestDevice()
+  #| (adapter) => {
+  #|   const requiredLimits = {};
+  #|   const limits = adapter.limits || {};
+  #|   if (typeof limits.maxStorageBufferBindingSize === "number") {
+  #|     requiredLimits.maxStorageBufferBindingSize = limits.maxStorageBufferBindingSize;
+  #|   }
+  #|   if (typeof limits.maxBufferSize === "number") {
+  #|     requiredLimits.maxBufferSize = limits.maxBufferSize;
+  #|   }
+  #|   return adapter.requestDevice(
+  #|     Object.keys(requiredLimits).length === 0 ? undefined : { requiredLimits }
+  #|   );
+  #| }
 
 // Synchronous getter methods (these are called after async init in JS)
 

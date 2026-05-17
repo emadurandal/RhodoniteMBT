@@ -349,6 +349,7 @@ pub fn World::write_global_transforms_dense_range_views(
 /// `MutArrayView` wrapper traffic and host-side transform recomputation. It is
 /// intended for immediate full-buffer host upload and does not enqueue drain
 /// ranges.
+
 ///|
 /// Implements `World::write_global_transforms_dense_wasm_bytes_range`.
 #cfg(target="wasm")
@@ -372,6 +373,7 @@ pub fn World::write_global_transforms_dense_wasm_bytes_range(
 /// a `Uint8Array` view over the exported wasm memory and upload the ECS GPU store
 /// without recomputing the transform data on the host side. The pointer is valid
 /// until the GlobalTransform GPU store grows and reallocates.
+
 ///|
 /// Implements `World::global_transform_wasm_gpu_bytes_payload_ptr`.
 #cfg(target="wasm")
@@ -382,6 +384,7 @@ pub fn World::global_transform_wasm_gpu_bytes_payload_ptr(self : World) -> Int {
 
 ///|
 /// Returns the byte length of the builtin GlobalTransform GPU store payload.
+
 ///|
 /// Implements `World::global_transform_wasm_gpu_bytes_len`.
 #cfg(target="wasm")
@@ -503,10 +506,11 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 }
 
 ///|
+
 ///|
 /// Implements `put_f32_array_le`.
 #cfg(not(target="js"))
-fn put_f32_array_le(bytes : Array[Byte], off : Int, v : Float) -> Unit {
+fn put_f32_array_le(bytes : FixedArray[Byte], off : Int, v : Float) -> Unit {
   let u = v.reinterpret_as_uint()
   bytes[off] = (u & 0xFFU).to_byte()
   bytes[off + 1] = ((u >> 8) & 0xFFU).to_byte()

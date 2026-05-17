@@ -318,6 +318,7 @@ extern "js" fn transform3d_local_matrix_data_from_component_view_js(
 
 ///|
 /// Decodes a read-only component row and returns its local model matrix.
+
 ///|
 /// Implements `Transform3D::local_matrix_from_component_view`.
 #cfg(target="js")
@@ -334,6 +335,7 @@ pub fn Transform3D::local_matrix_from_component_view(
 
 ///|
 /// Decodes a read-only component row and returns its local model matrix.
+
 ///|
 /// Implements `Transform3D::local_matrix_from_component_view`.
 #cfg(not(target="js"))

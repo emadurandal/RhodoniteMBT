@@ -52,6 +52,9 @@ pub(all) struct DemoState {
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
+  orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 pub fn DemoState::release(Self) -> Unit

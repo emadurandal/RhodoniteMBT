@@ -33,12 +33,15 @@ import {
 	world_new_with_global_transform_f16,
 	world_register_cpu_component,
 	world_remove_component,
+	world_set_camera_matrices_col_major,
 	world_set_component_bytes,
+	world_set_global_transform_col_major,
 	world_set_global_transform_format,
 	world_set_transform_trs,
 	spawn_batch_row_entity,
 	spawn_batch_row_write,
 	spawn_batch_row_write_view,
+	world_reserve_batch_capacity,
 	world_spawn_batch,
 	world_spawn_transform_global_batch_identity,
 	world_transform_component,
@@ -283,6 +286,41 @@ export class World {
 		);
 	}
 
+	setGlobalTransform(entity: EntityId, matrixColMajor: ArrayLike<number>): boolean {
+		return moonBool(
+			world_set_global_transform_col_major(
+				this.inner,
+				entity.inner,
+				Array.from(matrixColMajor),
+			),
+		);
+	}
+
+	setCameraMatrices(
+		entity: EntityId,
+		viewColMajor: ArrayLike<number>,
+		projColMajor: ArrayLike<number>,
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): boolean {
+		return moonBool(
+			world_set_camera_matrices_col_major(
+				this.inner,
+				entity.inner,
+				Array.from(viewColMajor),
+				Array.from(projColMajor),
+				near,
+				far,
+				aspect,
+				projectionKind,
+				flags,
+			),
+		);
+	}
+
 	updateGlobalTransformsFromTransforms(): void {
 		world_update_global_transforms_from_transforms(this.inner);
 	}
@@ -329,6 +367,19 @@ export class World {
 	spawnTransformGlobalBatchIdentity(count: number): EntityId[] {
 		return world_spawn_transform_global_batch_identity(this.inner, count).map(
 			(entity) => new EntityId(entity),
+		);
+	}
+
+	reserveBatchCapacity(
+		components: ComponentTypeId[],
+		additionalRows: number,
+	): boolean {
+		return moonBool(
+			world_reserve_batch_capacity(
+				this.inner,
+				components.map((component) => component.inner),
+				additionalRows,
+			),
 		);
 	}
 

@@ -92,6 +92,9 @@ pub(all) struct DemoState {
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
+  orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 
@@ -223,11 +226,19 @@ pub fn create_demo_state_for_scene(
   let layout_transforms = pipeline.get_bind_group_layout(0U)
   let layout_camera = pipeline.get_bind_group_layout(1U)
   let world = scene.world()
+  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
+  let camera_home = @ecs.register_camera_home_transform_component(world)
+  let camera_lens = @ecs.register_camera_lens_component(world)
   let camera = world.create_entity()
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  scene.add_transform_propagation_system(@app.phase_update())
+  scene.add_common_systems(
+    transform_propagation=true,
+    orbit_component=Some(orbit_controller),
+    home_component=Some(camera_home),
+    lens_component=Some(camera_lens),
+  )
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()
@@ -237,7 +248,68 @@ pub fn create_demo_state_for_scene(
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
   scene.set_main_camera(Some(camera))
-  push_camera_matrices(world, camera)
+  let camera_pan_y = Float::from_double(-2.0 / @math.cos(camera_elevation_rad))
+  let camera_distance = Float::from_double(
+    5.6 - camera_pan_y.to_double() * @math.sin(camera_elevation_rad),
+  )
+  let camera_qx = -@math.sin(camera_elevation_rad * 0.5)
+  let camera_qw = @math.cos(camera_elevation_rad * 0.5)
+  ignore(
+    world.set_transform_trs(
+      camera,
+      (0.0 : Float),
+      (2.0 : Float),
+      (5.6 : Float),
+      camera_qx,
+      0.0,
+      0.0,
+      camera_qw,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  ignore(world.set_global_transform(camera, id_m))
+  ignore(
+    @ecs.add_orbit_camera_controller_with_pose(
+      world,
+      camera,
+      orbit_controller,
+      0.0,
+      camera_elevation_rad,
+      (0.0 : Float),
+      camera_pan_y,
+      (1.0 : Float),
+      camera_distance,
+    ),
+  )
+  ignore(
+    @ecs.set_camera_home_from_current_transform(world, camera, camera_home),
+  )
+  ignore(
+    @ecs.add_camera_lens_orthographic(
+      world,
+      camera,
+      camera_lens,
+      (0.1 : Float),
+      (50.0 : Float),
+      (1.0 : Float),
+      (3.8 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      id_m,
+      id_m,
+      (0.1 : Float),
+      (50.0 : Float),
+      (1.0 : Float),
+      @ecs.camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
   let transform_storage = device.create_global_transform_words_buffer(world)
   let camera_storage = device.create_camera_words_buffer(world)
   let bind_transforms = device.create_global_transform_words_bind_group(
@@ -305,6 +377,18 @@ pub fn create_demo_state_for_scene(
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_post_update(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_render_extract(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
   queue.drain_and_upload_global_transform_writes(transform_storage, world)
   queue.drain_and_upload_camera_writes(camera_storage, world)
   {
@@ -326,38 +410,11 @@ pub fn create_demo_state_for_scene(
     scene,
     bodies,
     gt,
+    orbit_controller,
+    camera_home,
+    camera_lens,
     frame: @ref.new(0),
   }
-}
-
-///|
-/// Returns the scene main camera or aborts because this DemoState requires one.
-fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
-  match scene.main_camera() {
-    Some(camera) => camera
-    None => abort("render_scene requires Scene.main_camera")
-  }
-}
-
-///|
-/// Implements `push_camera_matrices`.
-fn push_camera_matrices(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
-  let view = @m44.Matrix44::rotation_x(camera_elevation_rad)
-    .mat_mul(@m44.Matrix44::translation(0.0, -2.0, -5.6, 1.0, 0.0))
-    .to_float()
-  let proj = @m44.Matrix44::ortho(-3.8, 3.8, -3.8, 3.8, 0.1, 50.0).to_float()
-  ignore(
-    world.set_camera_matrices(
-      camera,
-      view,
-      proj,
-      (0.1 : Float),
-      (50.0 : Float),
-      Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
-      (1.0 : Float),
-      (0.0 : Float),
-    ),
-  )
 }
 
 ///|
@@ -489,6 +546,10 @@ pub fn render_frame_to_view(
   )
   demo_state.update_scene(frame)
   ignore(demo_state.scene.run_schedule_phase(@app.phase_update(), frame))
+  ignore(demo_state.scene.run_schedule_phase(@app.phase_post_update(), frame))
+  ignore(
+    demo_state.scene.run_schedule_phase(@app.phase_render_extract(), frame),
+  )
   render_current_frame_to_view(demo_state, color_view)
 }
 
@@ -513,7 +574,6 @@ pub fn DemoState::render_scene(
     self.transform_storage,
     world,
   )
-  push_camera_matrices(world, scene_main_camera_or_abort(scene))
   self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
   let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -567,10 +627,17 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.on_phase(@app.phase_update(), fn(_engine, frame) {
+  engine.add_common_handlers(
+    demo_state.scene,
+    transform_propagation=true,
+    orbit_component=Some(demo_state.orbit_controller),
+    home_component=Some(demo_state.camera_home),
+    lens_component=Some(demo_state.camera_lens),
+  )
+  engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })
-  engine.on_phase(
+  engine.add_handler_on_phase(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
@@ -579,7 +646,7 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }

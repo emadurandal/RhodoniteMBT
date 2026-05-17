@@ -63,7 +63,7 @@ export class ByteView {
 
 	/**
 	 * Returns a zero-copy `Uint8Array` when the MoonBit backing storage is typed.
-	 * CPU SoA columns may use a JS number array; use `toUint8ArrayCopy()` for that case.
+	 * Some non-byte MoonBit views may use JS arrays; use `toUint8ArrayCopy()` for that case.
 	 */
 	asUint8Array(): Uint8Array | null {
 		if (!(this.raw.buf instanceof Uint8Array)) {

@@ -82,6 +82,7 @@ extern "js" fn write_f32x4_mut_view(
   #| }
 
 ///|
+
 ///|
 /// Implements `write_f32x4_mut_view`.
 #cfg(not(target="js"))

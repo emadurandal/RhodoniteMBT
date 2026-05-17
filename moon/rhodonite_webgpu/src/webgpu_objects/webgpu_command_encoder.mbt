@@ -6,6 +6,7 @@ pub type WebGPUCommandEncoder
 pub fn webgpu_command_encoder_release(WebGPUCommandEncoder) -> Unit
 
 ///|
+
 ///|
 /// Implements `webgpu_command_encoder_copy_texture_to_buffer_rgba8`.
 #cfg(any(target="js", target="native"))

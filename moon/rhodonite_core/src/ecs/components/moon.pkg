@@ -5,3 +5,7 @@ import {
   "emadurandal/rhodonite_core/math/vector3" @v3,
   "emadurandal/rhodonite_core/math/vector4" @v4,
 }
+
+options(
+  "native-stub": [ "global_transform_native.c" ],
+)

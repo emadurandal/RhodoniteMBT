@@ -3,6 +3,7 @@ package "emadurandal/rhodonite/app"
 
 import {
   "emadurandal/rhodonite_core/ecs",
+  "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
 }
 
@@ -16,6 +17,8 @@ pub fn phase_group(String) -> PhaseGroupKey
 pub fn phase_group_fixed_step() -> PhaseGroupKey
 
 pub fn phase_group_render_frame() -> PhaseGroupKey
+
+pub fn phase_input() -> @ecs.PhaseKey
 
 pub fn phase_post_update() -> @ecs.PhaseKey
 
@@ -39,16 +42,19 @@ pub fn phase_update() -> @ecs.PhaseKey
 pub struct Engine {
   // private fields
 }
+pub fn Engine::add_common_handlers(Self, Scene, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Engine::add_handler_on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize(Self) -> Unit
+pub fn Engine::input(Self) -> @input.InputState
 pub fn Engine::insert_phase_after_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
-pub fn Engine::on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
@@ -79,6 +85,11 @@ pub(all) enum PhaseSlot {
 pub struct Scene {
   // private fields
 }
+pub fn Scene::add_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Scene::add_orbit_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_orbit_camera_systems(Self, @ecs.ComponentTypeId, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_orbit_camera_transform_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_transform_propagation_system(Self, @ecs.PhaseKey) -> Unit

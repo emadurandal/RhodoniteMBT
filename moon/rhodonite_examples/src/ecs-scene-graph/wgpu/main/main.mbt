@@ -18,9 +18,11 @@ async fn run_ecs_scene_graph_native() -> Unit raise Error {
       }
       @demo_state.register_engine_handlers(engine, demo_state)
       engine.initialize()
-      let session = @sdl_wgpu.run_sdl_metal_webgpu_render_loop(session, fn() {
-        engine.run_render_frame()
-      })
+      let session = @sdl_wgpu.run_sdl_metal_webgpu_input_render_loop(
+        session,
+        engine.input(),
+        fn() { engine.run_render_frame() },
+      )
       engine.shutdown()
       @sdl_wgpu.release_native_demo_infrastructure(session)
     }

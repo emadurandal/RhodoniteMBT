@@ -1,7 +1,31 @@
 ///|
+/// Stores the browser demo engine after asynchronous initialization.
 let demo_engine : @ref.Ref[@app.Engine?] = @ref.new(None)
 
 ///|
+/// Converts DOM pointer button indices to the shared mouse button enum.
+fn mouse_button_from_dom(button : Int) -> @input.MouseButton {
+  match button {
+    0 => Left
+    1 => Middle
+    2 => Right
+    3 => Back
+    4 => Forward
+    _ => Other(button)
+  }
+}
+
+///|
+/// Enqueues an input event when the demo engine is initialized.
+fn enqueue_input(event : @input.InputEvent) -> Unit {
+  match demo_engine.val {
+    Some(engine) => engine.input().enqueue_event(event)
+    None => ()
+  }
+}
+
+///|
+/// Creates the browser WebGPU demo state and registers engine handlers.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
@@ -36,7 +60,57 @@ pub fn ecs_mass_cubes_render_tick() -> Unit {
 }
 
 ///|
-/// Implements `main {`.
+/// Implements `ecs_mass_cubes_input_pointer_move`.
+pub fn ecs_mass_cubes_input_pointer_move(x : Double, y : Double) -> Unit {
+  enqueue_input(PointerMove(Float::from_double(x), Float::from_double(y)))
+}
+
+///|
+/// Implements `ecs_mass_cubes_input_mouse_down`.
+pub fn ecs_mass_cubes_input_mouse_down(
+  button : Int,
+  x : Double,
+  y : Double,
+) -> Unit {
+  enqueue_input(
+    MouseDown(
+      mouse_button_from_dom(button),
+      Float::from_double(x),
+      Float::from_double(y),
+    ),
+  )
+}
+
+///|
+/// Implements `ecs_mass_cubes_input_mouse_up`.
+pub fn ecs_mass_cubes_input_mouse_up(
+  button : Int,
+  x : Double,
+  y : Double,
+) -> Unit {
+  enqueue_input(
+    MouseUp(
+      mouse_button_from_dom(button),
+      Float::from_double(x),
+      Float::from_double(y),
+    ),
+  )
+}
+
+///|
+/// Implements `ecs_mass_cubes_input_wheel`.
+pub fn ecs_mass_cubes_input_wheel(delta_x : Double, delta_y : Double) -> Unit {
+  enqueue_input(Wheel(Float::from_double(delta_x), Float::from_double(delta_y)))
+}
+
+///|
+/// Implements `ecs_mass_cubes_input_focus_lost`.
+pub fn ecs_mass_cubes_input_focus_lost() -> Unit {
+  enqueue_input(FocusLost)
+}
+
+///|
+/// Provides the package entry point for MoonBit JS builds.
 fn main {
   println("ecs-mass-cubes js main (use Vite entry)")
 }

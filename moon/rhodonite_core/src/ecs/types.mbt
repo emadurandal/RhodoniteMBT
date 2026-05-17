@@ -60,7 +60,7 @@ pub(all) struct EntityLocation {
 priv struct ComponentColumn {
   component : ComponentTypeId
   stride : Int
-  bytes : Array[Byte]
+  mut bytes : FixedArray[Byte]
   mut row_capacity : Int
 }
 

@@ -27,7 +27,7 @@ fn monotonic_ms() -> Double {
 
 ///|
 /// Number of root entities (grid layout). Increase to stress CPU/GPU; keep within device limits.
-let entity_count : Int = 800_000
+let entity_count : Int = @mass_shared.entity_count()
 
 ///|
 enum GlobalTransformPrecisionMode {
@@ -42,121 +42,39 @@ let global_transform_precision_mode : GlobalTransformPrecisionMode = AllF16
 
 ///|
 /// Canvas resolution (matches demo HTML).
-let canvas_width : UInt = 800U
+let canvas_width : UInt = @mass_shared.canvas_width()
 
 ///|
-let canvas_height : UInt = 600U
+let canvas_height : UInt = @mass_shared.canvas_height()
 
 ///|
-let vertex_stride_local : Int = 12
+let vertex_stride_local : Int = @mass_shared.vertex_stride_local()
 
 ///|
-let instance_stride : Int = 24
+let instance_stride : Int = @mass_shared.instance_stride()
 
 ///|
-let verts_per_cube : Int = 8
+let verts_per_cube : Int = @mass_shared.verts_per_cube()
 
 ///|
-let index_u16_count : Int = 36
+let index_u16_count : Int = @mass_shared.index_u16_count()
 
 ///|
 let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
 
 ///|
-let camera_elevation_rad : Double = 0.42
+let camera_elevation_rad : Double = @mass_shared.camera_elevation_rad()
 
 ///|
-let grid_spacing : Double = 0.14
+let grid_spacing : Double = @mass_shared.grid_spacing()
 
 ///|
-let cube_scale : Float = 0.055
+let cube_scale : Float = @mass_shared.cube_scale()
 
 ///|
 /// Smallest `s` with `s * s >= n` for a roughly square XZ grid.
 fn grid_side_len(n : Int) -> Int {
-  let mut s = 1
-  while s * s < n {
-    s = s + 1
-  }
-  s
-}
-
-///|
-/// View-space **z** extrema of the grid AABB corners after `view_rot` (before extra Z pull).
-fn view_space_z_range_corners(
-  view_rot : @m44.Matrix44D,
-  extent_xz : Double,
-  wave_y : Double,
-) -> (Double, Double) {
-  let sx_arr = [-1.0, 1.0]
-  let sz_arr = [-1.0, 1.0]
-  let wy_arr = [-1.0, 1.0]
-  let mut i = 0
-  let mut z_min = (0.0 : Double)
-  let mut z_max = (0.0 : Double)
-  for sx = 0; sx < 2; sx = sx + 1 {
-    for sy = 0; sy < 2; sy = sy + 1 {
-      for sz = 0; sz < 2; sz = sz + 1 {
-        let wx = sx_arr[sx] * extent_xz
-        let wy = wy_arr[sy] * wave_y
-        let wz = sz_arr[sz] * extent_xz
-        let v = view_rot.mul_vec4(@v4.Vector4::new(wx, wy, wz, (1.0 : Double)))
-        let z = v.z()
-        if i == 0 {
-          z_min = z
-          z_max = z
-        } else {
-          if z < z_min {
-            z_min = z
-          }
-          if z > z_max {
-            z_max = z
-          }
-        }
-        i = i + 1
-      }
-    }
-  }
-  (z_min, z_max)
-}
-
-///|
-/// View-space **y** extrema of the same world AABB corners (for ortho `bottom`/`top`).
-fn view_space_y_range_corners(
-  view_rot : @m44.Matrix44D,
-  extent_xz : Double,
-  wave_y : Double,
-) -> (Double, Double) {
-  let sx_arr = [-1.0, 1.0]
-  let sz_arr = [-1.0, 1.0]
-  let wy_arr = [-1.0, 1.0]
-  let mut i = 0
-  let mut y_min = (0.0 : Double)
-  let mut y_max = (0.0 : Double)
-  for sx = 0; sx < 2; sx = sx + 1 {
-    for sy = 0; sy < 2; sy = sy + 1 {
-      for sz = 0; sz < 2; sz = sz + 1 {
-        let wx = sx_arr[sx] * extent_xz
-        let wy = wy_arr[sy] * wave_y
-        let wz = sz_arr[sz] * extent_xz
-        let v = view_rot.mul_vec4(@v4.Vector4::new(wx, wy, wz, (1.0 : Double)))
-        let y = v.y()
-        if i == 0 {
-          y_min = y
-          y_max = y
-        } else {
-          if y < y_min {
-            y_min = y
-          }
-          if y > y_max {
-            y_max = y
-          }
-        }
-        i = i + 1
-      }
-    }
-  }
-  (y_min, y_max)
+  @mass_shared.grid_side_len(n)
 }
 
 ///|
@@ -165,49 +83,14 @@ fn view_space_y_range_corners(
 /// WebGPU clips to `0 ≤ clip.z ≤ clip.w`. [`Matrix44::ortho`] maps view **z** in
 /// `[-far, -near]` to NDC depth `[0, 1]`. This grid can reach **positive** view **z**,
 /// so we pull along **−Z** and extend **far** so the whole slab stays inside the clip volume.
-fn camera_matrices() -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
-  let view_rot = @m44.Matrix44::rotation_x(camera_elevation_rad).mat_mul(
-    @m44.Matrix44::translation(0.0, 0.0, -16.0, 1.0, 0.0),
-  )
-  let per_side = grid_side_len(entity_count)
-  let half = (per_side - 1).to_double() * 0.5
-  let extent_xz = half * grid_spacing
-  let wave = 0.12
-  let margin = cube_scale.to_double() * 2.5
-  /// World **y** bound: wave motion + scaled unit cube local **y** (±1 in mesh space).
-  let wave_y = wave + cube_scale.to_double() * 1.1
-  let (y_lo, y_hi) = view_space_y_range_corners(view_rot, extent_xz, wave_y)
-  let cy = (y_lo + y_hi) * 0.5
-  let hy = (y_hi - y_lo) * 0.5 + margin
-  let hx = extent_xz + margin
-  let aspect = canvas_width.to_double() / canvas_height.to_double()
-  let mut half_w = hx
-  let mut half_h = hy
-  if half_w / half_h < aspect {
-    half_w = half_h * aspect
-  } else {
-    half_h = half_w / aspect
-  }
-  let left = -half_w
-  let right = half_w
-  let bottom = cy - half_h
-  let top = cy + half_h
-  let (z_lo, z_hi) = view_space_z_range_corners(view_rot, extent_xz, wave_y)
-  let pull_z = if z_hi > -0.15 { -z_hi - 1.0 } else { 0.0 }
-  let view = @m44.Matrix44::translation(0.0, 0.0, pull_z, 1.0, 0.0).mat_mul(
-    view_rot,
-  )
-  let z_min_pulled = z_lo + pull_z
-  let far_need = -z_min_pulled + 8.0
-  let far_clip = if far_need > 80.0 { far_need } else { 80.0 }
-  let proj = @m44.Matrix44::ortho(left, right, bottom, top, 0.1, far_clip)
-  (
-    view.to_float(),
-    proj.to_float(),
-    (0.1 : Float),
-    Float::from_double(far_clip),
-    Float::from_double(aspect),
-  )
+fn camera_matrices(
+  yaw : Double,
+  pitch : Double,
+  pan_x : Double,
+  pan_y : Double,
+  dolly : Double,
+) -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
+  @mass_shared.camera_matrices(entity_count, yaw, pitch, pan_x, pan_y, dolly)
 }
 
 ///|
@@ -265,12 +148,170 @@ fn instance_color_rgb(idx : Int) -> (Double, Double, Double) {
 ///|
 /// Implements `grid_xz_for_index`.
 fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
-  let ix = idx % per_side
-  let iz = idx / per_side
-  let half = (per_side - 1).to_double() * 0.5
-  let fx = ix.to_double() - half
-  let fz = iz.to_double() - half
-  (Float::from_double(fx * grid_spacing), Float::from_double(fz * grid_spacing))
+  @mass_shared.grid_xz_for_index(idx, per_side)
+}
+
+///|
+/// Converts a GlobalTransform GPU format to the compact numeric code used by dense writers.
+fn global_transform_format_code_int(
+  format : @comp.GlobalTransformGpuFormat,
+) -> Int {
+  @comp.global_transform_format_code(format).reinterpret_as_int()
+}
+
+///|
+/// Writes the animated Y translation for a dense GlobalTransform blob in JavaScript.
+#cfg(target="js")
+extern "js" fn write_mass_cubes_dense_y_transform_wave(
+  bytes : MutArrayView[Byte],
+  count : Int,
+  first_word : Int,
+  words_per_entity : Int,
+  format_code : Int,
+  wave_time : Double,
+) -> Unit =
+  #| (
+  #|   bytes,
+  #|   count,
+  #|   firstWord,
+  #|   wordsPerEntity,
+  #|   formatCode,
+  #|   waveTime,
+  #| ) => {
+  #|   const src = bytes.buf;
+  #|   const start = bytes.start;
+  #|   const byteLength = bytes.end - bytes.start;
+  #|   if (!ArrayBuffer.isView(src)) {
+  #|     throw new Error("MassCubes dense transform writer requires typed byte storage.");
+  #|   }
+  #|   const floats = new Float32Array(src.buffer, src.byteOffset + start, byteLength >> 2);
+  #|   const sinStep = Math.sin(0.09);
+  #|   const cosStep = Math.cos(0.09);
+  #|   let waveSin = Math.sin(waveTime);
+  #|   let waveCos = Math.cos(waveTime);
+  #|   if (formatCode === 1) {
+  #|     const halfIndexBase = (3 - firstWord) * 2 + 1;
+  #|     const Float16ArrayCtor = globalThis.Float16Array;
+  #|     if (typeof Float16ArrayCtor === "function") {
+  #|       const halfFloats = new Float16ArrayCtor(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|       for (let i = 0; i < count; i++) {
+  #|         halfFloats[i * wordsPerEntity * 2 + halfIndexBase] = waveSin * 0.12;
+  #|         const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|         waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|         waveSin = nextSin;
+  #|       }
+  #|       return;
+  #|     }
+  #|     let cache = globalThis.__rhodonite_mass_cubes_f32_to_f16_table;
+  #|     if (!cache) {
+  #|       const base = new Uint16Array(512);
+  #|       const shift = new Uint8Array(512);
+  #|       for (let i = 0; i < 256; i++) {
+  #|         const e = i - 127;
+  #|         if (e < -24) {
+  #|           base[i] = 0x0000;
+  #|           base[i | 0x100] = 0x8000;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else if (e < -14) {
+  #|           const b = 0x0400 >> (-e - 14);
+  #|           const s = -e - 1;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = s;
+  #|           shift[i | 0x100] = s;
+  #|         } else if (e <= 15) {
+  #|           const b = (e + 15) << 10;
+  #|           base[i] = b;
+  #|           base[i | 0x100] = b | 0x8000;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         } else if (e < 128) {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 24;
+  #|           shift[i | 0x100] = 24;
+  #|         } else {
+  #|           base[i] = 0x7c00;
+  #|           base[i | 0x100] = 0xfc00;
+  #|           shift[i] = 13;
+  #|           shift[i | 0x100] = 13;
+  #|         }
+  #|       }
+  #|       const scratchF32 = new Float32Array(1);
+  #|       const scratchU32 = new Uint32Array(scratchF32.buffer);
+  #|       cache = globalThis.__rhodonite_mass_cubes_f32_to_f16_table = {
+  #|         base,
+  #|         shift,
+  #|         scratchF32,
+  #|         scratchU32,
+  #|       };
+  #|     }
+  #|     const halfBits = new Uint16Array(src.buffer, src.byteOffset + start, byteLength >> 1);
+  #|     for (let i = 0; i < count; i++) {
+  #|       cache.scratchF32[0] = Math.fround(waveSin * 0.12);
+  #|       const bits = cache.scratchU32[0] >>> 0;
+  #|       const index = (bits >>> 23) & 0x1ff;
+  #|       halfBits[i * wordsPerEntity * 2 + halfIndexBase] =
+  #|         cache.base[index] + ((bits & 0x007fffff) >>> cache.shift[index]);
+  #|       const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|       waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|       waveSin = nextSin;
+  #|     }
+  #|     return;
+  #|   }
+  #|   const baseWord = 7 - firstWord;
+  #|   for (let i = 0; i < count; i++) {
+  #|     floats[i * wordsPerEntity + baseWord] = Math.fround(waveSin * 0.12);
+  #|     const nextSin = waveSin * cosStep + waveCos * sinStep;
+  #|     waveCos = waveCos * cosStep - waveSin * sinStep;
+  #|     waveSin = nextSin;
+  #|   }
+  #| }
+
+///|
+/// Writes the animated Y translation for a dense GlobalTransform blob.
+#cfg(not(target="js"))
+fn write_mass_cubes_dense_y_transform_wave(
+  bytes : MutArrayView[Byte],
+  count : Int,
+  first_word : Int,
+  words_per_entity : Int,
+  format_code : Int,
+  wave_time : Double,
+) -> Unit {
+  let sin_step = @math.sin(0.09)
+  let cos_step = @math.cos(0.09)
+  let mut i = 0
+  let mut wave_sin = @math.sin(wave_time)
+  let mut wave_cos = @math.cos(wave_time)
+  let stride_bytes = words_per_entity * 4
+  if format_code == 1 {
+    let mut byte_offset = (3 - first_word) * 4 + 2
+    while i < count {
+      @comp.global_transform_put_f16_le_mut_view(
+        bytes,
+        byte_offset,
+        Float::from_double(wave_sin * 0.12),
+      )
+      let next_sin = wave_sin * cos_step + wave_cos * sin_step
+      wave_cos = wave_cos * cos_step - wave_sin * sin_step
+      wave_sin = next_sin
+      i = i + 1
+      byte_offset = byte_offset + stride_bytes
+    }
+    return
+  }
+  let mut byte_offset = (7 - first_word) * 4
+  while i < count {
+    let bits = Float::from_double(wave_sin * 0.12).reinterpret_as_uint()
+    @writes.put_u32_le_mut_view(bytes, byte_offset, bits)
+    let next_sin = wave_sin * cos_step + wave_cos * sin_step
+    wave_cos = wave_cos * cos_step - wave_sin * sin_step
+    wave_sin = next_sin
+    i = i + 1
+    byte_offset = byte_offset + stride_bytes
+  }
 }
 
 ///|
@@ -390,6 +431,28 @@ fn update_and_drain_global_transforms(
 ) -> Array[@ecs.GpuWriteView] {
   ignore(tf)
   ignore(gt)
+  if !full_rows {
+    match dense_transform_layout {
+      Some(layout) =>
+        return world.write_global_transform_blob_range_views(
+          upload_range.first_word,
+          upload_range.word_count,
+          ///|
+          /// Implements `this function`.
+          fn(bytes) {
+            write_mass_cubes_dense_y_transform_wave(
+              bytes,
+              entity_count,
+              upload_range.first_word,
+              layout.words_per_entity,
+              global_transform_format_code_int(layout.format),
+              t * 1.8,
+            )
+          },
+        )
+      None => ()
+    }
+  }
   world.write_global_transform_blob_range_by_refs(
     transform_refs,
     entity_count,
@@ -429,9 +492,13 @@ pub(all) struct DemoState {
   transform_upload_range : @ecs.GlobalTransformUploadRange
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
   bind_group_offsets : Array[UInt]
+  orbit_controller : @ecs.ComponentTypeId
+  camera_home : @ecs.ComponentTypeId
+  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
+  perf_excluded_wait_ms : @ref.Ref[Double]
 }
 
 ///|
@@ -650,9 +717,17 @@ pub fn create_demo_state_for_scene(
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
+  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
+  let camera_home = @ecs.register_camera_home_transform_component(world)
+  let camera_lens = @ecs.register_camera_lens_component(world)
+  scene.add_common_systems(
+    orbit_component=Some(orbit_controller),
+    home_component=Some(camera_home),
+  )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
+  ignore(world.reserve_batch_capacity([tf, gt], entity_count))
   let entities = world.spawn_transform_global_batch(entity_count, fn(
     i,
     e,
@@ -691,7 +766,58 @@ pub fn create_demo_state_for_scene(
     transform_refs, entity_count, dense_transform_layout,
   )
   let camera = world.create_entity()
-  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
+  ignore(
+    world.set_transform_trs(
+      camera,
+      (0.0 : Float),
+      (0.0 : Float),
+      (16.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  ignore(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  ignore(
+    @ecs.add_orbit_camera_controller_with_distance(
+      world,
+      camera,
+      orbit_controller,
+      0.0,
+      camera_elevation_rad,
+      (16.0 : Float),
+    ),
+  )
+  ignore(
+    @ecs.set_camera_home_from_current_transform(world, camera, camera_home),
+  )
+  ignore(
+    @ecs.add_camera_lens_orthographic(
+      world,
+      camera,
+      camera_lens,
+      (0.1 : Float),
+      (80.0 : Float),
+      Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @ecs.orbit_camera_transform(
+    world, camera, orbit_controller,
+  )
+  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
+    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
+  )
+  match camera_view.inverse() {
+    Some(camera_global) =>
+      ignore(world.set_global_transform(camera, camera_global))
+    None => ()
+  }
   ignore(
     world.set_camera_matrices(
       camera,
@@ -700,7 +826,7 @@ pub fn create_demo_state_for_scene(
       camera_near,
       camera_far,
       camera_aspect,
-      (1.0 : Float),
+      @ecs.camera_projection_orthographic(),
       (0.0 : Float),
     ),
   )
@@ -740,8 +866,7 @@ pub fn create_demo_state_for_scene(
     true,
   )
   queue.upload_global_transform_writes(transform_storage, writes0)
-  queue.drain_and_upload_camera_writes(camera_storage, world)
-  {
+  let demo_state : DemoState = {
     context,
     device,
     queue,
@@ -765,10 +890,29 @@ pub fn create_demo_state_for_scene(
     transform_upload_range,
     dense_transform_layout,
     bind_group_offsets: [],
+    orbit_controller,
+    camera_home,
+    camera_lens,
     frame: @ref.new(0),
     perf_last_frame_start_ms: @ref.new(-1.0),
     perf_frame_start_ms: @ref.new(-1.0),
+    perf_excluded_wait_ms: @ref.new(0.0),
   }
+  demo_state.add_mass_cubes_camera_sync_system()
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_post_update(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
+  ignore(
+    scene.run_schedule_phase(
+      @app.phase_render_extract(),
+      @app.FrameState::new((0.0 : Float), 0, 0.0),
+    ),
+  )
+  queue.drain_and_upload_camera_writes(camera_storage, world)
+  demo_state
 }
 
 ///|
@@ -776,6 +920,15 @@ pub fn create_demo_state_for_scene(
 fn DemoState::begin_perf_frame(self : DemoState) -> Unit {
   let t_frame_start = monotonic_ms()
   self.perf_frame_start_ms.val = t_frame_start
+  self.perf_excluded_wait_ms.val = 0.0
+}
+
+///|
+/// Excludes external frame pacing waits from the per-frame CPU timing.
+fn DemoState::exclude_perf_wait(self : DemoState, wait_ms : Double) -> Unit {
+  if self.perf_frame_start_ms.val >= 0.0 {
+    self.perf_excluded_wait_ms.val = self.perf_excluded_wait_ms.val + wait_ms
+  }
 }
 
 ///|
@@ -785,6 +938,50 @@ fn scene_main_camera_or_abort(scene : @app.Scene) -> @ecs.EntityId {
     Some(camera) => camera
     None => abort("render_scene requires Scene.main_camera")
   }
+}
+
+///|
+/// Updates the scene camera GlobalTransform and Camera blob through the MassCubes camera solver.
+fn DemoState::sync_mass_cubes_camera_blob(self : DemoState) -> Unit {
+  let world = self.scene.world()
+  let camera = scene_main_camera_or_abort(self.scene)
+  let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @ecs.orbit_camera_transform(
+    world,
+    camera,
+    self.orbit_controller,
+  )
+  let (camera_view0, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices(
+    camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly,
+  )
+  match camera_view0.inverse() {
+    Some(global) => ignore(world.set_global_transform(camera, global))
+    None => ()
+  }
+  ignore(
+    world.set_camera_matrices(
+      camera,
+      camera_view0,
+      camera_proj,
+      camera_near,
+      camera_far,
+      camera_aspect,
+      @ecs.camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+}
+
+///|
+/// Adds the MassCubes-specific camera blob sync as a render-extract ECS system.
+fn DemoState::add_mass_cubes_camera_sync_system(self : DemoState) -> Unit {
+  let world = self.scene.world()
+  self.scene.add_system(
+    @app.phase_render_extract(),
+    "MassCubesCameraSync",
+    [self.orbit_controller],
+    [world.global_transform_component(), world.camera_component()],
+    fn(_world, _ctx, _commands) { self.sync_mass_cubes_camera_blob() },
+  )
 }
 
 ///|
@@ -811,7 +1008,11 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
+  let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
+  if record_perf {
+    demo_state.exclude_perf_wait(monotonic_ms() - t_acquire_start)
+  }
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
@@ -859,6 +1060,26 @@ pub fn render_frame_to_view(
       demo_state.frame.val.to_double() * 0.022,
     ),
   )
+  ignore(
+    demo_state.scene.run_schedule_phase(
+      @app.phase_post_update(),
+      @app.FrameState::new(
+        (0.022 : Float),
+        demo_state.frame.val,
+        demo_state.frame.val.to_double() * 0.022,
+      ),
+    ),
+  )
+  ignore(
+    demo_state.scene.run_schedule_phase(
+      @app.phase_render_extract(),
+      @app.FrameState::new(
+        (0.022 : Float),
+        demo_state.frame.val,
+        demo_state.frame.val.to_double() * 0.022,
+      ),
+    ),
+  )
   render_current_frame_to_view(demo_state, color_view, record_perf~)
 }
 
@@ -889,7 +1110,10 @@ pub fn render_current_frame_to_view(
   demo_state.perf_last_frame_start_ms.val = t_frame_start
   demo_state.render_scene(demo_state.scene, color_view)
   if record_perf {
-    let cpu_ms = monotonic_ms() - t_frame_start
+    let raw_cpu_ms = monotonic_ms() -
+      t_frame_start -
+      demo_state.perf_excluded_wait_ms.val
+    let cpu_ms = if raw_cpu_ms > 0.0 { raw_cpu_ms } else { 0.0 }
     ecs_mass_cubes_perf_overlay(fps, cpu_ms)
     ecs_mass_cubes_perf_console_log(fps, cpu_ms, demo_state.frame.val)
   }
@@ -904,20 +1128,6 @@ pub fn DemoState::render_scene(
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   let world = scene.world()
-  let camera = scene_main_camera_or_abort(scene)
-  let (camera_view, camera_proj, camera_near, camera_far, camera_aspect) = camera_matrices()
-  ignore(
-    world.set_camera_matrices(
-      camera,
-      camera_view,
-      camera_proj,
-      camera_near,
-      camera_far,
-      camera_aspect,
-      (1.0 : Float),
-      (0.0 : Float),
-    ),
-  )
   self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
   let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -971,11 +1181,16 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.on_phase(@app.phase_update(), fn(_engine, frame) {
+  engine.add_common_handlers(
+    demo_state.scene,
+    orbit_component=Some(demo_state.orbit_controller),
+    home_component=Some(demo_state.camera_home),
+  )
+  engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
   })
-  engine.on_phase(
+  engine.add_handler_on_phase(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
@@ -984,7 +1199,7 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSchedule,
   )
-  engine.on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }

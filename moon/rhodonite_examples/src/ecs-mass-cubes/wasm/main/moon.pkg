@@ -1,6 +1,8 @@
 import {
+  "emadurandal/rhodonite_core/binary/writes" @writes,
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/components" @comp,
+  "emadurandal/rhodonite_examples/ecs-mass-cubes/shared" @mass_shared,
   "moonbitlang/core/ref" @ref,
 }
 
@@ -10,10 +12,22 @@ options(
   is_main: true,
   link: {
     "wasm": {
-      "exports": [ "create_wasm_demo_state", "ecs_mass_cubes_wasm_render_tick" ],
+      "exports": [
+        "create_wasm_demo_state",
+        "ecs_mass_cubes_wasm_update_tick",
+        "ecs_mass_cubes_wasm_render_extract",
+        "ecs_mass_cubes_wasm_render",
+        "ecs_mass_cubes_wasm_render_tick",
+      ],
     },
     "wasm-gc": {
-      "exports": [ "create_wasm_demo_state", "ecs_mass_cubes_wasm_render_tick" ],
+      "exports": [
+        "create_wasm_demo_state",
+        "ecs_mass_cubes_wasm_update_tick",
+        "ecs_mass_cubes_wasm_render_extract",
+        "ecs_mass_cubes_wasm_render",
+        "ecs_mass_cubes_wasm_render_tick",
+      ],
     },
   },
 )

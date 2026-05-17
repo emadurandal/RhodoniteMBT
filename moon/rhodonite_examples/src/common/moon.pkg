@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "Milky2018/wgpu_mbt/c" @c,
   "Kaida-Amethyst/sdl3" @sdl3,
@@ -7,3 +8,7 @@ import {
 }
 
 supported_targets = "native"
+
+options(
+  "native-stub": [ "sdl_keyboard_name_native.c" ],
+)

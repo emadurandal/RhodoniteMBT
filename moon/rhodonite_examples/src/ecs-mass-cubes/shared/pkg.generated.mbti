@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/ecs-mass-cubes/shared"
+
+import {
+  "emadurandal/rhodonite_core/math/matrix44",
+}
+
+// Values
+pub fn camera_elevation_rad() -> Double
+
+pub fn camera_matrices(Int, Double, Double, Double, Double, Double) -> (@matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float)
+
+pub fn canvas_height() -> UInt
+
+pub fn canvas_width() -> UInt
+
+pub fn cube_scale() -> Float
+
+pub fn entity_count() -> Int
+
+pub fn grid_side_len(Int) -> Int
+
+pub fn grid_spacing() -> Double
+
+pub fn grid_xz_for_index(Int, Int) -> (Float, Float)
+
+pub fn index_u16_count() -> Int
+
+pub fn instance_stride() -> Int
+
+pub fn vertex_stride_local() -> Int
+
+pub fn verts_per_cube() -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
