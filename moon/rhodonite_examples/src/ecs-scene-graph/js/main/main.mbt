@@ -52,9 +52,9 @@ pub fn create_webgpu_demo_state(
 
 ///|
 /// Implements `ecs_scene_graph_render_tick`.
-pub fn ecs_scene_graph_render_tick() -> Unit {
+pub fn ecs_scene_graph_render_tick(delta_seconds : Double) -> Unit {
   match demo_engine.val {
-    Some(engine) => engine.run_render_frame()
+    Some(engine) => engine.run_render_frame(Float::from_double(delta_seconds))
     _ => ()
   }
 }

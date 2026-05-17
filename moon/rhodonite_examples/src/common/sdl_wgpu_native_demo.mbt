@@ -150,11 +150,15 @@ pub fn release_native_demo_infrastructure(
 /// Implements `run_sdl_metal_webgpu_render_loop`.
 pub fn run_sdl_metal_webgpu_render_loop(
   session : SdlMetalWebGpuNativeSession,
-  render_frame : () -> Unit,
+  render_frame : (Float) -> Unit,
 ) -> SdlMetalWebGpuNativeSession {
   let input = @input.InputState::new()
   run_sdl_metal_webgpu_input_render_loop(session, input, render_frame)
 }
+
+///|
+/// Returns the monotonic SDL tick counter in milliseconds.
+extern "C" fn sdl_get_ticks() -> UInt64 = "SDL_GetTicks"
 
 ///|
 /// Returns an SDL scancode name without freeing SDL's borrowed static string.
@@ -308,10 +312,11 @@ fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
 pub fn run_sdl_metal_webgpu_input_render_loop(
   session : SdlMetalWebGpuNativeSession,
   input : @input.InputState,
-  render_frame : () -> Unit,
+  render_frame : (Float) -> Unit,
 ) -> SdlMetalWebGpuNativeSession {
   println("native: entering render loop")
   let quit = @ref.new(false)
+  let mut previous_ticks = sdl_get_ticks()
   while !quit.val {
     let event = @lib.new_sdl_event()
     while @lib.sdl_PollEvent(event) {
@@ -325,7 +330,12 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
       }
     }
     enqueue_sdl_mouse_state(input)
-    render_frame()
+    let current_ticks = sdl_get_ticks()
+    let delta_seconds = Float::from_double(
+      (current_ticks - previous_ticks).to_double() / 1000.0,
+    )
+    previous_ticks = current_ticks
+    render_frame(delta_seconds)
     let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
     @wgpu.webgpu_instance_process_events(session.instance)
   }

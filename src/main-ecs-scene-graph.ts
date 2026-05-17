@@ -53,8 +53,14 @@ if (!navigator.gpu) {
 			await create_webgpu_demo_state(canvas);
 			installOrbitPointerInput(canvas);
 
-			const loop = () => {
-				ecs_scene_graph_render_tick();
+			let previousTimestamp: number | null = null;
+			const loop = (timestamp: number) => {
+				const deltaSeconds =
+					previousTimestamp === null
+						? 0
+						: (timestamp - previousTimestamp) / 1000;
+				previousTimestamp = timestamp;
+				ecs_scene_graph_render_tick(deltaSeconds);
 				requestAnimationFrame(loop);
 			};
 			requestAnimationFrame(loop);

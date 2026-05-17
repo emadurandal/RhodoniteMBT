@@ -90,21 +90,43 @@ export class FrameState {
 }
 
 export class TimeState {
-	private frameIndexValue = 0;
-	private elapsedSecondsValue = 0;
+	private renderFrameIndexValue = 0;
+	private renderElapsedSecondsValue = 0;
+	private fixedFrameIndexValue = 0;
+	private fixedElapsedSecondsValue = 0;
+	private fixedAccumulatorSecondsValue = 0;
 	private readonly fixedDeltaSeconds: number;
 
-	constructor(fixedDeltaSeconds = 0.022) {
+	constructor(fixedDeltaSeconds = 1 / 60) {
 		this.fixedDeltaSeconds = fixedDeltaSeconds;
 	}
 
-	nextFrame(): FrameState {
-		this.frameIndexValue += 1;
-		this.elapsedSecondsValue += this.fixedDeltaSeconds;
+	nextRenderFrame(deltaSeconds: number): FrameState {
+		this.renderFrameIndexValue += 1;
+		this.renderElapsedSecondsValue += deltaSeconds;
+		return new FrameState(
+			deltaSeconds,
+			this.renderFrameIndexValue,
+			this.renderElapsedSecondsValue,
+		);
+	}
+
+	pushFixedElapsed(elapsedSeconds: number): void {
+		this.fixedAccumulatorSecondsValue += elapsedSeconds;
+	}
+
+	canStepFixed(): boolean {
+		return this.fixedAccumulatorSecondsValue >= this.fixedDeltaSeconds;
+	}
+
+	nextFixedFrame(): FrameState {
+		this.fixedAccumulatorSecondsValue -= this.fixedDeltaSeconds;
+		this.fixedFrameIndexValue += 1;
+		this.fixedElapsedSecondsValue += this.fixedDeltaSeconds;
 		return new FrameState(
 			this.fixedDeltaSeconds,
-			this.frameIndexValue,
-			this.elapsedSecondsValue,
+			this.fixedFrameIndexValue,
+			this.fixedElapsedSecondsValue,
 		);
 	}
 }
@@ -746,11 +768,23 @@ export class Engine {
 		}
 	}
 
-	runRenderFrame(): void {
+	runRenderFrame(deltaSeconds: number): void {
 		this.ensureInitialized("Engine.runRenderFrame");
 		this.input.beginFrame();
-		const frame = this.timeState.nextFrame();
+		const frame = this.timeState.nextRenderFrame(deltaSeconds);
 		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
+	}
+
+	runFixedSteps(elapsedSeconds: number): number {
+		this.ensureInitialized("Engine.runFixedSteps");
+		this.timeState.pushFixedElapsed(elapsedSeconds);
+		let count = 0;
+		while (this.timeState.canStepFixed()) {
+			const frame = this.timeState.nextFixedFrame();
+			this.runPhaseGroup(PhaseGroup.FixedStep, frame);
+			count += 1;
+		}
+		return count;
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {

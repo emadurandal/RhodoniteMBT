@@ -5,6 +5,7 @@ import {
   "Kaida-Amethyst/sdl3",
   "Kaida-Amethyst/sdl3/lib",
   "Milky2018/wgpu_mbt/c",
+  "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
 }
 
@@ -13,7 +14,9 @@ pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalW
 
 pub fn release_native_demo_infrastructure(SdlMetalWebGpuNativeSession) -> Unit
 
-pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, () -> Unit) -> SdlMetalWebGpuNativeSession
+pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
+
+pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession
 
 // Errors
 
@@ -33,4 +36,3 @@ pub(all) struct SdlMetalWebGpuNativeSession {
 // Type aliases
 
 // Traits
-

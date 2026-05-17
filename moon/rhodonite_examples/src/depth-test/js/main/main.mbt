@@ -30,9 +30,9 @@ pub fn create_webgpu_demo_state(
 
 ///|
 /// Implements `depth_test_render_tick`.
-pub fn depth_test_render_tick() -> Unit {
+pub fn depth_test_render_tick(delta_seconds : Double) -> Unit {
   match demo_engine.val {
-    Some(engine) => engine.run_render_frame()
+    Some(engine) => engine.run_render_frame(Float::from_double(delta_seconds))
     _ => ()
   }
 }

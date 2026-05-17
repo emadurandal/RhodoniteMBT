@@ -4,7 +4,6 @@ import {
   "emadurandal/rhodonite_examples/basic-triangle/common" @demo_state,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/async/js_async",
-  "moonbitlang/core/ref" @ref,
 }
 
 supported_targets = "js"

@@ -1,0 +1,9 @@
+import {
+  "emadurandal/rhodonite/app" @app,
+}
+
+supported_targets = "js"
+
+options(
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
+)

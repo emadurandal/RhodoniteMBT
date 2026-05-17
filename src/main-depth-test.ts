@@ -15,8 +15,14 @@ if (!navigator.gpu) {
 
 			await create_webgpu_demo_state(canvas);
 
-			const loop = () => {
-				depth_test_render_tick();
+			let previousTimestamp: number | null = null;
+			const loop = (timestamp: number) => {
+				const deltaSeconds =
+					previousTimestamp === null
+						? 0
+						: (timestamp - previousTimestamp) / 1000;
+				previousTimestamp = timestamp;
+				depth_test_render_tick(deltaSeconds);
 				requestAnimationFrame(loop);
 			};
 			requestAnimationFrame(loop);

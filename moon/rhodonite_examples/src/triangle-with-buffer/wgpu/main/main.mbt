@@ -29,7 +29,7 @@ async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
       let session = @sdl_wgpu.run_sdl_metal_webgpu_input_render_loop(
         session,
         engine.input(),
-        fn() { engine.run_render_frame() },
+        fn(delta_seconds) { engine.run_render_frame(delta_seconds) },
       )
       engine.shutdown()
       @sdl_wgpu.release_native_demo_infrastructure(session)
