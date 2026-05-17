@@ -37,6 +37,7 @@ flowchart LR
 - `add_component`, `add_component_bytes`, `remove_component`, `set_component_bytes`, and `component_bytes` operate only on archetype SoA rows.
 - Entity moves between archetypes copy overlapping CPU columns with `copy_row_to`; row indices may change, but `EntityId` remains stable.
 - `GlobalTransform` and `Camera` are CPU ref components. Their GPU matrix bytes are stored in `GlobalTransformBlobStore` and `CameraBlobStore`.
+- Low-level GlobalTransform fp16 helpers include `global_transform_put_f16_le_mut_view` for writing a f32 value into a packed little-endian fp16 lane without hand-rolled byte stores.
 
 ## Builtins
 

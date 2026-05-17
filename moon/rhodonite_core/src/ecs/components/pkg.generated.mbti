@@ -45,6 +45,8 @@ pub fn global_transform_gpu_layout() -> GpuLayout
 
 pub fn global_transform_gpu_layout_f16() -> GpuLayout
 
+pub fn global_transform_put_f16_le_mut_view(MutArrayView[Byte], Int, Float) -> Unit
+
 pub fn global_transform_ref_bytes(GlobalTransformGpuFormat, Int) -> FixedArray[Byte]
 
 pub fn global_transform_ref_cpu_layout() -> GpuLayout

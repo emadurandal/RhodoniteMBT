@@ -289,10 +289,11 @@ fn write_mass_cubes_dense_y_transform_wave(
   if format_code == 1 {
     let mut byte_offset = (3 - first_word) * 4 + 2
     while i < count {
-      let half = @comp.global_transform_f32_to_f16_bits(
+      @comp.global_transform_put_f16_le_mut_view(
+        bytes,
+        byte_offset,
         Float::from_double(wave_sin * 0.12),
       )
-      @writes.put_u16_le_mut_view(bytes, byte_offset, half)
       let next_sin = wave_sin * cos_step + wave_cos * sin_step
       wave_cos = wave_cos * cos_step - wave_sin * sin_step
       wave_sin = next_sin

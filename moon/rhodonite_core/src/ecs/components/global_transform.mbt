@@ -318,6 +318,31 @@ pub fn global_transform_f32_to_f16_bits(value : Float) -> UInt {
 }
 
 ///|
+/// Writes a f32 value as little-endian fp16 bits into a byte view.
+#cfg(target="native")
+#borrow(buf)
+pub extern "C" fn global_transform_put_f16_le_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : Float,
+) -> Unit = "rhodonite_global_transform_put_f16_le_mut_view"
+
+///|
+/// Writes a f32 value as little-endian fp16 bits into a byte view.
+#cfg(not(target="native"))
+pub fn global_transform_put_f16_le_mut_view(
+  buf : MutArrayView[Byte],
+  offset : Int,
+  value : Float,
+) -> Unit {
+  @writes.put_u16_le_mut_view(
+    buf,
+    offset,
+    global_transform_f32_to_f16_bits(value),
+  )
+}
+
+///|
 /// Implements `f16_bits_to_f32`.
 fn f16_bits_to_f32(bits16 : UInt) -> Float {
   let sign = (bits16 & 0x8000U) << 16

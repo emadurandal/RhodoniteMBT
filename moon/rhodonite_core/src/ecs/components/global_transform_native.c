@@ -1,13 +1,21 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "moonbit.h"
+
+typedef struct RhodoniteMutArrayViewU8 {
+  int32_t start;
+  int32_t end;
+  moonbit_bytes_t bytes;
+} RhodoniteMutArrayViewU8;
+
 static uint32_t rhodonite_f32_bits(float value) {
   uint32_t bits;
   memcpy(&bits, &value, sizeof(bits));
   return bits;
 }
 
-uint32_t rhodonite_global_transform_f32_to_f16_bits(float value) {
+static inline uint32_t rhodonite_global_transform_f32_to_f16_bits_impl(float value) {
   uint32_t bits = rhodonite_f32_bits(value);
   uint32_t sign = (bits >> 16) & 0x8000u;
   uint32_t mant = bits & 0x007fffffu;
@@ -40,4 +48,19 @@ uint32_t rhodonite_global_transform_f32_to_f16_bits(float value) {
     half += 1u;
   }
   return half;
+}
+
+uint32_t rhodonite_global_transform_f32_to_f16_bits(float value) {
+  return rhodonite_global_transform_f32_to_f16_bits_impl(value);
+}
+
+void rhodonite_global_transform_put_f16_le_mut_view(
+  RhodoniteMutArrayViewU8 buf,
+  int32_t off,
+  float value
+) {
+  uint32_t half = rhodonite_global_transform_f32_to_f16_bits_impl(value);
+  uint8_t* out = buf.bytes + buf.start + off;
+  out[0] = (uint8_t)half;
+  out[1] = (uint8_t)(half >> 8);
 }

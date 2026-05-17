@@ -37,6 +37,7 @@ flowchart LR
 - `add_component`、`add_component_bytes`、`remove_component`、`set_component_bytes`、`component_bytes` は archetype SoA row だけを扱います。
 - entity が archetype 間を移動すると、重複する CPU column は `copy_row_to` でコピーされます。row index は変わりますが、`EntityId` は安定しています。
 - `GlobalTransform` と `Camera` は CPU ref component です。GPU matrix bytes は `GlobalTransformBlobStore` / `CameraBlobStore` に置きます。
+- 低レベルの GlobalTransform fp16 helper として、f32 値を little-endian の packed fp16 lane へ書く `global_transform_put_f16_le_mut_view` があります。byte store を手書きせずに使います。
 
 ## Builtin Component
 
