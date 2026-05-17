@@ -68,6 +68,10 @@ The recommended frame order is input/controller update, `orbit_camera_transform_
 
 `RawQuery::for_each_archetype` yields `RawQueryArchetype` chunks. `read_column` and `write_column` return contiguous logical column views for the matched archetype, sized to `row_count * stride`.
 
+`Query::prepare(world)` and `RawQuery::prepare(world)` cache the matched archetypes and component-column lookups in `PreparedQuery` / `RawPreparedQuery`. Prepared queries are safe to keep and reuse across structural changes: iteration compares the cached `archetype_version` with the current `World`, and rebuilds the plan once if it is stale. They are optimization handles, not snapshots.
+
+Prefer plain `Query` / `RawQuery` for one-off local iteration. Use prepared queries when the same required component set is iterated repeatedly and the world structure is expected to stay stable between iterations. If entities are frequently created/destroyed or components are frequently added/removed between runs, prepared queries may rebuild often and provide little benefit.
+
 Queries reject duplicate required components. Structural mutation and direct payload setters are guarded while a query callback is active, because archetype rows and borrowed views could otherwise be invalidated.
 
 ## Mutation And Scheduling

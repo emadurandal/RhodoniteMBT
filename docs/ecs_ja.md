@@ -56,6 +56,10 @@ flowchart LR
 
 `RawQuery::for_each_archetype` は `RawQueryArchetype` chunk を返します。`read_column` / `write_column` は matched archetype の logical column view を `row_count * stride` サイズで返します。
 
+`Query::prepare(world)` / `RawQuery::prepare(world)` は、matched archetype と component column lookup を `PreparedQuery` / `RawPreparedQuery` に cache します。prepared query は構造変更をまたいで保持・再利用しても安全です。iteration 時に cached `archetype_version` と現在の `World` を比較し、古ければ一度 plan を作り直します。これは最適化用の handle であり、snapshot ではありません。
+
+単発のローカル iteration では通常の `Query` / `RawQuery` を使います。同じ required component set を繰り返し走査し、かつ iteration 間で world structure があまり変わらない場合は prepared query を使います。entity の create/destroy や component の add/remove が毎回頻繁に起きる場合、prepared query は再構築されやすく、利点は小さくなります。
+
 query は duplicate required component を拒否します。query callback 中は、archetype row や borrowed view を壊さないように、構造変更や直接 payload setter が guard されます。
 
 ## Mutation And Scheduling
