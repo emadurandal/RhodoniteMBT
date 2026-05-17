@@ -5,6 +5,8 @@ import {
 	Phase,
 	PhaseGroup,
 	Scene,
+	TimeState,
+	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
 	startBrowserEngineRuntime,
 	startBrowserFrameLoop,
@@ -149,6 +151,7 @@ describe("app-runtime Engine", () => {
 		engine.initialize();
 
 		expect(engine.phaseGroupOrder(PhaseGroup.FrameBegin)).toEqual([
+			Phase.Surface,
 			Phase.Input,
 		]);
 		expect(engine.phaseGroupOrder(PhaseGroup.FixedStep)).toEqual([
@@ -163,6 +166,22 @@ describe("app-runtime Engine", () => {
 			Phase.Render,
 			Phase.Present,
 		]);
+	});
+
+	it("caps fixed-step catch-up and drops excess backlog", () => {
+		const time = new TimeState(1 / 60);
+		const frames: number[] = [];
+		time.pushFixedElapsed(10);
+
+		const steps = time.drainReadyFixedFrames((frame) => {
+			frames.push(frame.frameIndex);
+		});
+
+		expect(steps).toBe(defaultMaxFixedStepsPerFrame());
+		expect(frames).toEqual([1, 2, 3, 4, 5]);
+		expect(time.canStepFixed()).toBe(false);
+		time.pushFixedElapsed(1 / 60);
+		expect(time.nextFixedFrame().frameIndex).toBe(6);
 	});
 
 	it("starts a browser frame loop with zero first delta and stoppable rAF", () => {

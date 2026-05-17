@@ -137,7 +137,7 @@ Engine::run_frame
     enabled scene systems for Input
     engine handlers in PhaseSlot::AfterSystems
   accumulate fixed-step elapsed time
-  run phase_group_fixed_step() 0..N times
+  run phase_group_fixed_step() 0..max_fixed_steps_per_frame times
     run phase_fixed_update()
     engine handlers / enabled scene systems / after handlers
     run phase_fixed_post_update()
@@ -161,7 +161,7 @@ Engine::run_frame
     same slot/system-runner structure
 ```
 
-`Engine::run_frame(elapsed_seconds)` は frame-begin、fixed-step、render-frame group に total order を与える標準 runner です。platform loop は SDL tick 差分や browser `requestAnimationFrame(timestamp)` 差分を秒に変換して `run_frame` に渡します。engine は内部 accumulator に経過時間を積み、固定 delta ごとに `phase_group_fixed_step()` を 0 回以上実行してから、その tick の render-frame group を 1 回実行します。`Engine::set_surface_active(width, height, format)` / `Engine::set_surface_suspended()` は platform runtime から surface 状態を通知する入口です。`FrameState` はその frame の surface snapshot と `surface_changed` を持ち、`phase_surface()` handler は depth texture や renderer-owned resource を再作成できます。surface が suspended の間、engine は update/post-update までは進めますが `render_extract` / `render_prepare` / `render` / `present` を skip します。`run_phase_group` / `run_phase` は特殊用途や test 用の低レベル API として残します。
+`Engine::run_frame(elapsed_seconds)` は frame-begin、fixed-step、render-frame group に total order を与える標準 runner です。platform loop は SDL tick 差分や browser `requestAnimationFrame(timestamp)` 差分を秒に変換して `run_frame` に渡します。engine は内部 accumulator に経過時間を積み、固定 delta ごとに `phase_group_fixed_step()` を 0 回以上実行してから、その tick の render-frame group を 1 回実行します。ただし browser tab の background 復帰や OS suspend 復帰で大きな delta が入っても一度に固定更新を走らせすぎないよう、1 tick あたりの固定ステップは既定で 5 回に打ち切り、まだ残る backlog は破棄します。`Engine::set_surface_active(width, height, format)` / `Engine::set_surface_suspended()` は platform runtime から surface 状態を通知する入口です。`FrameState` はその frame の surface snapshot と `surface_changed` を持ち、`phase_surface()` handler は depth texture や renderer-owned resource を再作成できます。surface が suspended の間、engine は update/post-update までは進めますが `render_extract` / `render_prepare` / `render` / `present` を skip します。`run_phase_group` / `run_phase` は特殊用途や test 用の低レベル API として残します。
 
 `Engine` の内部 field や命名は `scenes` / `main_scene_index` にし、複数 scene へ拡張できるようにします。
 
@@ -232,7 +232,7 @@ Phase 3 で `Engine` / `Scene` は public facade の [`moon/rhodonite/src/app/`]
 | `PhaseKey` | 文字列名を持つ open phase id。`phase("user/foo")` で追加でき、標準 phase は `phase_surface()`、`phase_update()`、`phase_render_extract()`、`phase_render()` などで取得する。 |
 | `PhaseGroupKey` | 文字列名を持つ open phase group id。`phase_group("user/simulation")` で追加でき、標準 group は `phase_group_frame_begin()`、`phase_group_fixed_step()`、`phase_group_render_frame()` で取得する。 |
 | `PhaseSlot` | phase 内の `BeforeSystems` / `AfterSystems` 実行帯。system runner 外処理や将来の renderer task を phase lifecycle 内に置く。 |
-| `TimeState` | render-frame clock と fixed-step clock を持つ。render は caller-supplied delta、fixed は accumulator と固定 delta で進む。 |
+| `TimeState` | render-frame clock と fixed-step clock を持つ。render は caller-supplied delta、fixed は accumulator と固定 delta で進む。固定ステップは 1 tick あたりの上限を持ち、超過 backlog を破棄できる。 |
 | `Scene` | 1 つの `World` と 1 つの `SystemRunner`、`main_camera`、enabled/visible state を持つ。 |
 | `Engine` | `GPUContext`、scene collection、main scene index、time state、phase groups、phase handler registry を持つ。`add_phase_handler` で handler を追加登録し、`run_frame(elapsed_seconds)` は frame-begin、fixed-step、render-frame group を標準順序で実行する。 |
 

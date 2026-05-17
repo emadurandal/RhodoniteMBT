@@ -149,6 +149,7 @@ pub struct TimeState {
   // private fields
 }
 pub fn TimeState::can_step_fixed(Self) -> Bool
+pub fn TimeState::drain_ready_fixed_frames(Self, (FrameState) -> Unit) -> Int
 pub fn TimeState::new(Float) -> Self
 pub fn TimeState::next_fixed_frame(Self) -> FrameState
 pub fn TimeState::next_render_frame(Self, Float) -> FrameState

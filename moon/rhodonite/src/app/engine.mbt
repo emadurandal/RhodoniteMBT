@@ -550,15 +550,10 @@ fn Engine::run_ready_fixed_steps(
   surface_changed : Bool,
 ) -> Int {
   self.time_state.push_fixed_elapsed(elapsed_seconds)
-  let mut count = 0
-  while self.time_state.can_step_fixed() {
-    let frame = self.time_state
-      .next_fixed_frame()
-      .with_surface(surface, surface_changed)
+  self.time_state.drain_ready_fixed_frames(fn(fixed_frame) {
+    let frame = fixed_frame.with_surface(surface, surface_changed)
     self.run_phase_group(phase_group_fixed_step(), frame)
-    count = count + 1
-  }
-  count
+  })
 }
 
 ///|

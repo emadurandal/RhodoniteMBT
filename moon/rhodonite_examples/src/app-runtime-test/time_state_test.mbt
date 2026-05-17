@@ -39,3 +39,19 @@ test "fixed clock accumulates real elapsed and steps by fixed delta" {
   assert_double_near(frame2.elapsed_seconds(), 0.5)
   assert_true(!time.can_step_fixed())
 }
+
+///|
+test "fixed clock drops backlog after default per frame cap" {
+  let time = @app.TimeState::new((1.0 : Float) / (60.0 : Float))
+  time.push_fixed_elapsed((10.0 : Float))
+  let mut callback_count = 0
+  let steps = time.drain_ready_fixed_frames(fn(_frame) {
+    callback_count = callback_count + 1
+  })
+  assert_eq(steps, 5)
+  assert_eq(callback_count, 5)
+  assert_true(!time.can_step_fixed())
+  time.push_fixed_elapsed((1.0 : Float) / (60.0 : Float))
+  let frame = time.next_fixed_frame()
+  assert_eq(frame.frame_index(), 6)
+}

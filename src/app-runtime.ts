@@ -58,6 +58,10 @@ export function defaultFixedStepPhases(): PhaseKey[] {
 	return [Phase.FixedUpdate, Phase.FixedPostUpdate];
 }
 
+export function defaultMaxFixedStepsPerFrame(): number {
+	return 5;
+}
+
 type PhaseGroupRecord = {
 	key: PhaseGroupKey;
 	phases: PhaseKey[];
@@ -163,9 +167,20 @@ export class TimeState {
 	private fixedElapsedSecondsValue = 0;
 	private fixedAccumulatorSecondsValue = 0;
 	private readonly fixedDeltaSeconds: number;
+	private readonly maxFixedStepsPerFrameValue: number;
 
-	constructor(fixedDeltaSeconds = 1 / 60) {
+	constructor(
+		fixedDeltaSeconds = 1 / 60,
+		maxFixedStepsPerFrame = defaultMaxFixedStepsPerFrame(),
+	) {
+		if (fixedDeltaSeconds <= 0) {
+			throw new Error("TimeState: fixed delta must be positive.");
+		}
+		if (maxFixedStepsPerFrame <= 0) {
+			throw new Error("TimeState: max fixed steps must be positive.");
+		}
 		this.fixedDeltaSeconds = fixedDeltaSeconds;
+		this.maxFixedStepsPerFrameValue = maxFixedStepsPerFrame;
 	}
 
 	nextRenderFrame(deltaSeconds: number): FrameState {
@@ -186,6 +201,10 @@ export class TimeState {
 		return this.fixedAccumulatorSecondsValue >= this.fixedDeltaSeconds;
 	}
 
+	maxFixedStepsPerFrame(): number {
+		return this.maxFixedStepsPerFrameValue;
+	}
+
 	nextFixedFrame(): FrameState {
 		this.fixedAccumulatorSecondsValue -= this.fixedDeltaSeconds;
 		this.fixedFrameIndexValue += 1;
@@ -195,6 +214,23 @@ export class TimeState {
 			this.fixedFrameIndexValue,
 			this.fixedElapsedSecondsValue,
 		);
+	}
+
+	private discardFixedAccumulator(): void {
+		this.fixedAccumulatorSecondsValue = 0;
+	}
+
+	drainReadyFixedFrames(run: (frame: FrameState) => void): number {
+		let count = 0;
+		const maxSteps = this.maxFixedStepsPerFrame();
+		while (count < maxSteps && this.canStepFixed()) {
+			run(this.nextFixedFrame());
+			count += 1;
+		}
+		if (this.canStepFixed()) {
+			this.discardFixedAccumulator();
+		}
+		return count;
 	}
 }
 
@@ -1026,16 +1062,10 @@ export class Engine {
 		surfaceChanged: boolean,
 	): number {
 		this.timeState.pushFixedElapsed(elapsedSeconds);
-		let count = 0;
-		while (this.timeState.canStepFixed()) {
-			const frame = this.timeState.nextFixedFrame().withSurface(
-				surface,
-				surfaceChanged,
-			);
+		return this.timeState.drainReadyFixedFrames((fixedFrame) => {
+			const frame = fixedFrame.withSurface(surface, surfaceChanged);
 			this.runPhaseGroup(PhaseGroup.FixedStep, frame);
-			count += 1;
-		}
-		return count;
+		});
 	}
 
 	runFrame(elapsedSeconds: number): number {
