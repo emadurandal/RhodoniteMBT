@@ -133,16 +133,15 @@ fn assert_native_visual_sample(id : String) -> Unit raise {
 /// Implements `assert_native_visual_manifest_matches_test_blocks`.
 fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
   let samples = visual_samples_for_target("native")
-  if samples.length() != 5 {
+  if samples.length() != 4 {
     @test.fail(
-      "native visual regression manifest has \{samples.length()} samples, but MoonBit declares 5 native test blocks",
+      "native visual regression manifest has \{samples.length()} samples, but MoonBit declares 4 native test blocks",
     )
   }
   for i = 0; i < samples.length(); i = i + 1 {
     match samples[i].id {
       "basic-triangle"
       | "ondemand-triangle"
-      | "triangle-with-buffer"
       | "ecs-scene-graph"
       | "ecs-mass-cubes" => ()
       id =>
@@ -161,11 +160,6 @@ test "visual WebGPU native basic triangle PNG golden" {
 ///|
 test "visual WebGPU native on-demand triangle PNG golden" {
   assert_native_visual_sample("ondemand-triangle")
-}
-
-///|
-test "visual WebGPU native triangle with buffer PNG golden" {
-  assert_native_visual_sample("triangle-with-buffer")
 }
 
 ///|
@@ -200,13 +194,6 @@ fn render_native_visual_sample(
         device, queue, format,
       )
       @ondemand_triangle.render_frame_to_view(demo_state, view)
-      demo_state.release()
-    }
-    "triangle-with-buffer" => {
-      let demo_state = @triangle_with_buffer.create_demo_state_for_device(
-        device, queue, format,
-      )
-      @triangle_with_buffer.render_frame_to_view(demo_state, view)
       demo_state.release()
     }
     "ecs-scene-graph" => {

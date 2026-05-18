@@ -22,7 +22,6 @@ export default defineConfig({
 				ondemandTriangle: "demos/ondemand-triangle.html",
 				tsEcsMassCubes: "demos/ts-ecs-mass-cubes.html",
 				tsOndemandTriangle: "demos/ts-ondemand-triangle.html",
-				triangleWithBuffer: "demos/triangle-with-buffer.html",
 				wasmEcsMassCubes: "demos/wasm-ecs-mass-cubes.html",
 				wasmGcEcsMassCubes: "demos/wasm-gc-ecs-mass-cubes.html",
 			},

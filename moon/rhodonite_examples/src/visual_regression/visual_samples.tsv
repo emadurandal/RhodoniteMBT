@@ -1,12 +1,10 @@
 # target	id	name	filename	max_mismatch_rate	perceptual_threshold
 native	basic-triangle	basic-triangle native	basic_triangle_sample.png	0.0005	0.1
 native	ondemand-triangle	ondemand-triangle native	ondemand_triangle_sample.png	0.0005	0.1
-native	triangle-with-buffer	triangle-with-buffer native	triangle_with_buffer_sample.png	0.0005	0.1
 native	ecs-scene-graph	ecs-scene-graph native	ecs_scene_graph_sample.png	0.0005	0.1
 native	ecs-mass-cubes	ecs-mass-cubes native	ecs_mass_cubes_sample.png	0.0005	0.1
 browser	basic-triangle	basic-triangle browser	basic_triangle_browser_sample.png	0.0005	0.1
 browser	ondemand-triangle	ondemand-triangle browser	ondemand_triangle_browser_sample.png	0.0005	0.1
-browser	triangle-with-buffer	triangle-with-buffer browser	triangle_with_buffer_browser_sample.png	0.0005	0.1
 browser	ecs-scene-graph	ecs-scene-graph browser	ecs_scene_graph_browser_sample.png	0.0005	0.1
 browser	ecs-mass-cubes	ecs-mass-cubes browser	ecs_mass_cubes_browser_sample.png	0.0005	0.1
 browser	ts-ecs-mass-cubes	ts-ecs-mass-cubes browser	ts_ecs_mass_cubes_browser_sample.png	0.0005	0.1

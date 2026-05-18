@@ -50,7 +50,7 @@ pnpm install
 
 | Goal | Command |
 |------|---------|
-| JS demo (browser) | `pnpm run dev:js:basic-triangle` (also `dev:js:triangle-with-buffer`, `dev:js:ecs-scene-graph`, `dev:js:ecs-mass-cubes`) |
+| JS demo (browser) | `pnpm run dev:js:basic-triangle`, `pnpm run dev:js:ondemand-triangle`, `pnpm run dev:js:ecs-scene-graph`, `pnpm run dev:js:multi-surface-independent-input`, `pnpm run dev:js:ecs-mass-cubes` |
 | Native (SDL3 / wgpu) | `pnpm run dev:native:basic-triangle`, etc. ([`scripts/run-wgpu-sdl3.sh`](scripts/run-wgpu-sdl3.sh)) |
 | Core JS bridge (Vitest) | `pnpm run test:core:js` |
 | Core MoonBit tests | `pnpm run test:core:mbt` |
