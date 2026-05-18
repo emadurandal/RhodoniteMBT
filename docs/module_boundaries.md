@@ -6,8 +6,8 @@ RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitla
 
 | Moon module (`moon.mod.json` `name`) | Directory | Role |
 |--------------------------------------|-----------|------|
-| `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | Public facade; aggregates lower modules and exposes high-level app/runtime helpers. |
-| `emadurandal/rhodonite_app_sdl3` | [`moon/rhodonite_app_sdl3/`](../moon/rhodonite_app_sdl3/) | SDL3 native app runtime helpers for window/event loop and Metal WebGPU bootstrap. |
+| `emadurandal/rhodonite` | [`moon/rhodonite/`](../moon/rhodonite/) | Public facade; aggregates lower modules and exposes high-level app/platform helpers. |
+| `emadurandal/rhodonite_app_sdl3` | [`moon/rhodonite_app_sdl3/`](../moon/rhodonite_app_sdl3/) | SDL3 native platform helpers for window/event loop and Metal WebGPU bootstrap. |
 | `emadurandal/rhodonite_core` | [`moon/rhodonite_core/`](../moon/rhodonite_core/) | Vectors, JS bridge (`src/math/`), little-endian buffer writes including native raw `MutArrayView` writers (`src/binary/writes`), ECS ([`docs/ecs.md`](ecs.md)), platform-independent input state ([`docs/input_architecture_ja.md`](input_architecture_ja.md)), and the ECS microbench package (`src/ecs_bench`). |
 | `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU abstraction (browser and native). |
 | `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | Runnable samples and sample-only shared helpers (demo module). |
@@ -44,9 +44,9 @@ flowchart LR
   examples --> core
 ```
 
-- **Allowed**: `rhodonite_examples` may depend on `emadurandal/rhodonite` for high-level app/runtime samples while still importing lower libraries directly for focused low-level WebGPU and ECS examples.
+- **Allowed**: `rhodonite_examples` may depend on `emadurandal/rhodonite` for high-level app/platform samples while still importing lower libraries directly for focused low-level WebGPU and ECS examples.
 - **Disallowed**: `rhodonite_webgpu` depending on `rhodonite_examples`.
-- **Input adapters**: platform-independent input state lives in `rhodonite_core/input`; browser runtime lives in `emadurandal/rhodonite/app/browser`, and SDL3 native runtime lives in `emadurandal/rhodonite_app_sdl3/sdl3`.
+- **Input adapters**: platform-independent input state lives in `rhodonite_core/input`; browser platform lives in `emadurandal/rhodonite/app/browser`, and SDL3 native platform lives in `emadurandal/rhodonite_app_sdl3/sdl3`.
 
 During development, link workspace members with [`path` dependencies](https://docs.moonbitlang.com/en/stable/toolchain/moon/module.html#dependency-management). Before publishing, replace `path` entries in dependents’ `moon.mod.json` with **semver** strings (use `moon work sync` if needed).
 
@@ -58,4 +58,4 @@ During development, link workspace members with [`path` dependencies](https://do
 4. In the module you publish, update `deps` workspace members to registry versions in `moon.mod.json`.
 5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
-From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core, temporarily rewrites `moon/rhodonite_webgpu/moon.mod.json`'s core path dep to semver, publishes webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver, publishes the facade, temporarily rewrites `moon/rhodonite_app_sdl3/moon.mod.json` path deps to semver, publishes the SDL3 app runtime, then restores the workspace files. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`. Use `PUBLISH_MOON_DOWNSTREAM_ONLY=1` when core/webgpu are already published, or `PUBLISH_MOON_APP_SDL3_ONLY=1` to retry only the SDL3 app runtime.
+From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core, temporarily rewrites `moon/rhodonite_webgpu/moon.mod.json`'s core path dep to semver, publishes webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver, publishes the facade, temporarily rewrites `moon/rhodonite_app_sdl3/moon.mod.json` path deps to semver, publishes the SDL3 app platform module, then restores the workspace files. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`. Use `PUBLISH_MOON_DOWNSTREAM_ONLY=1` when core/webgpu are already published, or `PUBLISH_MOON_APP_SDL3_ONLY=1` to retry only the SDL3 app platform module.

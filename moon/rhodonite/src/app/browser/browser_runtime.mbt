@@ -7,6 +7,141 @@ pub type BrowserFrameLoop
 pub type BrowserInputBinding
 
 ///|
+/// Configuration for the browser platform lifecycle owner.
+pub struct PlatformConfig {
+  priv canvas : @wgpu.HTMLCanvasElement
+}
+
+///|
+/// Application hooks used by the browser platform to create and set up an engine.
+pub struct PlatformApp {
+  priv create_engine : (@wgpu.GPUContext) -> @app.Engine
+  priv setup_engine : (@app.Engine) -> Bool
+}
+
+///|
+/// Browser platform frame driving mode.
+pub enum FrameMode {
+  Loop
+  SingleFrame
+}
+
+///|
+/// Options for starting the standard browser platform.
+pub struct PlatformOptions {
+  frame_mode : FrameMode
+  priv install_input : Bool
+}
+
+///|
+/// Owns browser platform resources for one engine.
+pub struct Platform {
+  priv engine : @app.Engine
+  priv mut frame_loop : BrowserFrameLoop?
+  priv mut input_binding : BrowserInputBinding?
+  priv mut disposed : Bool
+}
+
+///|
+/// Builds browser platform configuration from a canvas.
+pub fn PlatformConfig::new(canvas : @wgpu.HTMLCanvasElement) -> PlatformConfig {
+  { canvas, }
+}
+
+///|
+/// Builds browser platform application hooks.
+pub fn PlatformApp::new(
+  create_engine : (@wgpu.GPUContext) -> @app.Engine,
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  { create_engine, setup_engine }
+}
+
+///|
+/// Builds browser platform application hooks using the default engine constructor.
+pub fn PlatformApp::default_engine(
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  PlatformApp::new(fn(context) { @app.Engine::new(context) }, setup_engine)
+}
+
+///|
+/// Creates browser platform options for an interactive canvas sample.
+pub fn PlatformOptions::interactive() -> PlatformOptions {
+  { frame_mode: Loop, install_input: true }
+}
+
+///|
+/// Creates browser platform options for a render-only loop.
+pub fn PlatformOptions::render_loop() -> PlatformOptions {
+  { frame_mode: Loop, install_input: false }
+}
+
+///|
+/// Creates browser platform options for a single-frame canvas sample.
+pub fn PlatformOptions::single_frame() -> PlatformOptions {
+  { frame_mode: SingleFrame, install_input: false }
+}
+
+///|
+/// Replaces the active browser platform for a canvas in the JS-side registry.
+extern "js" fn replace_platform_for_canvas(
+  canvas : @wgpu.HTMLCanvasElement,
+  platform : Platform,
+  dispose_platform : (Platform) -> Unit,
+) -> Unit =
+  #| (canvas, platform, disposePlatform) => {
+  #|   const key = "__rhodonite_browser_platforms";
+  #|   const platforms =
+  #|     globalThis[key] ?? (globalThis[key] = new WeakMap());
+  #|   const existing = platforms.get(canvas);
+  #|   if (existing !== undefined && existing !== platform) {
+  #|     disposePlatform(existing);
+  #|   }
+  #|   platforms.set(canvas, platform);
+  #| }
+
+///|
+/// Stops and removes the active browser platform for a canvas.
+extern "js" fn stop_platform_for_canvas(
+  canvas : @wgpu.HTMLCanvasElement,
+  dispose_platform : (Platform) -> Unit,
+) -> Unit =
+  #| (canvas, disposePlatform) => {
+  #|   const key = "__rhodonite_browser_platforms";
+  #|   const platforms = globalThis[key];
+  #|   if (platforms === undefined) {
+  #|     return;
+  #|   }
+  #|   const existing = platforms.get(canvas);
+  #|   if (existing === undefined) {
+  #|     return;
+  #|   }
+  #|   disposePlatform(existing);
+  #|   platforms.delete(canvas);
+  #| }
+
+///|
+/// Disposes browser platform handles and shuts down the owned engine once.
+pub fn Platform::dispose(self : Platform) -> Unit {
+  if self.disposed {
+    return
+  }
+  self.disposed = true
+  match self.frame_loop {
+    Some(frame_loop) => frame_loop.stop()
+    None => ()
+  }
+  match self.input_binding {
+    Some(input_binding) => input_binding.dispose()
+    None => ()
+  }
+  self.frame_loop = None
+  self.input_binding = None
+  self.engine.shutdown()
+}
+
+///|
 /// Builds a WebGPU context from a browser canvas element.
 pub async fn gpu_context_from_html_canvas(
   canvas : @wgpu.HTMLCanvasElement,
@@ -274,4 +409,53 @@ pub fn install_browser_input(
     },
     fn() { input.enqueue_event(FocusLost) },
   )
+}
+
+///|
+/// Starts the standard browser platform resources for an initialized engine.
+pub fn start_platform(
+  engine : @app.Engine,
+  canvas : @wgpu.HTMLCanvasElement,
+  options : PlatformOptions,
+) -> Platform {
+  sync_browser_engine_surface(engine, canvas)
+  let frame_loop = match options.frame_mode {
+    Loop => Some(start_browser_engine_canvas_loop(engine, canvas))
+    SingleFrame => {
+      ignore(engine.run_frame((0.0 : Float)))
+      None
+    }
+  }
+  let input_binding = if options.install_input {
+    Some(install_browser_input(engine, canvas))
+  } else {
+    None
+  }
+  { engine, frame_loop, input_binding, disposed: false }
+}
+
+///|
+/// Runs the browser platform lifecycle from configuration and application hooks.
+pub async fn run_platform(
+  config : PlatformConfig,
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> Platform? {
+  let ctx = gpu_context_from_html_canvas(config.canvas)
+  let engine = (app.create_engine)(ctx)
+  if !(app.setup_engine)(engine) {
+    return None
+  }
+  engine.initialize()
+  let platform = start_platform(engine, config.canvas, options)
+  replace_platform_for_canvas(config.canvas, platform, fn(platform) {
+    platform.dispose()
+  })
+  Some(platform)
+}
+
+///|
+/// Stops the active browser platform associated with a canvas.
+pub fn stop_platform(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+  stop_platform_for_canvas(canvas, fn(platform) { platform.dispose() })
 }

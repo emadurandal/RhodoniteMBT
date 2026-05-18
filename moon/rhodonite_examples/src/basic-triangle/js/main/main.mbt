@@ -1,18 +1,27 @@
 ///|
+/// Creates DemoState and registers engine handlers.
+fn setup_engine(engine : @app.Engine) -> Bool {
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      @demo_state.register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Initializes the browser WebGPU sample and renders the first engine tick.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let ctx = @app_browser.gpu_context_from_html_canvas(canvas)
-  let engine = @app.Engine::new(ctx)
-  match @demo_state.create_demo_state_for_engine(engine) {
-    Some(demo_state) => {
-      @demo_state.register_engine_handlers(engine, demo_state)
-      engine.initialize()
-      @app_browser.sync_browser_engine_surface(engine, canvas)
-      ignore(engine.run_frame((0.0 : Float)))
-      println("WebGPU triangle rendered successfully!")
-    }
+  let platform = @app_browser.run_platform(
+    @app_browser.PlatformConfig::new(canvas),
+    @app_browser.PlatformApp::default_engine(setup_engine),
+    @app_browser.PlatformOptions::single_frame(),
+  )
+  match platform {
+    Some(_) => println("WebGPU triangle rendered successfully!")
     None => println("Failed to create DemoState")
   }
 }

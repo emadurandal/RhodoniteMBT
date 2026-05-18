@@ -23,9 +23,11 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
+	PlatformApp,
+	PlatformConfig,
+	PlatformOptions,
+	runPlatform,
 	runBrowserWebGpuCanvasDemo,
-	startBrowserEngineRuntime,
-	type BrowserEngineRuntime,
 	type FrameState,
 } from "./app-runtime";
 import {
@@ -87,7 +89,6 @@ type DemoState = {
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
-	browserRuntime?: BrowserEngineRuntime;
 };
 
 function globalTransformDefaultIsF16(): boolean {
@@ -570,7 +571,6 @@ function renderScene(
 function releaseDemoState(demoState: DemoState): void {
 	releaseMassCubesRenderResources(demoState.render);
 	demoState.transformStorage.destroy();
-	demoState.browserRuntime?.dispose();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -607,12 +607,15 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
-		const engine = await Engine.create(canvas, {
-			mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
-		});
-		const demoState = createDemoStateForEngine(engine);
-		registerEngineHandlers(engine, demoState);
-		engine.initialize();
-		demoState.browserRuntime = startBrowserEngineRuntime(engine);
+		await runPlatform(
+			new PlatformConfig(canvas, {
+				mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
+			}),
+			PlatformApp.defaultEngine((engine) => {
+				const demoState = createDemoStateForEngine(engine);
+				registerEngineHandlers(engine, demoState);
+			}),
+			PlatformOptions.interactive(),
+		);
 	},
 });

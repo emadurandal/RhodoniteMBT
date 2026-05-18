@@ -302,7 +302,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 }
 
-type RuntimeScene = {
+export type RuntimeScene = {
 	enabled: () => boolean;
 	visible: () => boolean;
 	runSchedulePhase: (phase: PhaseKey, frame: FrameState) => boolean;
@@ -512,11 +512,101 @@ export type BrowserFrameLoop = {
 	stop: () => void;
 };
 
-export type BrowserEngineRuntime = {
-	readonly inputBinding: BrowserInputBinding;
-	readonly frameLoop: BrowserFrameLoop;
+export type Platform = {
+	readonly engine: Engine;
+	readonly inputBinding?: BrowserInputBinding;
+	readonly frameLoop?: BrowserFrameLoop;
 	dispose: () => void;
 };
+
+export class PlatformConfig {
+	readonly canvas: HTMLCanvasElement;
+	readonly mainScene: RuntimeScene | undefined;
+
+	constructor(
+		canvas: HTMLCanvasElement,
+		options: { readonly mainScene?: RuntimeScene } = {},
+	) {
+		this.canvas = canvas;
+		this.mainScene = options.mainScene;
+	}
+}
+
+export class PlatformApp {
+	readonly createEngine: (config: PlatformConfig) => Promise<Engine>;
+	readonly setupEngine: (engine: Engine) => boolean | void;
+
+	constructor(options: {
+		readonly createEngine: (config: PlatformConfig) => Promise<Engine>;
+		readonly setupEngine: (engine: Engine) => boolean | void;
+	}) {
+		this.createEngine = options.createEngine;
+		this.setupEngine = options.setupEngine;
+	}
+
+	static defaultEngine(
+		setupEngine: (engine: Engine) => boolean | void,
+	): PlatformApp {
+		return new PlatformApp({
+			createEngine: (config) =>
+				Engine.create(config.canvas, { mainScene: config.mainScene }),
+			setupEngine,
+		});
+	}
+}
+
+export class PlatformOptions {
+	readonly keyboardTarget: Window | HTMLElement | undefined;
+	readonly frameMode: "loop" | "single-frame";
+	readonly installInput: boolean;
+
+	constructor(options: {
+		readonly keyboardTarget?: Window | HTMLElement;
+		readonly frameMode?: "loop" | "single-frame";
+		readonly installInput?: boolean;
+	} = {}) {
+		this.keyboardTarget = options.keyboardTarget;
+		this.frameMode = options.frameMode ?? "loop";
+		this.installInput = options.installInput ?? true;
+	}
+
+	static interactive(): PlatformOptions {
+		return new PlatformOptions();
+	}
+
+	static renderLoop(): PlatformOptions {
+		return new PlatformOptions({ frameMode: "loop", installInput: false });
+	}
+
+	static singleFrame(): PlatformOptions {
+		return new PlatformOptions({
+			frameMode: "single-frame",
+			installInput: false,
+		});
+	}
+}
+
+const browserPlatforms = new WeakMap<HTMLCanvasElement, Platform>();
+
+function replacePlatformForCanvas(
+	canvas: HTMLCanvasElement,
+	platform: Platform,
+): void {
+	const existing = browserPlatforms.get(canvas);
+	if (existing !== undefined && existing !== platform) {
+		existing.dispose();
+	}
+	browserPlatforms.set(canvas, platform);
+}
+
+export function stopPlatform(canvas: HTMLCanvasElement): void {
+	const existing = browserPlatforms.get(canvas);
+	if (existing === undefined) {
+		return;
+	}
+	existing.dispose();
+	browserPlatforms.delete(canvas);
+}
 
 function keyboardModifiers(event: KeyboardEvent): Modifiers {
 	return {
@@ -711,23 +801,53 @@ export function installBrowserInput(
 	return installBrowserInputState(engine.input, engine.canvas, options);
 }
 
-export function startBrowserEngineRuntime(
+export function startPlatform(
 	engine: Engine,
-	options: { keyboardTarget?: Window | HTMLElement } = {},
-): BrowserEngineRuntime {
-	const inputBinding = installBrowserInput(engine, options);
-	const frameLoop = startBrowserFrameLoop((deltaSeconds) => {
-		syncBrowserEngineSurface(engine);
-		engine.runFrame(deltaSeconds);
-	});
+	options: PlatformOptions = PlatformOptions.interactive(),
+): Platform {
+	syncBrowserEngineSurface(engine);
+	if (options.frameMode === "single-frame") {
+		engine.runFrame(0);
+	}
+	const inputBinding = options.installInput
+		? installBrowserInput(engine, options)
+		: undefined;
+	const frameLoop = options.frameMode === "loop"
+		? startBrowserFrameLoop((deltaSeconds) => {
+				syncBrowserEngineSurface(engine);
+				engine.runFrame(deltaSeconds);
+			})
+		: undefined;
+	let disposed = false;
 	return {
+		engine,
 		inputBinding,
 		frameLoop,
 		dispose: (): void => {
-			frameLoop.stop();
-			inputBinding.dispose();
+			if (disposed) {
+				return;
+			}
+			disposed = true;
+			frameLoop?.stop();
+			inputBinding?.dispose();
+			engine.shutdown();
 		},
 	};
+}
+
+export async function runPlatform(
+	config: PlatformConfig,
+	app: PlatformApp,
+	options: PlatformOptions = PlatformOptions.interactive(),
+): Promise<Platform | undefined> {
+	const engine = await app.createEngine(config);
+	if (app.setupEngine(engine) === false) {
+		return undefined;
+	}
+	engine.initialize();
+	const platform = startPlatform(engine, options);
+	replacePlatformForCanvas(config.canvas, platform);
+	return platform;
 }
 
 export function syncBrowserEngineSurface(engine: Engine): void {
