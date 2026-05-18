@@ -218,11 +218,14 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 ) -> Unit {
   self.add_phase_handler(
     phase,
-    fn(engine, _frame) {
+    fn(engine, frame) {
       let camera = scene_main_camera_or_abort(
         scene, "Engine::add_orbit_camera_controller_input_handler",
       )
-      let input = engine.input()
+      let input = match frame.input() {
+        Some(input) => input
+        None => engine.input()
+      }
       ignore(
         @ecs.update_orbit_camera_controller_from_mouse_frame(
           scene.world(),

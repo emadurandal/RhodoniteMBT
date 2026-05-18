@@ -1,0 +1,5 @@
+import {
+  "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_examples/ecs-scene-graph/common" @scene_graph,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+}

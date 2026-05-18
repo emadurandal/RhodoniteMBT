@@ -1208,6 +1208,10 @@ export class Engine {
 		return this.requireSurface(surfaceId).input;
 	}
 
+	surfaceGpuSurface(surfaceId: SurfaceId): GpuSurface {
+		return this.requireSurface(surfaceId).gpuSurface;
+	}
+
 	setSurfaceScene(surfaceId: SurfaceId, scene: RuntimeScene): void {
 		this.requireSurface(surfaceId).scene = scene;
 		this.requestRender("surface-scene");
@@ -1323,7 +1327,7 @@ export class Engine {
 				"Engine.addCommonHandlers: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
 			);
 		}
-		this.addPhaseHandler(Phase.Input, (engine) => {
+		this.addPhaseHandler(Phase.Input, (engine, frame) => {
 			const camera = scene.mainCamera();
 			if (camera === null) {
 				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
@@ -1332,7 +1336,7 @@ export class Engine {
 				scene.world(),
 				camera,
 				orbitControllerComponent,
-				engine.input,
+				frame.input ?? engine.input,
 			);
 		});
 		if (homeComponent === undefined) {
