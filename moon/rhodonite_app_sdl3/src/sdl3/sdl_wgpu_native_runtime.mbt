@@ -783,6 +783,14 @@ fn handle_sdl_platform_event_for_on_demand(
       }
       false
     }
+    SDL_EVENT_MOUSE_MOTION
+    | SDL_EVENT_MOUSE_BUTTON_DOWN
+    | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        request_render("input")
+      }
+      false
+    }
     SDL_EVENT_WINDOW_RESIZED
     | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
     | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {

@@ -106,6 +106,8 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 `pointer_delta_x/y` と `wheel_delta_x/y` はフレームごとに 0 に戻り、そのフレームで適用されたイベントの合計になる。button state はフレームをまたいで保持される。
 
+Native SDL3 の on-demand loop は mouse motion / button down / button up / wheel を input dirty event として扱い、`Engine::request_render("input")` で次フレームを起床する。実際の pointer 座標と button transition は render 直前の `SDL_GetMouseState` snapshot から enqueue するため、通常 loop と on-demand loop は同じ `InputState` 集約値を渡す。
+
 wheel delta は controller 側で同じ sensitivity を使えるよう、adapter 側で browser の `WheelEvent.deltaX/Y` に近い符号と大きさへ寄せる。native SDL3 adapter は wheel step を DOM wheel の pixel delta 相当に近づけるため 100 倍して enqueue し、通常スクロールの上方向が dolly-in になるよう `deltaY` を負方向へ正規化する。
 
 ## ECS camera controller
