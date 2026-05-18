@@ -652,19 +652,6 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
-/// Logs native mass-cubes setup milestones to stdout.
-#cfg(target="native")
-fn log_native_mass_cubes_setup(message : String) -> Unit {
-  println(message)
-}
-
-///|
-#cfg(not(target="native"))
-fn log_native_mass_cubes_setup(_message : String) -> Unit {
-  ignore(_message)
-}
-
-///|
 /// Builds the ECS scene used by the mass-cubes sample.
 fn create_scene() -> @app.Scene {
   @app.Scene::new_with_world(
@@ -771,9 +758,6 @@ pub fn create_demo_state_for_scene(
   )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
-  log_native_mass_cubes_setup(
-    "native: ecs-mass-cubes spawning " + entity_count.to_string() + " entities",
-  )
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
   ignore(world.reserve_batch_capacity([tf, gt], entity_count))
   let entities = world.spawn_transform_global_batch(entity_count, fn(
@@ -802,7 +786,6 @@ pub fn create_demo_state_for_scene(
     @writes.put_f32_le(instance_bytes, base + 12, cg)
     @writes.put_f32_le(instance_bytes, base + 16, cb)
   })
-  log_native_mass_cubes_setup("native: ecs-mass-cubes entity spawn complete")
   apply_global_transform_precision_mode(world, entities)
   world.write_global_transform_refs_into(
     entities, instance_bytes, instance_stride, 0,
