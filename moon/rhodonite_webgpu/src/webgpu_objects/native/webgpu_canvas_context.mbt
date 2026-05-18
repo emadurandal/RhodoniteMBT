@@ -115,11 +115,14 @@ pub fn webgpu_canvas_context_configure(
   device : GPUDevice,
   format : String,
 ) -> Unit {
-  let usage = @wgpu.TextureUsage::from_u64(
+  let usage_flags = if context.context.relayEnabled {
     @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT |
     @wgpu.TEXTURE_USAGE_COPY_SRC |
-    @wgpu.TEXTURE_USAGE_COPY_DST,
-  )
+    @wgpu.TEXTURE_USAGE_COPY_DST
+  } else {
+    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC
+  }
+  let usage = @wgpu.TextureUsage::from_u64(usage_flags)
   let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(format)
   let configured_format = if @wgpu.platform_is_linux() {
     webgpu_canvas_context_configure_linux_rgba_first(
