@@ -821,7 +821,9 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
   let mut previous_ticks = sdl_get_ticks()
   while !quit.val {
     let event = @lib.new_sdl_event()
-    if !render_requested() && !continuous_render_requested() {
+    let resumed_from_idle = !render_requested() &&
+      !continuous_render_requested()
+    if resumed_from_idle {
       if @lib.sdl_WaitEventTimeout(event, 100) {
         if handle_sdl_platform_event_for_on_demand(
             session, input, event, install_input, on_surface_change, request_render,
@@ -846,9 +848,13 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
         enqueue_sdl_mouse_state(input)
       }
       let current_ticks = sdl_get_ticks()
-      let delta_seconds = Float::from_double(
-        (current_ticks - previous_ticks).to_double() / 1000.0,
-      )
+      let delta_seconds = if resumed_from_idle {
+        (0.0 : Float)
+      } else {
+        Float::from_double(
+          (current_ticks - previous_ticks).to_double() / 1000.0,
+        )
+      }
       previous_ticks = current_ticks
       @wgpu.webgpu_instance_process_events(session.instance)
       render_frame(delta_seconds)

@@ -727,6 +727,8 @@ export function startBrowserOnDemandFrameLoop(
 		onFrame(deltaSeconds);
 		if (!stopped && shouldContinue()) {
 			request();
+		} else {
+			previousTimestamp = null;
 		}
 	};
 	return {

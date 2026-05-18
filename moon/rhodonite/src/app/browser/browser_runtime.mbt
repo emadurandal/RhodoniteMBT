@@ -236,6 +236,8 @@ pub extern "js" fn start_browser_on_demand_frame_loop(
   #|     tick(deltaSeconds);
   #|     if (!stopped && shouldContinue()) {
   #|       request();
+  #|     } else {
+  #|       previousTimestamp = null;
   #|     }
   #|   };
   #|   return {
