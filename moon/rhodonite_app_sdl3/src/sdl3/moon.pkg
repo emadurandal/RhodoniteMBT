@@ -2,17 +2,23 @@ import {
   "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
-  "Milky2018/wgpu_mbt/c" @c,
+  "emadurandal/rhodonite_webgpu/webgpu_objects" @wgpu_objects,
+  "Milky2018/wgpu_mbt" @wgpu_native,
   "Kaida-Amethyst/sdl3" @sdl3_pkg,
   "Kaida-Amethyst/sdl3/lib" @lib,
   "moonbitlang/core/ref" @ref,
+  "moonbitlang/core/encoding/utf8" @utf8,
 }
 
 supported_targets = "native"
 
 options(
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
   link: {
     "native": { "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3" },
   },
-  "native-stub": [ "sdl_keyboard_name_native.c" ],
+  "native-stub": [
+    "sdl_keyboard_name_native.c",
+    "sdl3_window_surface_native.c",
+  ],
 )

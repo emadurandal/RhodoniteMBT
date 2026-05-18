@@ -26,8 +26,6 @@ pub fn render_current_frame(DemoState) -> Unit
 
 pub fn render_current_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
 
-pub fn render_frame(DemoState) -> Unit
-
 pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
 
 // Errors

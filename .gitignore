@@ -23,6 +23,11 @@ _build
 *.sln
 *.sw?
 
+# Local ECS mass-run debug artifacts (machine-specific PIDs/paths)
+_ecs_mass_run.meta
+_ecs_mass_run.pid
+_run_ecs_15s.sh
+
 # moon
 .mooncakes
 

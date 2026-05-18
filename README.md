@@ -61,11 +61,18 @@ pnpm run dev:wasm-gc:ecs-mass-cubes
 
 ### Native
 
-> **Note:** SDL3 must be installed in advance for native builds.
+> **Note:** SDL3 must be installed in advance for native builds. Linux uses SDL3
+> window handles with the Vulkan backend. On Linux the runtime prefers the
+> **Wayland** SDL driver and `wl_surface` when `WAYLAND_DISPLAY` is set
+> (default on Ubuntu 24.04+). For an X11-only session, set `SDL_VIDEODRIVER=x11`.
+> macOS uses SDL3 + Metal.
 
 ```bash
 # macOS
 $ brew install sdl3
+
+# Linux (Debian/Ubuntu example)
+$ sudo apt install libsdl3-dev
 ```
 
 ```bash

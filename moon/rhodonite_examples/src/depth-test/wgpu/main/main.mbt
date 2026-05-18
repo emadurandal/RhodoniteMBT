@@ -2,7 +2,7 @@
 
 ///|
 async fn run_depth_test_native() -> Unit raise Error {
-  @sdl_app.run_sdl_metal_webgpu_app(
+  @sdl_app.run_sdl_webgpu_app(
     "MoonBit wgpu + SDL3 (depth-test)",
     800,
     600,
@@ -26,7 +26,7 @@ async fn main {
   run_depth_test_native() catch {
     _ =>
       println(
-        "wgpu+SDL3 failed to start: check macOS+Metal, SDL3/wgpu link, and headers.",
+        "wgpu+SDL3 failed to start: check SDL3/wgpu link, Vulkan (Linux), or Metal (macOS).",
       )
   }
 }

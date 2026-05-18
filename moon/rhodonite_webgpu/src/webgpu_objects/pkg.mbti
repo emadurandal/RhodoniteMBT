@@ -11,6 +11,10 @@ pub fn create_webgpu_instance(GPU) -> WebGPUInstance
 pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error
 pub fn create_canvas_context(GPUCanvasContext) -> WebGPUCanvasContext
 pub fn create_metal_canvas_context(WebGPUInstance, HTMLCanvasElement, Int, Int) -> WebGPUCanvasContext
+pub fn webgpu_canvas_context_surface_is_null(WebGPUCanvasContext) -> Bool
+pub fn create_wayland_canvas_context(WebGPUInstance, OpaquePtr, OpaquePtr, Int, Int) -> WebGPUCanvasContext
+pub fn create_xlib_canvas_context(WebGPUInstance, OpaquePtr, UInt64, Int, Int) -> WebGPUCanvasContext
+pub fn native_webgpu_instance_request_adapter_for_canvas(WebGPUInstance, WebGPUCanvasContext) -> WebGPUAdapter raise Error
 pub fn create_webgpu_context(WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue) -> WebGPUContext
 pub fn webgpu_instance_get_preferred_canvas_format(WebGPUInstance) -> String
 pub fn webgpu_instance_get_preferred_canvas_format_for_surface(WebGPUInstance, WebGPUAdapter, WebGPUCanvasContext) -> String
@@ -98,6 +102,9 @@ type GPUBindGroupEntry
 type GPUBindGroupLayout
 type GPUBindGroup
 type HTMLCanvasElement
+type OpaquePtr
+pub fn opaque_ptr_is_null(OpaquePtr) -> Bool
+pub fn null_opaque_ptr() -> OpaquePtr
 type WebGPUInstance
 type WebGPUAdapter
 type WebGPUDevice

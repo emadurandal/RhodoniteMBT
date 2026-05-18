@@ -62,6 +62,8 @@ fn webgpu_instance_surface_pick_texture_format(
   let lin_rgba = @wgpu.TextureFormat::from_u32(@wgpu.TEXTURE_FORMAT_RGBA8_UNORM)
   let prefs = if prefer_srgb {
     [srgb_bgra, srgb_rgba, lin_bgra, lin_rgba]
+  } else if @wgpu.platform_is_linux() {
+    [lin_rgba, lin_bgra, srgb_rgba, srgb_bgra]
   } else {
     [lin_bgra, lin_rgba, srgb_bgra, srgb_rgba]
   }
@@ -102,28 +104,57 @@ pub async fn webgpu_instance_request_adapter(
 }
 
 ///|
-/// Implements `native_webgpu_instance_request_adapter`.
-pub fn native_webgpu_instance_request_adapter(
+/// Returns the preferred native backend type for adapter requests on this host.
+fn native_preferred_backend_type_u32() -> UInt {
+  if @wgpu.platform_is_macos() {
+    @wgpu.BACKEND_TYPE_METAL
+  } else if @wgpu.platform_is_linux() {
+    @wgpu.BACKEND_TYPE_VULKAN
+  } else if @wgpu.platform_is_windows() {
+    @wgpu.BACKEND_TYPE_D3_D12
+  } else {
+    @wgpu.BACKEND_TYPE_UNDEFINED
+  }
+}
+
+///|
+/// Requests a native adapter, preferring one compatible with `canvas` when provided.
+pub fn native_webgpu_instance_request_adapter_for_canvas(
   instance : WebGPUInstance,
+  canvas : WebGPUCanvasContext,
 ) -> WebGPUAdapter raise Error {
-  let raw = instance.instance.raw.request_adapter_sync() catch {
-    _ => {
-      let backend = if @wgpu.platform_is_macos() {
-        @wgpu.BACKEND_TYPE_METAL
-      } else if @wgpu.platform_is_linux() {
-        @wgpu.BACKEND_TYPE_VULKAN
-      } else if @wgpu.platform_is_windows() {
-        @wgpu.BACKEND_TYPE_D3_D12
-      } else {
-        @wgpu.BACKEND_TYPE_UNDEFINED
-      }
+  let backend = native_preferred_backend_type_u32()
+  let raw = instance.instance.raw.request_adapter_sync_options_surface_u32(
+    canvas.context.surface,
+    feature_level_u32=@wgpu.FEATURE_LEVEL_CORE,
+    power_preference_u32=@wgpu.POWER_PREFERENCE_HIGH_PERFORMANCE,
+    force_fallback_adapter=false,
+    backend_type_u32=backend,
+  ) catch {
+    _ =>
       instance.instance.raw.request_adapter_sync_options_u32(
         feature_level_u32=@wgpu.FEATURE_LEVEL_CORE,
         power_preference_u32=@wgpu.POWER_PREFERENCE_HIGH_PERFORMANCE,
         force_fallback_adapter=false,
         backend_type_u32=backend,
       )
-    }
+  }
+  WebGPUAdapter::new(GPUAdapter::{ raw, instance: instance.instance.raw })
+}
+
+///|
+/// Implements `native_webgpu_instance_request_adapter`.
+pub fn native_webgpu_instance_request_adapter(
+  instance : WebGPUInstance,
+) -> WebGPUAdapter raise Error {
+  let raw = instance.instance.raw.request_adapter_sync() catch {
+    _ =>
+      instance.instance.raw.request_adapter_sync_options_u32(
+        feature_level_u32=@wgpu.FEATURE_LEVEL_CORE,
+        power_preference_u32=@wgpu.POWER_PREFERENCE_HIGH_PERFORMANCE,
+        force_fallback_adapter=false,
+        backend_type_u32=native_preferred_backend_type_u32(),
+      )
   }
   WebGPUAdapter::new(GPUAdapter::{ raw, instance: instance.instance.raw })
 }

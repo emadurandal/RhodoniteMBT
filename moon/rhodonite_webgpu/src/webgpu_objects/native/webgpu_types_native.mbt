@@ -31,6 +31,7 @@ pub struct GPUCanvasContext {
   surface : @wgpu.Surface
   mut width : UInt
   mut height : UInt
+  /// Color format reported to the engine.
   format : Ref[String]
   currentTexture : Ref[@wgpu.Texture?]
 }
