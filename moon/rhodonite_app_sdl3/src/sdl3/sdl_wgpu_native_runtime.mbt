@@ -66,6 +66,7 @@ priv struct SdlMouseMotionEvent {
 
 ///|
 /// Mirrors the SDL mouse button event layout needed by the native input adapter.
+/// `down` uses `Byte` because MoonBit `Bool` is wider than C `bool` in FFI structs.
 priv struct SdlMouseButtonEvent {
   event_type : @lib.SDL_EventType
   reserved : UInt
@@ -73,7 +74,7 @@ priv struct SdlMouseButtonEvent {
   windowID : @lib.SDL_WindowID
   which : @lib.SDL_MouseID
   button : Byte
-  down : Bool
+  down : Byte
   clicks : Byte
   padding : Byte
   x : Float
@@ -223,7 +224,7 @@ fn _touch_sdl_mouse_button_event_struct() -> Unit {
     windowID: 0U,
     which: 0U,
     button: (0 : Byte),
-    down: false,
+    down: (0 : Byte),
     clicks: (0 : Byte),
     padding: (0 : Byte),
     x: (0.0 : Float),
@@ -1248,6 +1249,22 @@ fn sdl_event_window_id(event : @lib.SDL_Event) -> @lib.SDL_WindowID {
 }
 
 ///|
+/// Snapshots SDL mouse button and position state for the focused native surface.
+fn enqueue_sdl_multi_window_focused_mouse_state(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+) -> Unit {
+  match session.focused_surface_index() {
+    Some(index) =>
+      match sdl_multi_window_engine_input_for_surface(session, engine, index) {
+        Some(input) => enqueue_sdl_mouse_state(input)
+        None => ()
+      }
+    None => ()
+  }
+}
+
+///|
 /// Finds a multi-window surface index by SDL window id.
 fn SdlMultiWindowPlatformSession::find_surface_index_by_window_id(
   self : SdlMultiWindowPlatformSession,
@@ -1490,6 +1507,9 @@ fn run_sdl_multi_window_platform_loop(
           )
           previous_ticks = current_ticks
           @wgpu.webgpu_instance_process_events(session.instance)
+          if options.install_input {
+            enqueue_sdl_multi_window_focused_mouse_state(session, engine)
+          }
           ignore(engine.run_multi_surface_frame(delta_seconds))
           let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
           @wgpu.webgpu_instance_process_events(session.instance)
