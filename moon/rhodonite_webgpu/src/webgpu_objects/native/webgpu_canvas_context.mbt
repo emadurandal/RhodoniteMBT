@@ -121,12 +121,12 @@ pub fn webgpu_canvas_context_configure(
     @wgpu.TEXTURE_USAGE_COPY_DST,
   )
   let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(format)
-  let ok = if @wgpu.platform_is_linux() {
+  let configured_format = if @wgpu.platform_is_linux() {
     webgpu_canvas_context_configure_linux_rgba_first(
       context, device, usage, prefer_srgb,
     )
   } else {
-    context.context.surface.configure_best_effort(
+    let ok = context.context.surface.configure_best_effort(
       device.adapter,
       device.raw,
       context.context.width,
@@ -135,20 +135,28 @@ pub fn webgpu_canvas_context_configure(
       prefer_srgb~,
       vsync=true,
     )
+    if ok {
+      let fmts = context.context.surface.capabilities_formats(device.adapter)
+      let chosen = webgpu_instance_surface_pick_texture_format(
+        fmts, prefer_srgb,
+      )
+      Some(texture_format_to_string(chosen))
+    } else {
+      None
+    }
   }
-  if ok {
-    let fmts = context.context.surface.capabilities_formats(device.adapter)
-    let chosen = webgpu_instance_surface_pick_texture_format(fmts, prefer_srgb)
-    context.context.format.val = texture_format_to_string(chosen)
-  } else {
-    let configured_format = context.context.surface.configure_default(
-      device.adapter,
-      device.raw,
-      context.context.width,
-      context.context.height,
-      usage,
-    )
-    context.context.format.val = texture_format_to_string(configured_format)
+  match configured_format {
+    Some(format) => context.context.format.val = format
+    None => {
+      let configured_format = context.context.surface.configure_default(
+        device.adapter,
+        device.raw,
+        context.context.width,
+        context.context.height,
+        usage,
+      )
+      context.context.format.val = texture_format_to_string(configured_format)
+    }
   }
   if context.context.format.val == "" {
     context.context.format.val = format
@@ -180,7 +188,7 @@ fn webgpu_canvas_context_configure_linux_rgba_first(
   device : GPUDevice,
   usage : @wgpu.TextureUsage,
   prefer_srgb : Bool,
-) -> Bool {
+) -> String? {
   let formats = context.context.surface.capabilities_formats(device.adapter)
   let chosen = webgpu_instance_surface_pick_texture_format(formats, prefer_srgb)
   let present_mode = webgpu_canvas_context_pick_supported_u32(
@@ -210,9 +218,10 @@ fn webgpu_canvas_context_configure_linux_rgba_first(
     alpha_mode,
   )
   if ok {
-    context.context.format.val = texture_format_to_string(chosen)
+    Some(texture_format_to_string(chosen))
+  } else {
+    None
   }
-  ok
 }
 
 ///|
