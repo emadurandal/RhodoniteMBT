@@ -553,7 +553,12 @@ pub fn DemoState::update_scene(
 }
 
 ///|
-/// Implements `render_frame_to_view`.
+/// Advances the demo clock, runs one frame of ECS phases, then draws into `color_view`.
+///
+/// Kept `pub` for browser and native visual regression (`visual_regression_browser`,
+/// `emadurandal/rhodonite_examples/visual_regression`), which render into an offscreen
+/// view without a swapchain. The interactive sample uses `render_current_frame` in
+/// `register_engine_handlers` instead.
 pub fn render_frame_to_view(
   demo_state : DemoState,
   color_view : @wgpu.GPUTextureView,
