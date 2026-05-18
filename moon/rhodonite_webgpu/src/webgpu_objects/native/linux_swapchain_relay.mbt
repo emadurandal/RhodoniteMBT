@@ -14,12 +14,6 @@ struct LinuxSwapchainRelay {
 }
 
 ///|
-/// WGSL color target format for relay rendering; must match the relay texture.
-fn linux_swapchain_relay_render_format(swap_format : String) -> String {
-  swap_format
-}
-
-///|
 /// Releases relay GPU resources.
 fn linux_swapchain_relay_release(relay : LinuxSwapchainRelay) -> Unit {
   relay.texture.raw.release()

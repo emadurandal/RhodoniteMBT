@@ -166,15 +166,14 @@ pub fn webgpu_canvas_context_configure(
   }
   context.context.swapFormat.val = context.context.format.val
   if context.context.relayEnabled {
+    // Engine-visible `format` stays the swapchain format; the relay texture is
+    // created with the same format in `linux_swapchain_relay_ensure`.
     let webgpu_device = WebGPUDevice::new(device)
     linux_swapchain_relay_ensure(
       context.context.relay,
       webgpu_device,
       context.context.width,
       context.context.height,
-      context.context.swapFormat.val,
-    )
-    context.context.format.val = linux_swapchain_relay_render_format(
       context.context.swapFormat.val,
     )
     context.context.relayDevice.val = Some(device)
