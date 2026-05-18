@@ -302,7 +302,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 }
 
-type RuntimeScene = {
+export type RuntimeScene = {
 	enabled: () => boolean;
 	visible: () => boolean;
 	runSchedulePhase: (phase: PhaseKey, frame: FrameState) => boolean;
@@ -513,10 +513,36 @@ export type BrowserFrameLoop = {
 };
 
 export type BrowserEngineRuntime = {
-	readonly inputBinding: BrowserInputBinding;
-	readonly frameLoop: BrowserFrameLoop;
+	readonly engine: Engine;
+	readonly inputBinding?: BrowserInputBinding;
+	readonly frameLoop?: BrowserFrameLoop;
 	dispose: () => void;
 };
+
+export type BrowserEngineRuntimeOptions = {
+	readonly keyboardTarget?: Window | HTMLElement;
+	readonly runLoop?: boolean;
+	readonly installInput?: boolean;
+	readonly runFirstFrame?: boolean;
+};
+
+export type CreateBrowserEngineRuntimeOptions = BrowserEngineRuntimeOptions & {
+	readonly mainScene?: RuntimeScene;
+};
+
+export class BrowserEngineRuntimeSlot {
+	private runtime?: BrowserEngineRuntime;
+
+	replace(runtime: BrowserEngineRuntime): void {
+		this.dispose();
+		this.runtime = runtime;
+	}
+
+	dispose(): void {
+		this.runtime?.dispose();
+		this.runtime = undefined;
+	}
+}
 
 function keyboardModifiers(event: KeyboardEvent): Modifiers {
 	return {
@@ -713,21 +739,54 @@ export function installBrowserInput(
 
 export function startBrowserEngineRuntime(
 	engine: Engine,
-	options: { keyboardTarget?: Window | HTMLElement } = {},
+	options: BrowserEngineRuntimeOptions = {},
 ): BrowserEngineRuntime {
-	const inputBinding = installBrowserInput(engine, options);
-	const frameLoop = startBrowserFrameLoop((deltaSeconds) => {
+	const {
+		runLoop = true,
+		installInput = true,
+		runFirstFrame = false,
+	} = options;
+	if (runLoop || runFirstFrame) {
 		syncBrowserEngineSurface(engine);
-		engine.runFrame(deltaSeconds);
-	});
+	}
+	if (runFirstFrame) {
+		engine.runFrame(0);
+	}
+	const inputBinding = installInput ? installBrowserInput(engine, options) : undefined;
+	const frameLoop = runLoop
+		? startBrowserFrameLoop((deltaSeconds) => {
+				syncBrowserEngineSurface(engine);
+				engine.runFrame(deltaSeconds);
+			})
+		: undefined;
+	let disposed = false;
 	return {
+		engine,
 		inputBinding,
 		frameLoop,
 		dispose: (): void => {
-			frameLoop.stop();
-			inputBinding.dispose();
+			if (disposed) {
+				return;
+			}
+			disposed = true;
+			frameLoop?.stop();
+			inputBinding?.dispose();
+			engine.shutdown();
 		},
 	};
+}
+
+export async function createBrowserEngineRuntime(
+	canvas: HTMLCanvasElement,
+	setup: (engine: Engine) => boolean | void,
+	options: CreateBrowserEngineRuntimeOptions = {},
+): Promise<BrowserEngineRuntime | undefined> {
+	const engine = await Engine.create(canvas, { mainScene: options.mainScene });
+	if (setup(engine) === false) {
+		return undefined;
+	}
+	engine.initialize();
+	return startBrowserEngineRuntime(engine, options);
 }
 
 export function syncBrowserEngineSurface(engine: Engine): void {

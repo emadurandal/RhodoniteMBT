@@ -7,6 +7,93 @@ pub type BrowserFrameLoop
 pub type BrowserInputBinding
 
 ///|
+/// Options for starting the standard browser engine runtime.
+pub struct BrowserEngineRuntimeOptions {
+  run_loop : Bool
+  install_input : Bool
+  run_first_frame : Bool
+}
+
+///|
+/// Owns browser runtime resources for one engine.
+pub struct BrowserEngineRuntime {
+  priv engine : @app.Engine
+  priv mut frame_loop : BrowserFrameLoop?
+  priv mut input_binding : BrowserInputBinding?
+  priv mut disposed : Bool
+}
+
+///|
+/// Stores the active browser runtime and disposes replaced runtimes.
+pub struct BrowserEngineRuntimeSlot {
+  priv mut runtime : BrowserEngineRuntime?
+}
+
+///|
+/// Creates browser runtime options for an interactive canvas sample.
+pub fn BrowserEngineRuntimeOptions::interactive() -> BrowserEngineRuntimeOptions {
+  { run_loop: true, install_input: true, run_first_frame: false }
+}
+
+///|
+/// Creates browser runtime options for a continuously rendered canvas sample.
+pub fn BrowserEngineRuntimeOptions::loop_only() -> BrowserEngineRuntimeOptions {
+  { run_loop: true, install_input: false, run_first_frame: false }
+}
+
+///|
+/// Creates browser runtime options for a single-frame canvas sample.
+pub fn BrowserEngineRuntimeOptions::single_frame() -> BrowserEngineRuntimeOptions {
+  { run_loop: false, install_input: false, run_first_frame: true }
+}
+
+///|
+/// Creates an empty browser engine runtime slot.
+pub fn BrowserEngineRuntimeSlot::new() -> BrowserEngineRuntimeSlot {
+  { runtime: None }
+}
+
+///|
+/// Disposes the current runtime stored in the slot.
+pub fn BrowserEngineRuntimeSlot::dispose(self : BrowserEngineRuntimeSlot) -> Unit {
+  match self.runtime {
+    Some(runtime) => runtime.dispose()
+    None => ()
+  }
+  self.runtime = None
+}
+
+///|
+/// Replaces the current runtime, disposing the previous runtime first.
+pub fn BrowserEngineRuntimeSlot::replace(
+  self : BrowserEngineRuntimeSlot,
+  runtime : BrowserEngineRuntime,
+) -> Unit {
+  self.dispose()
+  self.runtime = Some(runtime)
+}
+
+///|
+/// Disposes browser runtime handles and shuts down the owned engine once.
+pub fn BrowserEngineRuntime::dispose(self : BrowserEngineRuntime) -> Unit {
+  if self.disposed {
+    return
+  }
+  self.disposed = true
+  match self.frame_loop {
+    Some(frame_loop) => frame_loop.stop()
+    None => ()
+  }
+  match self.input_binding {
+    Some(input_binding) => input_binding.dispose()
+    None => ()
+  }
+  self.frame_loop = None
+  self.input_binding = None
+  self.engine.shutdown()
+}
+
+///|
 /// Builds a WebGPU context from a browser canvas element.
 pub async fn gpu_context_from_html_canvas(
   canvas : @wgpu.HTMLCanvasElement,
@@ -274,4 +361,65 @@ pub fn install_browser_input(
     },
     fn() { input.enqueue_event(FocusLost) },
   )
+}
+
+///|
+/// Starts the standard browser runtime resources for an initialized engine.
+pub fn start_browser_engine_runtime(
+  engine : @app.Engine,
+  canvas : @wgpu.HTMLCanvasElement,
+  options : BrowserEngineRuntimeOptions,
+) -> BrowserEngineRuntime {
+  if options.run_first_frame {
+    sync_browser_engine_surface(engine, canvas)
+    ignore(engine.run_frame((0.0 : Float)))
+  }
+  let frame_loop = if options.run_loop {
+    Some(start_browser_engine_canvas_loop(engine, canvas))
+  } else {
+    None
+  }
+  let input_binding = if options.install_input {
+    Some(install_browser_input(engine, canvas))
+  } else {
+    None
+  }
+  {
+    engine,
+    frame_loop,
+    input_binding,
+    disposed: false,
+  }
+}
+
+///|
+/// Creates, initializes, and starts a browser engine runtime from a canvas.
+pub async fn create_browser_engine_runtime(
+  canvas : @wgpu.HTMLCanvasElement,
+  setup : (@app.Engine) -> Bool,
+  options : BrowserEngineRuntimeOptions,
+) -> BrowserEngineRuntime? {
+  create_browser_engine_runtime_with_engine(
+    canvas,
+    fn(context) { @app.Engine::new(context) },
+    setup,
+    options,
+  )
+}
+
+///|
+/// Creates a browser runtime using a caller-provided engine factory.
+pub async fn create_browser_engine_runtime_with_engine(
+  canvas : @wgpu.HTMLCanvasElement,
+  create_engine : (@wgpu.GPUContext) -> @app.Engine,
+  setup : (@app.Engine) -> Bool,
+  options : BrowserEngineRuntimeOptions,
+) -> BrowserEngineRuntime? {
+  let ctx = gpu_context_from_html_canvas(canvas)
+  let engine = create_engine(ctx)
+  if !setup(engine) {
+    return None
+  }
+  engine.initialize()
+  Some(start_browser_engine_runtime(engine, canvas, options))
 }

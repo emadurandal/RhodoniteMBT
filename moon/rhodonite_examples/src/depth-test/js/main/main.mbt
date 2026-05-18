@@ -1,27 +1,28 @@
 ///|
-/// Holds the browser frame loop for the page lifetime.
-let browser_frame_loop : @ref.Ref[@app_browser.BrowserFrameLoop?] = @ref.new(
-  None,
-)
+/// Holds the browser runtime for the page lifetime.
+let browser_runtime : @app_browser.BrowserEngineRuntimeSlot = @app_browser.BrowserEngineRuntimeSlot::new()
 
 ///|
 /// Initializes the browser WebGPU sample and stores its engine lifecycle.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let ctx = @app_browser.gpu_context_from_html_canvas(canvas)
-  let engine = @app.Engine::new(ctx)
-  match @demo_state.create_demo_state_for_engine(engine) {
-    Some(demo_state) => {
-      @demo_state.register_engine_handlers(engine, demo_state)
-      engine.initialize()
-      match browser_frame_loop.val {
-        Some(frame_loop) => frame_loop.stop()
-        None => ()
+  let runtime = @app_browser.create_browser_engine_runtime(
+    canvas,
+    fn(engine) {
+      match @demo_state.create_demo_state_for_engine(engine) {
+        Some(demo_state) => {
+          @demo_state.register_engine_handlers(engine, demo_state)
+          true
+        }
+        None => false
       }
-      browser_frame_loop.val = Some(
-        @app_browser.start_browser_engine_canvas_loop(engine, canvas),
-      )
+    },
+    @app_browser.BrowserEngineRuntimeOptions::loop_only(),
+  )
+  match runtime {
+    Some(runtime) => {
+      browser_runtime.replace(runtime)
       println("depth-test: DemoState ready")
     }
     None => println("depth-test: failed to create DemoState")

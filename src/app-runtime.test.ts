@@ -6,6 +6,8 @@ import {
 	PhaseGroup,
 	Scene,
 	TimeState,
+	BrowserEngineRuntimeSlot,
+	createBrowserEngineRuntime,
 	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
 	startBrowserEngineRuntime,
@@ -271,11 +273,88 @@ describe("app-runtime Engine", () => {
 
 		const runtime = startBrowserEngineRuntime(engine);
 		runtime.dispose();
+		runtime.dispose();
 
 		expect(cancel).toHaveBeenCalled();
 		expect(canvas.removeEventListener).toHaveBeenCalledWith(
 			"pointermove",
 			expect.any(Function),
 		);
+	});
+
+	it("runs a single-frame browser engine runtime without input or loop", async () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		const { callbacks } = stubAnimationFrame();
+		stubWebGpu();
+		const engine = await Engine.create(canvas, { mainScene: new Scene("test") });
+		const frames: number[] = [];
+		engine.addPhaseHandler(Phase.Render, (_engine, frame) => {
+			frames.push(frame.frameIndex);
+		});
+		engine.initialize();
+
+		const runtime = startBrowserEngineRuntime(engine, {
+			runLoop: false,
+			installInput: false,
+			runFirstFrame: true,
+		});
+		runtime.dispose();
+
+		expect(frames).toEqual([1]);
+		expect(callbacks).toHaveLength(0);
+		expect(canvas.addEventListener).not.toHaveBeenCalledWith(
+			"pointermove",
+			expect.any(Function),
+		);
+	});
+
+	it("replaces browser engine runtimes through a slot", async () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		stubAnimationFrame();
+		stubWebGpu();
+		const first = await Engine.create(canvas, { mainScene: new Scene("first") });
+		const second = await Engine.create(canvas, { mainScene: new Scene("second") });
+		const shutdowns: string[] = [];
+		first.addPhaseHandler(Phase.Shutdown, () => {
+			shutdowns.push("first");
+		});
+		second.addPhaseHandler(Phase.Shutdown, () => {
+			shutdowns.push("second");
+		});
+		first.initialize();
+		second.initialize();
+		const slot = new BrowserEngineRuntimeSlot();
+
+		slot.replace(startBrowserEngineRuntime(first));
+		slot.replace(startBrowserEngineRuntime(second));
+		slot.dispose();
+
+		expect(shutdowns).toEqual(["first", "second"]);
+	});
+
+	it("creates a browser engine runtime around setup and initialization", async () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		stubAnimationFrame();
+		stubWebGpu();
+		const calls: string[] = [];
+
+		const runtime = await createBrowserEngineRuntime(
+			canvas,
+			(engine) => {
+				engine.addPhaseHandler(Phase.Startup, () => {
+					calls.push("startup");
+				});
+			},
+			{ runLoop: false, installInput: false },
+		);
+		runtime?.dispose();
+
+		expect(calls).toEqual(["startup"]);
 	});
 });

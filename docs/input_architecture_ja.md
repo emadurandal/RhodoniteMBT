@@ -49,11 +49,11 @@ ECS component に入力状態を反映して、その component を後続の upd
 Browser:
 
 ```text
-emadurandal/rhodonite/app/browser install_browser_input
+emadurandal/rhodonite/app/browser install_browser_input / start_browser_engine_runtime / create_browser_engine_runtime
 または src/app-runtime.ts installBrowserInputCallbacks
   -> engine.input().enqueue_event(...)
 app/browser start_browser_engine_loop
-または startBrowserEngineRuntime
+または startBrowserEngineRuntime / createBrowserEngineRuntime
   -> engine.run_frame(delta_seconds)
      -> input.begin_frame()
      -> rhodonite/input
@@ -84,8 +84,8 @@ SDL window resize は app runtime の責務として扱う。`emadurandal/rhodon
 
 Browser adapter はライブラリ側へ昇格済みで、MoonBit JS target と TypeScript runtime の両方から使える。
 
-- MoonBit browser runtime: `emadurandal/rhodonite/app/browser` の `gpu_context_from_html_canvas(canvas)`、`start_browser_engine_canvas_loop(engine, canvas)`、`sync_browser_engine_surface(engine, canvas)`、`install_browser_input(engine, canvas)`。
-- Browser TypeScript runtime: [`src/app-runtime.ts`](../src/app-runtime.ts) の `runBrowserWebGpuCanvasDemo(...)`、`startBrowserEngineRuntime(engine)`、`installBrowserInputCallbacks(...)`、`installBrowserInput(engine)`。
+- MoonBit browser runtime: `emadurandal/rhodonite/app/browser` の `create_browser_engine_runtime(canvas, setup, options)`、`create_browser_engine_runtime_with_engine(canvas, create_engine, setup, options)`、`start_browser_engine_runtime(engine, canvas, options)`、`BrowserEngineRuntimeSlot`、`gpu_context_from_html_canvas(canvas)`、`start_browser_engine_canvas_loop(engine, canvas)`、`sync_browser_engine_surface(engine, canvas)`、`install_browser_input(engine, canvas)`。
+- Browser TypeScript runtime: [`src/app-runtime.ts`](../src/app-runtime.ts) の `runBrowserWebGpuCanvasDemo(...)`、`createBrowserEngineRuntime(canvas, setup, options)`、`startBrowserEngineRuntime(engine, options)`、`BrowserEngineRuntimeSlot`、`installBrowserInputCallbacks(...)`、`installBrowserInput(engine)`。
 - Native SDL3 runtime: `emadurandal/rhodonite_app_sdl3/sdl3` の `run_sdl_metal_webgpu_app(...)`、`init_sdl_metal_webgpu_native(...)`、`run_sdl_metal_webgpu_input_render_loop(...)`。
 
 SDL3 adapter は `emadurandal/rhodonite_app_sdl3` に分離する。browser / SDL3 adapter は `rhodonite_webgpu` へ入れない。入力と platform event loop は WebGPU ではなく window/event source の責務だからである。SDL3 runtime の session は opaque で、sample や利用側は `gpu_context()`、`surface_active()`、`surface_width()`、`surface_height()`、`surface_format()` の accessor だけを読む。初期化や loop 中の platform failure は `Sdl3AppError` として構造化して返す。
