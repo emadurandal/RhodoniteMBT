@@ -49,7 +49,6 @@ type SnapshotUpdate = {
 type SnapshotModule = {
 	render_basic_triangle_browser_snapshot: () => Promise<unknown>;
 	render_triangle_with_buffer_browser_snapshot: () => Promise<unknown>;
-	render_depth_test_browser_snapshot: () => Promise<unknown>;
 	render_ecs_scene_graph_browser_snapshot: () => Promise<unknown>;
 	render_ecs_mass_cubes_browser_snapshot: () => Promise<unknown>;
 };
@@ -251,11 +250,6 @@ async function createSampleRenderRegistry(
 				toUint8Array(
 					await snapshotModule.render_triangle_with_buffer_browser_snapshot(),
 				),
-		],
-		[
-			"depth-test",
-			async () =>
-				toUint8Array(await snapshotModule.render_depth_test_browser_snapshot()),
 		],
 		[
 			"ecs-scene-graph",
