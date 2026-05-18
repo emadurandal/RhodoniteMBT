@@ -370,15 +370,7 @@ pub async fn init_sdl_linux_webgpu_native(
     webgpu_canvas_context,
     surface_width,
     surface_height,
-  ) catch {
-    error => {
-      webgpu_canvas_context.release()
-      instance.release()
-      @lib.sdl_DestroyWindow(sdl_win)
-      ctx.quit()
-      raise error
-    }
-  }
+  )
 }
 
 ///|
@@ -458,16 +450,7 @@ pub async fn init_sdl_metal_webgpu_native(
   )
   finish_sdl_webgpu_native_session(
     ctx, sdl_win, metal_view, instance, webgpu_canvas_context, surface_width, surface_height,
-  ) catch {
-    error => {
-      webgpu_canvas_context.release()
-      instance.release()
-      sdl_metal_destroy_view(metal_view)
-      @lib.sdl_DestroyWindow(sdl_win)
-      ctx.quit()
-      raise error
-    }
-  }
+  )
 }
 
 ///|
