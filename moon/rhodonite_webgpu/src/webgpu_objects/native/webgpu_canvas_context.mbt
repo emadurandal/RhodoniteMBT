@@ -40,11 +40,7 @@ pub fn create_metal_canvas_context(
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
-    swapFormat: @ref.new(""),
-    relayEnabled: false,
     currentTexture: @ref.new(None),
-    relay: @ref.new(None),
-    relayDevice: @ref.new(None),
   })
 }
 
@@ -74,11 +70,7 @@ pub fn create_wayland_canvas_context(
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
-    swapFormat: @ref.new(""),
-    relayEnabled: false,
     currentTexture: @ref.new(None),
-    relay: @ref.new(None),
-    relayDevice: @ref.new(None),
   })
 }
 
@@ -100,11 +92,7 @@ pub fn create_xlib_canvas_context(
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
-    swapFormat: @ref.new(""),
-    relayEnabled: false,
     currentTexture: @ref.new(None),
-    relay: @ref.new(None),
-    relayDevice: @ref.new(None),
   })
 }
 
@@ -115,14 +103,9 @@ pub fn webgpu_canvas_context_configure(
   device : GPUDevice,
   format : String,
 ) -> Unit {
-  let usage_flags = if context.context.relayEnabled {
-    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT |
-    @wgpu.TEXTURE_USAGE_COPY_SRC |
-    @wgpu.TEXTURE_USAGE_COPY_DST
-  } else {
-    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC
-  }
-  let usage = @wgpu.TextureUsage::from_u64(usage_flags)
+  let usage = @wgpu.TextureUsage::from_u64(
+    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
+  )
   let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(format)
   let configured_format = if @wgpu.platform_is_linux() {
     webgpu_canvas_context_configure_linux_rgba_first(
@@ -163,23 +146,6 @@ pub fn webgpu_canvas_context_configure(
   }
   if context.context.format.val == "" {
     context.context.format.val = format
-  }
-  context.context.swapFormat.val = context.context.format.val
-  if context.context.relayEnabled {
-    // Engine-visible `format` stays the swapchain format; the relay texture is
-    // created with the same format in `linux_swapchain_relay_ensure`.
-    let webgpu_device = WebGPUDevice::new(device)
-    linux_swapchain_relay_ensure(
-      context.context.relay,
-      webgpu_device,
-      context.context.width,
-      context.context.height,
-      context.context.swapFormat.val,
-    )
-    context.context.relayDevice.val = Some(device)
-  } else {
-    context.context.relay.val = None
-    context.context.relayDevice.val = None
   }
 }
 
@@ -296,50 +262,12 @@ pub fn webgpu_canvas_context_get_current_texture(
   let texture = surface_texture.take_texture()
   surface_texture.release()
   context.context.currentTexture.val = Some(texture)
-  match context.context.relay.val {
-    Some(_) => {
-      match context.context.relayDevice.val {
-        Some(device) =>
-          linux_swapchain_relay_ensure_for_swap_texture(
-            context.context.relay,
-            texture,
-            WebGPUDevice::new(device),
-            context.context.width,
-            context.context.height,
-          )
-        None => abort("linux swapchain relay: missing device before acquire")
-      }
-      let relay = match context.context.relay.val {
-        Some(r) => r
-        None =>
-          abort("linux swapchain relay: missing relay after acquire ensure")
-      }
-      linux_swapchain_relay_render_texture(relay)
-    }
-    None => WebGPUTexture::new(GPUTexture::{ raw: texture })
-  }
+  WebGPUTexture::new(GPUTexture::{ raw: texture })
 }
 
 ///|
 /// Implements `webgpu_canvas_context_present`.
 pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
-  match
-    (
-      context.context.relay.val,
-      context.context.currentTexture.val,
-      context.context.relayDevice.val,
-    ) {
-    (Some(relay), Some(swap_texture), Some(device)) => {
-      let queue = WebGPUQueue::new(GPUQueue::{ raw: device.raw.queue() })
-      linux_swapchain_relay_blit_to_swapchain(
-        relay,
-        swap_texture,
-        WebGPUDevice::new(device),
-        queue,
-      )
-    }
-    _ => ()
-  }
   context.context.surface.present_or_raise() catch {
     _ => println("native: WebGPU surface present failed")
   }
@@ -355,12 +283,6 @@ pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
 ///|
 /// Implements `webgpu_canvas_context_release`.
 pub fn webgpu_canvas_context_release(context : WebGPUCanvasContext) -> Unit {
-  match context.context.relay.val {
-    Some(relay) => linux_swapchain_relay_release(relay)
-    None => ()
-  }
-  context.context.relay.val = None
-  context.context.relayDevice.val = None
   context.context.surface.unconfigure()
   context.context.surface.release()
 }

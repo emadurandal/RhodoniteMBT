@@ -33,13 +33,7 @@ pub struct GPUCanvasContext {
   mut height : UInt
   /// Color format reported to the engine.
   format : Ref[String]
-  /// Configured swapchain format used by the native surface.
-  swapFormat : Ref[String]
-  /// True when rendering should go through the offscreen swapchain relay.
-  relayEnabled : Bool
   currentTexture : Ref[@wgpu.Texture?]
-  relay : Ref[LinuxSwapchainRelay?]
-  relayDevice : Ref[GPUDevice?]
 }
 
 ///|
