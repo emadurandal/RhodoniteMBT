@@ -2,6 +2,11 @@
  * SDL3 window property helpers for native Wayland/X11 surface creation.
  */
 
+#include <stddef.h>
+#include <stdint.h>
+
+#if defined(__linux__)
+
 #include <SDL3/SDL.h>
 
 void rhodonite_sdl_preinit_linux_video(void) {
@@ -85,3 +90,39 @@ void rhodonite_sdl_prepare_shown_window(SDL_Window *window) {
   SDL_SetWindowFocusable(window, true);
   SDL_SyncWindow(window);
 }
+
+#else
+
+void rhodonite_sdl_preinit_linux_video(void) {}
+
+void *rhodonite_sdl_get_window_wayland_display(void *window) {
+  (void)window;
+  return NULL;
+}
+
+void *rhodonite_sdl_get_window_wayland_surface(void *window) {
+  (void)window;
+  return NULL;
+}
+
+void *rhodonite_sdl_get_window_x11_display(void *window) {
+  (void)window;
+  return NULL;
+}
+
+int64_t rhodonite_sdl_get_window_x11_window(void *window) {
+  (void)window;
+  return 0;
+}
+
+void *rhodonite_sdl_create_linux_wgpu_window(const char *title, int width,
+                                             int height) {
+  (void)title;
+  (void)width;
+  (void)height;
+  return NULL;
+}
+
+void rhodonite_sdl_prepare_shown_window(void *window) { (void)window; }
+
+#endif

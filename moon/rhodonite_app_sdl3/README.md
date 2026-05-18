@@ -16,3 +16,7 @@ structured `Sdl3AppError` values. The runtime handles SDL window resize events
 and reconfigures the native WebGPU surface when the drawable pixel size changes.
 Runtime 0x0/minimized surfaces are propagated to `Engine` as suspended rather
 than as fatal errors.
+
+The Wayland/X11 native surface C helper is active only on Linux. Other native
+hosts export no-op/null ABI stubs so the macOS Metal path does not require SDL3
+headers while compiling Linux-only helper code.
