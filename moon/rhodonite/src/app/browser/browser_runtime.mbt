@@ -60,12 +60,6 @@ pub fn PlatformApp::default_engine(
 }
 
 ///|
-/// Stores the active browser platform and disposes replaced platforms.
-pub struct PlatformSlot {
-  priv mut platform : Platform?
-}
-
-///|
 /// Creates browser platform options for an interactive canvas sample.
 pub fn PlatformOptions::interactive() -> PlatformOptions {
   { run_loop: true, install_input: true, run_first_frame: false }
@@ -81,32 +75,6 @@ pub fn PlatformOptions::loop_only() -> PlatformOptions {
 /// Creates browser platform options for a single-frame canvas sample.
 pub fn PlatformOptions::single_frame() -> PlatformOptions {
   { run_loop: false, install_input: false, run_first_frame: true }
-}
-
-///|
-/// Creates an empty browser platform slot.
-pub fn PlatformSlot::new() -> PlatformSlot {
-  { platform: None }
-}
-
-///|
-/// Disposes the current platform stored in the slot.
-pub fn PlatformSlot::dispose(self : PlatformSlot) -> Unit {
-  match self.platform {
-    Some(platform) => platform.dispose()
-    None => ()
-  }
-  self.platform = None
-}
-
-///|
-/// Replaces the current platform, disposing the previous platform first.
-pub fn PlatformSlot::replace(
-  self : PlatformSlot,
-  platform : Platform,
-) -> Unit {
-  self.dispose()
-  self.platform = Some(platform)
 }
 
 ///|
