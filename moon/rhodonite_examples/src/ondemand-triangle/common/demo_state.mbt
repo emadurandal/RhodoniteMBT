@@ -5,7 +5,10 @@ pub(all) struct DemoState {
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
-  mut color_step : Int
+  uniform_buffer : @wgpu.GPUBuffer
+  bind_group_layout : @wgpu.GPUBindGroupLayout
+  bind_group : @wgpu.GPUBindGroup
+  mut angle : Double
 }
 
 ///|
@@ -37,7 +40,32 @@ pub fn create_demo_state_for_device(
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
   let pipeline = create_pipeline(device, format)
-  { context, device, queue, pipeline, color_step: 0 }
+  let uniform_buffer = device.create_buffer(
+    16UL,
+    @wgpu.GPU_BUFFER_USAGE_UNIFORM | @wgpu.GPU_BUFFER_USAGE_COPY_DST,
+  )
+  let bind_group_layout = pipeline.get_bind_group_layout(0U)
+  let bind_group = device.create_bind_group({
+    layout: bind_group_layout,
+    entries: [
+      {
+        binding: 0U,
+        resource: @wgpu.GPUBindingResource::Buffer(uniform_buffer),
+      },
+    ],
+  })
+  let demo_state = {
+    context,
+    device,
+    queue,
+    pipeline,
+    uniform_buffer,
+    bind_group_layout,
+    bind_group,
+    angle: 0.0,
+  }
+  write_angle_uniform(demo_state)
+  demo_state
 }
 
 ///|
@@ -61,20 +89,21 @@ fn create_pipeline(
 }
 
 ///|
-/// Returns the current clear color for the sample state.
-fn current_clear_color(demo_state : DemoState) -> @wgpu.GPUColor {
-  match demo_state.color_step % 4 {
-    0 => { r: 0.02, g: 0.03, b: 0.18, a: 1.0 }
-    1 => { r: 0.16, g: 0.04, b: 0.08, a: 1.0 }
-    2 => { r: 0.02, g: 0.13, b: 0.10, a: 1.0 }
-    _ => { r: 0.12, g: 0.10, b: 0.02, a: 1.0 }
-  }
+/// Returns the stable clear color used while the triangle rotates.
+fn current_clear_color(_demo_state : DemoState) -> @wgpu.GPUColor {
+  { r: 0.02, g: 0.03, b: 0.18, a: 1.0 }
 }
 
 ///|
-/// Advances the visible state after an input event reaches the on-demand frame.
-fn advance_on_input(demo_state : DemoState) -> Unit {
-  demo_state.color_step = demo_state.color_step + 1
+/// Writes the current rotation angle into the WebGPU uniform buffer.
+fn write_angle_uniform(demo_state : DemoState) -> Unit {
+  let buf = FixedArray::make(16, (0 : Byte))
+  @writes.put_f32_le(buf, 0, demo_state.angle)
+  demo_state.queue.write_buffer_from_fixed_array(
+    demo_state.uniform_buffer,
+    0UL,
+    buf,
+  )
 }
 
 ///|
@@ -85,15 +114,26 @@ fn update_from_input(demo_state : DemoState, input : @input.InputState) -> Unit 
       input.pointer_delta_x() != (0.0 : Float) ||
       input.pointer_delta_y() != (0.0 : Float)
     )
-  if input.mouse_pressed(Left) ||
-    dragging ||
+  let mut delta = 0.0
+  if dragging {
+    delta = delta + input.pointer_delta_x().to_double() * 0.012
+  }
+  if input.key_pressed(@input.KeyCode::arrow_left()) ||
+    input.key_pressed(@input.KeyCode::key_a()) {
+    delta = delta - 0.18
+  }
+  if input.key_pressed(@input.KeyCode::arrow_right()) ||
+    input.key_pressed(@input.KeyCode::key_d()) ||
     input.key_pressed(@input.KeyCode::space()) ||
-    input.key_pressed(@input.KeyCode::enter()) ||
-    input.key_pressed(@input.KeyCode::arrow_left()) ||
-    input.key_pressed(@input.KeyCode::arrow_right()) ||
-    input.wheel_delta_x() != (0.0 : Float) ||
-    input.wheel_delta_y() != (0.0 : Float) {
-    advance_on_input(demo_state)
+    input.key_pressed(@input.KeyCode::enter()) {
+    delta = delta + 0.18
+  }
+  if input.wheel_delta_y() != (0.0 : Float) {
+    delta = delta + input.wheel_delta_y().to_double() * 0.002
+  }
+  if delta != 0.0 {
+    demo_state.angle = demo_state.angle + delta
+    write_angle_uniform(demo_state)
   }
 }
 
@@ -152,6 +192,7 @@ pub fn render_frame_to_view(
     depth_stencil_attachment: None,
   })
   render_pass.set_pipeline(demo_state.pipeline)
+  render_pass.set_bind_group(0U, demo_state.bind_group, [])
   render_pass.draw(vertex_count)
   render_pass.end()
   render_pass.release()
@@ -184,6 +225,9 @@ pub fn register_engine_handlers(
 ///|
 /// Releases GPU resources owned by the sample state.
 pub fn DemoState::release(self : DemoState) -> Unit {
+  @wgpu.bindGroup_release(self.bind_group)
+  @wgpu.bindGroupLayout_release(self.bind_group_layout)
+  self.uniform_buffer.release()
   self.pipeline.release()
 }
 
@@ -195,6 +239,12 @@ pub fn demo_state_release(demo_state : DemoState) -> Unit {
 
 ///|
 let triangle_shader_code : String =
+  #|struct DemoUniform {
+  #|  angle: f32,
+  #|};
+  #|
+  #|@group(0) @binding(0) var<uniform> demo: DemoUniform;
+  #|
   #|struct VertexOutput {
   #|  @builtin(position) position: vec4<f32>,
   #|  @location(0) color: vec3<f32>,
@@ -212,8 +262,12 @@ let triangle_shader_code : String =
   #|    vec3<f32>(0.08, 0.86, 0.72),
   #|    vec3<f32>(0.96, 0.22, 0.38),
   #|  );
+  #|  let c = cos(demo.angle);
+  #|  let s = sin(demo.angle);
+  #|  let p = pos[vertexIndex];
+  #|  let rotated = vec2<f32>(p.x * c - p.y * s, p.x * s + p.y * c);
   #|  var output: VertexOutput;
-  #|  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
+  #|  output.position = vec4<f32>(rotated, 0.0, 1.0);
   #|  output.color = colors[vertexIndex];
   #|  return output;
   #|}

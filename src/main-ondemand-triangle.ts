@@ -18,7 +18,9 @@ import {
 type DemoState = {
 	readonly engine: Engine;
 	readonly pipeline: GPURenderPipeline;
-	colorStep: number;
+	readonly uniformBuffer: GPUBuffer;
+	readonly bindGroup: GPUBindGroup;
+	angle: number;
 	snapshotColorView?: GPUTextureView;
 };
 
@@ -26,6 +28,12 @@ const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 
 const shaderCode = `
+struct DemoUniform {
+  angle: f32,
+};
+
+@group(0) @binding(0) var<uniform> demo: DemoUniform;
+
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec3<f32>,
@@ -43,8 +51,12 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
     vec3<f32>(0.08, 0.86, 0.72),
     vec3<f32>(0.96, 0.22, 0.38),
   );
+  let c = cos(demo.angle);
+  let s = sin(demo.angle);
+  let p = pos[vertexIndex];
+  let rotated = vec2<f32>(p.x * c - p.y * s, p.x * s + p.y * c);
   var output: VertexOutput;
-  output.position = vec4<f32>(pos[vertexIndex], 0.0, 1.0);
+  output.position = vec4<f32>(rotated, 0.0, 1.0);
   output.color = colors[vertexIndex];
   return output;
 }
@@ -67,20 +79,27 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		},
 		primitive: { topology: "triangle-list" },
 	});
-	return { engine, pipeline, colorStep: 0 };
+	const uniformBuffer = engine.device.createBuffer({
+		size: 16,
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+	});
+	const bindGroup = engine.device.createBindGroup({
+		layout: pipeline.getBindGroupLayout(0),
+		entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+	});
+	const demoState = { engine, pipeline, uniformBuffer, bindGroup, angle: 0 };
+	writeAngleUniform(demoState);
+	return demoState;
 }
 
-function clearColor(step: number): GPUColorDict {
-	switch (step % 4) {
-		case 0:
-			return { r: 0.02, g: 0.03, b: 0.18, a: 1 };
-		case 1:
-			return { r: 0.16, g: 0.04, b: 0.08, a: 1 };
-		case 2:
-			return { r: 0.02, g: 0.13, b: 0.1, a: 1 };
-		default:
-			return { r: 0.12, g: 0.1, b: 0.02, a: 1 };
-	}
+function clearColor(): GPUColorDict {
+	return { r: 0.02, g: 0.03, b: 0.18, a: 1 };
+}
+
+function writeAngleUniform(demoState: DemoState): void {
+	const uniform = new Float32Array(4);
+	uniform[0] = demoState.angle;
+	demoState.engine.queue.writeBuffer(demoState.uniformBuffer, 0, uniform);
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
@@ -91,17 +110,27 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 			const dragging =
 				input.mouseDown("Left") &&
 				(input.pointerDeltaX() !== 0 || input.pointerDeltaY() !== 0);
+			let delta = 0;
+			if (dragging) {
+				delta += input.pointerDeltaX() * 0.012;
+			}
+			if (input.keyPressed("ArrowLeft") || input.keyPressed("KeyA")) {
+				delta -= 0.18;
+			}
 			if (
-				input.mousePressed("Left") ||
-				dragging ||
-				input.keyPressed("Space") ||
-				input.keyPressed("Enter") ||
-				input.keyPressed("ArrowLeft") ||
 				input.keyPressed("ArrowRight") ||
-				input.wheelDeltaX() !== 0 ||
-				input.wheelDeltaY() !== 0
+				input.keyPressed("KeyD") ||
+				input.keyPressed("Space") ||
+				input.keyPressed("Enter")
 			) {
-				demoState.colorStep += 1;
+				delta += 0.18;
+			}
+			if (input.wheelDeltaY() !== 0) {
+				delta += input.wheelDeltaY() * 0.002;
+			}
+			if (delta !== 0) {
+				demoState.angle += delta;
+				writeAngleUniform(demoState);
 			}
 		},
 		PhaseSlot.AfterSystems,
@@ -127,19 +156,22 @@ function renderToView(demoState: DemoState, colorView: GPUTextureView): void {
 		colorAttachments: [
 			{
 				view: colorView,
-				clearValue: clearColor(demoState.colorStep),
+				clearValue: clearColor(),
 				loadOp: "clear",
 				storeOp: "store",
 			},
 		],
 	});
 	pass.setPipeline(demoState.pipeline);
+	pass.setBindGroup(0, demoState.bindGroup);
 	pass.draw(3);
 	pass.end();
 	demoState.engine.queue.submit([encoder.finish()]);
 }
 
-function releaseDemoState(_demoState: DemoState): void {}
+function releaseDemoState(demoState: DemoState): void {
+	demoState.uniformBuffer.destroy();
+}
 
 export async function renderTsOndemandTriangleBrowserSnapshot(): Promise<Uint8Array> {
 	const canvas = document.createElement("canvas");

@@ -33,7 +33,10 @@ pub(all) struct DemoState {
   device : @webgpu.GPUDevice
   queue : @webgpu.GPUQueue
   pipeline : @webgpu.GPURenderPipeline
-  mut color_step : Int
+  uniform_buffer : @webgpu.GPUBuffer
+  bind_group_layout : @webgpu.GPUBindGroupLayout
+  bind_group : @webgpu.GPUBindGroup
+  mut angle : Double
 }
 pub fn DemoState::release(Self) -> Unit
 
