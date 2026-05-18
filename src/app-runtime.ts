@@ -590,18 +590,26 @@ export class PlatformOptions {
 	}
 }
 
-export class PlatformSlot {
-	private platform?: Platform;
+const browserPlatforms = new WeakMap<HTMLCanvasElement, Platform>();
 
-	replace(platform: Platform): void {
-		this.dispose();
-		this.platform = platform;
+function replacePlatformForCanvas(
+	canvas: HTMLCanvasElement,
+	platform: Platform,
+): void {
+	const existing = browserPlatforms.get(canvas);
+	if (existing !== undefined && existing !== platform) {
+		existing.dispose();
 	}
+	browserPlatforms.set(canvas, platform);
+}
 
-	dispose(): void {
-		this.platform?.dispose();
-		this.platform = undefined;
+export function stopPlatform(canvas: HTMLCanvasElement): void {
+	const existing = browserPlatforms.get(canvas);
+	if (existing === undefined) {
+		return;
 	}
+	existing.dispose();
+	browserPlatforms.delete(canvas);
 }
 
 function keyboardModifiers(event: KeyboardEvent): Modifiers {
@@ -843,7 +851,9 @@ export async function runPlatform(
 		return undefined;
 	}
 	engine.initialize();
-	return startPlatform(engine, options);
+	const platform = startPlatform(engine, options);
+	replacePlatformForCanvas(config.canvas, platform);
+	return platform;
 }
 
 export function syncBrowserEngineSurface(engine: Engine): void {

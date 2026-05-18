@@ -1,8 +1,4 @@
 ///|
-/// Holds the browser platform for the page lifetime.
-let browser_platform : @app_browser.PlatformSlot = @app_browser.PlatformSlot::new()
-
-///|
 /// Creates DemoState and registers engine handlers.
 fn setup_engine(engine : @app.Engine) -> Bool {
   match @demo_state.create_demo_state_for_engine(engine) {
@@ -25,8 +21,7 @@ async fn create_webgpu_demo_state_async(
     @app_browser.PlatformOptions::loop_only(),
   )
   match platform {
-    Some(platform) => {
-      browser_platform.replace(platform)
+    Some(_) => {
       println("depth-test: DemoState ready")
     }
     None => println("depth-test: failed to create DemoState")

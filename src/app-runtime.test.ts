@@ -9,12 +9,12 @@ import {
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
-	PlatformSlot,
 	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
 	runPlatform,
 	startPlatform,
 	startBrowserFrameLoop,
+	stopPlatform,
 } from "./app-runtime";
 
 type FakeEventTarget = {
@@ -309,30 +309,99 @@ describe("app-runtime Engine", () => {
 		);
 	});
 
-	it("replaces browser engine platforms through a slot", async () => {
+	it("replaces browser engine platforms per canvas through runPlatform", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
 		stubAnimationFrame();
 		stubWebGpu();
-		const first = await Engine.create(canvas, { mainScene: new Scene("first") });
-		const second = await Engine.create(canvas, { mainScene: new Scene("second") });
 		const shutdowns: string[] = [];
-		first.addPhaseHandler(Phase.Shutdown, () => {
-			shutdowns.push("first");
-		});
-		second.addPhaseHandler(Phase.Shutdown, () => {
-			shutdowns.push("second");
-		});
-		first.initialize();
-		second.initialize();
-		const slot = new PlatformSlot();
 
-		slot.replace(startPlatform(first));
-		slot.replace(startPlatform(second));
-		slot.dispose();
+		await runPlatform(
+			new PlatformConfig(canvas, { mainScene: new Scene("first") }),
+			PlatformApp.defaultEngine((engine) => {
+				engine.addPhaseHandler(Phase.Shutdown, () => {
+					shutdowns.push("first");
+				});
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+		await runPlatform(
+			new PlatformConfig(canvas, { mainScene: new Scene("second") }),
+			PlatformApp.defaultEngine((engine) => {
+				engine.addPhaseHandler(Phase.Shutdown, () => {
+					shutdowns.push("second");
+				});
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+		stopPlatform(canvas);
 
 		expect(shutdowns).toEqual(["first", "second"]);
+	});
+
+	it("keeps browser engine platforms isolated by canvas", async () => {
+		const firstCanvas = fakeCanvas();
+		const secondCanvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		stubAnimationFrame();
+		stubWebGpu();
+		const shutdowns: string[] = [];
+
+		await runPlatform(
+			new PlatformConfig(firstCanvas, { mainScene: new Scene("first") }),
+			PlatformApp.defaultEngine((engine) => {
+				engine.addPhaseHandler(Phase.Shutdown, () => {
+					shutdowns.push("first");
+				});
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+		await runPlatform(
+			new PlatformConfig(secondCanvas, { mainScene: new Scene("second") }),
+			PlatformApp.defaultEngine((engine) => {
+				engine.addPhaseHandler(Phase.Shutdown, () => {
+					shutdowns.push("second");
+				});
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+		stopPlatform(firstCanvas);
+		expect(shutdowns).toEqual(["first"]);
+
+		stopPlatform(secondCanvas);
+		expect(shutdowns).toEqual(["first", "second"]);
+	});
+
+	it("keeps the current browser engine platform when setup fails", async () => {
+		const canvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		stubAnimationFrame();
+		stubWebGpu();
+		const shutdowns: string[] = [];
+
+		await runPlatform(
+			new PlatformConfig(canvas, { mainScene: new Scene("current") }),
+			PlatformApp.defaultEngine((engine) => {
+				engine.addPhaseHandler(Phase.Shutdown, () => {
+					shutdowns.push("current");
+				});
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+		const failed = await runPlatform(
+			new PlatformConfig(canvas, { mainScene: new Scene("failed") }),
+			PlatformApp.defaultEngine(() => false),
+			new PlatformOptions({ runLoop: false, installInput: false }),
+		);
+
+		expect(failed).toBeUndefined();
+		expect(shutdowns).toEqual([]);
+
+		stopPlatform(canvas);
+		expect(shutdowns).toEqual(["current"]);
 	});
 
 	it("runs a browser engine platform around setup and initialization", async () => {

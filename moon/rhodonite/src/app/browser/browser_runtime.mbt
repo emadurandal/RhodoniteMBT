@@ -110,6 +110,44 @@ pub fn PlatformSlot::replace(
 }
 
 ///|
+/// Replaces the active browser platform for a canvas in the JS-side registry.
+extern "js" fn replace_platform_for_canvas(
+  canvas : @wgpu.HTMLCanvasElement,
+  platform : Platform,
+  dispose_platform : (Platform) -> Unit,
+) -> Unit =
+  #| (canvas, platform, disposePlatform) => {
+  #|   const key = "__rhodonite_browser_platforms";
+  #|   const platforms =
+  #|     globalThis[key] ?? (globalThis[key] = new WeakMap());
+  #|   const existing = platforms.get(canvas);
+  #|   if (existing !== undefined && existing !== platform) {
+  #|     disposePlatform(existing);
+  #|   }
+  #|   platforms.set(canvas, platform);
+  #| }
+
+///|
+/// Stops and removes the active browser platform for a canvas.
+extern "js" fn stop_platform_for_canvas(
+  canvas : @wgpu.HTMLCanvasElement,
+  dispose_platform : (Platform) -> Unit,
+) -> Unit =
+  #| (canvas, disposePlatform) => {
+  #|   const key = "__rhodonite_browser_platforms";
+  #|   const platforms = globalThis[key];
+  #|   if (platforms === undefined) {
+  #|     return;
+  #|   }
+  #|   const existing = platforms.get(canvas);
+  #|   if (existing === undefined) {
+  #|     return;
+  #|   }
+  #|   disposePlatform(existing);
+  #|   platforms.delete(canvas);
+  #| }
+
+///|
 /// Disposes browser platform handles and shuts down the owned engine once.
 pub fn Platform::dispose(self : Platform) -> Unit {
   if self.disposed {
@@ -441,5 +479,17 @@ pub async fn run_platform(
     return None
   }
   engine.initialize()
-  Some(start_platform(engine, config.canvas, options))
+  let platform = start_platform(engine, config.canvas, options)
+  replace_platform_for_canvas(
+    config.canvas,
+    platform,
+    fn(platform) { platform.dispose() },
+  )
+  Some(platform)
+}
+
+///|
+/// Stops the active browser platform associated with a canvas.
+pub fn stop_platform(canvas : @wgpu.HTMLCanvasElement) -> Unit {
+  stop_platform_for_canvas(canvas, fn(platform) { platform.dispose() })
 }

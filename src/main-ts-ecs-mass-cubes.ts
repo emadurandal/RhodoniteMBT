@@ -26,7 +26,6 @@ import {
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
-	PlatformSlot,
 	runPlatform,
 	runBrowserWebGpuCanvasDemo,
 	type FrameState,
@@ -91,8 +90,6 @@ type DemoState = {
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
 };
-
-const browserPlatform = new PlatformSlot();
 
 function globalTransformDefaultIsF16(): boolean {
 	return GLOBAL_TRANSFORM_PRECISION_MODE !== "all-f32";
@@ -610,7 +607,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
-		const platform = await runPlatform(
+		await runPlatform(
 			new PlatformConfig(canvas, {
 				mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
 			}),
@@ -620,8 +617,5 @@ runBrowserWebGpuCanvasDemo({
 			}),
 			PlatformOptions.interactive(),
 		);
-		if (platform !== undefined) {
-			browserPlatform.replace(platform);
-		}
 	},
 });
