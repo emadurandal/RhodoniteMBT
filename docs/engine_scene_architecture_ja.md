@@ -371,4 +371,4 @@ Phase 1 の最初の PR は完了済みです。現在は `emadurandal/rhodonite
 
 `multi-surface-independent-input` は `ecs-scene-graph` ベースの multi-surface sample である。Browser JS 版は `pnpm run dev:js:multi-surface-independent-input`、TypeScript 版は `pnpm run dev:js:ts-multi-surface-independent-input`、native 版は `pnpm run dev:native:multi-surface-independent-input` で起動する。
 
-Browser JS 版は1つの browser platform から2つの canvas surface を attach し、surface-local input で各 ECS scene graph camera を独立操作する。TypeScript 版も1つの engine tick で2 canvas surface を描画し、各 surface の input state だけで camera を更新する。SDL3 native 版は同じ common sample を使う entry point を持つが、複数 native window の完全な attach/routing は SDL3 platform session 分割後に置き換える。
+Browser JS 版は1つの browser platform から2つの canvas surface を attach し、surface-local input で各 ECS scene graph camera を独立操作する。TypeScript 版も1つの engine tick で2 canvas surface を描画し、各 surface の input state だけで camera を更新する。SDL3 native 版は `run_multi_window_platform(...)` で2つの native window surface を同じ WebGPU device/queue に attach し、SDL windowID で resize/input/close を surface-local に route する。

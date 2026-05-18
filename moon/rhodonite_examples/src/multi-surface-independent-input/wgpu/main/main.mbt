@@ -11,13 +11,21 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 ///|
 /// Runs the native sample through the SDL3 platform entry point.
 async fn run_multi_surface_independent_input_native() -> Unit raise Error {
-  @sdl_app.run_single_window_platform(
-    @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (multi-surface-independent-input)",
-      800,
-      600,
-      "native: multi-surface-independent-input",
-    ),
+  @sdl_app.run_multi_window_platform(
+    [
+      @sdl_app.PlatformConfig::new(
+        "MoonBit wgpu + SDL3 (multi-surface A)",
+        800,
+        600,
+        "native: multi-surface-independent-input A",
+      ),
+      @sdl_app.PlatformConfig::new(
+        "MoonBit wgpu + SDL3 (multi-surface B)",
+        800,
+        600,
+        "native: multi-surface-independent-input B",
+      ),
+    ],
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),
   )

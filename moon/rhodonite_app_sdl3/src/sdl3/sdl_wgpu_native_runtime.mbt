@@ -61,6 +61,40 @@ priv struct SdlWindowEvent {
 }
 
 ///|
+/// Mirrors the common SDL event prefix for events that carry a window id.
+priv struct SdlWindowScopedEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+}
+
+///|
+/// One native window and WebGPU presentation surface owned by a multi-window platform.
+pub(all) struct SdlMultiWindowSurface {
+  priv window_id : @lib.SDL_WindowID
+  priv sdl_win : @lib.SDL_Window
+  priv metal_view : @wgpu_objects.OpaquePtr
+  priv webgpu_canvas_context : @wgpu.GPUCanvasContext
+  priv gpu_surface : @wgpu.GPUSurface
+  priv input : @input.InputState
+  priv mut engine_surface_id : @app.SurfaceId?
+}
+
+///|
+/// Owns SDL3, one shared WebGPU device, and multiple native window surfaces.
+pub struct SdlMultiWindowPlatformSession {
+  priv ctx : @sdl3_pkg.Context
+  priv instance : @wgpu.GPUInstance
+  priv adapter : @wgpu.GPUAdapter
+  priv device : @wgpu.GPUDevice
+  priv queue : @wgpu.GPUQueue
+  priv gpu_context : @wgpu.GPUContext
+  priv surfaces : Array[SdlMultiWindowSurface]
+  priv mut focused_window_id : @lib.SDL_WindowID?
+}
+
+///|
 /// Keeps the private SDL window mirror visible to MoonBit's field checks.
 fn _touch_sdl_window_event_struct() -> Unit {
   let event = SdlWindowEvent::{
@@ -77,6 +111,21 @@ fn _touch_sdl_window_event_struct() -> Unit {
   ignore(event.windowID)
   ignore(event.data1)
   ignore(event.data2)
+}
+
+///|
+/// Keeps the private SDL window-scoped mirror visible to MoonBit's field checks.
+fn _touch_sdl_window_scoped_event_struct() -> Unit {
+  let event = SdlWindowScopedEvent::{
+    event_type: SDL_EVENT_WINDOW_RESIZED,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
 }
 
 ///|
@@ -154,6 +203,12 @@ extern "C" fn sdl_get_window_size_in_pixels(
   width : FixedArray[Int],
   height : FixedArray[Int],
 ) -> Bool = "SDL_GetWindowSizeInPixels"
+
+///|
+/// Returns SDL's stable id for a window.
+extern "C" fn sdl_get_window_id(
+  window : @lib.SDL_Window,
+) -> @lib.SDL_WindowID = "SDL_GetWindowID"
 
 ///|
 /// Raises a structured error if a drawable size cannot be used for WebGPU.
@@ -474,6 +529,194 @@ pub fn release_sdl_metal_webgpu_native(
   }
   @lib.sdl_DestroyWindow(session.sdl_win)
   session.ctx.quit()
+}
+
+///|
+/// Returns the compatibility GPU context for engine creation.
+pub fn SdlMultiWindowPlatformSession::gpu_context(
+  self : SdlMultiWindowPlatformSession,
+) -> @wgpu.GPUContext {
+  self.gpu_context
+}
+
+///|
+/// Returns the GPU surface owned by a native multi-window surface.
+pub fn SdlMultiWindowSurface::gpu_surface(
+  self : SdlMultiWindowSurface,
+) -> @wgpu.GPUSurface {
+  self.gpu_surface
+}
+
+///|
+/// Returns the surface-local input state.
+pub fn SdlMultiWindowSurface::input(
+  self : SdlMultiWindowSurface,
+) -> @input.InputState {
+  self.input
+}
+
+///|
+/// Releases a single native multi-window surface.
+fn release_sdl_multi_window_surface(surface : SdlMultiWindowSurface) -> Unit {
+  surface.webgpu_canvas_context.release()
+  if !@wgpu_objects.opaque_ptr_is_null(surface.metal_view) {
+    sdl_metal_destroy_view(surface.metal_view)
+  }
+  @lib.sdl_DestroyWindow(surface.sdl_win)
+}
+
+///|
+/// Releases all resources owned by a native multi-window platform.
+pub fn release_sdl_multi_window_platform(
+  session : SdlMultiWindowPlatformSession,
+) -> Unit {
+  for i = 0; i < session.surfaces.length(); i = i + 1 {
+    release_sdl_multi_window_surface(session.surfaces[i])
+  }
+  session.queue.release()
+  session.device.release()
+  session.adapter.release()
+  session.instance.release()
+  session.ctx.quit()
+}
+
+///|
+/// Converts the legacy single-window bootstrap result into a multi-window platform.
+fn init_sdl_multi_window_platform_from_first(
+  first : SdlMetalWebGpuNativeSession,
+) -> SdlMultiWindowPlatformSession {
+  let surface = @wgpu.create_gpu_surface(
+    first.webgpu_canvas_context,
+    first.surface_format,
+    first.surface_width,
+    first.surface_height,
+  )
+  let surfaces : Array[SdlMultiWindowSurface] = [
+    {
+      window_id: sdl_get_window_id(first.sdl_win),
+      sdl_win: first.sdl_win,
+      metal_view: first.metal_view,
+      webgpu_canvas_context: first.webgpu_canvas_context,
+      gpu_surface: surface,
+      input: @input.InputState::new(),
+      engine_surface_id: None,
+    },
+  ]
+  {
+    ctx: first.ctx,
+    instance: first.instance,
+    adapter: first.adapter,
+    device: first.device,
+    queue: first.queue,
+    gpu_context: first.gpu_context,
+    surfaces,
+    focused_window_id: Some(sdl_get_window_id(first.sdl_win)),
+  }
+}
+
+///|
+/// Creates one additional SDL window surface using an existing shared WebGPU device.
+fn attach_sdl_multi_window_surface(
+  session : SdlMultiWindowPlatformSession,
+  config : PlatformConfig,
+) -> Unit raise Sdl3AppError {
+  ensure_valid_surface_size(config.width, config.height)
+  let (sdl_win, metal_view, webgpu_canvas_context, surface_width, surface_height) = if @wgpu_native.platform_is_macos() {
+    let sdl_win = @lib.sdl_CreateWindow(
+      config.window_title,
+      config.width,
+      config.height,
+      @lib.SDL_WINDOW_METAL | @lib.SDL_WINDOW_RESIZABLE,
+    )
+    if sdl_win.is_null() {
+      raise Sdl3AppError::CreateWindowFailed(@lib.sdl_GetError())
+    }
+    let _ = @lib.sdl_ShowWindow(sdl_win)
+    let _ = @lib.sdl_RaiseWindow(sdl_win)
+    let _ = @lib.sdl_SyncWindow(sdl_win)
+    let (surface_width, surface_height) = query_valid_sdl_window_size_in_pixels(
+      sdl_win,
+    ) catch {
+      error => {
+        @lib.sdl_DestroyWindow(sdl_win)
+        raise error
+      }
+    }
+    let metal_view = sdl_metal_create_view(sdl_win)
+    if @wgpu_objects.opaque_ptr_is_null(metal_view) {
+      @lib.sdl_DestroyWindow(sdl_win)
+      raise Sdl3AppError::CreateMetalViewFailed(@lib.sdl_GetError())
+    }
+    let cametal_ptr = sdl_metal_get_layer_ptr(metal_view)
+    if @wgpu_objects.opaque_ptr_is_null(cametal_ptr) {
+      sdl_metal_destroy_view(metal_view)
+      @lib.sdl_DestroyWindow(sdl_win)
+      raise Sdl3AppError::GetMetalLayerFailed(@lib.sdl_GetError())
+    }
+    let cametal = sdl_metal_get_layer(metal_view)
+    (
+      sdl_win,
+      metal_view,
+      @wgpu.create_metal_canvas_context(
+        session.instance, cametal, surface_width, surface_height,
+      ),
+      surface_width,
+      surface_height,
+    )
+  } else if @wgpu_native.platform_is_linux() {
+    let sdl_win = create_linux_wgpu_sdl_window(
+      config.window_title, config.width, config.height,
+    )
+    if sdl_win.is_null() {
+      raise Sdl3AppError::CreateWindowFailed(@lib.sdl_GetError())
+    }
+    rhodonite_sdl_prepare_shown_window(sdl_win)
+    let (surface_width, surface_height) = query_valid_sdl_window_size_in_pixels(
+      sdl_win,
+    ) catch {
+      error => {
+        @lib.sdl_DestroyWindow(sdl_win)
+        raise error
+      }
+    }
+    let webgpu_canvas_context = create_linux_canvas_context(
+      session.instance, sdl_win, surface_width, surface_height,
+    ) catch {
+      error => {
+        @lib.sdl_DestroyWindow(sdl_win)
+        raise error
+      }
+    }
+    (
+      sdl_win,
+      @wgpu_objects.null_opaque_ptr(),
+      webgpu_canvas_context,
+      surface_width,
+      surface_height,
+    )
+  } else {
+    raise Sdl3AppError::UnsupportedNativePlatform
+  }
+  let format = session.instance.get_preferred_canvas_format_for_surface(
+    session.adapter, webgpu_canvas_context,
+  )
+  webgpu_canvas_context.configure(session.device, format)
+  let render_format = webgpu_canvas_context.get_format()
+  let gpu_surface = @wgpu.create_gpu_surface(
+    webgpu_canvas_context,
+    render_format,
+    surface_width,
+    surface_height,
+  )
+  session.surfaces.push({
+    window_id: sdl_get_window_id(sdl_win),
+    sdl_win,
+    metal_view,
+    webgpu_canvas_context,
+    gpu_surface,
+    input: @input.InputState::new(),
+    engine_surface_id: None,
+  })
 }
 
 ///|
@@ -866,6 +1109,219 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
 }
 
 ///|
+/// Extracts the SDL window id carried by a window-scoped event.
+fn sdl_event_window_id(event : @lib.SDL_Event) -> @lib.SDL_WindowID {
+  let scoped : SdlWindowScopedEvent = @lib.unsafe_from_sdl_event(event)
+  scoped.windowID
+}
+
+///|
+/// Finds a multi-window surface index by SDL window id.
+fn SdlMultiWindowPlatformSession::find_surface_index_by_window_id(
+  self : SdlMultiWindowPlatformSession,
+  window_id : @lib.SDL_WindowID,
+) -> Int? {
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    if self.surfaces[i].window_id == window_id {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+/// Returns the focused surface index or falls back to the first live surface.
+fn SdlMultiWindowPlatformSession::focused_surface_index(
+  self : SdlMultiWindowPlatformSession,
+) -> Int? {
+  match self.focused_window_id {
+    Some(window_id) => match self.find_surface_index_by_window_id(window_id) {
+      Some(index) => Some(index)
+      None => if self.surfaces.length() > 0 { Some(0) } else { None }
+    }
+    None => if self.surfaces.length() > 0 { Some(0) } else { None }
+  }
+}
+
+///|
+/// Removes and releases a native surface and unregisters it from the engine.
+fn remove_sdl_multi_window_surface_at(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  index : Int,
+) -> Unit {
+  let surface = session.surfaces[index]
+  match surface.engine_surface_id {
+    Some(id) => engine.remove_surface(id)
+    None => ()
+  }
+  ignore(session.surfaces.remove(index))
+  release_sdl_multi_window_surface(surface)
+  match session.focused_window_id {
+    Some(window_id) =>
+      if window_id == surface.window_id {
+        session.focused_window_id = None
+      }
+    None => ()
+  }
+}
+
+///|
+/// Reconfigures the matching native surface after a window resize event.
+fn handle_sdl_multi_window_resize_event(
+  session : SdlMultiWindowPlatformSession,
+  event : @lib.SDL_Event,
+) -> Bool raise Sdl3AppError {
+  let event_type = event.get_type()
+  if !sdl_event_is_resize(event_type) {
+    return false
+  }
+  let window_event : SdlWindowEvent = @lib.unsafe_from_sdl_event(event)
+  match session.find_surface_index_by_window_id(window_event.windowID) {
+    Some(index) => {
+      let surface = session.surfaces[index]
+      let (width, height) = match event_type {
+        SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED =>
+          (window_event.data1, window_event.data2)
+        _ => query_sdl_window_size_in_pixels_raw(surface.sdl_win)
+      }
+      if width <= 0 || height <= 0 {
+        surface.gpu_surface.suspend()
+      } else {
+        surface.gpu_surface.resize(session.device, width, height)
+      }
+    }
+    None => false
+  }
+}
+
+///|
+/// Processes one SDL event for a native multi-window platform.
+fn handle_sdl_multi_window_event(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  event : @lib.SDL_Event,
+  install_input : Bool,
+) -> Bool raise Sdl3AppError {
+  let event_type = event.get_type()
+  match event_type {
+    SDL_EVENT_QUIT => true
+    SDL_EVENT_WINDOW_CLOSE_REQUESTED => {
+      let window_id = sdl_event_window_id(event)
+      match session.find_surface_index_by_window_id(window_id) {
+        Some(index) => remove_sdl_multi_window_surface_at(session, engine, index)
+        None => ()
+      }
+      session.surfaces.length() == 0
+    }
+    SDL_EVENT_WINDOW_FOCUS_LOST => {
+      let window_id = sdl_event_window_id(event)
+      match session.find_surface_index_by_window_id(window_id) {
+        Some(index) =>
+          if install_input {
+            session.surfaces[index].input.enqueue_event(FocusLost)
+          }
+        None => ()
+      }
+      false
+    }
+    SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
+      if install_input {
+        match session.focused_surface_index() {
+          Some(index) => enqueue_sdl_keyboard_event(
+            session.surfaces[index].input, event,
+          )
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_WHEEL => {
+      if install_input {
+        let window_id = sdl_event_window_id(event)
+        session.focused_window_id = Some(window_id)
+        match session.find_surface_index_by_window_id(window_id) {
+          Some(index) => enqueue_sdl_mouse_wheel_event(
+            session.surfaces[index].input, event,
+          )
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_MOTION
+    | SDL_EVENT_MOUSE_BUTTON_DOWN
+    | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        let window_id = sdl_event_window_id(event)
+        session.focused_window_id = Some(window_id)
+        match session.find_surface_index_by_window_id(window_id) {
+          Some(index) => enqueue_sdl_mouse_state(session.surfaces[index].input)
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_WINDOW_RESIZED
+    | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+    | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {
+      if handle_sdl_multi_window_resize_event(session, event) {
+        engine.request_render("surface")
+      }
+      false
+    }
+    _ => false
+  }
+}
+
+///|
+/// Runs the SDL3 event loop for a platform with multiple native window surfaces.
+fn run_sdl_multi_window_platform_loop(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  options : PlatformOptions,
+) -> Unit raise Sdl3AppError {
+  println("native: entering multi-window render loop")
+  let quit = @ref.new(false)
+  let mut previous_ticks = sdl_get_ticks()
+  match options.frame_mode {
+    SingleFrame => {
+      @wgpu.webgpu_instance_process_events(session.instance)
+      ignore(engine.run_multi_surface_frame((0.0 : Float)))
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+    }
+    Loop | OnDemand =>
+      while !quit.val {
+        let event = @lib.new_sdl_event()
+        while @lib.sdl_PollEvent(event) {
+          let event_type = event.get_type()
+          if event_type == SDL_EVENT_POLL_SENTINEL {
+            break
+          }
+          if handle_sdl_multi_window_event(
+              session, engine, event, options.install_input,
+            ) {
+            quit.val = true
+          }
+        }
+        if session.surfaces.length() == 0 {
+          quit.val = true
+        } else {
+          let current_ticks = sdl_get_ticks()
+          let delta_seconds = Float::from_double(
+            (current_ticks - previous_ticks).to_double() / 1000.0,
+          )
+          previous_ticks = current_ticks
+          @wgpu.webgpu_instance_process_events(session.instance)
+          ignore(engine.run_multi_surface_frame(delta_seconds))
+          let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+          @wgpu.webgpu_instance_process_events(session.instance)
+        }
+      }
+  }
+}
+
+///|
 /// Configuration for the SDL3 platform lifecycle owner.
 pub struct PlatformConfig {
   priv window_title : String
@@ -1047,6 +1503,52 @@ pub async fn run_platform(
   }
   engine.shutdown()
   release_sdl_metal_webgpu_native(session)
+}
+
+///|
+/// Runs one SDL3 platform with one shared WebGPU device and multiple native windows.
+pub async fn run_multi_window_platform(
+  configs : Array[PlatformConfig],
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> Unit raise Sdl3AppError {
+  if configs.length() == 0 {
+    return
+  }
+  let first = init_sdl_webgpu_native(
+    configs[0].window_title,
+    configs[0].width,
+    configs[0].height,
+    configs[0].init_log,
+  )
+  let session = init_sdl_multi_window_platform_from_first(first)
+  for i = 1; i < configs.length(); i = i + 1 {
+    attach_sdl_multi_window_surface(session, configs[i]) catch {
+      error => {
+        release_sdl_multi_window_platform(session)
+        raise error
+      }
+    }
+  }
+  let engine = (app.create_engine)(session.gpu_context())
+  if !(app.setup_engine)(engine) {
+    release_sdl_multi_window_platform(session)
+    return
+  }
+  for i = 0; i < session.surfaces.length(); i = i + 1 {
+    let id = engine.add_surface(session.surfaces[i].gpu_surface())
+    session.surfaces[i].engine_surface_id = Some(id)
+  }
+  engine.initialize()
+  run_sdl_multi_window_platform_loop(session, engine, options) catch {
+    error => {
+      engine.shutdown()
+      release_sdl_multi_window_platform(session)
+      raise error
+    }
+  }
+  engine.shutdown()
+  release_sdl_multi_window_platform(session)
 }
 
 ///|
