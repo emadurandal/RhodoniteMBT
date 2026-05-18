@@ -3,21 +3,25 @@
 let browser_platform : @app_browser.PlatformSlot = @app_browser.PlatformSlot::new()
 
 ///|
+/// Creates DemoState and registers engine handlers.
+fn setup_engine(engine : @app.Engine) -> Bool {
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      @demo_state.register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Creates the browser WebGPU demo state and starts browser platform helpers.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let platform = @app_browser.create_platform(
-    canvas,
-    fn(engine) {
-      match @demo_state.create_demo_state_for_engine(engine) {
-        Some(demo_state) => {
-          @demo_state.register_engine_handlers(engine, demo_state)
-          true
-        }
-        None => false
-      }
-    },
+  let platform = @app_browser.run_platform(
+    @app_browser.PlatformConfig::new(canvas),
+    @app_browser.PlatformApp::default_engine(setup_engine),
     @app_browser.PlatformOptions::interactive(),
   )
   match platform {

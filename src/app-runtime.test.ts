@@ -6,10 +6,13 @@ import {
 	PhaseGroup,
 	Scene,
 	TimeState,
+	PlatformApp,
+	PlatformConfig,
+	PlatformOptions,
 	PlatformSlot,
-	createPlatform,
 	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
+	runPlatform,
 	startPlatform,
 	startBrowserFrameLoop,
 } from "./app-runtime";
@@ -295,11 +298,7 @@ describe("app-runtime Engine", () => {
 		});
 		engine.initialize();
 
-		const platform = startPlatform(engine, {
-			runLoop: false,
-			installInput: false,
-			runFirstFrame: true,
-		});
+		const platform = startPlatform(engine, PlatformOptions.singleFrame());
 		platform.dispose();
 
 		expect(frames).toEqual([1]);
@@ -336,7 +335,7 @@ describe("app-runtime Engine", () => {
 		expect(shutdowns).toEqual(["first", "second"]);
 	});
 
-	it("creates a browser engine platform around setup and initialization", async () => {
+	it("runs a browser engine platform around setup and initialization", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
@@ -344,14 +343,14 @@ describe("app-runtime Engine", () => {
 		stubWebGpu();
 		const calls: string[] = [];
 
-		const platform = await createPlatform(
-			canvas,
-			(engine) => {
+		const platform = await runPlatform(
+			new PlatformConfig(canvas),
+			PlatformApp.defaultEngine((engine) => {
 				engine.addPhaseHandler(Phase.Startup, () => {
 					calls.push("startup");
 				});
-			},
-			{ runLoop: false, installInput: false },
+			}),
+			new PlatformOptions({ runLoop: false, installInput: false }),
 		);
 		platform?.dispose();
 

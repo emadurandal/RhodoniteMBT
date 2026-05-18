@@ -27,8 +27,7 @@ async fn run_ecs_mass_cubes_native() -> Unit raise Error {
       600,
       "native: ecs-mass-cubes",
     ),
-    create_engine,
-    setup_engine,
+    @sdl_app.PlatformApp::new(create_engine, setup_engine),
     @sdl_app.PlatformOptions::interactive(),
   )
 }

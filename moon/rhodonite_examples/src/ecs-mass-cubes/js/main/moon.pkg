@@ -1,4 +1,5 @@
 import {
+  "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite/app/browser" @app_browser,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @demo_state,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,

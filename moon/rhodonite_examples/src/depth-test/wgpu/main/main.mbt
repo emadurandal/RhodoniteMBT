@@ -1,12 +1,6 @@
 ///| SDL3 + Metal + native wgpu; runs the `depth-test` DemoState each frame.
 
 ///|
-/// Creates the platform-independent engine for the sample.
-fn create_engine(gpu_context : @wgpu.GPUContext) -> @app.Engine {
-  @app.Engine::new(gpu_context)
-}
-
-///|
 /// Creates DemoState and registers engine handlers.
 fn setup_engine(engine : @app.Engine) -> Bool {
   match @demo_state.create_demo_state_for_engine(engine) {
@@ -27,8 +21,7 @@ async fn run_depth_test_native() -> Unit raise Error {
       600,
       "native: depth-test",
     ),
-    create_engine,
-    setup_engine,
+    @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),
   )
 }

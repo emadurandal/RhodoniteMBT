@@ -7,6 +7,19 @@ pub type BrowserFrameLoop
 pub type BrowserInputBinding
 
 ///|
+/// Configuration for the browser platform lifecycle owner.
+pub struct PlatformConfig {
+  priv canvas : @wgpu.HTMLCanvasElement
+}
+
+///|
+/// Application hooks used by the browser platform to create and set up an engine.
+pub struct PlatformApp {
+  priv create_engine : (@wgpu.GPUContext) -> @app.Engine
+  priv setup_engine : (@app.Engine) -> Bool
+}
+
+///|
 /// Options for starting the standard browser platform.
 pub struct PlatformOptions {
   run_loop : Bool
@@ -21,6 +34,29 @@ pub struct Platform {
   priv mut frame_loop : BrowserFrameLoop?
   priv mut input_binding : BrowserInputBinding?
   priv mut disposed : Bool
+}
+
+///|
+/// Builds browser platform configuration from a canvas.
+pub fn PlatformConfig::new(canvas : @wgpu.HTMLCanvasElement) -> PlatformConfig {
+  { canvas, }
+}
+
+///|
+/// Builds browser platform application hooks.
+pub fn PlatformApp::new(
+  create_engine : (@wgpu.GPUContext) -> @app.Engine,
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  { create_engine, setup_engine }
+}
+
+///|
+/// Builds browser platform application hooks using the default engine constructor.
+pub fn PlatformApp::default_engine(
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  PlatformApp::new(fn(context) { @app.Engine::new(context) }, setup_engine)
 }
 
 ///|
@@ -393,33 +429,17 @@ pub fn start_platform(
 }
 
 ///|
-/// Creates, initializes, and starts a browser platform from a canvas.
-pub async fn create_platform(
-  canvas : @wgpu.HTMLCanvasElement,
-  setup : (@app.Engine) -> Bool,
+/// Runs the browser platform lifecycle from configuration and application hooks.
+pub async fn run_platform(
+  config : PlatformConfig,
+  app : PlatformApp,
   options : PlatformOptions,
 ) -> Platform? {
-  create_platform_with_engine(
-    canvas,
-    fn(context) { @app.Engine::new(context) },
-    setup,
-    options,
-  )
-}
-
-///|
-/// Creates a browser platform using a caller-provided engine factory.
-pub async fn create_platform_with_engine(
-  canvas : @wgpu.HTMLCanvasElement,
-  create_engine : (@wgpu.GPUContext) -> @app.Engine,
-  setup : (@app.Engine) -> Bool,
-  options : PlatformOptions,
-) -> Platform? {
-  let ctx = gpu_context_from_html_canvas(canvas)
-  let engine = create_engine(ctx)
-  if !setup(engine) {
+  let ctx = gpu_context_from_html_canvas(config.canvas)
+  let engine = (app.create_engine)(ctx)
+  if !(app.setup_engine)(engine) {
     return None
   }
   engine.initialize()
-  Some(start_platform(engine, canvas, options))
+  Some(start_platform(engine, config.canvas, options))
 }

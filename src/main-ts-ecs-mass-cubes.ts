@@ -23,8 +23,11 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
+	PlatformApp,
+	PlatformConfig,
+	PlatformOptions,
 	PlatformSlot,
-	createPlatform,
+	runPlatform,
 	runBrowserWebGpuCanvasDemo,
 	type FrameState,
 } from "./app-runtime";
@@ -607,17 +610,15 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
-		const platform = await createPlatform(
-			canvas,
-			(engine) => {
+		const platform = await runPlatform(
+			new PlatformConfig(canvas, {
+				mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
+			}),
+			PlatformApp.defaultEngine((engine) => {
 				const demoState = createDemoStateForEngine(engine);
 				registerEngineHandlers(engine, demoState);
-			},
-			{
-				mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
-				runLoop: true,
-				installInput: true,
-			},
+			}),
+			PlatformOptions.interactive(),
 		);
 		if (platform !== undefined) {
 			browserPlatform.replace(platform);

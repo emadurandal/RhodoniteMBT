@@ -748,6 +748,13 @@ pub struct PlatformConfig {
 }
 
 ///|
+/// Application hooks used by the SDL3 platform to create and set up an engine.
+pub struct PlatformApp {
+  priv create_engine : (@wgpu.GPUContext) -> @app.Engine
+  priv setup_engine : (@app.Engine) -> Bool
+}
+
+///|
 /// Options for running the SDL3 platform lifecycle owner.
 pub struct PlatformOptions {
   priv interactive : Bool
@@ -765,48 +772,46 @@ pub fn PlatformConfig::new(
 }
 
 ///|
+/// Builds SDL3 platform application hooks.
+pub fn PlatformApp::new(
+  create_engine : (@wgpu.GPUContext) -> @app.Engine,
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  { create_engine, setup_engine }
+}
+
+///|
+/// Builds SDL3 platform application hooks using the default engine constructor.
+pub fn PlatformApp::default_engine(
+  setup_engine : (@app.Engine) -> Bool,
+) -> PlatformApp {
+  PlatformApp::new(fn(context) { @app.Engine::new(context) }, setup_engine)
+}
+
+///|
 /// Creates options for the standard interactive SDL3 platform.
 pub fn PlatformOptions::interactive() -> PlatformOptions {
   { interactive: true }
 }
 
 ///|
-/// Runs the SDL3 platform lifecycle with a caller-created engine.
+/// Runs the SDL3 platform lifecycle with application hooks.
 pub async fn run_platform(
   config : PlatformConfig,
-  create_engine : (@wgpu.GPUContext) -> @app.Engine,
-  setup : (@app.Engine) -> Bool,
+  app : PlatformApp,
   options : PlatformOptions,
 ) -> Unit raise Sdl3AppError {
   ignore(options.interactive)
-  run_platform_setup_result(config, fn(gpu_context) {
-    let engine = create_engine(gpu_context)
-    if setup(engine) {
-      Some(engine)
-    } else {
-      None
-    }
-  })
-}
-
-///|
-/// Runs the standard SDL3 native Rhodonite lifecycle for a host WebGPU window.
-async fn run_platform_setup_result(
-  config : PlatformConfig,
-  setup : (@wgpu.GPUContext) -> @app.Engine?,
-) -> Unit raise Sdl3AppError {
   let session = init_sdl_webgpu_native(
     config.window_title,
     config.width,
     config.height,
     config.init_log,
   )
-  let engine = match setup(session.gpu_context()) {
-    Some(engine) => engine
-    None => {
-      release_sdl_metal_webgpu_native(session)
-      return
-    }
+  let engine = (app.create_engine)(session.gpu_context())
+  if !(app.setup_engine)(engine) {
+    release_sdl_metal_webgpu_native(session)
+    return
   }
   if session.surface_active() {
     engine.set_surface_active(
@@ -842,31 +847,4 @@ async fn run_platform_setup_result(
   }
   engine.shutdown()
   release_sdl_metal_webgpu_native(session)
-}
-
-///|
-/// Runs the standard SDL3 native Rhodonite engine lifecycle for a host WebGPU window.
-pub async fn run_sdl_webgpu_app(
-  window_title : String,
-  width : Int,
-  height : Int,
-  init_log : String,
-  setup : (@wgpu.GPUContext) -> @app.Engine?,
-) -> Unit raise Sdl3AppError {
-  run_platform_setup_result(
-    PlatformConfig::new(window_title, width, height, init_log),
-    setup,
-  )
-}
-
-///|
-/// Runs the SDL3 native Rhodonite lifecycle using the macOS Metal surface path.
-pub async fn run_sdl_metal_webgpu_app(
-  window_title : String,
-  width : Int,
-  height : Int,
-  init_log : String,
-  setup : (@wgpu.GPUContext) -> @app.Engine?,
-) -> Unit raise Sdl3AppError {
-  run_sdl_webgpu_app(window_title, width, height, init_log, setup)
 }

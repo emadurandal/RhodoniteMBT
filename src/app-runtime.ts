@@ -519,16 +519,76 @@ export type Platform = {
 	dispose: () => void;
 };
 
-export type PlatformOptions = {
-	readonly keyboardTarget?: Window | HTMLElement;
-	readonly runLoop?: boolean;
-	readonly installInput?: boolean;
-	readonly runFirstFrame?: boolean;
-};
+export class PlatformConfig {
+	readonly canvas: HTMLCanvasElement;
+	readonly mainScene: RuntimeScene | undefined;
 
-export type CreatePlatformOptions = PlatformOptions & {
-	readonly mainScene?: RuntimeScene;
-};
+	constructor(
+		canvas: HTMLCanvasElement,
+		options: { readonly mainScene?: RuntimeScene } = {},
+	) {
+		this.canvas = canvas;
+		this.mainScene = options.mainScene;
+	}
+}
+
+export class PlatformApp {
+	readonly createEngine: (config: PlatformConfig) => Promise<Engine>;
+	readonly setupEngine: (engine: Engine) => boolean | void;
+
+	constructor(options: {
+		readonly createEngine: (config: PlatformConfig) => Promise<Engine>;
+		readonly setupEngine: (engine: Engine) => boolean | void;
+	}) {
+		this.createEngine = options.createEngine;
+		this.setupEngine = options.setupEngine;
+	}
+
+	static defaultEngine(
+		setupEngine: (engine: Engine) => boolean | void,
+	): PlatformApp {
+		return new PlatformApp({
+			createEngine: (config) =>
+				Engine.create(config.canvas, { mainScene: config.mainScene }),
+			setupEngine,
+		});
+	}
+}
+
+export class PlatformOptions {
+	readonly keyboardTarget: Window | HTMLElement | undefined;
+	readonly runLoop: boolean;
+	readonly installInput: boolean;
+	readonly runFirstFrame: boolean;
+
+	constructor(options: {
+		readonly keyboardTarget?: Window | HTMLElement;
+		readonly runLoop?: boolean;
+		readonly installInput?: boolean;
+		readonly runFirstFrame?: boolean;
+	} = {}) {
+		this.keyboardTarget = options.keyboardTarget;
+		this.runLoop = options.runLoop ?? true;
+		this.installInput = options.installInput ?? true;
+		this.runFirstFrame = options.runFirstFrame ?? false;
+	}
+
+	static interactive(): PlatformOptions {
+		return new PlatformOptions();
+	}
+
+	static loopOnly(): PlatformOptions {
+		return new PlatformOptions({ runLoop: true, installInput: false });
+	}
+
+	static singleFrame(): PlatformOptions {
+		return new PlatformOptions({
+			runLoop: false,
+			installInput: false,
+			runFirstFrame: true,
+		});
+	}
+}
 
 export class PlatformSlot {
 	private platform?: Platform;
@@ -739,21 +799,18 @@ export function installBrowserInput(
 
 export function startPlatform(
 	engine: Engine,
-	options: PlatformOptions = {},
+	options: PlatformOptions = PlatformOptions.interactive(),
 ): Platform {
-	const {
-		runLoop = true,
-		installInput = true,
-		runFirstFrame = false,
-	} = options;
-	if (runLoop || runFirstFrame) {
+	if (options.runLoop || options.runFirstFrame) {
 		syncBrowserEngineSurface(engine);
 	}
-	if (runFirstFrame) {
+	if (options.runFirstFrame) {
 		engine.runFrame(0);
 	}
-	const inputBinding = installInput ? installBrowserInput(engine, options) : undefined;
-	const frameLoop = runLoop
+	const inputBinding = options.installInput
+		? installBrowserInput(engine, options)
+		: undefined;
+	const frameLoop = options.runLoop
 		? startBrowserFrameLoop((deltaSeconds) => {
 				syncBrowserEngineSurface(engine);
 				engine.runFrame(deltaSeconds);
@@ -776,13 +833,13 @@ export function startPlatform(
 	};
 }
 
-export async function createPlatform(
-	canvas: HTMLCanvasElement,
-	setup: (engine: Engine) => boolean | void,
-	options: CreatePlatformOptions = {},
+export async function runPlatform(
+	config: PlatformConfig,
+	app: PlatformApp,
+	options: PlatformOptions = PlatformOptions.interactive(),
 ): Promise<Platform | undefined> {
-	const engine = await Engine.create(canvas, { mainScene: options.mainScene });
-	if (setup(engine) === false) {
+	const engine = await app.createEngine(config);
+	if (app.setupEngine(engine) === false) {
 		return undefined;
 	}
 	engine.initialize();
