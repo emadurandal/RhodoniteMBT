@@ -694,7 +694,7 @@ pub fn register_engine_handlers(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
-        render_frame(demo_state)
+        render_current_frame(demo_state)
       }
     },
     slot=@app.PhaseSlot::AfterSystems,
