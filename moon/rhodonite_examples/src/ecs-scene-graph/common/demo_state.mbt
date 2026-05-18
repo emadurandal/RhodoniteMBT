@@ -537,20 +537,6 @@ fn push_local_transforms(
 }
 
 ///|
-/// Implements `render_frame`.
-pub fn render_frame(demo_state : DemoState) -> Unit {
-  let canvas_context = match demo_state.context {
-    Some(c) => c
-    None => abort("render_frame requires a canvas context")
-  }
-  let texture = canvas_context.get_current_texture()
-  let color_view = texture.create_view()
-  render_frame_to_view(demo_state, color_view)
-  @wgpu.textureView_release(color_view)
-  canvas_context.present()
-}
-
-///|
 /// Renders the current scene state without advancing app time or running systems.
 pub fn render_current_frame(demo_state : DemoState) -> Unit {
   let canvas_context = match demo_state.context {
