@@ -31,11 +31,11 @@ pub struct GPUCanvasContext {
   surface : @wgpu.Surface
   mut width : UInt
   mut height : UInt
-  /// Color format reported to the engine (the relay texture format on Linux).
+  /// Color format reported to the engine.
   format : Ref[String]
-  /// Configured swapchain format used for the final blit (e.g. `bgra8unorm`).
+  /// Configured swapchain format used by the native surface.
   swapFormat : Ref[String]
-  /// True for Linux Wayland/Xlib surfaces that should render through the relay texture.
+  /// True when rendering should go through the offscreen swapchain relay.
   relayEnabled : Bool
   currentTexture : Ref[@wgpu.Texture?]
   relay : Ref[LinuxSwapchainRelay?]
