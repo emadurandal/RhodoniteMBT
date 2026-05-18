@@ -20,11 +20,17 @@ pub struct PlatformApp {
 }
 
 ///|
+/// Browser platform frame driving mode.
+pub enum FrameMode {
+  Loop
+  SingleFrame
+}
+
+///|
 /// Options for starting the standard browser platform.
 pub struct PlatformOptions {
-  run_loop : Bool
-  install_input : Bool
-  run_first_frame : Bool
+  frame_mode : FrameMode
+  priv install_input : Bool
 }
 
 ///|
@@ -62,19 +68,19 @@ pub fn PlatformApp::default_engine(
 ///|
 /// Creates browser platform options for an interactive canvas sample.
 pub fn PlatformOptions::interactive() -> PlatformOptions {
-  { run_loop: true, install_input: true, run_first_frame: false }
+  { frame_mode: Loop, install_input: true }
 }
 
 ///|
-/// Creates browser platform options for a continuously rendered canvas sample.
-pub fn PlatformOptions::loop_only() -> PlatformOptions {
-  { run_loop: true, install_input: false, run_first_frame: false }
+/// Creates browser platform options for a render-only loop.
+pub fn PlatformOptions::render_loop() -> PlatformOptions {
+  { frame_mode: Loop, install_input: false }
 }
 
 ///|
 /// Creates browser platform options for a single-frame canvas sample.
 pub fn PlatformOptions::single_frame() -> PlatformOptions {
-  { run_loop: false, install_input: false, run_first_frame: true }
+  { frame_mode: SingleFrame, install_input: false }
 }
 
 ///|
@@ -412,26 +418,20 @@ pub fn start_platform(
   canvas : @wgpu.HTMLCanvasElement,
   options : PlatformOptions,
 ) -> Platform {
-  if options.run_first_frame {
-    sync_browser_engine_surface(engine, canvas)
-    ignore(engine.run_frame((0.0 : Float)))
-  }
-  let frame_loop = if options.run_loop {
-    Some(start_browser_engine_canvas_loop(engine, canvas))
-  } else {
-    None
+  sync_browser_engine_surface(engine, canvas)
+  let frame_loop = match options.frame_mode {
+    Loop => Some(start_browser_engine_canvas_loop(engine, canvas))
+    SingleFrame => {
+      ignore(engine.run_frame((0.0 : Float)))
+      None
+    }
   }
   let input_binding = if options.install_input {
     Some(install_browser_input(engine, canvas))
   } else {
     None
   }
-  {
-    engine,
-    frame_loop,
-    input_binding,
-    disposed: false,
-  }
+  { engine, frame_loop, input_binding, disposed: false }
 }
 
 ///|
@@ -448,11 +448,9 @@ pub async fn run_platform(
   }
   engine.initialize()
   let platform = start_platform(engine, config.canvas, options)
-  replace_platform_for_canvas(
-    config.canvas,
-    platform,
-    fn(platform) { platform.dispose() },
-  )
+  replace_platform_for_canvas(config.canvas, platform, fn(platform) {
+    platform.dispose()
+  })
   Some(platform)
 }
 

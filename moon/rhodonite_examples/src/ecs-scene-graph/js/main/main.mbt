@@ -21,9 +21,7 @@ async fn create_webgpu_demo_state_async(
     @app_browser.PlatformOptions::interactive(),
   )
   match platform {
-    Some(_) => {
-      println("ecs-scene-graph: DemoState ready")
-    }
+    Some(_) => println("ecs-scene-graph: DemoState ready")
     None => println("ecs-scene-graph: failed to create DemoState")
   }
 }

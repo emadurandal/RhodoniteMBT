@@ -18,12 +18,10 @@ async fn create_webgpu_demo_state_async(
   let platform = @app_browser.run_platform(
     @app_browser.PlatformConfig::new(canvas),
     @app_browser.PlatformApp::default_engine(setup_engine),
-    @app_browser.PlatformOptions::loop_only(),
+    @app_browser.PlatformOptions::render_loop(),
   )
   match platform {
-    Some(_) => {
-      println("depth-test: DemoState ready")
-    }
+    Some(_) => println("depth-test: DemoState ready")
     None => println("depth-test: failed to create DemoState")
   }
 }

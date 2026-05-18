@@ -21,9 +21,8 @@ async fn create_webgpu_demo_state_async(
     @app_browser.PlatformOptions::single_frame(),
   )
   match platform {
-    Some(_) => {
+    Some(_) =>
       println("WebGPU triangle (vertex + index buffer) rendered successfully!")
-    }
     None => println("Failed to create DemoState")
   }
 }

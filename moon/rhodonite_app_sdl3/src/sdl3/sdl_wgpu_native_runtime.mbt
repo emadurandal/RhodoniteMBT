@@ -697,6 +697,7 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
   session : SdlMetalWebGpuNativeSession,
   input : @input.InputState,
   render_frame : (Float) -> Unit,
+  install_input? : Bool = true,
   on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit = fn(_) { () },
 ) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
   println("native: entering render loop")
@@ -711,10 +712,18 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
       }
       match event_type {
         SDL_EVENT_QUIT | SDL_EVENT_WINDOW_CLOSE_REQUESTED => quit.val = true
-        SDL_EVENT_WINDOW_FOCUS_LOST => input.enqueue_event(FocusLost)
+        SDL_EVENT_WINDOW_FOCUS_LOST =>
+          if install_input {
+            input.enqueue_event(FocusLost)
+          }
         SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP =>
-          enqueue_sdl_keyboard_event(input, event)
-        SDL_EVENT_MOUSE_WHEEL => enqueue_sdl_mouse_wheel_event(input, event)
+          if install_input {
+            enqueue_sdl_keyboard_event(input, event)
+          }
+        SDL_EVENT_MOUSE_WHEEL =>
+          if install_input {
+            enqueue_sdl_mouse_wheel_event(input, event)
+          }
         SDL_EVENT_WINDOW_RESIZED
         | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
         | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED =>
@@ -724,7 +733,9 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
         _ => ()
       }
     }
-    enqueue_sdl_mouse_state(input)
+    if install_input {
+      enqueue_sdl_mouse_state(input)
+    }
     let current_ticks = sdl_get_ticks()
     let delta_seconds = Float::from_double(
       (current_ticks - previous_ticks).to_double() / 1000.0,
@@ -755,9 +766,17 @@ pub struct PlatformApp {
 }
 
 ///|
+/// SDL3 platform frame driving mode.
+pub enum FrameMode {
+  Loop
+  SingleFrame
+}
+
+///|
 /// Options for running the SDL3 platform lifecycle owner.
 pub struct PlatformOptions {
-  priv interactive : Bool
+  priv frame_mode : FrameMode
+  priv install_input : Bool
 }
 
 ///|
@@ -791,7 +810,19 @@ pub fn PlatformApp::default_engine(
 ///|
 /// Creates options for the standard interactive SDL3 platform.
 pub fn PlatformOptions::interactive() -> PlatformOptions {
-  { interactive: true }
+  { frame_mode: Loop, install_input: true }
+}
+
+///|
+/// Creates options for a render-only SDL3 loop.
+pub fn PlatformOptions::render_loop() -> PlatformOptions {
+  { frame_mode: Loop, install_input: false }
+}
+
+///|
+/// Creates options for a single-frame SDL3 platform run.
+pub fn PlatformOptions::single_frame() -> PlatformOptions {
+  { frame_mode: SingleFrame, install_input: false }
 }
 
 ///|
@@ -801,7 +832,6 @@ pub async fn run_platform(
   app : PlatformApp,
   options : PlatformOptions,
 ) -> Unit raise Sdl3AppError {
-  ignore(options.interactive)
   let session = init_sdl_webgpu_native(
     config.window_title,
     config.width,
@@ -823,26 +853,38 @@ pub async fn run_platform(
     engine.set_surface_suspended()
   }
   engine.initialize()
-  let session = run_sdl_metal_webgpu_input_render_loop(
-    session,
-    engine.input(),
-    fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
-    on_surface_change=fn(session) {
-      if session.surface_active() {
-        engine.set_surface_active(
-          session.surface_width(),
-          session.surface_height(),
-          session.surface_format(),
-        )
-      } else {
-        engine.set_surface_suspended()
+  let session = match options.frame_mode {
+    Loop => {
+      let session = run_sdl_metal_webgpu_input_render_loop(
+        session,
+        engine.input(),
+        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
+        install_input=options.install_input,
+        on_surface_change=fn(session) {
+          if session.surface_active() {
+            engine.set_surface_active(
+              session.surface_width(),
+              session.surface_height(),
+              session.surface_format(),
+            )
+          } else {
+            engine.set_surface_suspended()
+          }
+        },
+      ) catch {
+        error => {
+          engine.shutdown()
+          release_sdl_metal_webgpu_native(session)
+          raise error
+        }
       }
-    },
-  ) catch {
-    error => {
-      engine.shutdown()
-      release_sdl_metal_webgpu_native(session)
-      raise error
+      session
+    }
+    SingleFrame => {
+      @wgpu.webgpu_instance_process_events(session.instance)
+      ignore(engine.run_frame((0.0 : Float)))
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+      session
     }
   }
   engine.shutdown()

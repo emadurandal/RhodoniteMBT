@@ -22,10 +22,7 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 async fn run_ecs_mass_cubes_native() -> Unit raise Error {
   @sdl_app.run_platform(
     @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (ecs-mass-cubes)",
-      800,
-      600,
-      "native: ecs-mass-cubes",
+      "MoonBit wgpu + SDL3 (ecs-mass-cubes)", 800, 600, "native: ecs-mass-cubes",
     ),
     @sdl_app.PlatformApp::new(create_engine, setup_engine),
     @sdl_app.PlatformOptions::interactive(),

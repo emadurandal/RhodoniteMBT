@@ -557,35 +557,31 @@ export class PlatformApp {
 
 export class PlatformOptions {
 	readonly keyboardTarget: Window | HTMLElement | undefined;
-	readonly runLoop: boolean;
+	readonly frameMode: "loop" | "single-frame";
 	readonly installInput: boolean;
-	readonly runFirstFrame: boolean;
 
 	constructor(options: {
 		readonly keyboardTarget?: Window | HTMLElement;
-		readonly runLoop?: boolean;
+		readonly frameMode?: "loop" | "single-frame";
 		readonly installInput?: boolean;
-		readonly runFirstFrame?: boolean;
 	} = {}) {
 		this.keyboardTarget = options.keyboardTarget;
-		this.runLoop = options.runLoop ?? true;
+		this.frameMode = options.frameMode ?? "loop";
 		this.installInput = options.installInput ?? true;
-		this.runFirstFrame = options.runFirstFrame ?? false;
 	}
 
 	static interactive(): PlatformOptions {
 		return new PlatformOptions();
 	}
 
-	static loopOnly(): PlatformOptions {
-		return new PlatformOptions({ runLoop: true, installInput: false });
+	static renderLoop(): PlatformOptions {
+		return new PlatformOptions({ frameMode: "loop", installInput: false });
 	}
 
 	static singleFrame(): PlatformOptions {
 		return new PlatformOptions({
-			runLoop: false,
+			frameMode: "single-frame",
 			installInput: false,
-			runFirstFrame: true,
 		});
 	}
 }
@@ -809,16 +805,14 @@ export function startPlatform(
 	engine: Engine,
 	options: PlatformOptions = PlatformOptions.interactive(),
 ): Platform {
-	if (options.runLoop || options.runFirstFrame) {
-		syncBrowserEngineSurface(engine);
-	}
-	if (options.runFirstFrame) {
+	syncBrowserEngineSurface(engine);
+	if (options.frameMode === "single-frame") {
 		engine.runFrame(0);
 	}
 	const inputBinding = options.installInput
 		? installBrowserInput(engine, options)
 		: undefined;
-	const frameLoop = options.runLoop
+	const frameLoop = options.frameMode === "loop"
 		? startBrowserFrameLoop((deltaSeconds) => {
 				syncBrowserEngineSurface(engine);
 				engine.runFrame(deltaSeconds);

@@ -324,7 +324,7 @@ describe("app-runtime Engine", () => {
 					shutdowns.push("first");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		await runPlatform(
 			new PlatformConfig(canvas, { mainScene: new Scene("second") }),
@@ -333,7 +333,7 @@ describe("app-runtime Engine", () => {
 					shutdowns.push("second");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		stopPlatform(canvas);
 
@@ -356,7 +356,7 @@ describe("app-runtime Engine", () => {
 					shutdowns.push("first");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		await runPlatform(
 			new PlatformConfig(secondCanvas, { mainScene: new Scene("second") }),
@@ -365,7 +365,7 @@ describe("app-runtime Engine", () => {
 					shutdowns.push("second");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		stopPlatform(firstCanvas);
 		expect(shutdowns).toEqual(["first"]);
@@ -389,12 +389,12 @@ describe("app-runtime Engine", () => {
 					shutdowns.push("current");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		const failed = await runPlatform(
 			new PlatformConfig(canvas, { mainScene: new Scene("failed") }),
 			PlatformApp.defaultEngine(() => false),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 
 		expect(failed).toBeUndefined();
@@ -419,7 +419,7 @@ describe("app-runtime Engine", () => {
 					calls.push("startup");
 				});
 			}),
-			new PlatformOptions({ runLoop: false, installInput: false }),
+			PlatformOptions.singleFrame(),
 		);
 		platform?.dispose();
 

@@ -24,10 +24,7 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 async fn run_sdl_wgpu_triangle_with_buffer() -> Unit raise Error {
   @sdl_app.run_platform(
     @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (vertex + index buffer)",
-      800,
-      600,
-      "native: initializing SDL3 (triangle-with-buffer demo)",
+      "MoonBit wgpu + SDL3 (vertex + index buffer)", 800, 600, "native: initializing SDL3 (triangle-with-buffer demo)",
     ),
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),

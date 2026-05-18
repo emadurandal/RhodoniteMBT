@@ -24,10 +24,7 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 async fn run_sdl_wgpu_triangle() -> Unit raise Error {
   @sdl_app.run_platform(
     @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3",
-      800,
-      600,
-      "native: initializing SDL3",
+      "MoonBit wgpu + SDL3", 800, 600, "native: initializing SDL3",
     ),
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),

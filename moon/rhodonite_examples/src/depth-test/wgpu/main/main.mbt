@@ -16,10 +16,7 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 async fn run_depth_test_native() -> Unit raise Error {
   @sdl_app.run_platform(
     @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (depth-test)",
-      800,
-      600,
-      "native: depth-test",
+      "MoonBit wgpu + SDL3 (depth-test)", 800, 600, "native: depth-test",
     ),
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),

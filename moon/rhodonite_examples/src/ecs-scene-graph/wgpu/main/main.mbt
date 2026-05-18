@@ -16,10 +16,7 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 async fn run_ecs_scene_graph_native() -> Unit raise Error {
   @sdl_app.run_platform(
     @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (ecs-scene-graph)",
-      800,
-      600,
-      "native: ecs-scene-graph",
+      "MoonBit wgpu + SDL3 (ecs-scene-graph)", 800, 600, "native: ecs-scene-graph",
     ),
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive(),

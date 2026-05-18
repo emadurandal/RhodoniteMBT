@@ -21,9 +21,7 @@ async fn create_webgpu_demo_state_async(
     @app_browser.PlatformOptions::interactive(),
   )
   match platform {
-    Some(_) => {
-      println("ecs-mass-cubes: DemoState ready")
-    }
+    Some(_) => println("ecs-mass-cubes: DemoState ready")
     None => println("ecs-mass-cubes: failed to create DemoState")
   }
 }
