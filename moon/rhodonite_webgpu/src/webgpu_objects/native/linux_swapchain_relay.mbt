@@ -1,5 +1,5 @@
 ///|
-/// Linux swapchain relay: render to rgba8unorm, blit to the swapchain on present.
+/// Linux swapchain relay: render offscreen, then blit to the swapchain on present.
 ///
 /// Native visual regression renders to `create_rgba8_render_texture` successfully; some
 /// Wayland/Vulkan swapchains accept clears but not ECS geometry when used as the sole
@@ -14,9 +14,9 @@ struct LinuxSwapchainRelay {
 }
 
 ///|
-/// WGSL color target format for relay rendering (matches native visual regression).
-fn linux_swapchain_relay_render_format() -> String {
-  "rgba8unorm"
+/// WGSL color target format for relay rendering; must match the relay texture.
+fn linux_swapchain_relay_render_format(swap_format : String) -> String {
+  swap_format
 }
 
 ///|
@@ -50,7 +50,14 @@ fn linux_swapchain_relay_ensure(
     @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
   )
   let texture = GPUTexture::{
-    raw: wgpu_dev.create_texture_rgba8_2d_with_usage(width, height, usage),
+    raw: wgpu_dev.create_texture_u32(
+      width,
+      height,
+      1U,
+      usage,
+      @wgpu.TextureDimension::from_u32(@wgpu.TEXTURE_DIMENSION_2D),
+      texture_format_from_string(swap_format),
+    ),
   }
   relay.val = Some({ texture, width, height, swap_format })
 }

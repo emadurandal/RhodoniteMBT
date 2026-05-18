@@ -31,7 +31,7 @@ pub struct GPUCanvasContext {
   surface : @wgpu.Surface
   mut width : UInt
   mut height : UInt
-  /// Color format reported to the engine (`rgba8unorm` when Linux relay is active).
+  /// Color format reported to the engine (the relay texture format on Linux).
   format : Ref[String]
   /// Configured swapchain format used for the final blit (e.g. `bgra8unorm`).
   swapFormat : Ref[String]

@@ -163,7 +163,9 @@ pub fn webgpu_canvas_context_configure(
       context.context.height,
       context.context.swapFormat.val,
     )
-    context.context.format.val = linux_swapchain_relay_render_format()
+    context.context.format.val = linux_swapchain_relay_render_format(
+      context.context.swapFormat.val,
+    )
     context.context.relayDevice.val = Some(device)
   } else {
     context.context.relay.val = None
