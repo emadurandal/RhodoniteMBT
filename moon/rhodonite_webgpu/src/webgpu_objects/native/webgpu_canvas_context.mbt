@@ -298,7 +298,25 @@ pub fn webgpu_canvas_context_get_current_texture(
   surface_texture.release()
   context.context.currentTexture.val = Some(texture)
   match context.context.relay.val {
-    Some(relay) => linux_swapchain_relay_render_texture(relay)
+    Some(_) => {
+      match context.context.relayDevice.val {
+        Some(device) =>
+          linux_swapchain_relay_ensure_for_swap_texture(
+            context.context.relay,
+            texture,
+            WebGPUDevice::new(device),
+            context.context.width,
+            context.context.height,
+          )
+        None => abort("linux swapchain relay: missing device before acquire")
+      }
+      let relay = match context.context.relay.val {
+        Some(r) => r
+        None =>
+          abort("linux swapchain relay: missing relay after acquire ensure")
+      }
+      linux_swapchain_relay_render_texture(relay)
+    }
     None => WebGPUTexture::new(GPUTexture::{ raw: texture })
   }
 }
@@ -312,15 +330,13 @@ pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
       context.context.currentTexture.val,
       context.context.relayDevice.val,
     ) {
-    (Some(_relay), Some(swap_texture), Some(device)) => {
+    (Some(relay), Some(swap_texture), Some(device)) => {
       let queue = WebGPUQueue::new(GPUQueue::{ raw: device.raw.queue() })
       linux_swapchain_relay_blit_to_swapchain(
-        context.context.relay,
+        relay,
         swap_texture,
         WebGPUDevice::new(device),
         queue,
-        context.context.width,
-        context.context.height,
       )
     }
     _ => ()

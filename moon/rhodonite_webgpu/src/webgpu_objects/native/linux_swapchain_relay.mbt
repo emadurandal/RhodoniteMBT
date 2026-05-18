@@ -65,31 +65,36 @@ fn linux_swapchain_relay_ensure(
 ///|
 /// Blits the relay texture into the acquired swapchain texture and submits the pass.
 fn linux_swapchain_relay_blit_to_swapchain(
-  relay_slot : @ref.Ref[LinuxSwapchainRelay?],
+  relay : LinuxSwapchainRelay,
   swap_texture : @wgpu.Texture,
   device : WebGPUDevice,
   queue : WebGPUQueue,
-  width : UInt,
-  height : UInt,
 ) -> Unit {
-  let swap_format = texture_format_to_string(swap_texture.format_u32())
-  linux_swapchain_relay_ensure(relay_slot, device, width, height, swap_format)
-  let relay = match relay_slot.val {
-    Some(r) => r
-    None => abort("linux swapchain relay: missing relay after ensure")
-  }
   let _ = device.device.raw.poll(wait=true)
   let encoder = device.device.raw.create_command_encoder()
   encoder.copy_texture_to_texture_rgba8(
     relay.texture.raw,
     swap_texture,
-    width,
-    height,
+    relay.width,
+    relay.height,
   )
   let command_buffer = encoder.finish()
   queue.queue.raw.submit_one(command_buffer)
   encoder.release()
   let _ = device.device.raw.poll(wait=true)
+}
+
+///|
+/// Ensures the relay texture matches the acquired swapchain texture before rendering.
+fn linux_swapchain_relay_ensure_for_swap_texture(
+  relay_slot : @ref.Ref[LinuxSwapchainRelay?],
+  swap_texture : @wgpu.Texture,
+  device : WebGPUDevice,
+  width : UInt,
+  height : UInt,
+) -> Unit {
+  let swap_format = texture_format_to_string(swap_texture.format_u32())
+  linux_swapchain_relay_ensure(relay_slot, device, width, height, swap_format)
 }
 
 ///|
