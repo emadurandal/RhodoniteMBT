@@ -31,6 +31,8 @@ pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUCont
 
 pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
+pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, (String) -> Unit, () -> Bool, () -> Bool, install_input? : Bool, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub async fn run_sdl_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
@@ -73,4 +75,3 @@ pub struct XlibWindowSurface {
 // Type aliases
 
 // Traits
-

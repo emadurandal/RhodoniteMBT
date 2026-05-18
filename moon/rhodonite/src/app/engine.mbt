@@ -5,6 +5,9 @@ pub struct Engine {
   priv input_state : @input.InputState
   priv mut surface_state : SurfaceState
   priv mut surface_changed : Bool
+  priv mut render_requested : Bool
+  priv mut continuous_render_requested : Bool
+  priv mut render_wakeup : (() -> Unit)?
   priv scenes : Array[Scene]
   priv main_scene_index : Int
   priv time_state : TimeState
@@ -36,6 +39,9 @@ pub fn Engine::new_with_main_scene(
     input_state: @input.InputState::new(),
     surface_state: SurfaceState::new_active(800, 600, format, 0),
     surface_changed: true,
+    render_requested: true,
+    continuous_render_requested: false,
+    render_wakeup: None,
     scenes,
     main_scene_index: 0,
     time_state: TimeState::new(default_fixed_delta_seconds()),
@@ -72,6 +78,67 @@ pub fn Engine::surface_active(self : Engine) -> Bool {
 }
 
 ///|
+/// Installs a platform wakeup callback used when render work is requested while idle.
+pub fn Engine::set_render_wakeup(
+  self : Engine,
+  wakeup : (() -> Unit)?,
+) -> Unit {
+  self.render_wakeup = wakeup
+}
+
+///|
+/// Marks the engine as needing one rendered frame.
+pub fn Engine::request_render(self : Engine, _reason : String) -> Unit {
+  self.render_requested = true
+  match self.render_wakeup {
+    Some(wakeup) => wakeup()
+    None => ()
+  }
+}
+
+///|
+/// Returns whether a one-shot render has been requested.
+pub fn Engine::render_requested(self : Engine) -> Bool {
+  self.render_requested
+}
+
+///|
+/// Consumes and clears the current one-shot render request flag.
+pub fn Engine::consume_render_requested(self : Engine) -> Bool {
+  let requested = self.render_requested
+  self.render_requested = false
+  requested
+}
+
+///|
+/// Requests continuous frame rendering until explicitly stopped.
+pub fn Engine::request_continuous_render(
+  self : Engine,
+  _reason : String,
+) -> Unit {
+  self.continuous_render_requested = true
+  match self.render_wakeup {
+    Some(wakeup) => wakeup()
+    None => ()
+  }
+}
+
+///|
+/// Stops continuous frame rendering.
+pub fn Engine::stop_continuous_render(
+  self : Engine,
+  _reason : String,
+) -> Unit {
+  self.continuous_render_requested = false
+}
+
+///|
+/// Returns whether continuous rendering is currently requested.
+pub fn Engine::continuous_render_requested(self : Engine) -> Bool {
+  self.continuous_render_requested
+}
+
+///|
 /// Marks the engine surface active with the latest drawable size and format.
 pub fn Engine::set_surface_active(
   self : Engine,
@@ -94,6 +161,7 @@ pub fn Engine::set_surface_active(
     width, height, format, generation,
   )
   self.surface_changed = true
+  self.request_render("surface")
 }
 
 ///|
@@ -105,6 +173,7 @@ pub fn Engine::set_surface_suspended(self : Engine) -> Unit {
   let generation = self.surface_state.generation() + 1
   self.surface_state = SurfaceState::suspended(generation)
   self.surface_changed = true
+  self.request_render("surface")
 }
 
 ///|
@@ -560,6 +629,7 @@ fn Engine::run_ready_fixed_steps(
 /// Advances one standard engine tick and runs frame-begin, fixed, and render phases.
 pub fn Engine::run_frame(self : Engine, elapsed_seconds : Float) -> Int {
   self.ensure_initialized("Engine::run_frame")
+  ignore(self.consume_render_requested())
   self.input_state.begin_frame()
   let surface = self.surface_state
   let surface_changed = self.surface_changed
