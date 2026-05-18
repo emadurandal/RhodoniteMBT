@@ -816,13 +816,8 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
     if !render_requested() && !continuous_render_requested() {
       if @lib.sdl_WaitEventTimeout(event, 100) {
         if handle_sdl_platform_event_for_on_demand(
-          session,
-          input,
-          event,
-          install_input,
-          on_surface_change,
-          request_render,
-        ) {
+            session, input, event, install_input, on_surface_change, request_render,
+          ) {
           quit.val = true
         }
       }
@@ -833,13 +828,8 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
         break
       }
       if handle_sdl_platform_event_for_on_demand(
-        session,
-        input,
-        event,
-        install_input,
-        on_surface_change,
-        request_render,
-      ) {
+          session, input, event, install_input, on_surface_change, request_render,
+        ) {
         quit.val = true
       }
     }

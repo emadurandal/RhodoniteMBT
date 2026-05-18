@@ -328,9 +328,7 @@ pub fn start_browser_engine_on_demand_canvas_loop(
       sync_browser_engine_surface(engine, canvas)
       ignore(engine.run_frame(Float::from_double(delta_seconds)))
     },
-    fn() {
-      engine.render_requested() || engine.continuous_render_requested()
-    },
+    fn() { engine.render_requested() || engine.continuous_render_requested() },
   )
   engine.set_render_wakeup(Some(fn() { frame_loop.request() }))
   frame_loop.request()

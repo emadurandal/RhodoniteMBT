@@ -87,14 +87,17 @@ The current manifest covers:
 | Sample | Golden file |
 |--------|-------------|
 | `basic-triangle` | `basic_triangle_sample.png` |
+| `ondemand-triangle` | `ondemand_triangle_sample.png` |
 | `triangle-with-buffer` | `triangle_with_buffer_sample.png` |
 | `ecs-scene-graph` | `ecs_scene_graph_sample.png` |
 | `ecs-mass-cubes` | `ecs_mass_cubes_sample.png` |
 | `basic-triangle` browser | `basic_triangle_browser_sample.png` |
+| `ondemand-triangle` browser | `ondemand_triangle_browser_sample.png` |
 | `triangle-with-buffer` browser | `triangle_with_buffer_browser_sample.png` |
 | `ecs-scene-graph` browser | `ecs_scene_graph_browser_sample.png` |
 | `ecs-mass-cubes` browser | `ecs_mass_cubes_browser_sample.png` |
 | `ts-ecs-mass-cubes` browser | `ts_ecs_mass_cubes_browser_sample.png` |
+| `ts-ondemand-triangle` browser | `ts_ondemand_triangle_browser_sample.png` |
 | `wasm-ecs-mass-cubes` browser | `wasm_ecs_mass_cubes_browser_sample.png` |
 | `wasm-gc-ecs-mass-cubes` browser | `wasm_gc_ecs_mass_cubes_browser_sample.png` |
 

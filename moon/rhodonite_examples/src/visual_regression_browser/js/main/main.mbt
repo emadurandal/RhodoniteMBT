@@ -77,6 +77,25 @@ pub fn render_basic_triangle_browser_snapshot() -> @js_async.Promise[Bytes] {
 }
 
 ///|
+async fn render_ondemand_triangle_browser_snapshot_async() -> Bytes raise Error {
+  render_browser_webgpu_sample(fn(device, queue, format, view) {
+    let demo_state = @ondemand_triangle.create_demo_state_for_device(
+      device, queue, format,
+    )
+    @ondemand_triangle.render_frame_to_view(demo_state, view)
+    demo_state.release()
+  })
+}
+
+///|
+/// Implements `render_ondemand_triangle_browser_snapshot`.
+pub fn render_ondemand_triangle_browser_snapshot() -> @js_async.Promise[Bytes] {
+  @js_async.Promise::from_async(() => {
+    render_ondemand_triangle_browser_snapshot_async()
+  })
+}
+
+///|
 async fn render_triangle_with_buffer_browser_snapshot_async() -> Bytes raise Error {
   render_browser_webgpu_sample(fn(device, queue, format, view) {
     let demo_state = @triangle_with_buffer.create_demo_state_for_device(

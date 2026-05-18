@@ -79,10 +79,7 @@ pub fn Engine::surface_active(self : Engine) -> Bool {
 
 ///|
 /// Installs a platform wakeup callback used when render work is requested while idle.
-pub fn Engine::set_render_wakeup(
-  self : Engine,
-  wakeup : (() -> Unit)?,
-) -> Unit {
+pub fn Engine::set_render_wakeup(self : Engine, wakeup : (() -> Unit)?) -> Unit {
   self.render_wakeup = wakeup
 }
 
@@ -125,10 +122,7 @@ pub fn Engine::request_continuous_render(
 
 ///|
 /// Stops continuous frame rendering.
-pub fn Engine::stop_continuous_render(
-  self : Engine,
-  _reason : String,
-) -> Unit {
+pub fn Engine::stop_continuous_render(self : Engine, _reason : String) -> Unit {
   self.continuous_render_requested = false
 }
 
