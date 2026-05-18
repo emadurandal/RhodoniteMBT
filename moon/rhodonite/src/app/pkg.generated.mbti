@@ -58,6 +58,8 @@ pub fn Engine::add_common_handlers(Self, Scene, transform_propagation? : Bool, o
 pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_surface(Self, @webgpu.GPUSurface) -> SurfaceId
+pub fn Engine::add_surface_for_scene(Self, @webgpu.GPUSurface, Scene) -> SurfaceId
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::consume_render_requested(Self) -> Bool
 pub fn Engine::continuous_render_requested(Self) -> Bool
@@ -70,37 +72,62 @@ pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
+pub fn Engine::remove_surface(Self, SurfaceId) -> Unit
 pub fn Engine::render_requested(Self) -> Bool
 pub fn Engine::request_continuous_render(Self, String) -> Unit
 pub fn Engine::request_render(Self, String) -> Unit
 pub fn Engine::run_frame(Self, Float) -> Int
+pub fn Engine::run_multi_surface_frame(Self, Float) -> Int
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
 pub fn Engine::set_render_wakeup(Self, (() -> Unit)?) -> Unit
 pub fn Engine::set_surface_active(Self, Int, Int, String) -> Unit
+pub fn Engine::set_surface_scene(Self, SurfaceId, Scene) -> Unit
 pub fn Engine::set_surface_suspended(Self) -> Unit
 pub fn Engine::shutdown(Self) -> Unit
 pub fn Engine::stop_continuous_render(Self, String) -> Unit
+pub fn Engine::surface(Self, SurfaceId) -> EngineSurface
 pub fn Engine::surface_active(Self) -> Bool
+pub fn Engine::surface_count(Self) -> Int
+pub fn Engine::surface_input(Self, SurfaceId) -> @input.InputState
 pub fn Engine::surface_state(Self) -> SurfaceState
+
+pub(all) struct EngineSurface {
+  id : SurfaceId
+  gpu_surface : @webgpu.GPUSurface
+  mut scene : Scene
+  input_state : @input.InputState
+  mut state : SurfaceState
+  mut changed : Bool
+}
+pub fn EngineSurface::gpu_surface(Self) -> @webgpu.GPUSurface
+pub fn EngineSurface::id(Self) -> SurfaceId
+pub fn EngineSurface::input(Self) -> @input.InputState
+pub fn EngineSurface::scene(Self) -> Scene
+pub fn EngineSurface::set_scene(Self, Scene) -> Unit
+pub fn EngineSurface::state(Self) -> SurfaceState
 
 pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
   elapsed_seconds : Double
+  surface_id : SurfaceId?
   surface : SurfaceState
   surface_changed : Bool
+  input_state : @input.InputState?
 }
 pub fn FrameState::delta_seconds(Self) -> Float
 pub fn FrameState::elapsed_seconds(Self) -> Double
 pub fn FrameState::frame_index(Self) -> Int
-pub fn FrameState::new(Float, Int, Double, surface? : SurfaceState, surface_changed? : Bool) -> Self
+pub fn FrameState::input(Self) -> @input.InputState?
+pub fn FrameState::new(Float, Int, Double, surface? : SurfaceState, surface_changed? : Bool, surface_id? : SurfaceId?, input_state? : @input.InputState?) -> Self
 pub fn FrameState::surface(Self) -> SurfaceState
 pub fn FrameState::surface_active(Self) -> Bool
 pub fn FrameState::surface_changed(Self) -> Bool
 pub fn FrameState::surface_format(Self) -> String
 pub fn FrameState::surface_generation(Self) -> Int
 pub fn FrameState::surface_height(Self) -> Int
+pub fn FrameState::surface_id(Self) -> SurfaceId?
 pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 
@@ -136,6 +163,12 @@ pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
+
+pub(all) struct SurfaceId {
+  value : Int
+} derive(Eq)
+pub fn SurfaceId::new(Int) -> Self
+pub fn SurfaceId::value(Self) -> Int
 
 pub(all) struct SurfaceState {
   width : Int

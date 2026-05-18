@@ -27,6 +27,10 @@ pub fn query_xlib_window_surface(@lib.SDL_Window) -> XlibWindowSurface?
 
 pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
 
+pub fn release_sdl_multi_window_platform(SdlMultiWindowPlatformSession) -> Unit
+
+pub async fn run_multi_window_platform(Array[PlatformConfig], PlatformApp, PlatformOptions) -> Unit raise Sdl3AppError
+
 pub async fn run_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Unit raise Sdl3AppError
 
 pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, (String) -> Unit, () -> Bool, () -> Bool, install_input? : Bool, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
@@ -34,6 +38,8 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(SdlMetalWebGpuNativeSess
 pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, install_input? : Bool, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
+pub async fn run_single_window_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Unit raise Sdl3AppError
 
 // Errors
 pub(all) suberror Sdl3AppError {
@@ -85,6 +91,17 @@ pub fn SdlMetalWebGpuNativeSession::surface_active(Self) -> Bool
 pub fn SdlMetalWebGpuNativeSession::surface_format(Self) -> String
 pub fn SdlMetalWebGpuNativeSession::surface_height(Self) -> Int
 pub fn SdlMetalWebGpuNativeSession::surface_width(Self) -> Int
+
+pub struct SdlMultiWindowPlatformSession {
+  // private fields
+}
+pub fn SdlMultiWindowPlatformSession::gpu_context(Self) -> @webgpu.GPUContext
+
+pub(all) struct SdlMultiWindowSurface {
+  // private fields
+}
+pub fn SdlMultiWindowSurface::gpu_surface(Self) -> @webgpu.GPUSurface
+pub fn SdlMultiWindowSurface::input(Self) -> @input.InputState
 
 pub struct WaylandWindowSurface {
   display : @webgpu_objects.OpaquePtr

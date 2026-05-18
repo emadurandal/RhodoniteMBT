@@ -50,6 +50,37 @@ priv struct SdlMouseWheelEvent {
 }
 
 ///|
+/// Mirrors the SDL mouse motion event layout needed by the native input adapter.
+priv struct SdlMouseMotionEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  which : @lib.SDL_MouseID
+  state : UInt
+  x : Float
+  y : Float
+  xrel : Float
+  yrel : Float
+}
+
+///|
+/// Mirrors the SDL mouse button event layout needed by the native input adapter.
+priv struct SdlMouseButtonEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  which : @lib.SDL_MouseID
+  button : Byte
+  down : Bool
+  clicks : Byte
+  padding : Byte
+  x : Float
+  y : Float
+}
+
+///|
 /// Mirrors the SDL window event layout needed for resize handling.
 priv struct SdlWindowEvent {
   event_type : @lib.SDL_EventType
@@ -153,6 +184,62 @@ fn _touch_sdl_mouse_wheel_event_struct() -> Unit {
   ignore(event.direction)
   ignore(event.mouse_x)
   ignore(event.mouse_y)
+}
+
+///|
+/// Keeps the private SDL mouse motion mirror visible to MoonBit's field checks.
+fn _touch_sdl_mouse_motion_event_struct() -> Unit {
+  let event = SdlMouseMotionEvent::{
+    event_type: SDL_EVENT_MOUSE_MOTION,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    which: 0U,
+    state: 0U,
+    x: (0.0 : Float),
+    y: (0.0 : Float),
+    xrel: (0.0 : Float),
+    yrel: (0.0 : Float),
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.which)
+  ignore(event.state)
+  ignore(event.x)
+  ignore(event.y)
+  ignore(event.xrel)
+  ignore(event.yrel)
+}
+
+///|
+/// Keeps the private SDL mouse button mirror visible to MoonBit's field checks.
+fn _touch_sdl_mouse_button_event_struct() -> Unit {
+  let event = SdlMouseButtonEvent::{
+    event_type: SDL_EVENT_MOUSE_BUTTON_DOWN,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    which: 0U,
+    button: (0 : Byte),
+    down: false,
+    clicks: (0 : Byte),
+    padding: (0 : Byte),
+    x: (0.0 : Float),
+    y: (0.0 : Float),
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.which)
+  ignore(event.button)
+  ignore(event.down)
+  ignore(event.clicks)
+  ignore(event.padding)
+  ignore(event.x)
+  ignore(event.y)
 }
 
 ///|
@@ -881,6 +968,51 @@ fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
 }
 
 ///|
+/// Converts an SDL mouse button index to the shared input button enum.
+fn mouse_button_from_sdl_button(button : Byte) -> @input.MouseButton {
+  if button.to_int() == 1 {
+    Left
+  } else if button.to_int() == 2 {
+    Middle
+  } else if button.to_int() == 3 {
+    Right
+  } else if button.to_int() == 4 {
+    Back
+  } else if button.to_int() == 5 {
+    Forward
+  } else {
+    Other(button.to_int())
+  }
+}
+
+///|
+/// Queues one SDL mouse motion event using event-local window coordinates.
+fn enqueue_sdl_mouse_motion_event(
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+) -> Unit {
+  let motion : SdlMouseMotionEvent = @lib.unsafe_from_sdl_event(event)
+  input.enqueue_event(PointerMove(motion.x, motion.y))
+}
+
+///|
+/// Queues one SDL mouse button event using event-local window coordinates.
+fn enqueue_sdl_mouse_button_event(
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+) -> Unit {
+  let button_event : SdlMouseButtonEvent = @lib.unsafe_from_sdl_event(event)
+  let button = mouse_button_from_sdl_button(button_event.button)
+  match event.get_type() {
+    SDL_EVENT_MOUSE_BUTTON_DOWN =>
+      input.enqueue_event(MouseDown(button, button_event.x, button_event.y))
+    SDL_EVENT_MOUSE_BUTTON_UP =>
+      input.enqueue_event(MouseUp(button, button_event.x, button_event.y))
+    _ => ()
+  }
+}
+
+///|
 /// Reports whether an SDL event means the native drawable size may have changed.
 fn sdl_event_is_resize(event_type : @lib.SDL_EventType) -> Bool {
   match event_type {
@@ -1227,7 +1359,13 @@ fn handle_sdl_multi_window_event(
     }
     SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
       if install_input {
-        match session.focused_surface_index() {
+        let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(event)
+        session.focused_window_id = Some(key_event.windowID)
+        let target_index = match session.find_surface_index_by_window_id(key_event.windowID) {
+          Some(index) => Some(index)
+          None => session.focused_surface_index()
+        }
+        match target_index {
           Some(index) => enqueue_sdl_keyboard_event(
             session.surfaces[index].input, event,
           )
@@ -1256,7 +1394,20 @@ fn handle_sdl_multi_window_event(
         let window_id = sdl_event_window_id(event)
         session.focused_window_id = Some(window_id)
         match session.find_surface_index_by_window_id(window_id) {
-          Some(index) => enqueue_sdl_mouse_state(session.surfaces[index].input)
+          Some(index) =>
+            match event_type {
+              SDL_EVENT_MOUSE_MOTION =>
+                enqueue_sdl_mouse_motion_event(
+                  session.surfaces[index].input,
+                  event,
+                )
+              SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP =>
+                enqueue_sdl_mouse_button_event(
+                  session.surfaces[index].input,
+                  event,
+                )
+              _ => ()
+            }
           None => ()
         }
       }
