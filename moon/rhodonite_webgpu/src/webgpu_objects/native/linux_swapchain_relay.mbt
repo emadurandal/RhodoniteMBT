@@ -66,18 +66,7 @@ fn linux_swapchain_relay_blit_to_swapchain(
   height : UInt,
 ) -> Unit {
   let swap_format = texture_format_to_string(swap_texture.format_u32())
-  match relay_slot.val {
-    Some(existing) =>
-      if existing.swap_format != swap_format {
-        linux_swapchain_relay_ensure(
-          relay_slot, device, width, height, swap_format,
-        )
-      }
-    None =>
-      linux_swapchain_relay_ensure(
-        relay_slot, device, width, height, swap_format,
-      )
-  }
+  linux_swapchain_relay_ensure(relay_slot, device, width, height, swap_format)
   let relay = match relay_slot.val {
     Some(r) => r
     None => abort("linux swapchain relay: missing relay after ensure")
