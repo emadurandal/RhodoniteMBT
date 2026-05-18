@@ -1276,6 +1276,19 @@ fn SdlMultiWindowPlatformSession::focused_surface_index(
 }
 
 ///|
+/// Returns the engine-owned input state for a native surface index.
+fn sdl_multi_window_engine_input_for_surface(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  index : Int,
+) -> @input.InputState? {
+  match session.surfaces[index].engine_surface_id {
+    Some(id) => Some(engine.surface_input(id))
+    None => None
+  }
+}
+
+///|
 /// Removes and releases a native surface and unregisters it from the engine.
 fn remove_sdl_multi_window_surface_at(
   session : SdlMultiWindowPlatformSession,
@@ -1351,7 +1364,12 @@ fn handle_sdl_multi_window_event(
       match session.find_surface_index_by_window_id(window_id) {
         Some(index) =>
           if install_input {
-            session.surfaces[index].input.enqueue_event(FocusLost)
+            match sdl_multi_window_engine_input_for_surface(
+              session, engine, index,
+            ) {
+              Some(input) => input.enqueue_event(FocusLost)
+              None => ()
+            }
           }
         None => ()
       }
@@ -1366,9 +1384,13 @@ fn handle_sdl_multi_window_event(
           None => session.focused_surface_index()
         }
         match target_index {
-          Some(index) => enqueue_sdl_keyboard_event(
-            session.surfaces[index].input, event,
-          )
+          Some(index) =>
+            match sdl_multi_window_engine_input_for_surface(
+              session, engine, index,
+            ) {
+              Some(input) => enqueue_sdl_keyboard_event(input, event)
+              None => ()
+            }
           None => ()
         }
       }
@@ -1379,9 +1401,13 @@ fn handle_sdl_multi_window_event(
         let window_id = sdl_event_window_id(event)
         session.focused_window_id = Some(window_id)
         match session.find_surface_index_by_window_id(window_id) {
-          Some(index) => enqueue_sdl_mouse_wheel_event(
-            session.surfaces[index].input, event,
-          )
+          Some(index) =>
+            match sdl_multi_window_engine_input_for_surface(
+              session, engine, index,
+            ) {
+              Some(input) => enqueue_sdl_mouse_wheel_event(input, event)
+              None => ()
+            }
           None => ()
         }
       }
@@ -1395,18 +1421,18 @@ fn handle_sdl_multi_window_event(
         session.focused_window_id = Some(window_id)
         match session.find_surface_index_by_window_id(window_id) {
           Some(index) =>
-            match event_type {
-              SDL_EVENT_MOUSE_MOTION =>
-                enqueue_sdl_mouse_motion_event(
-                  session.surfaces[index].input,
-                  event,
-                )
-              SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP =>
-                enqueue_sdl_mouse_button_event(
-                  session.surfaces[index].input,
-                  event,
-                )
-              _ => ()
+            match sdl_multi_window_engine_input_for_surface(
+              session, engine, index,
+            ) {
+              Some(input) =>
+                match event_type {
+                  SDL_EVENT_MOUSE_MOTION =>
+                    enqueue_sdl_mouse_motion_event(input, event)
+                  SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP =>
+                    enqueue_sdl_mouse_button_event(input, event)
+                  _ => ()
+                }
+              None => ()
             }
           None => ()
         }
