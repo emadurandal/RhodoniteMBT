@@ -56,21 +56,25 @@ pub struct XlibWindowSurface {
 }
 
 ///|
+#borrow(window)
 extern "C" fn rhodonite_sdl_get_window_wayland_display(
   window : @lib.SDL_Window,
 ) -> @wgpu_objects.OpaquePtr = "rhodonite_sdl_get_window_wayland_display"
 
 ///|
+#borrow(window)
 extern "C" fn rhodonite_sdl_get_window_wayland_surface(
   window : @lib.SDL_Window,
 ) -> @wgpu_objects.OpaquePtr = "rhodonite_sdl_get_window_wayland_surface"
 
 ///|
+#borrow(window)
 extern "C" fn rhodonite_sdl_get_window_x11_display(
   window : @lib.SDL_Window,
 ) -> @wgpu_objects.OpaquePtr = "rhodonite_sdl_get_window_x11_display"
 
 ///|
+#borrow(window)
 extern "C" fn rhodonite_sdl_get_window_x11_window(
   window : @lib.SDL_Window,
 ) -> Int64 = "rhodonite_sdl_get_window_x11_window"
