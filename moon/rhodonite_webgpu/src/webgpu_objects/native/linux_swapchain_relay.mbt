@@ -20,12 +20,6 @@ fn linux_swapchain_relay_render_format() -> String {
 }
 
 ///|
-/// Whether the relay path is enabled on this host.
-fn linux_swapchain_relay_enabled() -> Bool {
-  @wgpu.platform_is_linux()
-}
-
-///|
 /// Releases relay GPU resources.
 fn linux_swapchain_relay_release(relay : LinuxSwapchainRelay) -> Unit {
   relay.texture.raw.release()

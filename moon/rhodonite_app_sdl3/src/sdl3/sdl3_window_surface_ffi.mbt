@@ -18,15 +18,6 @@ pub fn preinit_linux_sdl_video() -> Unit {
 }
 
 ///|
-extern "C" fn rhodonite_sdl_log_video_driver() -> Unit = "rhodonite_sdl_log_video_driver"
-
-///|
-/// Logs the active SDL video driver (wayland, x11, etc.) to stderr.
-pub fn log_sdl_video_driver() -> Unit {
-  rhodonite_sdl_log_video_driver()
-}
-
-///|
 /// Creates an SDL window configured for external Vulkan presentation on Linux.
 pub fn create_linux_wgpu_sdl_window(
   title : String,
@@ -45,39 +36,10 @@ extern "C" fn rhodonite_sdl_create_linux_wgpu_window(
 ) -> @lib.SDL_Window = "rhodonite_sdl_create_linux_wgpu_window"
 
 ///|
-extern "C" fn rhodonite_sdl_pump_events_rounds(rounds : Int) -> Unit = "rhodonite_sdl_pump_events_rounds"
-
-///|
 #borrow(window)
 extern "C" fn rhodonite_sdl_prepare_shown_window(
   window : @lib.SDL_Window,
 ) -> Unit = "rhodonite_sdl_prepare_shown_window"
-
-///|
-#borrow(window)
-extern "C" fn rhodonite_sdl_sync_window_after_external_present(
-  window : @lib.SDL_Window,
-) -> Unit = "rhodonite_sdl_sync_window_after_external_present"
-
-///|
-#borrow(window)
-extern "C" fn rhodonite_sdl_log_window_state(window : @lib.SDL_Window) -> Unit = "rhodonite_sdl_log_window_state"
-
-///|
-#borrow(message)
-extern "C" fn rhodonite_sdl_log_stderr(message : Bytes) -> Unit = "rhodonite_sdl_log_stderr"
-
-///|
-fn sdl_log_stderr(message : String) -> Unit {
-  rhodonite_sdl_log_stderr(string_to_cbytes(message))
-}
-
-///|
-/// Native windowing backend used to create a wgpu surface on Linux.
-pub(all) enum NativeWindowSurfaceKind {
-  Wayland
-  Xlib
-} derive(Eq)
 
 ///|
 /// Wayland handles (`wl_display*`, `wl_surface*`) read from an SDL window.
@@ -143,37 +105,4 @@ pub fn query_xlib_window_surface(
       window: window_id.reinterpret_as_uint64(),
     })
   }
-}
-
-///|
-/// Detects whether the SDL window exposes Wayland or X11 handles for wgpu.
-pub fn query_native_window_surface_kind(
-  window : @lib.SDL_Window,
-) -> (NativeWindowSurfaceKind, WaylandWindowSurface?, XlibWindowSurface?) {
-  match query_wayland_window_surface(window) {
-    Some(wayland) => (NativeWindowSurfaceKind::Wayland, Some(wayland), None)
-    None =>
-      match query_xlib_window_surface(window) {
-        Some(xlib) => (NativeWindowSurfaceKind::Xlib, None, Some(xlib))
-        None => (NativeWindowSurfaceKind::Wayland, None, None)
-      }
-  }
-}
-
-///|
-/// Pumps SDL events so Wayland/X11 can map a newly shown window.
-pub fn pump_sdl_events_for_compositor(rounds : Int) -> Unit {
-  rhodonite_sdl_pump_events_rounds(rounds)
-}
-
-///|
-/// Commits external GPU presentation to the host windowing system (Wayland/X11).
-pub fn sync_sdl_window_after_external_present(window : @lib.SDL_Window) -> Unit {
-  rhodonite_sdl_sync_window_after_external_present(window)
-}
-
-///|
-/// Logs SDL window visibility and size to stderr for native startup diagnostics.
-pub fn log_sdl_window_state(window : @lib.SDL_Window) -> Unit {
-  rhodonite_sdl_log_window_state(window)
 }

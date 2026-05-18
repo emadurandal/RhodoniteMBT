@@ -11,13 +11,15 @@ import {
 }
 
 // Values
+pub fn create_linux_wgpu_sdl_window(String, Int, Int) -> @lib.SDL_Window
+
 pub async fn init_sdl_linux_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub async fn init_sdl_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
-pub fn query_native_window_surface_kind(@lib.SDL_Window) -> (NativeWindowSurfaceKind, WaylandWindowSurface?, XlibWindowSurface?)
+pub fn preinit_linux_sdl_video() -> Unit
 
 pub fn query_wayland_window_surface(@lib.SDL_Window) -> WaylandWindowSurface?
 
@@ -49,11 +51,6 @@ pub(all) suberror Sdl3AppError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
-pub(all) enum NativeWindowSurfaceKind {
-  Wayland
-  Xlib
-} derive(Eq)
-
 pub struct SdlMetalWebGpuNativeSession {
   // private fields
 }

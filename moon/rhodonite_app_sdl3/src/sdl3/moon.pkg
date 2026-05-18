@@ -4,7 +4,6 @@ import {
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "emadurandal/rhodonite_webgpu/webgpu_objects" @wgpu_objects,
   "Milky2018/wgpu_mbt" @wgpu_native,
-  "Milky2018/wgpu_mbt/c" @c,
   "Kaida-Amethyst/sdl3" @sdl3_pkg,
   "Kaida-Amethyst/sdl3/lib" @lib,
   "moonbitlang/core/ref" @ref,

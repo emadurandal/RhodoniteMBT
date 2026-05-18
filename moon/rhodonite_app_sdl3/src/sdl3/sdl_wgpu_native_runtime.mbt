@@ -197,10 +197,8 @@ fn create_linux_canvas_context(
   surface_width : Int,
   surface_height : Int,
 ) -> @wgpu.GPUCanvasContext raise Sdl3AppError {
-  let (_kind, wayland, xlib) = query_native_window_surface_kind(sdl_win)
-  match wayland {
+  match query_wayland_window_surface(sdl_win) {
     Some(handles) => {
-      sdl_log_stderr("native: creating Wayland wgpu surface")
       let canvas = @wgpu_objects.create_wayland_canvas_context(
         instance.raw,
         handles.display,
@@ -212,9 +210,8 @@ fn create_linux_canvas_context(
       @wgpu.GPUCanvasContext::{ raw: canvas }
     }
     None =>
-      match xlib {
+      match query_xlib_window_surface(sdl_win) {
         Some(handles) => {
-          sdl_log_stderr("native: creating Xlib wgpu surface")
           let canvas = @wgpu_objects.create_xlib_canvas_context(
             instance.raw,
             handles.display,
@@ -246,38 +243,6 @@ fn ensure_wgpu_surface_ready(
 }
 
 ///|
-/// Clears and presents one frame so Linux compositors show the swapchain.
-fn present_native_startup_clear_frame(
-  device : @wgpu.GPUDevice,
-  canvas : @wgpu.GPUCanvasContext,
-  queue : @wgpu.GPUQueue,
-) -> Unit {
-  let texture = canvas.get_current_texture()
-  let view = texture.create_view()
-  let encoder = device.create_command_encoder()
-  let render_pass = encoder.begin_render_pass({
-    color_attachments: [
-      Some({
-        view,
-        clear_value: Some({ r: 0.12, g: 0.14, b: 0.22, a: 1.0 }),
-        load_op: @wgpu.GPULoadOp::Clear,
-        store_op: @wgpu.GPUStoreOp::Store,
-      }),
-    ],
-    depth_stencil_attachment: None,
-  })
-  render_pass.end()
-  render_pass.release()
-  let command_buffer = encoder.finish()
-  queue.submit(command_buffer)
-  encoder.release()
-  @wgpu.textureView_release(view)
-  canvas.present()
-  let _ = @wgpu.webgpu_device_poll(device, wait=true)
-  sdl_log_stderr("native: startup swapchain frame presented")
-}
-
-///|
 /// Requests a native GPU adapter, preferring one that can present to `canvas`.
 fn request_native_webgpu_adapter(
   instance : @wgpu.GPUInstance,
@@ -300,7 +265,6 @@ fn finish_sdl_webgpu_native_session(
   surface_height : Int,
 ) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
   println("native: requesting adapter and device")
-  sdl_log_stderr("native: requesting adapter and device")
   let adapter = request_native_webgpu_adapter(instance, webgpu_canvas_context) catch {
     _ => {
       webgpu_canvas_context.release()
@@ -313,8 +277,6 @@ fn finish_sdl_webgpu_native_session(
       raise Sdl3AppError::RequestAdapterFailed
     }
   }
-  sdl_log_stderr("native: adapter acquired")
-  sdl_log_stderr("native: requesting device")
   let device = adapter.request_device_sync() catch {
     _ => {
       webgpu_canvas_context.release()
@@ -331,26 +293,10 @@ fn finish_sdl_webgpu_native_session(
   let format = instance.get_preferred_canvas_format_for_surface(
     adapter, webgpu_canvas_context,
   )
-  sdl_log_stderr("native: device acquired")
   println("native: configuring surface")
-  sdl_log_stderr("native: configuring surface")
   webgpu_canvas_context.configure(device, format)
-  sdl_log_stderr("native: surface configured")
   let queue = device.get_queue()
-  if @wgpu_native.platform_is_linux() {
-    present_native_startup_clear_frame(device, webgpu_canvas_context, queue)
-    sync_sdl_window_after_external_present(sdl_win)
-    log_sdl_window_state(sdl_win)
-  }
   let render_format = webgpu_canvas_context.get_format()
-  sdl_log_stderr(
-    "native: swapchain render_format=" +
-    render_format +
-    " size=" +
-    surface_width.to_string() +
-    "x" +
-    surface_height.to_string(),
-  )
   let gpu_context = @wgpu.create_webgpu_context(
     device, webgpu_canvas_context, render_format, queue,
   )
@@ -388,29 +334,17 @@ pub async fn init_sdl_linux_webgpu_native(
   let ctx = @sdl3_pkg.Context::new() catch {
     _ => raise Sdl3AppError::CreateContextFailed
   }
-  log_sdl_video_driver()
   println("native: creating SDL window (Linux Vulkan)")
-  sdl_log_stderr("native: creating SDL window (Linux Vulkan)")
   let sdl_win = create_linux_wgpu_sdl_window(window_title, width, height)
   if sdl_win.is_null() {
     ctx.quit()
     raise Sdl3AppError::CreateWindowFailed(@lib.sdl_GetError())
   }
   rhodonite_sdl_prepare_shown_window(sdl_win)
-  log_sdl_window_state(sdl_win)
-  pump_sdl_events_for_compositor(32)
   let (surface_width, surface_height) = query_valid_sdl_window_size_in_pixels(
     sdl_win,
   )
-  let (surface_kind, _, _) = query_native_window_surface_kind(sdl_win)
-  match surface_kind {
-    NativeWindowSurfaceKind::Wayland =>
-      sdl_log_stderr("native: using Wayland wl_surface for Vulkan")
-    NativeWindowSurfaceKind::Xlib =>
-      sdl_log_stderr("native: using X11 window for Vulkan")
-  }
   println("native: creating WebGPU instance and Vulkan surface")
-  sdl_log_stderr("native: creating WebGPU instance and Vulkan surface")
   let instance = @wgpu.create_native_webgpu_instance() catch {
     _ => {
       @lib.sdl_DestroyWindow(sdl_win)
@@ -418,8 +352,6 @@ pub async fn init_sdl_linux_webgpu_native(
       raise Sdl3AppError::CreateWebGpuInstanceFailed
     }
   }
-  sdl_log_stderr("native: WebGPU instance created")
-  pump_sdl_events_for_compositor(8)
   let webgpu_canvas_context = create_linux_canvas_context(
     instance, sdl_win, surface_width, surface_height,
   ) catch {
@@ -430,8 +362,6 @@ pub async fn init_sdl_linux_webgpu_native(
       raise error
     }
   }
-  sdl_log_stderr("native: wgpu surface created")
-  pump_sdl_events_for_compositor(8)
   finish_sdl_webgpu_native_session(
     ctx,
     sdl_win,
@@ -781,7 +711,6 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
   on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit = fn(_) { () },
 ) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
   println("native: entering render loop")
-  sdl_log_stderr("native: entering render loop")
   let quit = @ref.new(false)
   let mut previous_ticks = sdl_get_ticks()
   while !quit.val {
@@ -814,9 +743,6 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
     previous_ticks = current_ticks
     @wgpu.webgpu_instance_process_events(session.instance)
     render_frame(delta_seconds)
-    if @wgpu_native.platform_is_linux() {
-      sync_sdl_window_after_external_present(session.sdl_win)
-    }
     let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
     @wgpu.webgpu_instance_process_events(session.instance)
   }
@@ -833,9 +759,6 @@ pub async fn run_sdl_webgpu_app(
   setup : (@wgpu.GPUContext) -> @app.Engine?,
 ) -> Unit raise Sdl3AppError {
   let session = init_sdl_webgpu_native(window_title, width, height, init_log)
-  sdl_log_stderr("native: session ready")
-  pump_sdl_events_for_compositor(32)
-  sdl_log_stderr("native: running engine setup")
   let engine = match setup(session.gpu_context()) {
     Some(engine) => engine
     None => {
@@ -843,8 +766,6 @@ pub async fn run_sdl_webgpu_app(
       return
     }
   }
-  sdl_log_stderr("native: engine setup complete")
-  pump_sdl_events_for_compositor(16)
   if session.surface_active() {
     engine.set_surface_active(
       session.surface_width(),
@@ -854,10 +775,7 @@ pub async fn run_sdl_webgpu_app(
   } else {
     engine.set_surface_suspended()
   }
-  sdl_log_stderr("native: initializing engine")
   engine.initialize()
-  sdl_log_stderr("native: engine initialized")
-  pump_sdl_events_for_compositor(16)
   let session = run_sdl_metal_webgpu_input_render_loop(
     session,
     engine.input(),

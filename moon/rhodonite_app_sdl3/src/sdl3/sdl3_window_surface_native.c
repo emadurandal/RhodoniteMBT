@@ -3,9 +3,6 @@
  */
 
 #include <SDL3/SDL.h>
-#include <stdio.h>
-
-void rhodonite_sdl_log_stderr(const char *message);
 
 void rhodonite_sdl_preinit_linux_video(void) {
   const char *driver = SDL_getenv("SDL_VIDEODRIVER");
@@ -20,16 +17,6 @@ void rhodonite_sdl_preinit_linux_video(void) {
   }
   if (SDL_getenv("DISPLAY") != NULL) {
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11");
-  }
-}
-
-void rhodonite_sdl_log_video_driver(void) {
-  const char *driver = SDL_GetCurrentVideoDriver();
-  if (driver != NULL && driver[0] != '\0') {
-    fprintf(stderr, "SDL video driver: %s\n", driver);
-    fflush(stderr);
-  } else {
-    rhodonite_sdl_log_stderr("SDL video driver: (none)");
   }
 }
 
@@ -83,13 +70,9 @@ SDL_Window *rhodonite_sdl_create_linux_wgpu_window(const char *title, int width,
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
   SDL_SetBooleanProperty(
       props, SDL_PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN, true);
-  return SDL_CreateWindowWithProperties(props);
-}
-
-void rhodonite_sdl_pump_events_rounds(int rounds) {
-  for (int i = 0; i < rounds; ++i) {
-    SDL_PumpEvents();
-  }
+  SDL_Window *window = SDL_CreateWindowWithProperties(props);
+  SDL_DestroyProperties(props);
+  return window;
 }
 
 void rhodonite_sdl_prepare_shown_window(SDL_Window *window) {
@@ -101,44 +84,4 @@ void rhodonite_sdl_prepare_shown_window(SDL_Window *window) {
   SDL_RaiseWindow(window);
   SDL_SetWindowFocusable(window, true);
   SDL_SyncWindow(window);
-  for (int i = 0; i < 64; ++i) {
-    SDL_PumpEvents();
-    SDL_Delay(1);
-  }
-}
-
-void rhodonite_sdl_sync_window_after_external_present(SDL_Window *window) {
-  if (window == NULL) {
-    return;
-  }
-  SDL_SyncWindow(window);
-  SDL_PumpEvents();
-}
-
-void rhodonite_sdl_log_window_state(SDL_Window *window) {
-  if (window == NULL) {
-    rhodonite_sdl_log_stderr("SDL window state: null window");
-    return;
-  }
-  const Uint32 flags = SDL_GetWindowFlags(window);
-  int w = 0;
-  int h = 0;
-  int pw = 0;
-  int ph = 0;
-  SDL_GetWindowSize(window, &w, &h);
-  SDL_GetWindowSizeInPixels(window, &pw, &ph);
-  fprintf(stderr,
-          "SDL window state: flags=0x%08x logical=%dx%d pixels=%dx%d hidden=%d "
-          "minimized=%d\n",
-          flags, w, h, pw, ph, (flags & SDL_WINDOW_HIDDEN) ? 1 : 0,
-          (flags & SDL_WINDOW_MINIMIZED) ? 1 : 0);
-  fflush(stderr);
-}
-
-void rhodonite_sdl_log_stderr(const char *message) {
-  if (message != NULL) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
-    fflush(stderr);
-  }
 }
