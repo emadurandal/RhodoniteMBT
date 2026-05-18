@@ -216,7 +216,13 @@ pub async fn init_sdl_metal_webgpu_native(
   let _ = @lib.sdl_SyncWindow(sdl_win)
   let (surface_width, surface_height) = query_valid_sdl_window_size_in_pixels(
     sdl_win,
-  )
+  ) catch {
+    error => {
+      @lib.sdl_DestroyWindow(sdl_win)
+      ctx.quit()
+      raise error
+    }
+  }
   println("native: creating SDL Metal view")
   let metal_view = sdl_metal_create_view(sdl_win)
   if @c.opaque_ptr_is_null(metal_view) {
