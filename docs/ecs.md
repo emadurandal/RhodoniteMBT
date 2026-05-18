@@ -68,11 +68,17 @@ The recommended frame order is input/controller update, `orbit_camera_transform_
 
 `RawQuery::for_each_archetype` yields `RawQueryArchetype` chunks. `read_column` and `write_column` return contiguous logical column views for the matched archetype, sized to `row_count * stride`.
 
+`Query::prepare(world)` and `RawQuery::prepare(world)` cache the matched archetypes and component-column lookups in `PreparedQuery` / `RawPreparedQuery`. Prepared queries are safe to keep and reuse across structural changes: iteration compares the cached `archetype_version` with the current `World`, and rebuilds the plan once if it is stale. They are optimization handles, not snapshots.
+
+Prefer plain `Query` / `RawQuery` for one-off local iteration. Use prepared queries when the same required component set is iterated repeatedly and the world structure is expected to stay stable between iterations. If entities are frequently created/destroyed or components are frequently added/removed between runs, prepared queries may rebuild often and provide little benefit.
+
 Queries reject duplicate required components. Structural mutation and direct payload setters are guarded while a query callback is active, because archetype rows and borrowed views could otherwise be invalidated.
 
 ## Mutation And Scheduling
 
-`Schedule` does not own a fixed update/render lifecycle. Callers supply named `PhaseKey` values and either run one phase with `Schedule::run_phase` or pass an explicit phase order to `Schedule::run`; the facade runtime groups those phases with `PhaseGroupKey` before running scene schedules. `World` mutation APIs are guarded by `System` access declarations during schedule execution:
+`SystemRunner` does not own a fixed update/render lifecycle. Callers supply named `PhaseKey` values and run one phase at a time with `SystemRunner::run_phase`; the facade runtime owns phase-group ordering and calls scene systems phase by phase. `World` mutation APIs are guarded by `System` access declarations during system runner execution:
+
+In this API, `SystemRunner` means a system list/runner with phase filtering, not an object that owns the global frame timeline. Phase meaning and ordering live at the caller/runtime boundary.
 
 | Operation | Required declaration |
 |-----------|----------------------|

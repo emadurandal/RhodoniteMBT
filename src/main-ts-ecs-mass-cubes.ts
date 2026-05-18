@@ -23,8 +23,9 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
-	installBrowserInput,
-	type BrowserInputBinding,
+	runBrowserWebGpuCanvasDemo,
+	startBrowserEngineRuntime,
+	type BrowserEngineRuntime,
 	type FrameState,
 } from "./app-runtime";
 import {
@@ -86,7 +87,7 @@ type DemoState = {
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
-	browserInputBinding?: BrowserInputBinding;
+	browserRuntime?: BrowserEngineRuntime;
 };
 
 function globalTransformDefaultIsF16(): boolean {
@@ -496,20 +497,20 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 			updateOrbitCameraControllerComponentFromInput,
 		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
 	});
-	engine.addHandlerOnPhase(Phase.Update, (_engine, frame) => {
+	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
-	engine.addHandlerOnPhase(
+	engine.addPhaseHandler(
 		Phase.Render,
 		() => {
 			if (demoState.scene.visible()) {
 				renderCurrentFrame(demoState);
 			}
 		},
-		PhaseSlot.AfterSchedule,
+		PhaseSlot.AfterSystems,
 	);
-	engine.addHandlerOnPhase(Phase.Shutdown, () => releaseDemoState(demoState));
+	engine.addPhaseHandler(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
@@ -569,7 +570,7 @@ function renderScene(
 function releaseDemoState(demoState: DemoState): void {
 	releaseMassCubesRenderResources(demoState.render);
 	demoState.transformStorage.destroy();
-	demoState.browserInputBinding?.dispose();
+	demoState.browserRuntime?.dispose();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -586,7 +587,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	try {
 		demoState.snapshotColorView = target.view;
 		demoState.snapshotDepthView = target.depthView;
-		engine.runRenderFrame();
+		engine.runFrame(0);
 		demoState.snapshotColorView = undefined;
 		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
@@ -604,33 +605,14 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	}
 }
 
-if (!navigator.gpu) {
-	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
-} else {
-	window.addEventListener("load", () => {
-		const canvas = document.getElementById("webgpu-canvas");
-		if (!(canvas instanceof HTMLCanvasElement)) {
-			document.body.innerHTML = "<h1>Missing WebGPU canvas.</h1>";
-			return;
-		}
-		void Engine.create(canvas, {
+runBrowserWebGpuCanvasDemo({
+	initialize: async (canvas) => {
+		const engine = await Engine.create(canvas, {
 			mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
-		})
-			.then((engine) => {
-				const demoState = createDemoStateForEngine(engine);
-				demoState.browserInputBinding = installBrowserInput(engine);
-				registerEngineHandlers(engine, demoState);
-				engine.initialize();
-				const loop = () => {
-					engine.runRenderFrame();
-					requestAnimationFrame(loop);
-				};
-				requestAnimationFrame(loop);
-			})
-			.catch((error: unknown) => {
-				console.error("Failed to initialize WebGPU:", error);
-				document.body.innerHTML =
-					"<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
-			});
-	});
-}
+		});
+		const demoState = createDemoStateForEngine(engine);
+		registerEngineHandlers(engine, demoState);
+		engine.initialize();
+		demoState.browserRuntime = startBrowserEngineRuntime(engine);
+	},
+});

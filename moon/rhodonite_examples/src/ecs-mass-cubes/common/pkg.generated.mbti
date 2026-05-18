@@ -40,8 +40,8 @@ pub(all) struct DemoState {
   device : @webgpu.GPUDevice
   queue : @webgpu.GPUQueue
   pipeline : @webgpu.GPURenderPipeline
-  depth_texture : @webgpu.GPUTexture
-  depth_view : @webgpu_objects.GPUTextureView
+  mut depth_texture : @webgpu.GPUTexture
+  mut depth_view : @webgpu_objects.GPUTextureView
   vertex_buffer : @webgpu.GPUBuffer
   instance_buffer : @webgpu.GPUBuffer
   index_buffer : @webgpu.GPUBuffer

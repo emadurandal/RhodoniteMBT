@@ -216,30 +216,30 @@ pub fn System::conflicts_with(self : System, other : System) -> Bool {
 }
 
 ///|
-/// Implements `Schedule::new`.
-pub fn Schedule::new() -> Schedule {
+/// Implements `SystemRunner::new`.
+pub fn SystemRunner::new() -> SystemRunner {
   let systems : Array[System] = []
   { systems, }
 }
 
 ///|
-/// Implements `Schedule::len`.
-pub fn Schedule::len(self : Schedule) -> Int {
+/// Implements `SystemRunner::len`.
+pub fn SystemRunner::len(self : SystemRunner) -> Int {
   self.systems.length()
 }
 
 ///|
-/// Implements `Schedule::add_system`.
-pub fn Schedule::add_system(self : Schedule, system : System) -> Unit {
+/// Implements `SystemRunner::add_system`.
+pub fn SystemRunner::add_system(self : SystemRunner, system : System) -> Unit {
   self.systems.push(system)
 }
 
 ///|
 /// Reports whether any two systems in the same phase have read/write or write/write conflicts.
 ///
-/// `Schedule::run` remains single-threaded and registration-ordered; this helper is a scheduling
-/// boundary for future parallel batching or validation.
-pub fn Schedule::has_parallel_access_conflicts(self : Schedule) -> Bool {
+/// `SystemRunner::run_phase` remains single-threaded and registration-ordered; this helper is a
+/// scheduling boundary for future parallel batching or validation.
+pub fn SystemRunner::has_parallel_access_conflicts(self : SystemRunner) -> Bool {
   for i = 0; i < self.systems.length(); i = i + 1 {
     for j = i + 1; j < self.systems.length(); j = j + 1 {
       if self.systems[i].phase == self.systems[j].phase &&
@@ -272,8 +272,8 @@ pub fn transform_propagation_system(world : World, phase : PhaseKey) -> System {
 /// system in that batch has returned, preserving registration order for apply. Later batches can
 /// observe earlier batch commands, while systems in the same batch cannot observe each other's
 /// queued changes.
-pub fn Schedule::run_phase(
-  self : Schedule,
+pub fn SystemRunner::run_phase(
+  self : SystemRunner,
   world : World,
   ctx : SystemContext,
   phase : PhaseKey,
@@ -304,28 +304,5 @@ pub fn Schedule::run_phase(
     }
   }
   world.unlock_component_registration()
-  ok
-}
-
-///|
-/// Runs systems by the externally supplied phase order.
-pub fn Schedule::run(
-  self : Schedule,
-  world : World,
-  ctx : SystemContext,
-  phases : Array[PhaseKey],
-) -> Bool {
-  let mut ok = true
-  let seen : Array[PhaseKey] = []
-  for i = 0; i < phases.length(); i = i + 1 {
-    let phase = phases[i]
-    if phase_array_contains(seen, phase) {
-      abort("Schedule::run: duplicate phase in phase order")
-    }
-    seen.push(phase)
-    if !self.run_phase(world, ctx, phase) {
-      ok = false
-    }
-  }
   ok
 }

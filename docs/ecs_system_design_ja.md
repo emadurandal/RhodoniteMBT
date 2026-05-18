@@ -1,6 +1,6 @@
 # ECS System Design
 
-[`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) の ECS は、`World` が entity、archetype SoA、builtin packed GPU blob を所有し、`Schedule` / `System` / `CommandBuffer` が更新順序と遅延変更を扱います。
+[`moon/rhodonite_core/src/ecs/`](../moon/rhodonite_core/src/ecs/) の ECS は、`World` が entity、archetype SoA、builtin packed GPU blob を所有し、`SystemRunner` / `System` / `CommandBuffer` が更新順序と遅延変更を扱います。
 
 ## Storage
 
@@ -16,19 +16,21 @@ component 所有の追加は `add_component` または `add_component_bytes` を
 
 `reserve_batch_capacity(components, additional_rows)` は任意の CPU component signature の archetype に対して、今後 append する row 数を事前確保します。大量 entity を作る sample やアプリでは、既知の batch spawn 前に呼ぶことで spawn/write hot path 中の capacity 拡張と既存 payload コピーを避けます。`spawn_batch(components, count, write)` は同じ signature の archetype に直接 append します。callback 中は row view を貸し出しているため、通常 query callback と同じく構造変更 API は拒否されます。
 
-## Schedule Access Rules
+## SystemRunner Access Rules
 
-`Schedule` は固定の update/render lifecycle を持ちません。`PhaseKey` は外部から渡される文字列名付き id で、phase の意味と実行順序は `Schedule::run(world, ctx, phases)` または `Schedule::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では標準 phase を `phase_update()` / `phase_render_extract()` / `phase_render()` などの関数で提供し、`Engine::run_phase_group` が `PhaseGroupKey` ごとの順序で `PhaseSlot::BeforeSchedule`、scene schedule、`PhaseSlot::AfterSchedule` の順に処理します。
+`SystemRunner` は固定の update/render lifecycle を持ちません。`PhaseKey` は外部から渡される文字列名付き id で、phase の意味と実行順序は `SystemRunner::run_phase(world, ctx, phase)` の呼び出し側が決めます。facade runtime では標準 phase を `phase_update()` / `phase_render_extract()` / `phase_render()` などの関数で提供し、`Engine::run_phase_group` が `PhaseGroupKey` ごとの順序で `PhaseSlot::BeforeSystems`、scene systems、`PhaseSlot::AfterSystems` の順に処理します。
+
+このため、ここでの `SystemRunner` は lifecycle owner ではなく、1 つの `World` に対する system set / runner として扱います。どの phase をどの順で走らせるかは caller / runtime が所有し、`SystemRunner` は渡された phase に属する system を access declaration に従って実行します。
 
 | API | Required access |
 |-----|-----------------|
 | `has_component`, `component_bytes`, query prepare/iteration | `reads` または `writes` |
 | `set_component_bytes`, `QueryRow::write`, `RawQueryRow::write_view`, column writes | `writes` |
 | `create_entity`, `destroy_entity`, `add_component*`, `remove_component`, `reserve_batch_capacity`, `spawn_batch` | `structural_write` と対象 component の `writes` |
-| `register_cpu_component` | schedule execution 外 |
+| `register_cpu_component` | system runner execution 外 |
 | builtin blob resize event drain | `structural_write` |
 
-`Schedule::run` / `Schedule::run_phase` 中は component 登録が lock されます。新しい component type は schedule 実行前、または実行と実行の間で登録します。
+`SystemRunner::run_phase` 中は component 登録が lock されます。新しい component type は system runner 実行前、または実行と実行の間で登録します。
 
 ## Query Model
 

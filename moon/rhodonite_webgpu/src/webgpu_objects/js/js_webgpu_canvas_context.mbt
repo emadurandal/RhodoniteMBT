@@ -29,6 +29,20 @@ pub fn webgpu_canvas_context_configure(
 }
 
 ///|
+/// Reconfigures a browser canvas context after a host-owned resize.
+pub fn webgpu_canvas_context_resize(
+  context : WebGPUCanvasContext,
+  device : GPUDevice,
+  format : String,
+  width : Int,
+  height : Int,
+) -> Unit {
+  ignore(width)
+  ignore(height)
+  context_configure(context.context, device, format)
+}
+
+///|
 /// Implements `webgpu_canvas_context_get_current_texture`.
 pub fn webgpu_canvas_context_get_current_texture(
   context : WebGPUCanvasContext,

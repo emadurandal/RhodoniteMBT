@@ -1,5 +1,5 @@
 import {
-  "emadurandal/rhodonite_examples/common" @sdl_wgpu,
+  "emadurandal/rhodonite_app_sdl3/sdl3" @sdl_app,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @demo_state,
   "moonbitlang/async" @async,
 }

@@ -253,14 +253,14 @@ pub struct CommandBuffer {
 }
 
 ///|
-/// Per-run data passed to systems by [`Schedule`].
+/// Per-run data passed to systems by [`SystemRunner`].
 pub(all) struct SystemContext {
   delta_seconds : Float
   frame_index : Int
 }
 
 ///|
-/// Open schedule phase identifier. The scheduler only compares phase names; lifecycle meaning and
+/// Open system phase identifier. The runner only compares phase names; lifecycle meaning and
 /// execution order are supplied by the caller.
 pub(all) struct PhaseKey {
   name : String
@@ -278,8 +278,8 @@ pub struct System {
 }
 
 ///|
-/// External system list. `World` stays focused on ECS storage and mutation.
-pub struct Schedule {
+/// Phase-filtered ECS system runner. `World` stays focused on ECS storage and mutation.
+pub struct SystemRunner {
   priv systems : Array[System]
 }
 
@@ -300,7 +300,7 @@ pub struct World {
   priv camera_blob : CameraBlobStore
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
-  /// Schedule execution depth; component registration is closed while this is nonzero.
+  /// SystemRunner execution depth; component registration is closed while this is nonzero.
   priv mut component_registration_lock_depth : Int
   /// Active system access guard; nonzero means component reads/writes are checked against declarations.
   priv mut system_access_depth : Int

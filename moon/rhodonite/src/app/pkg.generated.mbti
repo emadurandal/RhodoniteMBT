@@ -8,13 +8,23 @@ import {
 }
 
 // Values
+pub fn default_fixed_step_phases() -> Array[@ecs.PhaseKey]
+
+pub fn default_frame_begin_phases() -> Array[@ecs.PhaseKey]
+
 pub fn default_render_frame_phases() -> Array[@ecs.PhaseKey]
 
 pub fn phase(String) -> @ecs.PhaseKey
 
+pub fn phase_fixed_post_update() -> @ecs.PhaseKey
+
+pub fn phase_fixed_update() -> @ecs.PhaseKey
+
 pub fn phase_group(String) -> PhaseGroupKey
 
 pub fn phase_group_fixed_step() -> PhaseGroupKey
+
+pub fn phase_group_frame_begin() -> PhaseGroupKey
 
 pub fn phase_group_render_frame() -> PhaseGroupKey
 
@@ -34,6 +44,8 @@ pub fn phase_shutdown() -> @ecs.PhaseKey
 
 pub fn phase_startup() -> @ecs.PhaseKey
 
+pub fn phase_surface() -> @ecs.PhaseKey
+
 pub fn phase_update() -> @ecs.PhaseKey
 
 // Errors
@@ -43,9 +55,9 @@ pub struct Engine {
   // private fields
 }
 pub fn Engine::add_common_handlers(Self, Scene, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
-pub fn Engine::add_handler_on_phase(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
+pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize(Self) -> Unit
@@ -56,20 +68,33 @@ pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
+pub fn Engine::run_frame(Self, Float) -> Int
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
-pub fn Engine::run_render_frame(Self) -> Unit
+pub fn Engine::set_surface_active(Self, Int, Int, String) -> Unit
+pub fn Engine::set_surface_suspended(Self) -> Unit
 pub fn Engine::shutdown(Self) -> Unit
+pub fn Engine::surface_active(Self) -> Bool
+pub fn Engine::surface_state(Self) -> SurfaceState
 
 pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
   elapsed_seconds : Double
+  surface : SurfaceState
+  surface_changed : Bool
 }
 pub fn FrameState::delta_seconds(Self) -> Float
 pub fn FrameState::elapsed_seconds(Self) -> Double
 pub fn FrameState::frame_index(Self) -> Int
-pub fn FrameState::new(Float, Int, Double) -> Self
+pub fn FrameState::new(Float, Int, Double, surface? : SurfaceState, surface_changed? : Bool) -> Self
+pub fn FrameState::surface(Self) -> SurfaceState
+pub fn FrameState::surface_active(Self) -> Bool
+pub fn FrameState::surface_changed(Self) -> Bool
+pub fn FrameState::surface_format(Self) -> String
+pub fn FrameState::surface_generation(Self) -> Int
+pub fn FrameState::surface_height(Self) -> Int
+pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 
 pub(all) struct PhaseGroupKey {
@@ -78,8 +103,8 @@ pub(all) struct PhaseGroupKey {
 pub fn PhaseGroupKey::name(Self) -> String
 
 pub(all) enum PhaseSlot {
-  BeforeSchedule
-  AfterSchedule
+  BeforeSystems
+  AfterSystems
 } derive(Eq)
 
 pub struct Scene {
@@ -98,18 +123,37 @@ pub fn Scene::main_camera(Self) -> @ecs.EntityId?
 pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
-pub fn Scene::run_schedule_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
+pub fn Scene::run_systems_for_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
 
+pub(all) struct SurfaceState {
+  width : Int
+  height : Int
+  format : String
+  active : Bool
+  generation : Int
+} derive(Eq)
+pub fn SurfaceState::active(Self) -> Bool
+pub fn SurfaceState::format(Self) -> String
+pub fn SurfaceState::generation(Self) -> Int
+pub fn SurfaceState::height(Self) -> Int
+pub fn SurfaceState::new_active(Int, Int, String, Int) -> Self
+pub fn SurfaceState::suspended(Int) -> Self
+pub fn SurfaceState::width(Self) -> Int
+
 pub struct TimeState {
   // private fields
 }
+pub fn TimeState::can_step_fixed(Self) -> Bool
+pub fn TimeState::drain_ready_fixed_frames(Self, (FrameState) -> Unit) -> Int
 pub fn TimeState::new(Float) -> Self
-pub fn TimeState::next_frame(Self) -> FrameState
+pub fn TimeState::next_fixed_frame(Self) -> FrameState
+pub fn TimeState::next_render_frame(Self, Float) -> FrameState
+pub fn TimeState::push_fixed_elapsed(Self, Float) -> Unit
 
 // Type aliases
 pub using @ecs {type PhaseKey}

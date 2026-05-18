@@ -1,5 +1,5 @@
 import {
-  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+  "emadurandal/rhodonite/app" @app,
 }
 
 supported_targets = "js"

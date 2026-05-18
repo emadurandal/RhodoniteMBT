@@ -216,16 +216,6 @@ pub(all) struct RegisteredComponent {
   cpu_stride : Int
 }
 
-pub struct Schedule {
-  // private fields
-}
-pub fn Schedule::add_system(Self, System) -> Unit
-pub fn Schedule::has_parallel_access_conflicts(Self) -> Bool
-pub fn Schedule::len(Self) -> Int
-pub fn Schedule::new() -> Self
-pub fn Schedule::run(Self, World, SystemContext, Array[PhaseKey]) -> Bool
-pub fn Schedule::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
-
 pub struct SpawnBatchRow {
   // private fields
 }
@@ -250,6 +240,15 @@ pub(all) struct SystemContext {
   frame_index : Int
 }
 pub fn SystemContext::new(Float, Int) -> Self
+
+pub struct SystemRunner {
+  // private fields
+}
+pub fn SystemRunner::add_system(Self, System) -> Unit
+pub fn SystemRunner::has_parallel_access_conflicts(Self) -> Bool
+pub fn SystemRunner::len(Self) -> Int
+pub fn SystemRunner::new() -> Self
+pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 
 pub struct World {
   // private fields

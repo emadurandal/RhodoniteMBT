@@ -81,14 +81,14 @@ test "orbit camera reset restores home Transform3D" {
     ),
   )
   let phase = PhaseKey::new("test/post_update")
-  let schedule = Schedule::new()
-  schedule.add_system(orbit_camera_transform_system(world, phase, orbit, home))
+  let runner = SystemRunner::new()
+  runner.add_system(orbit_camera_transform_system(world, phase, orbit, home))
   assert_true(
-    schedule.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
   )
   assert_true(request_orbit_camera_reset(world, camera, orbit))
   assert_true(
-    schedule.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
   )
   assert_eq(
     orbit_camera_pose(world, camera, orbit),
@@ -149,10 +149,10 @@ test "camera blob sync system writes from GlobalTransform and CameraLens" {
     ),
   )
   let phase = PhaseKey::new("test/render_extract")
-  let schedule = Schedule::new()
-  schedule.add_system(camera_blob_sync_system(world, phase, lens))
+  let runner = SystemRunner::new()
+  runner.add_system(camera_blob_sync_system(world, phase, lens))
   assert_true(
-    schedule.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
   )
   let writes = world.drain_camera_blob_write_views()
   assert_eq(writes.length(), 1)
@@ -223,10 +223,10 @@ test "orbit camera blob sync applies orthographic dolly scale" {
     ),
   )
   let phase = PhaseKey::new("test/render_extract")
-  let schedule = Schedule::new()
-  schedule.add_system(orbit_camera_blob_sync_system(world, phase, orbit, lens))
+  let runner = SystemRunner::new()
+  runner.add_system(orbit_camera_blob_sync_system(world, phase, orbit, lens))
   assert_true(
-    schedule.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
   )
   match world.camera_gpu_row(camera) {
     Some(bytes) => {

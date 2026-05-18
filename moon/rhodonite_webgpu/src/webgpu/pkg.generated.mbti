@@ -76,6 +76,8 @@ pub fn webgpu_canvas_context_get_format(GPUCanvasContext) -> String
 
 pub fn webgpu_canvas_context_release(GPUCanvasContext) -> Unit
 
+pub fn webgpu_canvas_context_resize(GPUCanvasContext, GPUDevice, String, Int, Int) -> Unit
+
 pub fn webgpu_device_poll(GPUDevice, wait? : Bool) -> Bool
 
 pub fn webgpu_device_release(GPUDevice) -> Unit
@@ -141,6 +143,7 @@ pub fn GPUCanvasContext::get_current_texture(Self) -> GPUTexture
 pub fn GPUCanvasContext::get_format(Self) -> String
 pub fn GPUCanvasContext::present(Self) -> Unit
 pub fn GPUCanvasContext::release(Self) -> Unit
+pub fn GPUCanvasContext::resize(Self, GPUDevice, String, Int, Int) -> Unit
 
 pub(all) struct GPUCommandEncoder {
   raw : @webgpu_objects.WebGPUCommandEncoder

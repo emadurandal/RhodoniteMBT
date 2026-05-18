@@ -12,7 +12,10 @@ export type PhaseGroupKey = string;
 
 export const Phase = {
 	Startup: "rhodonite/startup",
+	Surface: "rhodonite/surface",
 	Input: "rhodonite/input",
+	FixedUpdate: "rhodonite/fixed_update",
+	FixedPostUpdate: "rhodonite/fixed_post_update",
 	Update: "rhodonite/update",
 	PostUpdate: "rhodonite/post_update",
 	RenderExtract: "rhodonite/render_extract",
@@ -23,6 +26,7 @@ export const Phase = {
 } as const;
 
 export const PhaseGroup = {
+	FrameBegin: "rhodonite/frame_begin",
 	RenderFrame: "rhodonite/render_frame",
 	FixedStep: "rhodonite/fixed_step",
 } as const;
@@ -37,7 +41,6 @@ export function phaseGroup(name: string): PhaseGroupKey {
 
 export function defaultRenderFramePhases(): PhaseKey[] {
 	return [
-		Phase.Input,
 		Phase.Update,
 		Phase.PostUpdate,
 		Phase.RenderExtract,
@@ -47,6 +50,18 @@ export function defaultRenderFramePhases(): PhaseKey[] {
 	];
 }
 
+export function defaultFrameBeginPhases(): PhaseKey[] {
+	return [Phase.Surface, Phase.Input];
+}
+
+export function defaultFixedStepPhases(): PhaseKey[] {
+	return [Phase.FixedUpdate, Phase.FixedPostUpdate];
+}
+
+export function defaultMaxFixedStepsPerFrame(): number {
+	return 5;
+}
+
 type PhaseGroupRecord = {
 	key: PhaseGroupKey;
 	phases: PhaseKey[];
@@ -54,14 +69,15 @@ type PhaseGroupRecord = {
 
 function defaultPhaseGroups(): PhaseGroupRecord[] {
 	return [
+		{ key: PhaseGroup.FrameBegin, phases: defaultFrameBeginPhases() },
+		{ key: PhaseGroup.FixedStep, phases: defaultFixedStepPhases() },
 		{ key: PhaseGroup.RenderFrame, phases: defaultRenderFramePhases() },
-		{ key: PhaseGroup.FixedStep, phases: [] },
 	];
 }
 
 export const PhaseSlot = {
-	BeforeSchedule: "BeforeSchedule",
-	AfterSchedule: "AfterSchedule",
+	BeforeSystems: "BeforeSystems",
+	AfterSystems: "AfterSystems",
 } as const;
 
 export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
@@ -81,31 +97,140 @@ export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
 	readonly elapsedSeconds: number;
+	readonly surface: SurfaceState;
+	readonly surfaceChanged: boolean;
 
-	constructor(deltaSeconds: number, frameIndex: number, elapsedSeconds: number) {
+	constructor(
+		deltaSeconds: number,
+		frameIndex: number,
+		elapsedSeconds: number,
+		surface: SurfaceState = SurfaceState.active(800, 600, "", 0),
+		surfaceChanged = false,
+	) {
 		this.deltaSeconds = deltaSeconds;
 		this.frameIndex = frameIndex;
 		this.elapsedSeconds = elapsedSeconds;
+		this.surface = surface;
+		this.surfaceChanged = surfaceChanged;
+	}
+
+	withSurface(surface: SurfaceState, surfaceChanged: boolean): FrameState {
+		return new FrameState(
+			this.deltaSeconds,
+			this.frameIndex,
+			this.elapsedSeconds,
+			surface,
+			surfaceChanged,
+		);
+	}
+}
+
+export class SurfaceState {
+	readonly width: number;
+	readonly height: number;
+	readonly format: string;
+	readonly active: boolean;
+	readonly generation: number;
+
+	private constructor(
+		width: number,
+		height: number,
+		format: string,
+		active: boolean,
+		generation: number,
+	) {
+		this.width = width;
+		this.height = height;
+		this.format = format;
+		this.active = active;
+		this.generation = generation;
+	}
+
+	static active(
+		width: number,
+		height: number,
+		format: string,
+		generation: number,
+	): SurfaceState {
+		return new SurfaceState(width, height, format, true, generation);
+	}
+
+	static suspended(generation: number): SurfaceState {
+		return new SurfaceState(0, 0, "", false, generation);
 	}
 }
 
 export class TimeState {
-	private frameIndexValue = 0;
-	private elapsedSecondsValue = 0;
+	private renderFrameIndexValue = 0;
+	private renderElapsedSecondsValue = 0;
+	private fixedFrameIndexValue = 0;
+	private fixedElapsedSecondsValue = 0;
+	private fixedAccumulatorSecondsValue = 0;
 	private readonly fixedDeltaSeconds: number;
+	private readonly maxFixedStepsPerFrameValue: number;
 
-	constructor(fixedDeltaSeconds = 0.022) {
+	constructor(
+		fixedDeltaSeconds = 1 / 60,
+		maxFixedStepsPerFrame = defaultMaxFixedStepsPerFrame(),
+	) {
+		if (fixedDeltaSeconds <= 0) {
+			throw new Error("TimeState: fixed delta must be positive.");
+		}
+		if (maxFixedStepsPerFrame <= 0) {
+			throw new Error("TimeState: max fixed steps must be positive.");
+		}
 		this.fixedDeltaSeconds = fixedDeltaSeconds;
+		this.maxFixedStepsPerFrameValue = maxFixedStepsPerFrame;
 	}
 
-	nextFrame(): FrameState {
-		this.frameIndexValue += 1;
-		this.elapsedSecondsValue += this.fixedDeltaSeconds;
+	nextRenderFrame(deltaSeconds: number): FrameState {
+		this.renderFrameIndexValue += 1;
+		this.renderElapsedSecondsValue += deltaSeconds;
+		return new FrameState(
+			deltaSeconds,
+			this.renderFrameIndexValue,
+			this.renderElapsedSecondsValue,
+		);
+	}
+
+	pushFixedElapsed(elapsedSeconds: number): void {
+		this.fixedAccumulatorSecondsValue += elapsedSeconds;
+	}
+
+	canStepFixed(): boolean {
+		return this.fixedAccumulatorSecondsValue >= this.fixedDeltaSeconds;
+	}
+
+	maxFixedStepsPerFrame(): number {
+		return this.maxFixedStepsPerFrameValue;
+	}
+
+	nextFixedFrame(): FrameState {
+		this.fixedAccumulatorSecondsValue -= this.fixedDeltaSeconds;
+		this.fixedFrameIndexValue += 1;
+		this.fixedElapsedSecondsValue += this.fixedDeltaSeconds;
 		return new FrameState(
 			this.fixedDeltaSeconds,
-			this.frameIndexValue,
-			this.elapsedSecondsValue,
+			this.fixedFrameIndexValue,
+			this.fixedElapsedSecondsValue,
 		);
+	}
+
+	private discardFixedAccumulator(): void {
+		this.fixedAccumulatorSecondsValue = 0;
+	}
+
+	drainReadyFixedFrames(run: (frame: FrameState) => void): number {
+		let count = 0;
+		const maxSteps = this.maxFixedStepsPerFrame();
+		while (count < maxSteps && this.canStepFixed()) {
+			run(this.nextFixedFrame());
+			count += 1;
+		}
+		if (this.canStepFixed()) {
+			this.discardFixedAccumulator();
+		}
+		return count;
 	}
 }
 
@@ -383,6 +508,16 @@ export type BrowserInputBinding = {
 	dispose: () => void;
 };
 
+export type BrowserFrameLoop = {
+	stop: () => void;
+};
+
+export type BrowserEngineRuntime = {
+	readonly inputBinding: BrowserInputBinding;
+	readonly frameLoop: BrowserFrameLoop;
+	dispose: () => void;
+};
+
 function keyboardModifiers(event: KeyboardEvent): Modifiers {
 	return {
 		shift: event.shiftKey,
@@ -422,63 +557,88 @@ function pointerButton(button: number): MouseButton {
 	}
 }
 
-export function installBrowserInputState(
-	input: InputState,
+export type BrowserInputCallbacks = {
+	readonly keyDown?: (
+		key: KeyCode,
+		modifiers: Modifiers,
+		repeat: boolean,
+	) => void;
+	readonly keyUp?: (key: KeyCode, modifiers: Modifiers) => void;
+	readonly pointerMove?: (x: number, y: number) => void;
+	readonly mouseDown?: (button: number, x: number, y: number) => void;
+	readonly mouseUp?: (button: number, x: number, y: number) => void;
+	readonly wheel?: (deltaX: number, deltaY: number) => void;
+	readonly focusLost?: () => void;
+};
+
+export function startBrowserFrameLoop(
+	onFrame: (deltaSeconds: number) => void,
+): BrowserFrameLoop {
+	let stopped = false;
+	let previousTimestamp: number | null = null;
+	let requestId = 0;
+	const loop = (timestamp: number): void => {
+		if (stopped) {
+			return;
+		}
+		const deltaSeconds =
+			previousTimestamp === null ? 0 : (timestamp - previousTimestamp) / 1000;
+		previousTimestamp = timestamp;
+		onFrame(deltaSeconds);
+		if (!stopped) {
+			requestId = requestAnimationFrame(loop);
+		}
+	};
+	requestId = requestAnimationFrame(loop);
+	return {
+		stop: (): void => {
+			stopped = true;
+			if (requestId !== 0) {
+				cancelAnimationFrame(requestId);
+				requestId = 0;
+			}
+		},
+	};
+}
+
+export function installBrowserInputCallbacks(
 	canvas: HTMLCanvasElement,
+	callbacks: BrowserInputCallbacks,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
 	const keyboardTarget = options.keyboardTarget ?? window;
 	const onKeyDown: EventListener = (event): void => {
 		const keyboardEvent = event as KeyboardEvent;
-		input.enqueueEvent({
-			type: "KeyDown",
-			key: keyboardEvent.code,
-			modifiers: keyboardModifiers(keyboardEvent),
-			repeat: keyboardEvent.repeat,
-		});
+		callbacks.keyDown?.(
+			keyboardEvent.code,
+			keyboardModifiers(keyboardEvent),
+			keyboardEvent.repeat,
+		);
 	};
 	const onKeyUp: EventListener = (event): void => {
 		const keyboardEvent = event as KeyboardEvent;
-		input.enqueueEvent({
-			type: "KeyUp",
-			key: keyboardEvent.code,
-			modifiers: keyboardModifiers(keyboardEvent),
-		});
+		callbacks.keyUp?.(keyboardEvent.code, keyboardModifiers(keyboardEvent));
 	};
 	const onPointerMove = (event: PointerEvent): void => {
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({ type: "PointerMove", x, y });
+		callbacks.pointerMove?.(x, y);
 	};
 	const onPointerDown = (event: PointerEvent): void => {
 		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({
-			type: "MouseDown",
-			button: pointerButton(event.button),
-			x,
-			y,
-		});
+		callbacks.mouseDown?.(event.button, x, y);
 	};
 	const onPointerUp = (event: PointerEvent): void => {
 		const { x, y } = pointerPosition(canvas, event);
-		input.enqueueEvent({
-			type: "MouseUp",
-			button: pointerButton(event.button),
-			x,
-			y,
-		});
+		callbacks.mouseUp?.(event.button, x, y);
 	};
 	const onWheel = (event: WheelEvent): void => {
 		event.preventDefault();
-		input.enqueueEvent({
-			type: "Wheel",
-			deltaX: event.deltaX,
-			deltaY: event.deltaY,
-		});
+		callbacks.wheel?.(event.deltaX, event.deltaY);
 	};
 	const onBlur = (): void => {
-		input.enqueueEvent({ type: "FocusLost" });
+		callbacks.focusLost?.();
 	};
 	keyboardTarget.addEventListener("keydown", onKeyDown);
 	keyboardTarget.addEventListener("keyup", onKeyUp);
@@ -500,11 +660,113 @@ export function installBrowserInputState(
 	};
 }
 
+export function installBrowserInputState(
+	input: InputState,
+	canvas: HTMLCanvasElement,
+	options: { keyboardTarget?: Window | HTMLElement } = {},
+): BrowserInputBinding {
+	return installBrowserInputCallbacks(
+		canvas,
+		{
+			keyDown: (key, modifiers, repeat) => {
+				input.enqueueEvent({ type: "KeyDown", key, modifiers, repeat });
+			},
+			keyUp: (key, modifiers) => {
+				input.enqueueEvent({ type: "KeyUp", key, modifiers });
+			},
+			pointerMove: (x, y) => {
+				input.enqueueEvent({ type: "PointerMove", x, y });
+			},
+			mouseDown: (button, x, y) => {
+				input.enqueueEvent({
+					type: "MouseDown",
+					button: pointerButton(button),
+					x,
+					y,
+				});
+			},
+			mouseUp: (button, x, y) => {
+				input.enqueueEvent({
+					type: "MouseUp",
+					button: pointerButton(button),
+					x,
+					y,
+				});
+			},
+			wheel: (deltaX, deltaY) => {
+				input.enqueueEvent({ type: "Wheel", deltaX, deltaY });
+			},
+			focusLost: () => {
+				input.enqueueEvent({ type: "FocusLost" });
+			},
+		},
+		options,
+	);
+}
+
 export function installBrowserInput(
 	engine: Engine,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
 	return installBrowserInputState(engine.input, engine.canvas, options);
+}
+
+export function startBrowserEngineRuntime(
+	engine: Engine,
+	options: { keyboardTarget?: Window | HTMLElement } = {},
+): BrowserEngineRuntime {
+	const inputBinding = installBrowserInput(engine, options);
+	const frameLoop = startBrowserFrameLoop((deltaSeconds) => {
+		syncBrowserEngineSurface(engine);
+		engine.runFrame(deltaSeconds);
+	});
+	return {
+		inputBinding,
+		frameLoop,
+		dispose: (): void => {
+			frameLoop.stop();
+			inputBinding.dispose();
+		},
+	};
+}
+
+export function syncBrowserEngineSurface(engine: Engine): void {
+	if (engine.canvas.width <= 0 || engine.canvas.height <= 0) {
+		engine.setSurfaceSuspended();
+		return;
+	}
+	engine.setSurfaceActive(engine.canvas.width, engine.canvas.height, engine.format);
+}
+
+export function runBrowserWebGpuCanvasDemo(options: {
+	readonly initialize: (canvas: HTMLCanvasElement) => void | Promise<void>;
+	readonly canvasId?: string;
+	readonly unsupportedMessage?: string;
+	readonly missingCanvasMessage?: string;
+	readonly failureMessage?: string;
+}): void {
+	const {
+		initialize,
+		canvasId = "webgpu-canvas",
+		unsupportedMessage = "WebGPU is not supported in this browser.",
+		missingCanvasMessage = "Missing WebGPU canvas.",
+		failureMessage = "Failed to initialize WebGPU. Check the console for errors.",
+	} = options;
+	if (!navigator.gpu) {
+		document.body.innerHTML = `<h1>${unsupportedMessage}</h1>`;
+		return;
+	}
+	window.addEventListener("load", () => {
+		const canvas = document.getElementById(canvasId);
+		if (!(canvas instanceof HTMLCanvasElement)) {
+			document.body.innerHTML = `<h1>${missingCanvasMessage}</h1>`;
+			return;
+		}
+		Promise.resolve(initialize(canvas)).catch((error: unknown) => {
+			console.error("Failed to initialize WebGPU:", error);
+			document.body.innerHTML = `<h1>${failureMessage}</h1>`;
+		});
+	});
 }
 
 export type CommonOrbitCameraHandlers<TWorld, TMainCamera, TComponent> = {
@@ -540,6 +802,8 @@ export class Engine {
 	private initializing = false;
 	private initialized = false;
 	private mainSceneIndex = 0;
+	private surfaceStateValue: SurfaceState;
+	private surfaceChangedValue = true;
 
 	private constructor(
 		canvas: HTMLCanvasElement,
@@ -559,6 +823,12 @@ export class Engine {
 		this.scenes = [mainScene];
 		this.timeState = new TimeState();
 		this.phaseGroupsValue = defaultPhaseGroups();
+		this.surfaceStateValue = SurfaceState.active(
+			Math.max(canvas.width, 1),
+			Math.max(canvas.height, 1),
+			format,
+			0,
+		);
 	}
 
 	static async create(
@@ -593,25 +863,57 @@ export class Engine {
 		return this.scenes[this.mainSceneIndex] as Scene<TWorld, TMainCamera>;
 	}
 
-	addHandlerOnPhase(
+	surfaceState(): SurfaceState {
+		return this.surfaceStateValue;
+	}
+
+	surfaceActive(): boolean {
+		return this.surfaceStateValue.active;
+	}
+
+	setSurfaceActive(width: number, height: number, format: string): void {
+		if (width <= 0 || height <= 0) {
+			this.setSurfaceSuspended();
+			return;
+		}
+		if (
+			this.surfaceStateValue.active &&
+			this.surfaceStateValue.width === width &&
+			this.surfaceStateValue.height === height &&
+			this.surfaceStateValue.format === format
+		) {
+			return;
+		}
+		this.surfaceStateValue = SurfaceState.active(
+			width,
+			height,
+			format,
+			this.surfaceStateValue.generation + 1,
+		);
+		this.surfaceChangedValue = true;
+	}
+
+	setSurfaceSuspended(): void {
+		if (!this.surfaceStateValue.active) {
+			return;
+		}
+		this.surfaceStateValue = SurfaceState.suspended(
+			this.surfaceStateValue.generation + 1,
+		);
+		this.surfaceChangedValue = true;
+	}
+
+	addPhaseHandler(
 		phase: PhaseKey,
 		callback: EngineCallback,
-		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
+		slot: PhaseSlot = PhaseSlot.BeforeSystems,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
-				"Engine.addHandlerOnPhase cannot register phase handlers after engine initialization.",
+				"Engine.addPhaseHandler cannot register phase handlers after engine initialization.",
 			);
 		}
 		this.phaseHandlers.push({ phase, slot, callback });
-	}
-
-	onPhase(
-		phase: PhaseKey,
-		callback: EngineCallback,
-		slot: PhaseSlot = PhaseSlot.BeforeSchedule,
-	): void {
-		this.addHandlerOnPhase(phase, callback, slot);
 	}
 
 	addCommonHandlers<TWorld, TMainCamera, TComponent>(
@@ -637,7 +939,7 @@ export class Engine {
 				"Engine.addCommonHandlers: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
 			);
 		}
-		this.addHandlerOnPhase(Phase.Input, (engine) => {
+		this.addPhaseHandler(Phase.Input, (engine) => {
 			const camera = scene.mainCamera();
 			if (camera === null) {
 				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
@@ -737,13 +1039,13 @@ export class Engine {
 	}
 
 	private runPhaseUnchecked(phase: PhaseKey, frame: FrameState): void {
-		this.runPhaseHandlers(phase, PhaseSlot.BeforeSchedule, frame);
+		this.runPhaseHandlers(phase, PhaseSlot.BeforeSystems, frame);
 		for (const scene of this.scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
 				scene.runSchedulePhase(phase, frame);
 			}
 		}
-		this.runPhaseHandlers(phase, PhaseSlot.AfterSchedule, frame);
+		this.runPhaseHandlers(phase, PhaseSlot.AfterSystems, frame);
 	}
 
 	runPhaseGroup(group: PhaseGroupKey, frame: FrameState): void {
@@ -754,11 +1056,47 @@ export class Engine {
 		}
 	}
 
-	runRenderFrame(): void {
-		this.ensureInitialized("Engine.runRenderFrame");
+	private runReadyFixedSteps(
+		elapsedSeconds: number,
+		surface: SurfaceState,
+		surfaceChanged: boolean,
+	): number {
+		this.timeState.pushFixedElapsed(elapsedSeconds);
+		return this.timeState.drainReadyFixedFrames((fixedFrame) => {
+			const frame = fixedFrame.withSurface(surface, surfaceChanged);
+			this.runPhaseGroup(PhaseGroup.FixedStep, frame);
+		});
+	}
+
+	runFrame(elapsedSeconds: number): number {
+		this.ensureInitialized("Engine.runFrame");
 		this.input.beginFrame();
-		const frame = this.timeState.nextFrame();
-		this.runPhaseGroup(PhaseGroup.RenderFrame, frame);
+		const surface = this.surfaceStateValue;
+		const surfaceChanged = this.surfaceChangedValue;
+		const frame = this.timeState
+			.nextRenderFrame(elapsedSeconds)
+			.withSurface(surface, surfaceChanged);
+		this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
+		const fixedSteps = this.runReadyFixedSteps(
+			elapsedSeconds,
+			surface,
+			surfaceChanged,
+		);
+		this.runRenderFrameGroupForSurface(frame);
+		this.surfaceChangedValue = false;
+		return fixedSteps;
+	}
+
+	private runRenderFrameGroupForSurface(frame: FrameState): void {
+		const phaseGroup = this.findPhaseGroup(
+			"Engine.runRenderFrameGroupForSurface",
+			PhaseGroup.RenderFrame,
+		);
+		for (const phase of phaseGroup.phases) {
+			if (frame.surface.active || !phaseIsRenderPath(phase)) {
+				this.runPhase(phase, frame);
+			}
+		}
 	}
 
 	private sceneParticipatesInPhase(scene: RuntimeScene, phase: PhaseKey): boolean {

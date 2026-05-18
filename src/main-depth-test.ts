@@ -1,29 +1,5 @@
 import "./style.css";
-import {
-	create_webgpu_demo_state,
-	depth_test_render_tick,
-} from "../_build/js/debug/build/emadurandal/rhodonite_examples/depth-test/js/main/main.js";
+import { runBrowserWebGpuCanvasDemo } from "./app-runtime";
+import { create_webgpu_demo_state } from "../_build/js/debug/build/emadurandal/rhodonite_examples/depth-test/js/main/main.js";
 
-if (!navigator.gpu) {
-	document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
-} else {
-	window.addEventListener("load", async () => {
-		try {
-			const canvas = document.getElementById(
-				"webgpu-canvas",
-			) as HTMLCanvasElement;
-
-			await create_webgpu_demo_state(canvas);
-
-			const loop = () => {
-				depth_test_render_tick();
-				requestAnimationFrame(loop);
-			};
-			requestAnimationFrame(loop);
-		} catch (error) {
-			console.error("Failed to initialize WebGPU:", error);
-			document.body.innerHTML =
-				"<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
-		}
-	});
-}
+runBrowserWebGpuCanvasDemo({ initialize: create_webgpu_demo_state });

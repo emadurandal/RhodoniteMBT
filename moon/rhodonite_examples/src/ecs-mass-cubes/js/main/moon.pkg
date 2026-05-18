@@ -1,7 +1,5 @@
 import {
-  "emadurandal/rhodonite/app" @app,
-  "emadurandal/rhodonite_core/input" @input,
-  "emadurandal/rhodonite_examples/common/browser" @html_ctx,
+  "emadurandal/rhodonite/app/browser" @app_browser,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @demo_state,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/async/js_async",
@@ -12,19 +10,6 @@ supported_targets = "js"
 
 options(
   "is-main": true,
-  link: {
-    "js": {
-      "exports": [
-        "create_webgpu_demo_state",
-        "ecs_mass_cubes_render_tick",
-        "ecs_mass_cubes_input_pointer_move",
-        "ecs_mass_cubes_input_mouse_down",
-        "ecs_mass_cubes_input_mouse_up",
-        "ecs_mass_cubes_input_wheel",
-        "ecs_mass_cubes_input_focus_lost",
-      ],
-      "format": "esm",
-    },
-  },
+  link: { "js": { "exports": [ "create_webgpu_demo_state" ], "format": "esm" } },
   overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
 )

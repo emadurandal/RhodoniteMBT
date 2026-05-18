@@ -1,8 +1,9 @@
 import {
+  "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "Milky2018/wgpu_mbt/c" @c,
-  "Kaida-Amethyst/sdl3" @sdl3,
+  "Kaida-Amethyst/sdl3" @sdl3_pkg,
   "Kaida-Amethyst/sdl3/lib" @lib,
   "moonbitlang/core/ref" @ref,
 }
@@ -10,5 +11,8 @@ import {
 supported_targets = "native"
 
 options(
+  link: {
+    "native": { "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3" },
+  },
   "native-stub": [ "sdl_keyboard_name_native.c" ],
 )

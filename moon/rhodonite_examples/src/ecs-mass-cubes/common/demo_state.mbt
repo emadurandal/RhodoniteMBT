@@ -473,8 +473,8 @@ pub(all) struct DemoState {
   device : @wgpu.GPUDevice
   queue : @wgpu.GPUQueue
   pipeline : @wgpu.GPURenderPipeline
-  depth_texture : @wgpu.GPUTexture
-  depth_view : @wgpu.GPUTextureView
+  mut depth_texture : @wgpu.GPUTexture
+  mut depth_view : @wgpu.GPUTextureView
   vertex_buffer : @wgpu.GPUBuffer
   instance_buffer : @wgpu.GPUBuffer
   index_buffer : @wgpu.GPUBuffer
@@ -499,6 +499,38 @@ pub(all) struct DemoState {
   perf_last_frame_start_ms : @ref.Ref[Double]
   perf_frame_start_ms : @ref.Ref[Double]
   perf_excluded_wait_ms : @ref.Ref[Double]
+}
+
+///|
+/// Recreates the depth attachment for the current drawable size.
+fn DemoState::resize_depth_attachment(
+  self : DemoState,
+  width : Int,
+  height : Int,
+) -> Unit {
+  if width <= 0 || height <= 0 {
+    return
+  }
+  @wgpu.textureView_release(self.depth_view)
+  self.depth_texture.release()
+  self.depth_texture = self.device.create_texture(
+    width.reinterpret_as_uint(),
+    height.reinterpret_as_uint(),
+    "depth24plus",
+    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+  )
+  self.depth_view = self.depth_texture.create_view()
+}
+
+///|
+/// Applies surface changes to sample-owned render resources.
+fn DemoState::handle_surface_frame(
+  self : DemoState,
+  frame : @app.FrameState,
+) -> Unit {
+  if frame.surface_changed() && frame.surface_active() {
+    self.resize_depth_attachment(frame.surface_width(), frame.surface_height())
+  }
 }
 
 ///|
@@ -900,13 +932,13 @@ pub fn create_demo_state_for_scene(
   }
   demo_state.add_mass_cubes_camera_sync_system()
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_post_update(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
   ignore(
-    scene.run_schedule_phase(
+    scene.run_systems_for_phase(
       @app.phase_render_extract(),
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
@@ -1061,7 +1093,7 @@ pub fn render_frame_to_view(
     ),
   )
   ignore(
-    demo_state.scene.run_schedule_phase(
+    demo_state.scene.run_systems_for_phase(
       @app.phase_post_update(),
       @app.FrameState::new(
         (0.022 : Float),
@@ -1071,7 +1103,7 @@ pub fn render_frame_to_view(
     ),
   )
   ignore(
-    demo_state.scene.run_schedule_phase(
+    demo_state.scene.run_systems_for_phase(
       @app.phase_render_extract(),
       @app.FrameState::new(
         (0.022 : Float),
@@ -1181,25 +1213,28 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
+  engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
+    demo_state.handle_surface_frame(frame)
+  })
   engine.add_common_handlers(
     demo_state.scene,
     orbit_component=Some(demo_state.orbit_controller),
     home_component=Some(demo_state.camera_home),
   )
-  engine.add_handler_on_phase(@app.phase_update(), fn(_engine, frame) {
+  engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
   })
-  engine.add_handler_on_phase(
+  engine.add_phase_handler(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
         render_current_frame(demo_state, record_perf=true)
       }
     },
-    slot=@app.PhaseSlot::AfterSchedule,
+    slot=@app.PhaseSlot::AfterSystems,
   )
-  engine.add_handler_on_phase(@app.phase_shutdown(), fn(_engine, _frame) {
+  engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
 }

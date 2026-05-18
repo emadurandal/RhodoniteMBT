@@ -7,6 +7,7 @@ A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser
 | Module | Description |
 |--------|-------------|
 | `emadurandal/rhodonite` | Public facade and high-level app/runtime helpers ([`moon/rhodonite`](moon/rhodonite)) |
+| `emadurandal/rhodonite_app_sdl3` | SDL3 native app runtime helpers |
 | `emadurandal/rhodonite_core` | Core (vectors, JS bridge, binary buffer writes, etc.) |
 | `emadurandal/rhodonite_webgpu` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | Samples |

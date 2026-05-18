@@ -1,0 +1,11 @@
+import {
+  "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_core/input" @input,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+}
+
+supported_targets = "js"
+
+options(
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
+)

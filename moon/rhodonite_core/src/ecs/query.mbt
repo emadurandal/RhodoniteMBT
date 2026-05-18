@@ -445,7 +445,7 @@ pub fn QueryRow::read(
 ///|
 /// Runs `f` with a closure-scoped mutable payload view for `component`.
 ///
-/// Schedule execution requires `component` to be declared in the active System's `writes` set.
+/// SystemRunner execution requires `component` to be declared in the active System's `writes` set.
 pub fn QueryRow::write(
   self : QueryRow,
   component : ComponentTypeId,

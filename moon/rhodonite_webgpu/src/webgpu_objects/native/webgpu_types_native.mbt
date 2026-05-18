@@ -29,8 +29,8 @@ pub struct GPUQueue {
 /// Defines `GPUCanvasContext`.
 pub struct GPUCanvasContext {
   surface : @wgpu.Surface
-  width : UInt
-  height : UInt
+  mut width : UInt
+  mut height : UInt
   format : Ref[String]
   currentTexture : Ref[@wgpu.Texture?]
 }
