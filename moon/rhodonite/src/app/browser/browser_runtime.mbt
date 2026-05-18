@@ -24,6 +24,7 @@ pub struct PlatformApp {
 pub enum FrameMode {
   Loop
   SingleFrame
+  OnDemand
 }
 
 ///|
@@ -78,6 +79,18 @@ pub fn PlatformOptions::render_loop() -> PlatformOptions {
 }
 
 ///|
+/// Creates browser platform options for interactive on-demand rendering.
+pub fn PlatformOptions::interactive_on_demand() -> PlatformOptions {
+  { frame_mode: OnDemand, install_input: true }
+}
+
+///|
+/// Creates browser platform options for render-only on-demand rendering.
+pub fn PlatformOptions::render_on_demand() -> PlatformOptions {
+  { frame_mode: OnDemand, install_input: false }
+}
+
+///|
 /// Creates browser platform options for a single-frame canvas sample.
 pub fn PlatformOptions::single_frame() -> PlatformOptions {
   { frame_mode: SingleFrame, install_input: false }
@@ -128,6 +141,7 @@ pub fn Platform::dispose(self : Platform) -> Unit {
     return
   }
   self.disposed = true
+  self.engine.set_render_wakeup(None)
   match self.frame_loop {
     Some(frame_loop) => frame_loop.stop()
     None => ()
@@ -194,9 +208,64 @@ pub extern "js" fn start_browser_frame_loop(
   #| }
 
 ///|
+/// Starts an on-demand browser frame loop that only schedules frames when requested.
+pub extern "js" fn start_browser_on_demand_frame_loop(
+  tick : (Double) -> Unit,
+  should_continue : () -> Bool,
+) -> BrowserFrameLoop =
+  #| (tick, shouldContinue) => {
+  #|   let stopped = false;
+  #|   let scheduled = false;
+  #|   let previousTimestamp = null;
+  #|   let requestId = 0;
+  #|   const request = () => {
+  #|     if (stopped || scheduled) {
+  #|       return;
+  #|     }
+  #|     scheduled = true;
+  #|     requestId = requestAnimationFrame(loop);
+  #|   };
+  #|   const loop = (timestamp) => {
+  #|     if (stopped) {
+  #|       return;
+  #|     }
+  #|     scheduled = false;
+  #|     const deltaSeconds =
+  #|       previousTimestamp === null ? 0 : (timestamp - previousTimestamp) / 1000;
+  #|     previousTimestamp = timestamp;
+  #|     tick(deltaSeconds);
+  #|     if (!stopped && shouldContinue()) {
+  #|       request();
+  #|     } else {
+  #|       previousTimestamp = null;
+  #|     }
+  #|   };
+  #|   return {
+  #|     request,
+  #|     stop() {
+  #|       stopped = true;
+  #|       if (scheduled && requestId !== 0) {
+  #|         cancelAnimationFrame(requestId);
+  #|       }
+  #|       scheduled = false;
+  #|       requestId = 0;
+  #|     },
+  #|   };
+  #| }
+
+///|
 /// Stops a browser frame loop returned by `start_browser_frame_loop`.
 pub extern "js" fn BrowserFrameLoop::stop(self : BrowserFrameLoop) -> Unit =
   #| (self) => self.stop()
+
+///|
+/// Requests one frame from an on-demand browser frame loop.
+pub extern "js" fn BrowserFrameLoop::request(self : BrowserFrameLoop) -> Unit =
+  #| (self) => {
+  #|   if (typeof self.request === "function") {
+  #|     self.request();
+  #|   }
+  #| }
 
 ///|
 /// Returns the canvas backing width in pixels.
@@ -247,6 +316,25 @@ pub fn start_browser_engine_canvas_loop(
     sync_browser_engine_surface(engine, canvas)
     ignore(engine.run_frame(Float::from_double(delta_seconds)))
   })
+}
+
+///|
+/// Starts an on-demand browser loop and wires engine render requests to RAF.
+pub fn start_browser_engine_on_demand_canvas_loop(
+  engine : @app.Engine,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> BrowserFrameLoop {
+  sync_browser_engine_surface(engine, canvas)
+  let frame_loop = start_browser_on_demand_frame_loop(
+    fn(delta_seconds) {
+      sync_browser_engine_surface(engine, canvas)
+      ignore(engine.run_frame(Float::from_double(delta_seconds)))
+    },
+    fn() { engine.render_requested() || engine.continuous_render_requested() },
+  )
+  engine.set_render_wakeup(Some(fn() { frame_loop.request() }))
+  frame_loop.request()
+  frame_loop
 }
 
 ///|
@@ -370,6 +458,7 @@ pub fn install_browser_input(
           repeat,
         ),
       )
+      engine.request_render("input")
     },
     fn(code, shift, ctrl, alt, meta) {
       input.enqueue_event(
@@ -378,11 +467,13 @@ pub fn install_browser_input(
           @input.Modifiers::new(shift, ctrl, alt, meta),
         ),
       )
+      engine.request_render("input")
     },
     fn(x, y) {
       input.enqueue_event(
         PointerMove(Float::from_double(x), Float::from_double(y)),
       )
+      engine.request_render("input")
     },
     fn(button, x, y) {
       input.enqueue_event(
@@ -392,6 +483,7 @@ pub fn install_browser_input(
           Float::from_double(y),
         ),
       )
+      engine.request_render("input")
     },
     fn(button, x, y) {
       input.enqueue_event(
@@ -401,13 +493,18 @@ pub fn install_browser_input(
           Float::from_double(y),
         ),
       )
+      engine.request_render("input")
     },
     fn(delta_x, delta_y) {
       input.enqueue_event(
         Wheel(Float::from_double(delta_x), Float::from_double(delta_y)),
       )
+      engine.request_render("input")
     },
-    fn() { input.enqueue_event(FocusLost) },
+    fn() {
+      input.enqueue_event(FocusLost)
+      engine.request_render("input")
+    },
   )
 }
 
@@ -421,6 +518,7 @@ pub fn start_platform(
   sync_browser_engine_surface(engine, canvas)
   let frame_loop = match options.frame_mode {
     Loop => Some(start_browser_engine_canvas_loop(engine, canvas))
+    OnDemand => Some(start_browser_engine_on_demand_canvas_loop(engine, canvas))
     SingleFrame => {
       ignore(engine.run_frame((0.0 : Float)))
       None

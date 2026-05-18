@@ -48,14 +48,18 @@ type SnapshotUpdate = {
 
 type SnapshotModule = {
 	render_basic_triangle_browser_snapshot: () => Promise<unknown>;
+	render_ondemand_triangle_browser_snapshot: () => Promise<unknown>;
 	render_triangle_with_buffer_browser_snapshot: () => Promise<unknown>;
-	render_depth_test_browser_snapshot: () => Promise<unknown>;
 	render_ecs_scene_graph_browser_snapshot: () => Promise<unknown>;
 	render_ecs_mass_cubes_browser_snapshot: () => Promise<unknown>;
 };
 
 type TsMassCubesModule = {
 	renderTsEcsMassCubesBrowserSnapshot: () => Promise<unknown>;
+};
+
+type TsOndemandTriangleModule = {
+	renderTsOndemandTriangleBrowserSnapshot: () => Promise<unknown>;
 };
 
 type WasmMassCubesModule = {
@@ -239,6 +243,9 @@ async function createSampleRenderRegistry(
 			"../../_build/wasm-gc/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
 		) as Promise<{ default: string }>,
 	]);
+	const tsOndemandTriangleModule = await import(
+		"../main-ondemand-triangle"
+	) as TsOndemandTriangleModule;
 	return new Map<string, () => Promise<Uint8Array>>([
 		[
 			"basic-triangle",
@@ -246,16 +253,18 @@ async function createSampleRenderRegistry(
 				toUint8Array(await snapshotModule.render_basic_triangle_browser_snapshot()),
 		],
 		[
+			"ondemand-triangle",
+			async () =>
+				toUint8Array(
+					await snapshotModule.render_ondemand_triangle_browser_snapshot(),
+				),
+		],
+		[
 			"triangle-with-buffer",
 			async () =>
 				toUint8Array(
 					await snapshotModule.render_triangle_with_buffer_browser_snapshot(),
 				),
-		],
-		[
-			"depth-test",
-			async () =>
-				toUint8Array(await snapshotModule.render_depth_test_browser_snapshot()),
 		],
 		[
 			"ecs-scene-graph",
@@ -273,6 +282,13 @@ async function createSampleRenderRegistry(
 			"ts-ecs-mass-cubes",
 			async () =>
 				toUint8Array(await tsModule.renderTsEcsMassCubesBrowserSnapshot()),
+		],
+		[
+			"ts-ondemand-triangle",
+			async () =>
+				toUint8Array(
+					await tsOndemandTriangleModule.renderTsOndemandTriangleBrowserSnapshot(),
+				),
 		],
 		[
 			"wasm-ecs-mass-cubes",

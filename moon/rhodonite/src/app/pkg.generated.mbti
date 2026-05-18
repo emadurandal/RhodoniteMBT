@@ -59,6 +59,8 @@ pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.Compo
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
+pub fn Engine::consume_render_requested(Self) -> Bool
+pub fn Engine::continuous_render_requested(Self) -> Bool
 pub fn Engine::gpu_context(Self) -> @webgpu.GPUContext
 pub fn Engine::initialize(Self) -> Unit
 pub fn Engine::input(Self) -> @input.InputState
@@ -68,12 +70,17 @@ pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
+pub fn Engine::render_requested(Self) -> Bool
+pub fn Engine::request_continuous_render(Self, String) -> Unit
+pub fn Engine::request_render(Self, String) -> Unit
 pub fn Engine::run_frame(Self, Float) -> Int
 pub fn Engine::run_phase(Self, @ecs.PhaseKey, FrameState) -> Unit
 pub fn Engine::run_phase_group(Self, PhaseGroupKey, FrameState) -> Unit
+pub fn Engine::set_render_wakeup(Self, (() -> Unit)?) -> Unit
 pub fn Engine::set_surface_active(Self, Int, Int, String) -> Unit
 pub fn Engine::set_surface_suspended(Self) -> Unit
 pub fn Engine::shutdown(Self) -> Unit
+pub fn Engine::stop_continuous_render(Self, String) -> Unit
 pub fn Engine::surface_active(Self) -> Bool
 pub fn Engine::surface_state(Self) -> SurfaceState
 

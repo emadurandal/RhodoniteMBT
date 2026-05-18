@@ -509,6 +509,7 @@ export type BrowserInputBinding = {
 };
 
 export type BrowserFrameLoop = {
+	request: () => void;
 	stop: () => void;
 };
 
@@ -557,12 +558,12 @@ export class PlatformApp {
 
 export class PlatformOptions {
 	readonly keyboardTarget: Window | HTMLElement | undefined;
-	readonly frameMode: "loop" | "single-frame";
+	readonly frameMode: "loop" | "single-frame" | "on-demand";
 	readonly installInput: boolean;
 
 	constructor(options: {
 		readonly keyboardTarget?: Window | HTMLElement;
-		readonly frameMode?: "loop" | "single-frame";
+		readonly frameMode?: "loop" | "single-frame" | "on-demand";
 		readonly installInput?: boolean;
 	} = {}) {
 		this.keyboardTarget = options.keyboardTarget;
@@ -576,6 +577,14 @@ export class PlatformOptions {
 
 	static renderLoop(): PlatformOptions {
 		return new PlatformOptions({ frameMode: "loop", installInput: false });
+	}
+
+	static interactiveOnDemand(): PlatformOptions {
+		return new PlatformOptions({ frameMode: "on-demand", installInput: true });
+	}
+
+	static renderOnDemand(): PlatformOptions {
+		return new PlatformOptions({ frameMode: "on-demand", installInput: false });
 	}
 
 	static singleFrame(): PlatformOptions {
@@ -681,12 +690,56 @@ export function startBrowserFrameLoop(
 	};
 	requestId = requestAnimationFrame(loop);
 	return {
+		request: (): void => {},
 		stop: (): void => {
 			stopped = true;
 			if (requestId !== 0) {
 				cancelAnimationFrame(requestId);
 				requestId = 0;
 			}
+		},
+	};
+}
+
+export function startBrowserOnDemandFrameLoop(
+	onFrame: (deltaSeconds: number) => void,
+	shouldContinue: () => boolean,
+): BrowserFrameLoop {
+	let stopped = false;
+	let scheduled = false;
+	let previousTimestamp: number | null = null;
+	let requestId = 0;
+	const request = (): void => {
+		if (stopped || scheduled) {
+			return;
+		}
+		scheduled = true;
+		requestId = requestAnimationFrame(loop);
+	};
+	const loop = (timestamp: number): void => {
+		if (stopped) {
+			return;
+		}
+		scheduled = false;
+		const deltaSeconds =
+			previousTimestamp === null ? 0 : (timestamp - previousTimestamp) / 1000;
+		previousTimestamp = timestamp;
+		onFrame(deltaSeconds);
+		if (!stopped && shouldContinue()) {
+			request();
+		} else {
+			previousTimestamp = null;
+		}
+	};
+	return {
+		request,
+		stop: (): void => {
+			stopped = true;
+			if (scheduled && requestId !== 0) {
+				cancelAnimationFrame(requestId);
+			}
+			scheduled = false;
+			requestId = 0;
 		},
 	};
 }
@@ -753,19 +806,22 @@ export function installBrowserInputCallbacks(
 export function installBrowserInputState(
 	input: InputState,
 	canvas: HTMLCanvasElement,
-	options: { keyboardTarget?: Window | HTMLElement } = {},
+	options: { keyboardTarget?: Window | HTMLElement; onInput?: () => void } = {},
 ): BrowserInputBinding {
 	return installBrowserInputCallbacks(
 		canvas,
 		{
 			keyDown: (key, modifiers, repeat) => {
 				input.enqueueEvent({ type: "KeyDown", key, modifiers, repeat });
+				options.onInput?.();
 			},
 			keyUp: (key, modifiers) => {
 				input.enqueueEvent({ type: "KeyUp", key, modifiers });
+				options.onInput?.();
 			},
 			pointerMove: (x, y) => {
 				input.enqueueEvent({ type: "PointerMove", x, y });
+				options.onInput?.();
 			},
 			mouseDown: (button, x, y) => {
 				input.enqueueEvent({
@@ -774,6 +830,7 @@ export function installBrowserInputState(
 					x,
 					y,
 				});
+				options.onInput?.();
 			},
 			mouseUp: (button, x, y) => {
 				input.enqueueEvent({
@@ -782,12 +839,15 @@ export function installBrowserInputState(
 					x,
 					y,
 				});
+				options.onInput?.();
 			},
 			wheel: (deltaX, deltaY) => {
 				input.enqueueEvent({ type: "Wheel", deltaX, deltaY });
+				options.onInput?.();
 			},
 			focusLost: () => {
 				input.enqueueEvent({ type: "FocusLost" });
+				options.onInput?.();
 			},
 		},
 		options,
@@ -798,7 +858,10 @@ export function installBrowserInput(
 	engine: Engine,
 	options: { keyboardTarget?: Window | HTMLElement } = {},
 ): BrowserInputBinding {
-	return installBrowserInputState(engine.input, engine.canvas, options);
+	return installBrowserInputState(engine.input, engine.canvas, {
+		...options,
+		onInput: () => engine.requestRender("input"),
+	});
 }
 
 export function startPlatform(
@@ -812,12 +875,26 @@ export function startPlatform(
 	const inputBinding = options.installInput
 		? installBrowserInput(engine, options)
 		: undefined;
-	const frameLoop = options.frameMode === "loop"
-		? startBrowserFrameLoop((deltaSeconds) => {
+	const frameLoop =
+		options.frameMode === "loop"
+			? startBrowserFrameLoop((deltaSeconds) => {
 				syncBrowserEngineSurface(engine);
 				engine.runFrame(deltaSeconds);
 			})
-		: undefined;
+			: options.frameMode === "on-demand"
+				? startBrowserOnDemandFrameLoop(
+						(deltaSeconds) => {
+							syncBrowserEngineSurface(engine);
+							engine.runFrame(deltaSeconds);
+						},
+						() =>
+							engine.renderRequested() || engine.continuousRenderRequested(),
+					)
+				: undefined;
+	if (frameLoop !== undefined && options.frameMode === "on-demand") {
+		engine.setRenderWakeup(() => frameLoop.request());
+		frameLoop.request();
+	}
 	let disposed = false;
 	return {
 		engine,
@@ -828,6 +905,7 @@ export function startPlatform(
 				return;
 			}
 			disposed = true;
+			engine.setRenderWakeup(undefined);
 			frameLoop?.stop();
 			inputBinding?.dispose();
 			engine.shutdown();
@@ -924,6 +1002,9 @@ export class Engine {
 	private mainSceneIndex = 0;
 	private surfaceStateValue: SurfaceState;
 	private surfaceChangedValue = true;
+	private renderRequestedValue = true;
+	private continuousRenderRequestedValue = false;
+	private renderWakeupValue: (() => void) | undefined;
 
 	private constructor(
 		canvas: HTMLCanvasElement,
@@ -991,6 +1072,38 @@ export class Engine {
 		return this.surfaceStateValue.active;
 	}
 
+	setRenderWakeup(wakeup: (() => void) | undefined): void {
+		this.renderWakeupValue = wakeup;
+	}
+
+	requestRender(_reason: string): void {
+		this.renderRequestedValue = true;
+		this.renderWakeupValue?.();
+	}
+
+	renderRequested(): boolean {
+		return this.renderRequestedValue;
+	}
+
+	consumeRenderRequested(): boolean {
+		const requested = this.renderRequestedValue;
+		this.renderRequestedValue = false;
+		return requested;
+	}
+
+	requestContinuousRender(_reason: string): void {
+		this.continuousRenderRequestedValue = true;
+		this.renderWakeupValue?.();
+	}
+
+	stopContinuousRender(_reason: string): void {
+		this.continuousRenderRequestedValue = false;
+	}
+
+	continuousRenderRequested(): boolean {
+		return this.continuousRenderRequestedValue;
+	}
+
 	setSurfaceActive(width: number, height: number, format: string): void {
 		if (width <= 0 || height <= 0) {
 			this.setSurfaceSuspended();
@@ -1011,6 +1124,7 @@ export class Engine {
 			this.surfaceStateValue.generation + 1,
 		);
 		this.surfaceChangedValue = true;
+		this.requestRender("surface");
 	}
 
 	setSurfaceSuspended(): void {
@@ -1021,6 +1135,7 @@ export class Engine {
 			this.surfaceStateValue.generation + 1,
 		);
 		this.surfaceChangedValue = true;
+		this.requestRender("surface");
 	}
 
 	addPhaseHandler(
@@ -1190,6 +1305,7 @@ export class Engine {
 
 	runFrame(elapsedSeconds: number): number {
 		this.ensureInitialized("Engine.runFrame");
+		this.consumeRenderRequested();
 		this.input.beginFrame();
 		const surface = this.surfaceStateValue;
 		const surfaceChanged = this.surfaceChangedValue;

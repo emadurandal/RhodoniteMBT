@@ -1,11 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "emadurandal/rhodonite_examples/depth-test/common"
+package "emadurandal/rhodonite_examples/ondemand-triangle/common"
 
 import {
   "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_webgpu/webgpu",
+  "emadurandal/rhodonite_webgpu/webgpu_enums",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
-  "moonbitlang/core/ref",
 }
 
 // Values
@@ -21,11 +21,9 @@ pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState) -> Unit
 
-pub fn render_current_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
-
 pub fn render_frame(DemoState) -> Unit
 
-pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
+pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView, clearColor? : @webgpu_enums.GPUColor, vertex_count? : Int) -> Unit
 
 // Errors
 
@@ -35,15 +33,12 @@ pub(all) struct DemoState {
   device : @webgpu.GPUDevice
   queue : @webgpu.GPUQueue
   pipeline : @webgpu.GPURenderPipeline
-  mut depth_texture : @webgpu.GPUTexture
-  mut depth_view : @webgpu_objects.GPUTextureView
-  vertex_buffer_a : @webgpu.GPUBuffer
-  vertex_buffer_b : @webgpu.GPUBuffer
-  index_buffer : @webgpu.GPUBuffer
-  frame : @ref.Ref[Int]
+  uniform_buffer : @webgpu.GPUBuffer
+  bind_group_layout : @webgpu.GPUBindGroupLayout
+  bind_group : @webgpu.GPUBindGroup
+  mut angle : Double
 }
 pub fn DemoState::release(Self) -> Unit
-pub fn DemoState::update_scene(Self, @app.FrameState) -> Unit
 
 // Type aliases
 

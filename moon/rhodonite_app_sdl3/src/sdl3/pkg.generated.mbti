@@ -27,13 +27,13 @@ pub fn query_xlib_window_surface(@lib.SDL_Window) -> XlibWindowSurface?
 
 pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
 
-pub async fn run_sdl_metal_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
+pub async fn run_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Unit raise Sdl3AppError
 
-pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, (String) -> Unit, () -> Bool, () -> Bool, install_input? : Bool, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
+pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @input.InputState, (Float) -> Unit, install_input? : Bool, on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
-
-pub async fn run_sdl_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
 
 // Errors
 pub(all) suberror Sdl3AppError {
@@ -51,6 +51,32 @@ pub(all) suberror Sdl3AppError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
+pub enum FrameMode {
+  Loop
+  SingleFrame
+  OnDemand
+}
+
+pub struct PlatformApp {
+  // private fields
+}
+pub fn PlatformApp::default_engine((@app.Engine) -> Bool) -> Self
+pub fn PlatformApp::new((@webgpu.GPUContext) -> @app.Engine, (@app.Engine) -> Bool) -> Self
+
+pub struct PlatformConfig {
+  // private fields
+}
+pub fn PlatformConfig::new(String, Int, Int, String) -> Self
+
+pub struct PlatformOptions {
+  // private fields
+}
+pub fn PlatformOptions::interactive() -> Self
+pub fn PlatformOptions::interactive_on_demand() -> Self
+pub fn PlatformOptions::render_loop() -> Self
+pub fn PlatformOptions::render_on_demand() -> Self
+pub fn PlatformOptions::single_frame() -> Self
+
 pub struct SdlMetalWebGpuNativeSession {
   // private fields
 }

@@ -750,6 +750,122 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
 }
 
 ///|
+/// Processes one SDL event and reports whether the platform should quit.
+fn handle_sdl_platform_event_for_on_demand(
+  session : SdlMetalWebGpuNativeSession,
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+  install_input : Bool,
+  on_surface_change : (SdlMetalWebGpuNativeSession) -> Unit,
+  request_render : (String) -> Unit,
+) -> Bool raise Sdl3AppError {
+  let event_type = event.get_type()
+  match event_type {
+    SDL_EVENT_QUIT | SDL_EVENT_WINDOW_CLOSE_REQUESTED => true
+    SDL_EVENT_WINDOW_FOCUS_LOST => {
+      if install_input {
+        input.enqueue_event(FocusLost)
+        request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
+      if install_input {
+        enqueue_sdl_keyboard_event(input, event)
+        request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_WHEEL => {
+      if install_input {
+        enqueue_sdl_mouse_wheel_event(input, event)
+        request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_MOTION
+    | SDL_EVENT_MOUSE_BUTTON_DOWN
+    | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_WINDOW_RESIZED
+    | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+    | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {
+      if handle_sdl_window_resize_event(session, event) {
+        on_surface_change(session)
+        request_render("surface")
+      }
+      false
+    }
+    _ => false
+  }
+}
+
+///|
+/// Runs an SDL3 event loop that renders only while dirty or continuous rendering is active.
+pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
+  session : SdlMetalWebGpuNativeSession,
+  input : @input.InputState,
+  render_frame : (Float) -> Unit,
+  request_render : (String) -> Unit,
+  render_requested : () -> Bool,
+  continuous_render_requested : () -> Bool,
+  install_input? : Bool = true,
+  on_surface_change? : (SdlMetalWebGpuNativeSession) -> Unit = fn(_) { () },
+) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
+  println("native: entering on-demand render loop")
+  let quit = @ref.new(false)
+  let mut previous_ticks = sdl_get_ticks()
+  while !quit.val {
+    let event = @lib.new_sdl_event()
+    let resumed_from_idle = !render_requested() &&
+      !continuous_render_requested()
+    if resumed_from_idle {
+      if @lib.sdl_WaitEventTimeout(event, 100) {
+        if handle_sdl_platform_event_for_on_demand(
+            session, input, event, install_input, on_surface_change, request_render,
+          ) {
+          quit.val = true
+        }
+      }
+    }
+    while @lib.sdl_PollEvent(event) {
+      let event_type = event.get_type()
+      if event_type == SDL_EVENT_POLL_SENTINEL {
+        break
+      }
+      if handle_sdl_platform_event_for_on_demand(
+          session, input, event, install_input, on_surface_change, request_render,
+        ) {
+        quit.val = true
+      }
+    }
+    if render_requested() || continuous_render_requested() {
+      if install_input {
+        enqueue_sdl_mouse_state(input)
+      }
+      let current_ticks = sdl_get_ticks()
+      let delta_seconds = if resumed_from_idle {
+        (0.0 : Float)
+      } else {
+        Float::from_double(
+          (current_ticks - previous_ticks).to_double() / 1000.0,
+        )
+      }
+      previous_ticks = current_ticks
+      @wgpu.webgpu_instance_process_events(session.instance)
+      render_frame(delta_seconds)
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+      @wgpu.webgpu_instance_process_events(session.instance)
+    }
+  }
+  session
+}
+
+///|
 /// Configuration for the SDL3 platform lifecycle owner.
 pub struct PlatformConfig {
   priv window_title : String
@@ -770,6 +886,7 @@ pub struct PlatformApp {
 pub enum FrameMode {
   Loop
   SingleFrame
+  OnDemand
 }
 
 ///|
@@ -820,6 +937,18 @@ pub fn PlatformOptions::render_loop() -> PlatformOptions {
 }
 
 ///|
+/// Creates options for an interactive on-demand SDL3 platform.
+pub fn PlatformOptions::interactive_on_demand() -> PlatformOptions {
+  { frame_mode: OnDemand, install_input: true }
+}
+
+///|
+/// Creates options for a render-only on-demand SDL3 platform.
+pub fn PlatformOptions::render_on_demand() -> PlatformOptions {
+  { frame_mode: OnDemand, install_input: false }
+}
+
+///|
 /// Creates options for a single-frame SDL3 platform run.
 pub fn PlatformOptions::single_frame() -> PlatformOptions {
   { frame_mode: SingleFrame, install_input: false }
@@ -859,6 +988,35 @@ pub async fn run_platform(
         session,
         engine.input(),
         fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
+        install_input=options.install_input,
+        on_surface_change=fn(session) {
+          if session.surface_active() {
+            engine.set_surface_active(
+              session.surface_width(),
+              session.surface_height(),
+              session.surface_format(),
+            )
+          } else {
+            engine.set_surface_suspended()
+          }
+        },
+      ) catch {
+        error => {
+          engine.shutdown()
+          release_sdl_metal_webgpu_native(session)
+          raise error
+        }
+      }
+      session
+    }
+    OnDemand => {
+      let session = run_sdl_metal_webgpu_input_on_demand_render_loop(
+        session,
+        engine.input(),
+        fn(delta_seconds) { ignore(engine.run_frame(delta_seconds)) },
+        fn(reason) { engine.request_render(reason) },
+        fn() { engine.render_requested() },
+        fn() { engine.continuous_render_requested() },
         install_input=options.install_input,
         on_surface_change=fn(session) {
           if session.surface_active() {

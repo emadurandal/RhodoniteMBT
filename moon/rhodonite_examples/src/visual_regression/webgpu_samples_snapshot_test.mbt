@@ -141,8 +141,8 @@ fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
   for i = 0; i < samples.length(); i = i + 1 {
     match samples[i].id {
       "basic-triangle"
+      | "ondemand-triangle"
       | "triangle-with-buffer"
-      | "depth-test"
       | "ecs-scene-graph"
       | "ecs-mass-cubes" => ()
       id =>
@@ -159,13 +159,13 @@ test "visual WebGPU native basic triangle PNG golden" {
 }
 
 ///|
-test "visual WebGPU native triangle with buffer PNG golden" {
-  assert_native_visual_sample("triangle-with-buffer")
+test "visual WebGPU native on-demand triangle PNG golden" {
+  assert_native_visual_sample("ondemand-triangle")
 }
 
 ///|
-test "visual WebGPU native depth test PNG golden" {
-  assert_native_visual_sample("depth-test")
+test "visual WebGPU native triangle with buffer PNG golden" {
+  assert_native_visual_sample("triangle-with-buffer")
 }
 
 ///|
@@ -195,18 +195,18 @@ fn render_native_visual_sample(
       @basic_triangle.render_frame_to_view(demo_state, view)
       demo_state.release()
     }
+    "ondemand-triangle" => {
+      let demo_state = @ondemand_triangle.create_demo_state_for_device(
+        device, queue, format,
+      )
+      @ondemand_triangle.render_frame_to_view(demo_state, view)
+      demo_state.release()
+    }
     "triangle-with-buffer" => {
       let demo_state = @triangle_with_buffer.create_demo_state_for_device(
         device, queue, format,
       )
       @triangle_with_buffer.render_frame_to_view(demo_state, view)
-      demo_state.release()
-    }
-    "depth-test" => {
-      let demo_state = @depth_test.create_demo_state_for_device(
-        device, queue, format,
-      )
-      @depth_test.render_frame_to_view(demo_state, view)
       demo_state.release()
     }
     "ecs-scene-graph" => {

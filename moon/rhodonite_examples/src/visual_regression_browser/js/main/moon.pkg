@@ -1,8 +1,8 @@
 import {
   "emadurandal/rhodonite_examples/basic-triangle/common" @basic_triangle,
-  "emadurandal/rhodonite_examples/depth-test/common" @depth_test,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @ecs_mass_cubes,
   "emadurandal/rhodonite_examples/ecs-scene-graph/common" @ecs_scene_graph,
+  "emadurandal/rhodonite_examples/ondemand-triangle/common" @ondemand_triangle,
   "emadurandal/rhodonite_examples/triangle-with-buffer/common" @triangle_with_buffer,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/async/js_async",
@@ -16,8 +16,8 @@ options(
     "js": {
       "exports": [
         "render_basic_triangle_browser_snapshot",
+        "render_ondemand_triangle_browser_snapshot",
         "render_triangle_with_buffer_browser_snapshot",
-        "render_depth_test_browser_snapshot",
         "render_ecs_scene_graph_browser_snapshot",
         "render_ecs_mass_cubes_browser_snapshot",
       ],

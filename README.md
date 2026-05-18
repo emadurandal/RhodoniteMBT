@@ -39,13 +39,15 @@ From [`justfile`](justfile), `just check-ws` runs `moon check --target all`.
 ```bash
 pnpm install
 pnpm run dev:js:basic-triangle
+pnpm run dev:js:ondemand-triangle
 ```
 
 The browser demos also include a TypeScript-only WebGPU DemoState using the ECS
-TypeScript wrapper:
+TypeScript wrapper and a TypeScript-only on-demand triangle:
 
 ```bash
 pnpm run dev:js:ts-ecs-mass-cubes
+pnpm run dev:js:ts-ondemand-triangle
 ```
 
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
@@ -78,6 +80,7 @@ $ sudo apt install libsdl3-dev
 ```bash
 pnpm install
 pnpm run dev:native:basic-triangle
+pnpm run dev:native:ondemand-triangle
 ```
 
 The native demo scripts use `moon run --target native --release` from

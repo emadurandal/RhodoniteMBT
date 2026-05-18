@@ -11,18 +11,18 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 }
 
 ///|
-/// Initializes the browser WebGPU sample and stores its engine lifecycle.
+/// Initializes the browser WebGPU sample using the library on-demand platform.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
   let platform = @app_browser.run_platform(
     @app_browser.PlatformConfig::new(canvas),
     @app_browser.PlatformApp::default_engine(setup_engine),
-    @app_browser.PlatformOptions::render_loop(),
+    @app_browser.PlatformOptions::interactive_on_demand(),
   )
   match platform {
-    Some(_) => println("depth-test: DemoState ready")
-    None => println("depth-test: failed to create DemoState")
+    Some(_) => println("WebGPU on-demand triangle initialized successfully!")
+    None => println("Failed to create DemoState")
   }
 }
 
@@ -37,5 +37,5 @@ pub fn create_webgpu_demo_state(
 ///|
 /// Implements `main {`.
 fn main {
-  println("depth-test js stub")
+  println("Hello")
 }
