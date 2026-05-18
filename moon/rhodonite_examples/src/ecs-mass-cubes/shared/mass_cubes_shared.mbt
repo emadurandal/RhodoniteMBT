@@ -1,5 +1,22 @@
 ///|
+#cfg(target="native")
+extern "C" fn rhodonite_mass_cubes_entity_count_or_default(
+  default_count : Int,
+) -> Int = "rhodonite_mass_cubes_entity_count_or_default"
+
+///|
 /// Returns the root entity count used by the mass-cubes samples.
+///
+/// On native, override with `RHODONITE_MASS_CUBES_ENTITY_COUNT` (e.g. `50000`) when
+/// debugging startup crashes or low-memory machines.
+#cfg(target="native")
+pub fn entity_count() -> Int {
+  rhodonite_mass_cubes_entity_count_or_default(800_000)
+}
+
+///|
+/// Returns the root entity count used by the mass-cubes samples.
+#cfg(not(target="native"))
 pub fn entity_count() -> Int {
   800_000
 }

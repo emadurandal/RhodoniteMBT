@@ -2,14 +2,26 @@
 package "emadurandal/rhodonite_app_sdl3/sdl3"
 
 import {
+  "Kaida-Amethyst/sdl3/lib",
   "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
+  "emadurandal/rhodonite_webgpu/webgpu_objects",
   "moonbitlang/core/debug",
 }
 
 // Values
+pub async fn init_sdl_linux_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
 pub async fn init_sdl_metal_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
+pub async fn init_sdl_webgpu_native(String, Int, Int, String) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
+
+pub fn query_native_window_surface_kind(@lib.SDL_Window) -> (NativeWindowSurfaceKind, WaylandWindowSurface?, XlibWindowSurface?)
+
+pub fn query_wayland_window_surface(@lib.SDL_Window) -> WaylandWindowSurface?
+
+pub fn query_xlib_window_surface(@lib.SDL_Window) -> XlibWindowSurface?
 
 pub fn release_sdl_metal_webgpu_native(SdlMetalWebGpuNativeSession) -> Unit
 
@@ -19,6 +31,8 @@ pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @inpu
 
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
+pub async fn run_sdl_webgpu_app(String, Int, Int, String, (@webgpu.GPUContext) -> @app.Engine?) -> Unit raise Sdl3AppError
+
 // Errors
 pub(all) suberror Sdl3AppError {
   CreateContextFailed
@@ -26,6 +40,8 @@ pub(all) suberror Sdl3AppError {
   CreateWindowFailed(String)
   CreateMetalViewFailed(String)
   GetMetalLayerFailed(String)
+  CreateNativeSurfaceFailed(String)
+  UnsupportedNativePlatform
   CreateWebGpuInstanceFailed
   RequestAdapterFailed
   RequestDeviceFailed
@@ -33,6 +49,11 @@ pub(all) suberror Sdl3AppError {
 } derive(Eq, @debug.Debug)
 
 // Types and methods
+pub(all) enum NativeWindowSurfaceKind {
+  Wayland
+  Xlib
+} derive(Eq)
+
 pub struct SdlMetalWebGpuNativeSession {
   // private fields
 }
@@ -41,6 +62,16 @@ pub fn SdlMetalWebGpuNativeSession::surface_active(Self) -> Bool
 pub fn SdlMetalWebGpuNativeSession::surface_format(Self) -> String
 pub fn SdlMetalWebGpuNativeSession::surface_height(Self) -> Int
 pub fn SdlMetalWebGpuNativeSession::surface_width(Self) -> Int
+
+pub struct WaylandWindowSurface {
+  display : @webgpu_objects.OpaquePtr
+  surface : @webgpu_objects.OpaquePtr
+}
+
+pub struct XlibWindowSurface {
+  display : @webgpu_objects.OpaquePtr
+  window : UInt64
+}
 
 // Type aliases
 

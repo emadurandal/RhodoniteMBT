@@ -99,6 +99,19 @@ pub(all) struct DemoState {
 }
 
 ///|
+/// Waits for the native GPU queue before swapchain acquire or present.
+#cfg(target="native")
+fn wait_native_gpu_queue(device : @wgpu.GPUDevice) -> Unit {
+  let _ = @wgpu.webgpu_device_poll(device, wait=true)
+}
+
+///|
+#cfg(not(target="native"))
+fn wait_native_gpu_queue(_device : @wgpu.GPUDevice) -> Unit {
+  ignore(_device)
+}
+
+///|
 /// Recreates the depth attachment for the current drawable size.
 fn DemoState::resize_depth_attachment(
   self : DemoState,
@@ -544,10 +557,12 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
+  wait_native_gpu_queue(demo_state.device)
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view)
   @wgpu.textureView_release(color_view)
+  wait_native_gpu_queue(demo_state.device)
   canvas_context.present()
 }
 
@@ -653,6 +668,7 @@ pub fn DemoState::render_scene(
   let command_buffer = encoder.finish()
   self.queue.submit(command_buffer)
   encoder.release()
+  wait_native_gpu_queue(self.device)
 }
 
 ///|
@@ -678,7 +694,7 @@ pub fn register_engine_handlers(
     @app.phase_render(),
     fn(_engine, _frame) {
       if demo_state.scene.visible() {
-        render_current_frame(demo_state)
+        render_frame(demo_state)
       }
     },
     slot=@app.PhaseSlot::AfterSystems,

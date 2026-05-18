@@ -40,7 +40,71 @@ pub fn create_metal_canvas_context(
     width: width.reinterpret_as_uint(),
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
+    swapFormat: @ref.new(""),
+    relayEnabled: false,
     currentTexture: @ref.new(None),
+    relay: @ref.new(None),
+    relayDevice: @ref.new(None),
+  })
+}
+
+///|
+/// Returns whether the native wgpu swapchain surface handle is null.
+pub fn webgpu_canvas_context_surface_is_null(
+  context : WebGPUCanvasContext,
+) -> Bool {
+  @c.surface_is_null(context.context.surface.raw)
+}
+
+///|
+/// Creates a Wayland-backed native canvas context for Linux Vulkan surfaces.
+pub fn create_wayland_canvas_context(
+  instance : WebGPUInstance,
+  display : OpaquePtr,
+  wl_surface : OpaquePtr,
+  width : Int,
+  height : Int,
+) -> WebGPUCanvasContext {
+  let surface = instance.instance.raw.create_surface_wayland(
+    opaque_ptr_to_c(display),
+    opaque_ptr_to_c(wl_surface),
+  )
+  WebGPUCanvasContext::new(GPUCanvasContext::{
+    surface,
+    width: width.reinterpret_as_uint(),
+    height: height.reinterpret_as_uint(),
+    format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
+    swapFormat: @ref.new(""),
+    relayEnabled: true,
+    currentTexture: @ref.new(None),
+    relay: @ref.new(None),
+    relayDevice: @ref.new(None),
+  })
+}
+
+///|
+/// Creates an Xlib-backed native canvas context for Linux Vulkan surfaces.
+pub fn create_xlib_canvas_context(
+  instance : WebGPUInstance,
+  display : OpaquePtr,
+  window : UInt64,
+  width : Int,
+  height : Int,
+) -> WebGPUCanvasContext {
+  let surface = instance.instance.raw.create_surface_xlib(
+    opaque_ptr_to_c(display),
+    window,
+  )
+  WebGPUCanvasContext::new(GPUCanvasContext::{
+    surface,
+    width: width.reinterpret_as_uint(),
+    height: height.reinterpret_as_uint(),
+    format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
+    swapFormat: @ref.new(""),
+    relayEnabled: true,
+    currentTexture: @ref.new(None),
+    relay: @ref.new(None),
+    relayDevice: @ref.new(None),
   })
 }
 
@@ -52,18 +116,26 @@ pub fn webgpu_canvas_context_configure(
   format : String,
 ) -> Unit {
   let usage = @wgpu.TextureUsage::from_u64(
-    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
+    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT |
+    @wgpu.TEXTURE_USAGE_COPY_SRC |
+    @wgpu.TEXTURE_USAGE_COPY_DST,
   )
   let prefer_srgb = webgpu_instance_surface_hint_prefers_srgb(format)
-  let ok = context.context.surface.configure_best_effort(
-    device.adapter,
-    device.raw,
-    context.context.width,
-    context.context.height,
-    usage,
-    prefer_srgb~,
-    vsync=true,
-  )
+  let ok = if @wgpu.platform_is_linux() {
+    webgpu_canvas_context_configure_linux_rgba_first(
+      context, device, usage, prefer_srgb,
+    )
+  } else {
+    context.context.surface.configure_best_effort(
+      device.adapter,
+      device.raw,
+      context.context.width,
+      context.context.height,
+      usage,
+      prefer_srgb~,
+      vsync=true,
+    )
+  }
   if ok {
     let fmts = context.context.surface.capabilities_formats(device.adapter)
     let chosen = webgpu_instance_surface_pick_texture_format(fmts, prefer_srgb)
@@ -80,6 +152,85 @@ pub fn webgpu_canvas_context_configure(
   }
   if context.context.format.val == "" {
     context.context.format.val = format
+  }
+  context.context.swapFormat.val = context.context.format.val
+  if context.context.relayEnabled {
+    let webgpu_device = WebGPUDevice::new(device)
+    linux_swapchain_relay_ensure(
+      context.context.relay,
+      webgpu_device,
+      context.context.width,
+      context.context.height,
+      context.context.swapFormat.val,
+    )
+    context.context.format.val = linux_swapchain_relay_render_format()
+    context.context.relayDevice.val = Some(device)
+  } else {
+    context.context.relay.val = None
+    context.context.relayDevice.val = None
+  }
+}
+
+///|
+/// Configures Linux Vulkan surfaces with an RGBA format when the compositor supports it.
+fn webgpu_canvas_context_configure_linux_rgba_first(
+  context : WebGPUCanvasContext,
+  device : GPUDevice,
+  usage : @wgpu.TextureUsage,
+  prefer_srgb : Bool,
+) -> Bool {
+  let formats = context.context.surface.capabilities_formats(device.adapter)
+  let chosen = webgpu_instance_surface_pick_texture_format(formats, prefer_srgb)
+  let present_mode = webgpu_canvas_context_pick_supported_u32(
+    context.context.surface.capabilities_present_modes(device.adapter),
+    [@wgpu.PRESENT_MODE_FIFO, @wgpu.PRESENT_MODE_FIFO_RELAXED],
+    @wgpu.PRESENT_MODE_FIFO,
+  )
+  let alpha_mode = webgpu_canvas_context_pick_supported_u32(
+    context.context.surface.capabilities_alpha_modes(device.adapter),
+    [
+      @wgpu.COMPOSITE_ALPHA_MODE_AUTO,
+      @wgpu.COMPOSITE_ALPHA_MODE_OPAQUE,
+      @wgpu.COMPOSITE_ALPHA_MODE_PREMULTIPLIED,
+      @wgpu.COMPOSITE_ALPHA_MODE_UNPREMULTIPLIED,
+      @wgpu.COMPOSITE_ALPHA_MODE_INHERIT,
+    ],
+    @wgpu.COMPOSITE_ALPHA_MODE_AUTO,
+  )
+  let ok = context.context.surface.configure_u32(
+    device.adapter,
+    device.raw,
+    context.context.width,
+    context.context.height,
+    usage,
+    chosen,
+    present_mode,
+    alpha_mode,
+  )
+  if ok {
+    context.context.format.val = texture_format_to_string(chosen)
+  }
+  ok
+}
+
+///|
+/// Picks the first preferred integer capability supported by a native surface.
+fn webgpu_canvas_context_pick_supported_u32(
+  supported : Array[UInt],
+  prefs : Array[UInt],
+  fallback : UInt,
+) -> UInt {
+  for pi = 0; pi < prefs.length(); pi = pi + 1 {
+    for si = 0; si < supported.length(); si = si + 1 {
+      if supported[si] == prefs[pi] {
+        return prefs[pi]
+      }
+    }
+  }
+  if supported.length() > 0 {
+    supported[0]
+  } else {
+    fallback
   }
 }
 
@@ -132,14 +283,36 @@ pub fn webgpu_canvas_context_get_current_texture(
   let texture = surface_texture.take_texture()
   surface_texture.release()
   context.context.currentTexture.val = Some(texture)
-  WebGPUTexture::new(GPUTexture::{ raw: texture })
+  match context.context.relay.val {
+    Some(relay) => linux_swapchain_relay_render_texture(relay)
+    None => WebGPUTexture::new(GPUTexture::{ raw: texture })
+  }
 }
 
 ///|
 /// Implements `webgpu_canvas_context_present`.
 pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
-  context.context.surface.present_or_raise() catch {
+  match
+    (
+      context.context.relay.val,
+      context.context.currentTexture.val,
+      context.context.relayDevice.val,
+    ) {
+    (Some(_relay), Some(swap_texture), Some(device)) => {
+      let queue = WebGPUQueue::new(GPUQueue::{ raw: device.raw.queue() })
+      linux_swapchain_relay_blit_to_swapchain(
+        context.context.relay,
+        swap_texture,
+        WebGPUDevice::new(device),
+        queue,
+        context.context.width,
+        context.context.height,
+      )
+    }
     _ => ()
+  }
+  context.context.surface.present_or_raise() catch {
+    _ => println("native: WebGPU surface present failed")
   }
   match context.context.currentTexture.val {
     Some(texture) => {
@@ -153,6 +326,12 @@ pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
 ///|
 /// Implements `webgpu_canvas_context_release`.
 pub fn webgpu_canvas_context_release(context : WebGPUCanvasContext) -> Unit {
+  match context.context.relay.val {
+    Some(relay) => linux_swapchain_relay_release(relay)
+    None => ()
+  }
+  context.context.relay.val = None
+  context.context.relayDevice.val = None
   context.context.surface.unconfigure()
   context.context.surface.release()
 }

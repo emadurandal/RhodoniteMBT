@@ -2,3 +2,7 @@ import {
   "emadurandal/rhodonite_core/math/matrix44" @m44,
   "emadurandal/rhodonite_core/math/vector4" @v4,
 }
+
+options(
+  "native-stub": [ "mass_cubes_native_env.c" ],
+)

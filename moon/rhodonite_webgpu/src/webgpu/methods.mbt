@@ -35,6 +35,21 @@ pub fn GPUInstance::request_adapter_sync(
 }
 
 ///|
+/// Requests a native adapter compatible with the supplied swapchain surface.
+#cfg(target="native")
+pub fn GPUInstance::request_adapter_for_surface(
+  self : GPUInstance,
+  canvas : GPUCanvasContext,
+) -> GPUAdapter raise Error {
+  {
+    raw: @raw.native_webgpu_instance_request_adapter_for_canvas(
+      self.raw,
+      canvas.raw,
+    ),
+  }
+}
+
+///|
 /// Implements `GPUInstance::process_events`.
 pub fn GPUInstance::process_events(self : GPUInstance) -> Unit {
   webgpu_instance_process_events(self)

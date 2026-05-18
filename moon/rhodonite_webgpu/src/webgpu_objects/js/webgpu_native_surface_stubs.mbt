@@ -16,6 +16,49 @@ pub fn create_metal_canvas_context(
 }
 
 ///|
+/// Implements `webgpu_canvas_context_surface_is_null`.
+pub fn webgpu_canvas_context_surface_is_null(
+  _context : WebGPUCanvasContext,
+) -> Bool {
+  true
+}
+
+///|
+/// Implements `create_wayland_canvas_context`.
+pub fn create_wayland_canvas_context(
+  _instance : WebGPUInstance,
+  _display : OpaquePtr,
+  _wl_surface : OpaquePtr,
+  _width : Int,
+  _height : Int,
+) -> WebGPUCanvasContext {
+  abort("create_wayland_canvas_context is only available in the native backend")
+}
+
+///|
+/// Implements `create_xlib_canvas_context`.
+pub fn create_xlib_canvas_context(
+  _instance : WebGPUInstance,
+  _display : OpaquePtr,
+  _window : UInt64,
+  _width : Int,
+  _height : Int,
+) -> WebGPUCanvasContext {
+  abort("create_xlib_canvas_context is only available in the native backend")
+}
+
+///|
+/// Implements `native_webgpu_instance_request_adapter_for_canvas`.
+pub fn native_webgpu_instance_request_adapter_for_canvas(
+  _instance : WebGPUInstance,
+  _canvas : WebGPUCanvasContext,
+) -> WebGPUAdapter raise Error {
+  abort(
+    "native_webgpu_instance_request_adapter_for_canvas is only available in the native backend",
+  )
+}
+
+///|
 /// Implements `webgpu_canvas_context_get_format`.
 pub fn webgpu_canvas_context_get_format(
   _context : WebGPUCanvasContext,

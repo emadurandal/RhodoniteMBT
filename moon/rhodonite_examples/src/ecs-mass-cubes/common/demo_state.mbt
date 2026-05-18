@@ -652,6 +652,32 @@ fn ecs_mass_cubes_perf_console_log(
 }
 
 ///|
+/// Logs native mass-cubes setup milestones to stdout.
+#cfg(target="native")
+fn log_native_mass_cubes_setup(message : String) -> Unit {
+  println(message)
+}
+
+///|
+#cfg(not(target="native"))
+fn log_native_mass_cubes_setup(_message : String) -> Unit {
+  ignore(_message)
+}
+
+///|
+/// Waits for the native GPU queue before presenting a swapchain frame.
+#cfg(target="native")
+fn wait_native_gpu_queue(device : @wgpu.GPUDevice) -> Unit {
+  let _ = @wgpu.webgpu_device_poll(device, wait=true)
+}
+
+///|
+#cfg(not(target="native"))
+fn wait_native_gpu_queue(_device : @wgpu.GPUDevice) -> Unit {
+  ignore(_device)
+}
+
+///|
 /// Builds the ECS scene used by the mass-cubes sample.
 fn create_scene() -> @app.Scene {
   @app.Scene::new_with_world(
@@ -758,6 +784,9 @@ pub fn create_demo_state_for_scene(
   )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride
+  log_native_mass_cubes_setup(
+    "native: ecs-mass-cubes spawning " + entity_count.to_string() + " entities",
+  )
   let instance_bytes = FixedArray::make(inst_bytes_len, (0 : Byte))
   ignore(world.reserve_batch_capacity([tf, gt], entity_count))
   let entities = world.spawn_transform_global_batch(entity_count, fn(
@@ -786,6 +815,7 @@ pub fn create_demo_state_for_scene(
     @writes.put_f32_le(instance_bytes, base + 12, cg)
     @writes.put_f32_le(instance_bytes, base + 16, cb)
   })
+  log_native_mass_cubes_setup("native: ecs-mass-cubes entity spawn complete")
   apply_global_transform_precision_mode(world, entities)
   world.write_global_transform_refs_into(
     entities, instance_bytes, instance_stride, 0,
@@ -1040,6 +1070,7 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
+  wait_native_gpu_queue(demo_state.device)
   let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
   if record_perf {
@@ -1048,6 +1079,7 @@ pub fn render_current_frame(
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
+  wait_native_gpu_queue(demo_state.device)
   canvas_context.present()
 }
 
@@ -1160,6 +1192,11 @@ pub fn DemoState::render_scene(
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   let world = scene.world()
+  self.sync_mass_cubes_camera_blob()
+  self.queue.drain_and_upload_global_transform_writes(
+    self.transform_storage,
+    world,
+  )
   self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
   let encoder = self.device.create_command_encoder()
   let render_pass = encoder.begin_render_pass({
@@ -1205,6 +1242,7 @@ pub fn DemoState::render_scene(
   let command_buffer = encoder.finish()
   self.queue.submit(command_buffer)
   encoder.release()
+  wait_native_gpu_queue(self.device)
 }
 
 ///|

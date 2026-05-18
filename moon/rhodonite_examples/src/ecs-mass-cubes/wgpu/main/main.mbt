@@ -1,8 +1,8 @@
-///| SDL3 + Metal + native wgpu; ECS mass instancing sample.
+///| SDL3 + native wgpu (macOS Metal / Linux Vulkan); ECS mass instancing sample.
 
 ///|
 async fn run_ecs_mass_cubes_native() -> Unit raise Error {
-  @sdl_app.run_sdl_metal_webgpu_app(
+  @sdl_app.run_sdl_webgpu_app(
     "MoonBit wgpu + SDL3 (ecs-mass-cubes)",
     800,
     600,
@@ -26,7 +26,7 @@ async fn main {
   run_ecs_mass_cubes_native() catch {
     _ =>
       println(
-        "wgpu+SDL3 failed to start: check macOS+Metal, SDL3/wgpu link, and headers.",
+        "wgpu+SDL3 failed to start: check SDL3/wgpu link, Vulkan (Linux), or Metal (macOS).",
       )
   }
 }

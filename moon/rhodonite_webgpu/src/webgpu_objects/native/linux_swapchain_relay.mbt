@@ -1,0 +1,111 @@
+///|
+/// Linux swapchain relay: render to rgba8unorm, blit to the swapchain on present.
+///
+/// Native visual regression renders to `create_rgba8_render_texture` successfully; some
+/// Wayland/Vulkan swapchains accept clears but not ECS geometry when used as the sole
+/// color attachment.
+
+///|
+struct LinuxSwapchainRelay {
+  texture : GPUTexture
+  width : UInt
+  height : UInt
+  swap_format : String
+}
+
+///|
+/// WGSL color target format for relay rendering (matches native visual regression).
+fn linux_swapchain_relay_render_format() -> String {
+  "rgba8unorm"
+}
+
+///|
+/// Whether the relay path is enabled on this host.
+fn linux_swapchain_relay_enabled() -> Bool {
+  @wgpu.platform_is_linux()
+}
+
+///|
+/// Releases relay GPU resources.
+fn linux_swapchain_relay_release(relay : LinuxSwapchainRelay) -> Unit {
+  relay.texture.raw.release()
+}
+
+///|
+/// Builds or rebuilds relay resources for the configured swapchain size and format.
+fn linux_swapchain_relay_ensure(
+  relay : @ref.Ref[LinuxSwapchainRelay?],
+  device : WebGPUDevice,
+  width : UInt,
+  height : UInt,
+  swap_format : String,
+) -> Unit {
+  match relay.val {
+    Some(existing) =>
+      if existing.width == width &&
+        existing.height == height &&
+        existing.swap_format == swap_format {
+        return
+      } else {
+        linux_swapchain_relay_release(existing)
+      }
+    None => ()
+  }
+  let wgpu_dev = device.device.raw
+  let usage = @wgpu.TextureUsage::from_u64(
+    @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
+  )
+  let texture = GPUTexture::{
+    raw: wgpu_dev.create_texture_rgba8_2d_with_usage(width, height, usage),
+  }
+  relay.val = Some({ texture, width, height, swap_format })
+}
+
+///|
+/// Blits the relay texture into the acquired swapchain texture and submits the pass.
+fn linux_swapchain_relay_blit_to_swapchain(
+  relay_slot : @ref.Ref[LinuxSwapchainRelay?],
+  swap_texture : @wgpu.Texture,
+  device : WebGPUDevice,
+  queue : WebGPUQueue,
+  width : UInt,
+  height : UInt,
+) -> Unit {
+  let swap_format = texture_format_to_string(swap_texture.format_u32())
+  match relay_slot.val {
+    Some(existing) =>
+      if existing.swap_format != swap_format {
+        linux_swapchain_relay_ensure(
+          relay_slot, device, width, height, swap_format,
+        )
+      }
+    None =>
+      linux_swapchain_relay_ensure(
+        relay_slot, device, width, height, swap_format,
+      )
+  }
+  let relay = match relay_slot.val {
+    Some(r) => r
+    None => abort("linux swapchain relay: missing relay after ensure")
+  }
+  let _ = device.device.raw.poll(wait=true)
+  let encoder = device.device.raw.create_command_encoder()
+  encoder.copy_texture_to_texture_rgba8(
+    relay.texture.raw,
+    swap_texture,
+    width,
+    height,
+  )
+  let command_buffer = encoder.finish()
+  queue.queue.raw.submit_one(command_buffer)
+  encoder.release()
+  let _ = device.device.raw.poll(wait=true)
+}
+
+///|
+/// Returns the relay render target texture when relay mode is active.
+fn linux_swapchain_relay_render_texture(
+  relay : LinuxSwapchainRelay,
+) -> WebGPUTexture {
+  WebGPUTexture::new(relay.texture)
+}
