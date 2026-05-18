@@ -1048,3 +1048,13 @@ pub async fn run_platform(
   engine.shutdown()
   release_sdl_metal_webgpu_native(session)
 }
+
+///|
+/// Runs the simplified single-window SDL3 platform entry point.
+pub async fn run_single_window_platform(
+  config : PlatformConfig,
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> Unit raise Sdl3AppError {
+  run_platform(config, app, options)
+}

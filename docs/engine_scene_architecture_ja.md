@@ -188,6 +188,14 @@ sample migration では、既存 sample の `DemoState` が持っていた updat
 
 WebGPU context、device、queue、surface、GPU resources は最終的には `Engine` が所有する汎用 `Renderer` 側に置きます。`Scene` / `World` は GPU resource の所有者にしません。
 
+## Multi-surface Platform
+
+`Platform` は WebGPU device / queue と event loop を共有所有し、`Surface` は canvas/window/swapchain と surface-local input を所有する。`Engine` は `SurfaceId` で登録された複数 surface view を持ち、1 tick で update/fixed update を共有してから active surface ごとに render path を実行する。
+
+`FrameState` は render path では `surface_id`、`surface`、`input` を持つ。depth texture や drawable size に依存する renderer resource は engine/global 単位ではなく `SurfaceId` keyed に保持する。入力は標準で surface-local とし、canvas/window A の pointer event は canvas/window B の camera controller に影響させない。
+
+単一 surface 利用は引き続き主要ユースケースなので、browser は `run_single_canvas_platform(...)`、SDL3 は `run_single_window_platform(...)` を簡易 entry point として提供する。これらは互換 API ではなく、multi-surface 設計上の thin wrapper として扱う。
+
 MassCubes のように大きな `GlobalTransform` storage buffer を丸ごと bind する sample があるため、browser / native の device creation では adapter が公開する最大の `maxStorageBufferBindingSize` を required limit として要求します。browser / TypeScript host では同時に `maxBufferSize` も最大値へ引き上げます。それでも必要 buffer size が adapter limit を超える場合は、単一 storage buffer ではなく buffer / binding を分割する設計が必要です。
 
 ```text

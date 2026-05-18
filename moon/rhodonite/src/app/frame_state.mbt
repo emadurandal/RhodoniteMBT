@@ -1,4 +1,22 @@
 ///|
+/// Stable identifier assigned by an engine to one platform presentation surface.
+pub(all) struct SurfaceId {
+  value : Int
+} derive(Eq)
+
+///|
+/// Builds a surface identifier from its integer value.
+pub fn SurfaceId::new(value : Int) -> SurfaceId {
+  { value, }
+}
+
+///|
+/// Returns the integer value of this surface identifier.
+pub fn SurfaceId::value(self : SurfaceId) -> Int {
+  self.value
+}
+
+///|
 /// Drawable surface state owned by the engine and supplied by platform runtimes.
 pub(all) struct SurfaceState {
   width : Int
@@ -67,8 +85,10 @@ pub(all) struct FrameState {
   delta_seconds : Float
   frame_index : Int
   elapsed_seconds : Double
+  surface_id : SurfaceId?
   surface : SurfaceState
   surface_changed : Bool
+  input_state : @input.InputState?
 }
 
 ///|
@@ -79,8 +99,18 @@ pub fn FrameState::new(
   elapsed_seconds : Double,
   surface? : SurfaceState = default_surface_state(),
   surface_changed? : Bool = false,
+  surface_id? : SurfaceId? = None,
+  input_state? : @input.InputState? = None,
 ) -> FrameState {
-  { delta_seconds, frame_index, elapsed_seconds, surface, surface_changed }
+  {
+    delta_seconds,
+    frame_index,
+    elapsed_seconds,
+    surface_id,
+    surface,
+    surface_changed,
+    input_state,
+  }
 }
 
 ///|
@@ -99,6 +129,12 @@ pub fn FrameState::frame_index(self : FrameState) -> Int {
 /// Implements `FrameState::elapsed_seconds`.
 pub fn FrameState::elapsed_seconds(self : FrameState) -> Double {
   self.elapsed_seconds
+}
+
+///|
+/// Returns the target surface id when this frame is running a surface-scoped phase.
+pub fn FrameState::surface_id(self : FrameState) -> SurfaceId? {
+  self.surface_id
 }
 
 ///|
@@ -144,6 +180,12 @@ pub fn FrameState::surface_generation(self : FrameState) -> Int {
 }
 
 ///|
+/// Returns the surface-local input state for this frame, if one is attached.
+pub fn FrameState::input(self : FrameState) -> @input.InputState? {
+  self.input_state
+}
+
+///|
 /// Returns a copy of this frame with a platform surface snapshot attached.
 fn FrameState::with_surface(
   self : FrameState,
@@ -154,8 +196,30 @@ fn FrameState::with_surface(
     self.delta_seconds,
     self.frame_index,
     self.elapsed_seconds,
+    surface_id=self.surface_id,
     surface~,
     surface_changed=changed,
+    input_state=self.input_state,
+  )
+}
+
+///|
+/// Returns a copy of this frame with a surface id, snapshot, and local input attached.
+fn FrameState::with_surface_view(
+  self : FrameState,
+  surface_id : SurfaceId,
+  surface : SurfaceState,
+  changed : Bool,
+  input_state : @input.InputState,
+) -> FrameState {
+  FrameState::new(
+    self.delta_seconds,
+    self.frame_index,
+    self.elapsed_seconds,
+    surface_id=Some(surface_id),
+    surface~,
+    surface_changed=changed,
+    input_state=Some(input_state),
   )
 }
 

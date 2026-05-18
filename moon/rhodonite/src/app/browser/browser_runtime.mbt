@@ -44,6 +44,26 @@ pub struct Platform {
 }
 
 ///|
+/// One browser canvas attached to a multi-surface platform.
+pub(all) struct BrowserPlatformSurface {
+  id : @app.SurfaceId
+  canvas : @wgpu.HTMLCanvasElement
+  surface : @wgpu.GPUSurface
+  mut input_binding : BrowserInputBinding?
+}
+
+///|
+/// Browser platform that owns one WebGPU device and any number of canvas surfaces.
+pub struct MultiSurfacePlatform {
+  priv gpu : @wgpu.GPUDeviceContext
+  priv engine : @app.Engine
+  priv surfaces : Array[BrowserPlatformSurface]
+  priv options : PlatformOptions
+  priv mut frame_loop : BrowserFrameLoop?
+  priv mut disposed : Bool
+}
+
+///|
 /// Builds browser platform configuration from a canvas.
 pub fn PlatformConfig::new(canvas : @wgpu.HTMLCanvasElement) -> PlatformConfig {
   { canvas, }
@@ -156,6 +176,28 @@ pub fn Platform::dispose(self : Platform) -> Unit {
 }
 
 ///|
+/// Disposes browser multi-surface platform handles and shuts down the owned engine once.
+pub fn MultiSurfacePlatform::dispose(self : MultiSurfacePlatform) -> Unit {
+  if self.disposed {
+    return
+  }
+  self.disposed = true
+  self.engine.set_render_wakeup(None)
+  match self.frame_loop {
+    Some(frame_loop) => frame_loop.stop()
+    None => ()
+  }
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    match self.surfaces[i].input_binding {
+      Some(binding) => binding.dispose()
+      None => ()
+    }
+  }
+  self.frame_loop = None
+  self.engine.shutdown()
+}
+
+///|
 /// Builds a WebGPU context from a browser canvas element.
 pub async fn gpu_context_from_html_canvas(
   canvas : @wgpu.HTMLCanvasElement,
@@ -172,6 +214,38 @@ pub async fn gpu_context_from_html_canvas(
   webgpu_canvas_context.configure(device, format)
   let queue = device.get_queue()
   @wgpu.create_webgpu_context(device, webgpu_canvas_context, format, queue)
+}
+
+///|
+/// Builds shared browser WebGPU device state for one platform with multiple canvases.
+pub async fn gpu_device_context_from_browser() -> @wgpu.GPUDeviceContext raise Error {
+  let instance = @wgpu.create_webgpu_instance(@wgpu.navigatorGPU())
+  let adapter = instance.request_adapter()
+  let device = adapter.request_device()
+  let queue = device.get_queue()
+  @wgpu.create_gpu_device_context(instance, adapter, device, queue)
+}
+
+///|
+/// Creates and configures a browser presentation surface from a shared device context.
+pub fn gpu_surface_from_html_canvas(
+  gpu : @wgpu.GPUDeviceContext,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> @wgpu.GPUSurface {
+  let webgpu_canvas_context = @wgpu.create_canvas_context(
+    @wgpu.canvas_getContext(canvas),
+  )
+  let format = gpu.instance().get_preferred_canvas_format_for_surface(
+    gpu.adapter(),
+    webgpu_canvas_context,
+  )
+  webgpu_canvas_context.configure(gpu.device(), format)
+  @wgpu.create_gpu_surface(
+    webgpu_canvas_context,
+    format,
+    browser_canvas_width(canvas),
+    browser_canvas_height(canvas),
+  )
 }
 
 ///|
@@ -509,6 +583,73 @@ pub fn install_browser_input(
 }
 
 ///|
+/// Installs browser input callbacks into a surface-local input state.
+pub fn install_browser_surface_input(
+  input : @input.InputState,
+  canvas : @wgpu.HTMLCanvasElement,
+  request_render : () -> Unit,
+) -> BrowserInputBinding {
+  install_browser_input_callbacks(
+    canvas,
+    fn(code, shift, ctrl, alt, meta, repeat) {
+      input.enqueue_event(
+        KeyDown(
+          @input.KeyCode::new(code),
+          @input.Modifiers::new(shift, ctrl, alt, meta),
+          repeat,
+        ),
+      )
+      request_render()
+    },
+    fn(code, shift, ctrl, alt, meta) {
+      input.enqueue_event(
+        KeyUp(
+          @input.KeyCode::new(code),
+          @input.Modifiers::new(shift, ctrl, alt, meta),
+        ),
+      )
+      request_render()
+    },
+    fn(x, y) {
+      input.enqueue_event(
+        PointerMove(Float::from_double(x), Float::from_double(y)),
+      )
+      request_render()
+    },
+    fn(button, x, y) {
+      input.enqueue_event(
+        MouseDown(
+          mouse_button_from_browser(button),
+          Float::from_double(x),
+          Float::from_double(y),
+        ),
+      )
+      request_render()
+    },
+    fn(button, x, y) {
+      input.enqueue_event(
+        MouseUp(
+          mouse_button_from_browser(button),
+          Float::from_double(x),
+          Float::from_double(y),
+        ),
+      )
+      request_render()
+    },
+    fn(delta_x, delta_y) {
+      input.enqueue_event(
+        Wheel(Float::from_double(delta_x), Float::from_double(delta_y)),
+      )
+      request_render()
+    },
+    fn() {
+      input.enqueue_event(FocusLost)
+      request_render()
+    },
+  )
+}
+
+///|
 /// Starts the standard browser platform resources for an initialized engine.
 pub fn start_platform(
   engine : @app.Engine,
@@ -533,6 +674,112 @@ pub fn start_platform(
 }
 
 ///|
+/// Starts the frame loop for a multi-surface browser platform.
+fn MultiSurfacePlatform::start(self : MultiSurfacePlatform) -> Unit {
+  let frame_loop = match self.options.frame_mode {
+    Loop => Some(start_browser_frame_loop(fn(delta_seconds) {
+      ignore(
+        self.engine.run_multi_surface_frame(
+          Float::from_double(delta_seconds),
+        ),
+      )
+    }))
+    OnDemand => {
+      let on_demand_loop = start_browser_on_demand_frame_loop(
+        fn(delta_seconds) {
+          ignore(
+            self.engine.run_multi_surface_frame(
+              Float::from_double(delta_seconds),
+            ),
+          )
+        },
+        fn() {
+          self.engine.render_requested() ||
+          self.engine.continuous_render_requested()
+        },
+      )
+      self.engine.set_render_wakeup(Some(fn() { on_demand_loop.request() }))
+      on_demand_loop.request()
+      Some(on_demand_loop)
+    }
+    SingleFrame => {
+      ignore(self.engine.run_multi_surface_frame((0.0 : Float)))
+      None
+    }
+  }
+  self.frame_loop = frame_loop
+}
+
+///|
+/// Attaches an additional canvas surface to a multi-surface browser platform.
+pub fn MultiSurfacePlatform::attach_canvas(
+  self : MultiSurfacePlatform,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> @app.SurfaceId {
+  let surface = gpu_surface_from_html_canvas(self.gpu, canvas)
+  let id = self.engine.add_surface(surface)
+  let input_binding = if self.options.install_input {
+    Some(
+      install_browser_surface_input(
+        self.engine.surface_input(id),
+        canvas,
+        fn() { self.engine.request_render("input") },
+      ),
+    )
+  } else {
+    None
+  }
+  self.surfaces.push({ id, canvas, surface, input_binding })
+  id
+}
+
+///|
+/// Creates a browser platform from the first canvas and allows more canvases to attach later.
+pub async fn run_multi_surface_platform(
+  first_canvas : @wgpu.HTMLCanvasElement,
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> MultiSurfacePlatform? {
+  let gpu = gpu_device_context_from_browser()
+  let surface = gpu_surface_from_html_canvas(gpu, first_canvas)
+  let ctx = @wgpu.create_webgpu_context(
+    gpu.device(),
+    surface.canvas_context(),
+    surface.format(),
+    gpu.queue(),
+  )
+  let engine = (app.create_engine)(ctx)
+  if !(app.setup_engine)(engine) {
+    return None
+  }
+  let surfaces : Array[BrowserPlatformSurface] = []
+  let platform : MultiSurfacePlatform = {
+    gpu,
+    engine,
+    surfaces,
+    options,
+    frame_loop: None,
+    disposed: false,
+  }
+  let id = engine.add_surface(surface)
+  let input_binding = if options.install_input {
+    Some(
+      install_browser_surface_input(
+        engine.surface_input(id),
+        first_canvas,
+        fn() { engine.request_render("input") },
+      ),
+    )
+  } else {
+    None
+  }
+  platform.surfaces.push({ id, canvas: first_canvas, surface, input_binding })
+  engine.initialize()
+  platform.start()
+  Some(platform)
+}
+
+///|
 /// Runs the browser platform lifecycle from configuration and application hooks.
 pub async fn run_platform(
   config : PlatformConfig,
@@ -550,6 +797,16 @@ pub async fn run_platform(
     platform.dispose()
   })
   Some(platform)
+}
+
+///|
+/// Runs the simplified single-canvas browser platform entry point.
+pub async fn run_single_canvas_platform(
+  canvas : @wgpu.HTMLCanvasElement,
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> Platform? {
+  run_platform(PlatformConfig::new(canvas), app, options)
 }
 
 ///|
