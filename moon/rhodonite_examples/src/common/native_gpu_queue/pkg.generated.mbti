@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/common/native_gpu_queue"
+
+import {
+  "emadurandal/rhodonite_webgpu/webgpu",
+}
+
+// Values
+pub fn wait_native_gpu_queue(@webgpu.GPUDevice) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

@@ -665,19 +665,6 @@ fn log_native_mass_cubes_setup(_message : String) -> Unit {
 }
 
 ///|
-/// Waits for the native GPU queue before presenting a swapchain frame.
-#cfg(target="native")
-fn wait_native_gpu_queue(device : @wgpu.GPUDevice) -> Unit {
-  let _ = @wgpu.webgpu_device_poll(device, wait=true)
-}
-
-///|
-#cfg(not(target="native"))
-fn wait_native_gpu_queue(_device : @wgpu.GPUDevice) -> Unit {
-  ignore(_device)
-}
-
-///|
 /// Builds the ECS scene used by the mass-cubes sample.
 fn create_scene() -> @app.Scene {
   @app.Scene::new_with_world(
@@ -1070,7 +1057,7 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
-  wait_native_gpu_queue(demo_state.device)
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.device)
   let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
   if record_perf {
@@ -1079,7 +1066,7 @@ pub fn render_current_frame(
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
-  wait_native_gpu_queue(demo_state.device)
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.device)
   canvas_context.present()
 }
 
@@ -1242,7 +1229,7 @@ pub fn DemoState::render_scene(
   let command_buffer = encoder.finish()
   self.queue.submit(command_buffer)
   encoder.release()
-  wait_native_gpu_queue(self.device)
+  @native_gpu_queue.wait_native_gpu_queue(self.device)
 }
 
 ///|
