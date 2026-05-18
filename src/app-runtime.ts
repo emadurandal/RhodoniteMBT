@@ -512,35 +512,35 @@ export type BrowserFrameLoop = {
 	stop: () => void;
 };
 
-export type BrowserEngineRuntime = {
+export type Platform = {
 	readonly engine: Engine;
 	readonly inputBinding?: BrowserInputBinding;
 	readonly frameLoop?: BrowserFrameLoop;
 	dispose: () => void;
 };
 
-export type BrowserEngineRuntimeOptions = {
+export type PlatformOptions = {
 	readonly keyboardTarget?: Window | HTMLElement;
 	readonly runLoop?: boolean;
 	readonly installInput?: boolean;
 	readonly runFirstFrame?: boolean;
 };
 
-export type CreateBrowserEngineRuntimeOptions = BrowserEngineRuntimeOptions & {
+export type CreatePlatformOptions = PlatformOptions & {
 	readonly mainScene?: RuntimeScene;
 };
 
-export class BrowserEngineRuntimeSlot {
-	private runtime?: BrowserEngineRuntime;
+export class PlatformSlot {
+	private platform?: Platform;
 
-	replace(runtime: BrowserEngineRuntime): void {
+	replace(platform: Platform): void {
 		this.dispose();
-		this.runtime = runtime;
+		this.platform = platform;
 	}
 
 	dispose(): void {
-		this.runtime?.dispose();
-		this.runtime = undefined;
+		this.platform?.dispose();
+		this.platform = undefined;
 	}
 }
 
@@ -737,10 +737,10 @@ export function installBrowserInput(
 	return installBrowserInputState(engine.input, engine.canvas, options);
 }
 
-export function startBrowserEngineRuntime(
+export function startPlatform(
 	engine: Engine,
-	options: BrowserEngineRuntimeOptions = {},
-): BrowserEngineRuntime {
+	options: PlatformOptions = {},
+): Platform {
 	const {
 		runLoop = true,
 		installInput = true,
@@ -776,17 +776,17 @@ export function startBrowserEngineRuntime(
 	};
 }
 
-export async function createBrowserEngineRuntime(
+export async function createPlatform(
 	canvas: HTMLCanvasElement,
 	setup: (engine: Engine) => boolean | void,
-	options: CreateBrowserEngineRuntimeOptions = {},
-): Promise<BrowserEngineRuntime | undefined> {
+	options: CreatePlatformOptions = {},
+): Promise<Platform | undefined> {
 	const engine = await Engine.create(canvas, { mainScene: options.mainScene });
 	if (setup(engine) === false) {
 		return undefined;
 	}
 	engine.initialize();
-	return startBrowserEngineRuntime(engine, options);
+	return startPlatform(engine, options);
 }
 
 export function syncBrowserEngineSurface(engine: Engine): void {

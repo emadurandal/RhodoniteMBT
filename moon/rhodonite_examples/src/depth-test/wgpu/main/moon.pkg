@@ -2,6 +2,7 @@ import {
   "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_app_sdl3/sdl3" @sdl_app,
   "emadurandal/rhodonite_examples/depth-test/common" @demo_state,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/async" @async,
 }
 

@@ -23,8 +23,8 @@ import {
 	Phase,
 	PhaseSlot,
 	Scene,
-	BrowserEngineRuntimeSlot,
-	createBrowserEngineRuntime,
+	PlatformSlot,
+	createPlatform,
 	runBrowserWebGpuCanvasDemo,
 	type FrameState,
 } from "./app-runtime";
@@ -89,7 +89,7 @@ type DemoState = {
 	cpuFrameStartMs: number;
 };
 
-const browserRuntime = new BrowserEngineRuntimeSlot();
+const browserPlatform = new PlatformSlot();
 
 function globalTransformDefaultIsF16(): boolean {
 	return GLOBAL_TRANSFORM_PRECISION_MODE !== "all-f32";
@@ -607,7 +607,7 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
-		const runtime = await createBrowserEngineRuntime(
+		const platform = await createPlatform(
 			canvas,
 			(engine) => {
 				const demoState = createDemoStateForEngine(engine);
@@ -619,8 +619,8 @@ runBrowserWebGpuCanvasDemo({
 				installInput: true,
 			},
 		);
-		if (runtime !== undefined) {
-			browserRuntime.replace(runtime);
+		if (platform !== undefined) {
+			browserPlatform.replace(platform);
 		}
 	},
 });

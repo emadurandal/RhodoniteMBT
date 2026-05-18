@@ -1,13 +1,13 @@
 ///|
-/// Holds the browser runtime for the page lifetime.
-let browser_runtime : @app_browser.BrowserEngineRuntimeSlot = @app_browser.BrowserEngineRuntimeSlot::new()
+/// Holds the browser platform for the page lifetime.
+let browser_platform : @app_browser.PlatformSlot = @app_browser.PlatformSlot::new()
 
 ///|
-/// Creates the browser WebGPU demo state and starts browser runtime helpers.
+/// Creates the browser WebGPU demo state and starts browser platform helpers.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let runtime = @app_browser.create_browser_engine_runtime_with_engine(
+  let platform = @app_browser.create_platform_with_engine(
     canvas,
     @demo_state.create_engine,
     fn(engine) {
@@ -19,11 +19,11 @@ async fn create_webgpu_demo_state_async(
         None => false
       }
     },
-    @app_browser.BrowserEngineRuntimeOptions::interactive(),
+    @app_browser.PlatformOptions::interactive(),
   )
-  match runtime {
-    Some(runtime) => {
-      browser_runtime.replace(runtime)
+  match platform {
+    Some(platform) => {
+      browser_platform.replace(platform)
       println("ecs-mass-cubes: DemoState ready")
     }
     None => println("ecs-mass-cubes: failed to create DemoState")

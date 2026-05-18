@@ -1,22 +1,35 @@
 ///| SDL3 + Metal + native wgpu; runs the `depth-test` DemoState each frame.
 
 ///|
+/// Creates the platform-independent engine for the sample.
+fn create_engine(gpu_context : @wgpu.GPUContext) -> @app.Engine {
+  @app.Engine::new(gpu_context)
+}
+
+///|
+/// Creates DemoState and registers engine handlers.
+fn setup_engine(engine : @app.Engine) -> Bool {
+  match @demo_state.create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      @demo_state.register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 async fn run_depth_test_native() -> Unit raise Error {
-  @sdl_app.run_sdl_webgpu_app(
-    "MoonBit wgpu + SDL3 (depth-test)",
-    800,
-    600,
-    "native: depth-test",
-    fn(gpu_context) {
-      let engine = @app.Engine::new(gpu_context)
-      match @demo_state.create_demo_state_for_engine(engine) {
-        Some(demo_state) => {
-          @demo_state.register_engine_handlers(engine, demo_state)
-          Some(engine)
-        }
-        None => None
-      }
-    },
+  @sdl_app.run_platform(
+    @sdl_app.PlatformConfig::new(
+      "MoonBit wgpu + SDL3 (depth-test)",
+      800,
+      600,
+      "native: depth-test",
+    ),
+    create_engine,
+    setup_engine,
+    @sdl_app.PlatformOptions::interactive(),
   )
 }
 

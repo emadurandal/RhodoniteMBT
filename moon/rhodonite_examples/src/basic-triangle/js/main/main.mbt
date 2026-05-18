@@ -1,13 +1,13 @@
 ///|
-/// Holds the browser runtime for the page lifetime.
-let browser_runtime : @app_browser.BrowserEngineRuntimeSlot = @app_browser.BrowserEngineRuntimeSlot::new()
+/// Holds the browser platform for the page lifetime.
+let browser_platform : @app_browser.PlatformSlot = @app_browser.PlatformSlot::new()
 
 ///|
 /// Initializes the browser WebGPU sample and renders the first engine tick.
 async fn create_webgpu_demo_state_async(
   canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
-  let runtime = @app_browser.create_browser_engine_runtime(
+  let platform = @app_browser.create_platform(
     canvas,
     fn(engine) {
       match @demo_state.create_demo_state_for_engine(engine) {
@@ -18,11 +18,11 @@ async fn create_webgpu_demo_state_async(
         None => false
       }
     },
-    @app_browser.BrowserEngineRuntimeOptions::single_frame(),
+    @app_browser.PlatformOptions::single_frame(),
   )
-  match runtime {
-    Some(runtime) => {
-      browser_runtime.replace(runtime)
+  match platform {
+    Some(platform) => {
+      browser_platform.replace(platform)
       println("WebGPU triangle rendered successfully!")
     }
     None => println("Failed to create DemoState")

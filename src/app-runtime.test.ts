@@ -6,11 +6,11 @@ import {
 	PhaseGroup,
 	Scene,
 	TimeState,
-	BrowserEngineRuntimeSlot,
-	createBrowserEngineRuntime,
+	PlatformSlot,
+	createPlatform,
 	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
-	startBrowserEngineRuntime,
+	startPlatform,
 	startBrowserFrameLoop,
 } from "./app-runtime";
 
@@ -262,7 +262,7 @@ describe("app-runtime Engine", () => {
 		);
 	});
 
-	it("starts and disposes a browser engine runtime", async () => {
+	it("starts and disposes a browser engine platform", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
@@ -271,9 +271,9 @@ describe("app-runtime Engine", () => {
 		const engine = await Engine.create(canvas, { mainScene: new Scene("test") });
 		engine.initialize();
 
-		const runtime = startBrowserEngineRuntime(engine);
-		runtime.dispose();
-		runtime.dispose();
+		const platform = startPlatform(engine);
+		platform.dispose();
+		platform.dispose();
 
 		expect(cancel).toHaveBeenCalled();
 		expect(canvas.removeEventListener).toHaveBeenCalledWith(
@@ -282,7 +282,7 @@ describe("app-runtime Engine", () => {
 		);
 	});
 
-	it("runs a single-frame browser engine runtime without input or loop", async () => {
+	it("runs a single-frame browser engine platform without input or loop", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
@@ -295,12 +295,12 @@ describe("app-runtime Engine", () => {
 		});
 		engine.initialize();
 
-		const runtime = startBrowserEngineRuntime(engine, {
+		const platform = startPlatform(engine, {
 			runLoop: false,
 			installInput: false,
 			runFirstFrame: true,
 		});
-		runtime.dispose();
+		platform.dispose();
 
 		expect(frames).toEqual([1]);
 		expect(callbacks).toHaveLength(0);
@@ -310,7 +310,7 @@ describe("app-runtime Engine", () => {
 		);
 	});
 
-	it("replaces browser engine runtimes through a slot", async () => {
+	it("replaces browser engine platforms through a slot", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
@@ -327,16 +327,16 @@ describe("app-runtime Engine", () => {
 		});
 		first.initialize();
 		second.initialize();
-		const slot = new BrowserEngineRuntimeSlot();
+		const slot = new PlatformSlot();
 
-		slot.replace(startBrowserEngineRuntime(first));
-		slot.replace(startBrowserEngineRuntime(second));
+		slot.replace(startPlatform(first));
+		slot.replace(startPlatform(second));
 		slot.dispose();
 
 		expect(shutdowns).toEqual(["first", "second"]);
 	});
 
-	it("creates a browser engine runtime around setup and initialization", async () => {
+	it("creates a browser engine platform around setup and initialization", async () => {
 		const canvas = fakeCanvas();
 		const windowTarget = fakeEventTarget();
 		vi.stubGlobal("window", windowTarget);
@@ -344,7 +344,7 @@ describe("app-runtime Engine", () => {
 		stubWebGpu();
 		const calls: string[] = [];
 
-		const runtime = await createBrowserEngineRuntime(
+		const platform = await createPlatform(
 			canvas,
 			(engine) => {
 				engine.addPhaseHandler(Phase.Startup, () => {
@@ -353,7 +353,7 @@ describe("app-runtime Engine", () => {
 			},
 			{ runLoop: false, installInput: false },
 		);
-		runtime?.dispose();
+		platform?.dispose();
 
 		expect(calls).toEqual(["startup"]);
 	});

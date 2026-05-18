@@ -7,16 +7,16 @@ pub type BrowserFrameLoop
 pub type BrowserInputBinding
 
 ///|
-/// Options for starting the standard browser engine runtime.
-pub struct BrowserEngineRuntimeOptions {
+/// Options for starting the standard browser platform.
+pub struct PlatformOptions {
   run_loop : Bool
   install_input : Bool
   run_first_frame : Bool
 }
 
 ///|
-/// Owns browser runtime resources for one engine.
-pub struct BrowserEngineRuntime {
+/// Owns browser platform resources for one engine.
+pub struct Platform {
   priv engine : @app.Engine
   priv mut frame_loop : BrowserFrameLoop?
   priv mut input_binding : BrowserInputBinding?
@@ -24,58 +24,58 @@ pub struct BrowserEngineRuntime {
 }
 
 ///|
-/// Stores the active browser runtime and disposes replaced runtimes.
-pub struct BrowserEngineRuntimeSlot {
-  priv mut runtime : BrowserEngineRuntime?
+/// Stores the active browser platform and disposes replaced platforms.
+pub struct PlatformSlot {
+  priv mut platform : Platform?
 }
 
 ///|
-/// Creates browser runtime options for an interactive canvas sample.
-pub fn BrowserEngineRuntimeOptions::interactive() -> BrowserEngineRuntimeOptions {
+/// Creates browser platform options for an interactive canvas sample.
+pub fn PlatformOptions::interactive() -> PlatformOptions {
   { run_loop: true, install_input: true, run_first_frame: false }
 }
 
 ///|
-/// Creates browser runtime options for a continuously rendered canvas sample.
-pub fn BrowserEngineRuntimeOptions::loop_only() -> BrowserEngineRuntimeOptions {
+/// Creates browser platform options for a continuously rendered canvas sample.
+pub fn PlatformOptions::loop_only() -> PlatformOptions {
   { run_loop: true, install_input: false, run_first_frame: false }
 }
 
 ///|
-/// Creates browser runtime options for a single-frame canvas sample.
-pub fn BrowserEngineRuntimeOptions::single_frame() -> BrowserEngineRuntimeOptions {
+/// Creates browser platform options for a single-frame canvas sample.
+pub fn PlatformOptions::single_frame() -> PlatformOptions {
   { run_loop: false, install_input: false, run_first_frame: true }
 }
 
 ///|
-/// Creates an empty browser engine runtime slot.
-pub fn BrowserEngineRuntimeSlot::new() -> BrowserEngineRuntimeSlot {
-  { runtime: None }
+/// Creates an empty browser platform slot.
+pub fn PlatformSlot::new() -> PlatformSlot {
+  { platform: None }
 }
 
 ///|
-/// Disposes the current runtime stored in the slot.
-pub fn BrowserEngineRuntimeSlot::dispose(self : BrowserEngineRuntimeSlot) -> Unit {
-  match self.runtime {
-    Some(runtime) => runtime.dispose()
+/// Disposes the current platform stored in the slot.
+pub fn PlatformSlot::dispose(self : PlatformSlot) -> Unit {
+  match self.platform {
+    Some(platform) => platform.dispose()
     None => ()
   }
-  self.runtime = None
+  self.platform = None
 }
 
 ///|
-/// Replaces the current runtime, disposing the previous runtime first.
-pub fn BrowserEngineRuntimeSlot::replace(
-  self : BrowserEngineRuntimeSlot,
-  runtime : BrowserEngineRuntime,
+/// Replaces the current platform, disposing the previous platform first.
+pub fn PlatformSlot::replace(
+  self : PlatformSlot,
+  platform : Platform,
 ) -> Unit {
   self.dispose()
-  self.runtime = Some(runtime)
+  self.platform = Some(platform)
 }
 
 ///|
-/// Disposes browser runtime handles and shuts down the owned engine once.
-pub fn BrowserEngineRuntime::dispose(self : BrowserEngineRuntime) -> Unit {
+/// Disposes browser platform handles and shuts down the owned engine once.
+pub fn Platform::dispose(self : Platform) -> Unit {
   if self.disposed {
     return
   }
@@ -364,12 +364,12 @@ pub fn install_browser_input(
 }
 
 ///|
-/// Starts the standard browser runtime resources for an initialized engine.
-pub fn start_browser_engine_runtime(
+/// Starts the standard browser platform resources for an initialized engine.
+pub fn start_platform(
   engine : @app.Engine,
   canvas : @wgpu.HTMLCanvasElement,
-  options : BrowserEngineRuntimeOptions,
-) -> BrowserEngineRuntime {
+  options : PlatformOptions,
+) -> Platform {
   if options.run_first_frame {
     sync_browser_engine_surface(engine, canvas)
     ignore(engine.run_frame((0.0 : Float)))
@@ -393,13 +393,13 @@ pub fn start_browser_engine_runtime(
 }
 
 ///|
-/// Creates, initializes, and starts a browser engine runtime from a canvas.
-pub async fn create_browser_engine_runtime(
+/// Creates, initializes, and starts a browser platform from a canvas.
+pub async fn create_platform(
   canvas : @wgpu.HTMLCanvasElement,
   setup : (@app.Engine) -> Bool,
-  options : BrowserEngineRuntimeOptions,
-) -> BrowserEngineRuntime? {
-  create_browser_engine_runtime_with_engine(
+  options : PlatformOptions,
+) -> Platform? {
+  create_platform_with_engine(
     canvas,
     fn(context) { @app.Engine::new(context) },
     setup,
@@ -408,18 +408,18 @@ pub async fn create_browser_engine_runtime(
 }
 
 ///|
-/// Creates a browser runtime using a caller-provided engine factory.
-pub async fn create_browser_engine_runtime_with_engine(
+/// Creates a browser platform using a caller-provided engine factory.
+pub async fn create_platform_with_engine(
   canvas : @wgpu.HTMLCanvasElement,
   create_engine : (@wgpu.GPUContext) -> @app.Engine,
   setup : (@app.Engine) -> Bool,
-  options : BrowserEngineRuntimeOptions,
-) -> BrowserEngineRuntime? {
+  options : PlatformOptions,
+) -> Platform? {
   let ctx = gpu_context_from_html_canvas(canvas)
   let engine = create_engine(ctx)
   if !setup(engine) {
     return None
   }
   engine.initialize()
-  Some(start_browser_engine_runtime(engine, canvas, options))
+  Some(start_platform(engine, canvas, options))
 }
