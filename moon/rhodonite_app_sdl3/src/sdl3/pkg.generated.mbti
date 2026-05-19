@@ -101,7 +101,6 @@ pub(all) struct SdlMultiWindowSurface {
   // private fields
 }
 pub fn SdlMultiWindowSurface::gpu_surface(Self) -> @webgpu.GPUSurface
-pub fn SdlMultiWindowSurface::input(Self) -> @input.InputState
 
 pub struct WaylandWindowSurface {
   display : @webgpu_objects.OpaquePtr

@@ -77,7 +77,6 @@ pub(all) struct SdlMultiWindowSurface {
   priv metal_view : @wgpu_objects.OpaquePtr
   priv webgpu_canvas_context : @wgpu.GPUCanvasContext
   priv gpu_surface : @wgpu.GPUSurface
-  priv input : @input.InputState
   priv mut engine_surface_id : @app.SurfaceId?
 }
 
@@ -546,14 +545,6 @@ pub fn SdlMultiWindowSurface::gpu_surface(
 }
 
 ///|
-/// Returns the surface-local input state.
-pub fn SdlMultiWindowSurface::input(
-  self : SdlMultiWindowSurface,
-) -> @input.InputState {
-  self.input
-}
-
-///|
 /// Releases a single native multi-window surface.
 fn release_sdl_multi_window_surface(surface : SdlMultiWindowSurface) -> Unit {
   surface.webgpu_canvas_context.release()
@@ -596,7 +587,6 @@ fn init_sdl_multi_window_platform_from_first(
       metal_view: first.metal_view,
       webgpu_canvas_context: first.webgpu_canvas_context,
       gpu_surface: surface,
-      input: @input.InputState::new(),
       engine_surface_id: None,
     },
   ]
@@ -719,7 +709,6 @@ fn attach_sdl_multi_window_surface(
     metal_view,
     webgpu_canvas_context,
     gpu_surface,
-    input: @input.InputState::new(),
     engine_surface_id: None,
   })
 }
