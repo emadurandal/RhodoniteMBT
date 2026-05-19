@@ -3,6 +3,7 @@ import {
   "emadurandal/rhodonite_core/binary/writes" @writes,
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/ecs/wgsl" @ecs_wgsl,
+  "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
   "emadurandal/rhodonite_examples/common/native_gpu_queue" @native_gpu_queue,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,

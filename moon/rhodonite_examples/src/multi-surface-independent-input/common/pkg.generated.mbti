@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite_examples/multi-surface-independent-input/common"
+
+import {
+  "emadurandal/rhodonite/app",
+  "emadurandal/rhodonite_webgpu/webgpu",
+}
+
+// Values
+pub fn create_demo_state_for_engine(@app.Engine) -> MultiSurfaceDemoState
+
+pub fn register_engine_handlers(@app.Engine, MultiSurfaceDemoState) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct MultiSurfaceDemoState {
+  device : @webgpu.GPUDevice
+  queue : @webgpu.GPUQueue
+  format : String
+  surfaces : Array[SurfaceDemoState]
+}
+
+pub(all) struct SurfaceDemoState {
+  id : @app.SurfaceId
+  demo : @emadurandal/rhodonite_examples/ecs-scene-graph/common.DemoState
+}
+
+// Type aliases
+
+// Traits
+

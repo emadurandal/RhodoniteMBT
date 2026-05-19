@@ -45,3 +45,4 @@ moon/rhodonite_examples/_build
 moon/rhodonite_core/_build
 moon/rhodonite_core/target
 moon/rhodonite/_build
+.pnpm-store

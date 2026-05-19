@@ -55,6 +55,35 @@ pub fn create_webgpu_context(
 }
 
 ///|
+/// Builds shared WebGPU device state for platform runtimes with multiple surfaces.
+pub fn create_gpu_device_context(
+  instance : GPUInstance,
+  adapter : GPUAdapter,
+  device : GPUDevice,
+  queue : GPUQueue,
+) -> GPUDeviceContext {
+  { instance, adapter, device, queue }
+}
+
+///|
+/// Builds an active presentation surface from an already configured canvas context.
+pub fn create_gpu_surface(
+  context : GPUCanvasContext,
+  format : String,
+  width : Int,
+  height : Int,
+) -> GPUSurface {
+  {
+    context,
+    format,
+    width,
+    height,
+    active: width > 0 && height > 0,
+    generation: 0,
+  }
+}
+
+///|
 /// Implements `webgpu_device_poll`.
 pub fn webgpu_device_poll(device : GPUDevice, wait? : Bool = false) -> Bool {
   @raw.webgpu_device_poll(device.raw, wait~)

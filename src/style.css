@@ -49,3 +49,28 @@ h1 {
     border-color: #ccc;
   }
 }
+.surface-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 1rem;
+  width: min(1680px, 96vw);
+  margin: 1rem auto;
+}
+
+.surface-grid section {
+  min-width: 0;
+}
+
+.surface-grid canvas {
+  width: 100%;
+  height: auto;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #020617;
+}
+
+@media (max-width: 900px) {
+  .surface-grid {
+    grid-template-columns: 1fr;
+  }
+}

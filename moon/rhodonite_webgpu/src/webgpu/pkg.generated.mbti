@@ -42,6 +42,10 @@ pub fn canvas_getContext(@webgpu_objects.HTMLCanvasElement) -> @webgpu_objects.G
 
 pub fn create_canvas_context(@webgpu_objects.GPUCanvasContext) -> GPUCanvasContext
 
+pub fn create_gpu_device_context(GPUInstance, GPUAdapter, GPUDevice, GPUQueue) -> GPUDeviceContext
+
+pub fn create_gpu_surface(GPUCanvasContext, String, Int, Int) -> GPUSurface
+
 pub fn create_metal_canvas_context(GPUInstance, @webgpu_objects.HTMLCanvasElement, Int, Int) -> GPUCanvasContext
 
 pub fn create_native_webgpu_instance() -> GPUInstance raise
@@ -176,6 +180,17 @@ pub fn GPUDevice::get_queue(Self) -> GPUQueue
 pub fn GPUDevice::poll(Self, wait? : Bool) -> Bool
 pub fn GPUDevice::release(Self) -> Unit
 
+pub(all) struct GPUDeviceContext {
+  instance : GPUInstance
+  adapter : GPUAdapter
+  device : GPUDevice
+  queue : GPUQueue
+}
+pub fn GPUDeviceContext::adapter(Self) -> GPUAdapter
+pub fn GPUDeviceContext::device(Self) -> GPUDevice
+pub fn GPUDeviceContext::instance(Self) -> GPUInstance
+pub fn GPUDeviceContext::queue(Self) -> GPUQueue
+
 pub(all) struct GPUExternalTexture {
   raw : @webgpu_objects.GPUExternalTexture
 }
@@ -251,6 +266,25 @@ pub(all) struct GPURenderPipelineDescriptor {
 pub(all) struct GPUSampler {
   raw : @webgpu_objects.GPUSampler
 }
+
+pub(all) struct GPUSurface {
+  context : GPUCanvasContext
+  mut format : String
+  mut width : Int
+  mut height : Int
+  mut active : Bool
+  mut generation : Int
+}
+pub fn GPUSurface::acquire_view(Self) -> @webgpu_objects.GPUTextureView
+pub fn GPUSurface::active(Self) -> Bool
+pub fn GPUSurface::canvas_context(Self) -> GPUCanvasContext
+pub fn GPUSurface::format(Self) -> String
+pub fn GPUSurface::generation(Self) -> Int
+pub fn GPUSurface::height(Self) -> Int
+pub fn GPUSurface::present(Self) -> Unit
+pub fn GPUSurface::resize(Self, GPUDevice, Int, Int) -> Bool
+pub fn GPUSurface::suspend(Self) -> Bool
+pub fn GPUSurface::width(Self) -> Int
 
 pub(all) struct GPUTexture {
   raw : @webgpu_objects.WebGPUTexture

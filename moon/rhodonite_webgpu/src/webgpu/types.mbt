@@ -183,3 +183,23 @@ pub(all) struct GPURenderPassEncoder {
 pub(all) struct GPUContext {
   raw : @raw.WebGPUContext
 }
+
+///|
+/// Shared WebGPU device state that can be used by multiple presentation surfaces.
+pub(all) struct GPUDeviceContext {
+  instance : GPUInstance
+  adapter : GPUAdapter
+  device : GPUDevice
+  queue : GPUQueue
+}
+
+///|
+/// Presentation surface backed by one browser canvas or native window swapchain.
+pub(all) struct GPUSurface {
+  context : GPUCanvasContext
+  mut format : String
+  mut width : Int
+  mut height : Int
+  mut active : Bool
+  mut generation : Int
+}

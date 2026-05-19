@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	Engine,
 	type EngineCallback,
+	GpuSurface,
 	Phase,
 	PhaseGroup,
 	Scene,
@@ -95,6 +96,66 @@ async function createTestEngine(): Promise<Engine> {
 	return Engine.create(fakeCanvas(), { mainScene: new Scene("test") });
 }
 
+function createTestGpuSurface(
+	canvas: HTMLCanvasElement & FakeEventTarget,
+): GpuSurface {
+	return new GpuSurface(canvas, {} as GPUDevice, "rgba8unorm");
+}
+
+describe("GpuSurface.syncFromCanvas", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("keeps generation unchanged across no-op syncs", () => {
+		const canvas = fakeCanvas();
+		const surface = createTestGpuSurface(canvas);
+
+		for (let index = 0; index < 8; index += 1) {
+			expect(surface.syncFromCanvas()).toBe(false);
+		}
+
+		expect(surface.state().generation).toBe(0);
+	});
+
+	it("increments generation only on actual active/suspend transitions", () => {
+		const canvas = fakeCanvas();
+		const surface = createTestGpuSurface(canvas);
+
+		expect(surface.syncFromCanvas()).toBe(false);
+		expect(surface.state().generation).toBe(0);
+
+		canvas.width = 0;
+		canvas.height = 0;
+		expect(surface.syncFromCanvas()).toBe(true);
+		expect(surface.state().generation).toBe(1);
+
+		for (let index = 0; index < 4; index += 1) {
+			expect(surface.syncFromCanvas()).toBe(false);
+			expect(surface.state().generation).toBe(1);
+		}
+
+		canvas.width = 800;
+		canvas.height = 600;
+		expect(surface.syncFromCanvas()).toBe(true);
+		expect(surface.state().generation).toBe(2);
+	});
+
+	it("increments generation by one after intervening no-op syncs", () => {
+		const canvas = fakeCanvas();
+		const surface = createTestGpuSurface(canvas);
+
+		for (let index = 0; index < 5; index += 1) {
+			expect(surface.syncFromCanvas()).toBe(false);
+		}
+
+		canvas.width = 1024;
+		canvas.height = 768;
+		expect(surface.syncFromCanvas()).toBe(true);
+		expect(surface.state().generation).toBe(1);
+	});
+});
+
 describe("app-runtime Engine", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
@@ -149,6 +210,79 @@ describe("app-runtime Engine", () => {
 		expect(calls[1]?.frameIndex).toBe(1);
 		expect(calls[3]?.frameIndex).toBe(2);
 		expect(calls.at(-1)?.frameIndex).toBe(1);
+	});
+
+	it("attaches legacy surface state to fixed steps in multi-surface frames", async () => {
+		const engine = await createTestEngine();
+		const fixedFrames: Array<{
+			format: string;
+			surfaceChanged: boolean;
+			surfaceId: number | undefined;
+		}> = [];
+
+		engine.addPhaseHandler(Phase.FixedUpdate, (_engine, frame) => {
+			fixedFrames.push({
+				format: frame.surface.format,
+				surfaceChanged: frame.surfaceChanged,
+				surfaceId: frame.surfaceId,
+			});
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()));
+
+		const fixedSteps = engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(fixedSteps).toBe(1);
+		expect(fixedFrames).toEqual([
+			{
+				format: engine.format,
+				surfaceChanged: true,
+				surfaceId: undefined,
+			},
+		]);
+	});
+
+	it("keeps surfaceChanged stable across render-frame phases in multi-surface frames", async () => {
+		const engine = await createTestEngine();
+		const renderSurfaceChanged: boolean[] = [];
+
+		engine.addPhaseHandler(Phase.Update, () => {
+			const surfaces = (
+				engine as unknown as { surfaces: Array<{ changed: boolean }> }
+			).surfaces;
+			surfaces[0]!.changed = false;
+		});
+		engine.addPhaseHandler(Phase.Render, (_engine, frame) => {
+			renderSurfaceChanged.push(frame.surfaceChanged);
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()));
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(renderSurfaceChanged).toEqual([true]);
+	});
+
+	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
+		const engine = await createTestEngine();
+		const sceneA = new Scene("surface-a", {});
+		const sceneB = new Scene("surface-b", {});
+		sceneA.setMainCamera("camera-a");
+
+		let orbitUpdateCount = 0;
+		engine.addCommonHandlers(sceneA, {
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneA });
+		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
 	});
 
 	it("exposes frame-begin, fixed-step, and render-frame groups separately", async () => {

@@ -2,4 +2,5 @@ import {
   "emadurandal/rhodonite_core/ecs" @ecs,
   "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+  "moonbitlang/core/ref" @ref,
 }
