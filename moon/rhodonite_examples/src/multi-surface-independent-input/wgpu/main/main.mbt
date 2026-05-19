@@ -14,16 +14,10 @@ async fn run_multi_surface_independent_input_native() -> Unit raise Error {
   @sdl_app.run_multi_window_platform(
     [
       @sdl_app.PlatformConfig::new(
-        "MoonBit wgpu + SDL3 (multi-surface A)",
-        800,
-        600,
-        "native: multi-surface-independent-input A",
+        "MoonBit wgpu + SDL3 (multi-surface A)", 800, 600, "native: multi-surface-independent-input A",
       ),
       @sdl_app.PlatformConfig::new(
-        "MoonBit wgpu + SDL3 (multi-surface B)",
-        800,
-        600,
-        "native: multi-surface-independent-input B",
+        "MoonBit wgpu + SDL3 (multi-surface B)", 800, 600, "native: multi-surface-independent-input B",
       ),
     ],
     @sdl_app.PlatformApp::default_engine(setup_engine),

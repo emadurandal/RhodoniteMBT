@@ -16,7 +16,9 @@ pub(all) struct MultiSurfaceDemoState {
 
 ///|
 /// Creates multi-surface demo state from an engine's shared WebGPU context.
-pub fn create_demo_state_for_engine(engine : @app.Engine) -> MultiSurfaceDemoState {
+pub fn create_demo_state_for_engine(
+  engine : @app.Engine,
+) -> MultiSurfaceDemoState {
   let (device, _canvas_context, format, queue) = engine.gpu_context().get()
   { device, queue, format, surfaces: [] }
 }

@@ -294,9 +294,7 @@ extern "C" fn sdl_get_window_size_in_pixels(
 
 ///|
 /// Returns SDL's stable id for a window.
-extern "C" fn sdl_get_window_id(
-  window : @lib.SDL_Window,
-) -> @lib.SDL_WindowID = "SDL_GetWindowID"
+extern "C" fn sdl_get_window_id(window : @lib.SDL_Window) -> @lib.SDL_WindowID = "SDL_GetWindowID"
 
 ///|
 /// Raises a structured error if a drawable size cannot be used for WebGPU.
@@ -709,7 +707,8 @@ fn attach_sdl_multi_window_surface(
   config : PlatformConfig,
 ) -> Unit raise Sdl3AppError {
   ensure_valid_surface_size(config.width, config.height)
-  let (sdl_win, metal_view, webgpu_canvas_context, surface_width, surface_height) = if @wgpu_native.platform_is_macos() {
+  let (sdl_win, metal_view, webgpu_canvas_context, surface_width, surface_height
+  ) = if @wgpu_native.platform_is_macos() {
     let sdl_win = @lib.sdl_CreateWindow(
       config.window_title,
       config.width,
@@ -746,14 +745,19 @@ fn attach_sdl_multi_window_surface(
       sdl_win,
       metal_view,
       @wgpu.create_metal_canvas_context(
-        session.instance, cametal, surface_width, surface_height,
+        session.instance,
+        cametal,
+        surface_width,
+        surface_height,
       ),
       surface_width,
       surface_height,
     )
   } else if @wgpu_native.platform_is_linux() {
     let sdl_win = create_linux_wgpu_sdl_window(
-      config.window_title, config.width, config.height,
+      config.window_title,
+      config.width,
+      config.height,
     )
     if sdl_win.is_null() {
       raise Sdl3AppError::CreateWindowFailed(@lib.sdl_GetError())
@@ -768,7 +772,10 @@ fn attach_sdl_multi_window_surface(
       }
     }
     let webgpu_canvas_context = create_linux_canvas_context(
-      session.instance, sdl_win, surface_width, surface_height,
+      session.instance,
+      sdl_win,
+      surface_width,
+      surface_height,
     ) catch {
       error => {
         @lib.sdl_DestroyWindow(sdl_win)
@@ -786,15 +793,13 @@ fn attach_sdl_multi_window_surface(
     raise Sdl3AppError::UnsupportedNativePlatform
   }
   let format = session.instance.get_preferred_canvas_format_for_surface(
-    session.adapter, webgpu_canvas_context,
+    session.adapter,
+    webgpu_canvas_context,
   )
   webgpu_canvas_context.configure(session.device, format)
   let render_format = webgpu_canvas_context.get_format()
   let gpu_surface = @wgpu.create_gpu_surface(
-    webgpu_canvas_context,
-    render_format,
-    surface_width,
-    surface_height,
+    webgpu_canvas_context, render_format, surface_width, surface_height,
   )
   session.surfaces.push({
     window_id: sdl_get_window_id(sdl_win),
@@ -1284,10 +1289,11 @@ fn SdlMultiWindowPlatformSession::focused_surface_index(
   self : SdlMultiWindowPlatformSession,
 ) -> Int? {
   match self.focused_window_id {
-    Some(window_id) => match self.find_surface_index_by_window_id(window_id) {
-      Some(index) => Some(index)
-      None => if self.surfaces.length() > 0 { Some(0) } else { None }
-    }
+    Some(window_id) =>
+      match self.find_surface_index_by_window_id(window_id) {
+        Some(index) => Some(index)
+        None => if self.surfaces.length() > 0 { Some(0) } else { None }
+      }
     None => if self.surfaces.length() > 0 { Some(0) } else { None }
   }
 }
@@ -1371,7 +1377,8 @@ fn handle_sdl_multi_window_event(
     SDL_EVENT_WINDOW_CLOSE_REQUESTED => {
       let window_id = sdl_event_window_id(event)
       match session.find_surface_index_by_window_id(window_id) {
-        Some(index) => remove_sdl_multi_window_surface_at(session, engine, index)
+        Some(index) =>
+          remove_sdl_multi_window_surface_at(session, engine, index)
         None => ()
       }
       session.surfaces.length() == 0
@@ -1381,9 +1388,8 @@ fn handle_sdl_multi_window_event(
       match session.find_surface_index_by_window_id(window_id) {
         Some(index) =>
           if install_input {
-            match sdl_multi_window_engine_input_for_surface(
-              session, engine, index,
-            ) {
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => input.enqueue_event(FocusLost)
               None => ()
             }
@@ -1394,17 +1400,19 @@ fn handle_sdl_multi_window_event(
     }
     SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
       if install_input {
-        let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(event)
+        let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(
+          event,
+        )
         session.focused_window_id = Some(key_event.windowID)
-        let target_index = match session.find_surface_index_by_window_id(key_event.windowID) {
+        let target_index = match
+          session.find_surface_index_by_window_id(key_event.windowID) {
           Some(index) => Some(index)
           None => session.focused_surface_index()
         }
         match target_index {
           Some(index) =>
-            match sdl_multi_window_engine_input_for_surface(
-              session, engine, index,
-            ) {
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => enqueue_sdl_keyboard_event(input, event)
               None => ()
             }
@@ -1419,9 +1427,8 @@ fn handle_sdl_multi_window_event(
         session.focused_window_id = Some(window_id)
         match session.find_surface_index_by_window_id(window_id) {
           Some(index) =>
-            match sdl_multi_window_engine_input_for_surface(
-              session, engine, index,
-            ) {
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => enqueue_sdl_mouse_wheel_event(input, event)
               None => ()
             }
@@ -1438,9 +1445,8 @@ fn handle_sdl_multi_window_event(
         session.focused_window_id = Some(window_id)
         match session.find_surface_index_by_window_id(window_id) {
           Some(index) =>
-            match sdl_multi_window_engine_input_for_surface(
-              session, engine, index,
-            ) {
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) =>
                 match event_type {
                   SDL_EVENT_MOUSE_MOTION =>
@@ -1469,6 +1475,173 @@ fn handle_sdl_multi_window_event(
 }
 
 ///|
+/// Processes one SDL event for multi-window on-demand rendering.
+fn handle_sdl_multi_window_event_for_on_demand(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  event : @lib.SDL_Event,
+  install_input : Bool,
+) -> Bool raise Sdl3AppError {
+  let event_type = event.get_type()
+  match event_type {
+    SDL_EVENT_QUIT => true
+    SDL_EVENT_WINDOW_CLOSE_REQUESTED => {
+      let window_id = sdl_event_window_id(event)
+      match session.find_surface_index_by_window_id(window_id) {
+        Some(index) =>
+          remove_sdl_multi_window_surface_at(session, engine, index)
+        None => ()
+      }
+      session.surfaces.length() == 0
+    }
+    SDL_EVENT_WINDOW_FOCUS_LOST => {
+      let window_id = sdl_event_window_id(event)
+      match session.find_surface_index_by_window_id(window_id) {
+        Some(index) =>
+          if install_input {
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
+              Some(input) => {
+                input.enqueue_event(FocusLost)
+                engine.request_render("input")
+              }
+              None => ()
+            }
+          }
+        None => ()
+      }
+      false
+    }
+    SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
+      if install_input {
+        let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(
+          event,
+        )
+        session.focused_window_id = Some(key_event.windowID)
+        let target_index = match
+          session.find_surface_index_by_window_id(key_event.windowID) {
+          Some(index) => Some(index)
+          None => session.focused_surface_index()
+        }
+        match target_index {
+          Some(index) =>
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
+              Some(input) => {
+                enqueue_sdl_keyboard_event(input, event)
+                engine.request_render("input")
+              }
+              None => ()
+            }
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_WHEEL => {
+      if install_input {
+        let window_id = sdl_event_window_id(event)
+        session.focused_window_id = Some(window_id)
+        match session.find_surface_index_by_window_id(window_id) {
+          Some(index) =>
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
+              Some(input) => {
+                enqueue_sdl_mouse_wheel_event(input, event)
+                engine.request_render("input")
+              }
+              None => ()
+            }
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_MOTION
+    | SDL_EVENT_MOUSE_BUTTON_DOWN
+    | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        session.focused_window_id = Some(sdl_event_window_id(event))
+        engine.request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_WINDOW_RESIZED
+    | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+    | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {
+      if handle_sdl_multi_window_resize_event(session, event) {
+        engine.request_render("surface")
+      }
+      false
+    }
+    _ => false
+  }
+}
+
+///|
+/// Runs an SDL3 multi-window loop that renders only while dirty or continuous rendering is active.
+fn run_sdl_multi_window_on_demand_platform_loop(
+  session : SdlMultiWindowPlatformSession,
+  engine : @app.Engine,
+  options : PlatformOptions,
+) -> Unit raise Sdl3AppError {
+  println("native: entering multi-window on-demand render loop")
+  let quit = @ref.new(false)
+  let mut previous_ticks = sdl_get_ticks()
+  while !quit.val {
+    let event = @lib.new_sdl_event()
+    let resumed_from_idle = !engine.render_requested() &&
+      !engine.continuous_render_requested()
+    if resumed_from_idle {
+      if @lib.sdl_WaitEventTimeout(event, 100) {
+        if handle_sdl_multi_window_event_for_on_demand(
+            session,
+            engine,
+            event,
+            options.install_input,
+          ) {
+          quit.val = true
+        }
+      }
+    }
+    while @lib.sdl_PollEvent(event) {
+      let event_type = event.get_type()
+      if event_type == SDL_EVENT_POLL_SENTINEL {
+        break
+      }
+      if handle_sdl_multi_window_event_for_on_demand(
+          session,
+          engine,
+          event,
+          options.install_input,
+        ) {
+        quit.val = true
+      }
+    }
+    if session.surfaces.length() == 0 {
+      quit.val = true
+    } else if engine.render_requested() || engine.continuous_render_requested() {
+      if options.install_input {
+        enqueue_sdl_multi_window_focused_mouse_state(session, engine)
+      }
+      let current_ticks = sdl_get_ticks()
+      let delta_seconds = if resumed_from_idle {
+        (0.0 : Float)
+      } else {
+        Float::from_double(
+          (current_ticks - previous_ticks).to_double() / 1000.0,
+        )
+      }
+      previous_ticks = current_ticks
+      @wgpu.webgpu_instance_process_events(session.instance)
+      ignore(engine.run_multi_surface_frame(delta_seconds))
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+      @wgpu.webgpu_instance_process_events(session.instance)
+    }
+  }
+}
+
+///|
 /// Runs the SDL3 event loop for a platform with multiple native window surfaces.
 fn run_sdl_multi_window_platform_loop(
   session : SdlMultiWindowPlatformSession,
@@ -1484,7 +1657,7 @@ fn run_sdl_multi_window_platform_loop(
       ignore(engine.run_multi_surface_frame((0.0 : Float)))
       let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
     }
-    Loop | OnDemand =>
+    Loop =>
       while !quit.val {
         let event = @lib.new_sdl_event()
         while @lib.sdl_PollEvent(event) {
@@ -1493,7 +1666,10 @@ fn run_sdl_multi_window_platform_loop(
             break
           }
           if handle_sdl_multi_window_event(
-              session, engine, event, options.install_input,
+              session,
+              engine,
+              event,
+              options.install_input,
             ) {
             quit.val = true
           }
@@ -1515,6 +1691,8 @@ fn run_sdl_multi_window_platform_loop(
           @wgpu.webgpu_instance_process_events(session.instance)
         }
       }
+    OnDemand =>
+      run_sdl_multi_window_on_demand_platform_loop(session, engine, options)
   }
 }
 

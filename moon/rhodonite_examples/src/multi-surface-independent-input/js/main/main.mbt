@@ -22,7 +22,8 @@ async fn create_webgpu_demo_state_async(
       ignore(platform.attach_canvas(second_canvas))
       println("multi-surface-independent-input: DemoState ready")
     }
-    None => println("multi-surface-independent-input: failed to create DemoState")
+    None =>
+      println("multi-surface-independent-input: failed to create DemoState")
   }
 }
 
@@ -32,8 +33,9 @@ pub fn create_webgpu_demo_state(
   first_canvas : @wgpu.HTMLCanvasElement,
   second_canvas : @wgpu.HTMLCanvasElement,
 ) -> @js_async.Promise[Unit] {
-  @js_async.Promise::from_async(() =>
-    create_webgpu_demo_state_async(first_canvas, second_canvas))
+  @js_async.Promise::from_async(() => {
+    create_webgpu_demo_state_async(first_canvas, second_canvas)
+  })
 }
 
 ///|

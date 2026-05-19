@@ -108,7 +108,7 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 Native SDL3 の on-demand loop は mouse motion / button down / button up / wheel を input dirty event として扱い、`Engine::request_render("input")` で次フレームを起床する。実際の pointer 座標と button transition は render 直前の `SDL_GetMouseState` snapshot から enqueue するため、通常 loop と on-demand loop は同じ `InputState` 集約値を渡す。
 
-multi-window native loop も同様に、各フレームでフォーカス中 window の `SDL_GetMouseState` を surface-local `InputState` へ enqueue する。SDL mouse button event の FFI mirror は C `bool` と同じ 1 バイト幅で読む。
+multi-window native loop も同様に、render 直前にフォーカス中 window の `SDL_GetMouseState` を surface-local `InputState` へ enqueue する。`PlatformOptions::interactive_on_demand()` の multi-window loop は single-window on-demand と同じく `SDL_WaitEventTimeout`、idle 検出、`Engine::render_requested()` / `continuous_render_requested()` 判定で必要なフレームだけ `run_multi_surface_frame` を実行する。SDL mouse button event の FFI mirror は C `bool` と同じ 1 バイト幅で読む。
 
 wheel delta は controller 側で同じ sensitivity を使えるよう、adapter 側で browser の `WheelEvent.deltaX/Y` に近い符号と大きさへ寄せる。native SDL3 adapter は wheel step を DOM wheel の pixel delta 相当に近づけるため 100 倍して enqueue し、通常スクロールの上方向が dolly-in になるよう `deltaY` を負方向へ正規化する。
 
