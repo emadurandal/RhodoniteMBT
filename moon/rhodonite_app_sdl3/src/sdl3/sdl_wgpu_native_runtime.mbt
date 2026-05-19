@@ -35,6 +35,38 @@ pub struct SdlMetalWebGpuNativeSession {
 }
 
 ///|
+/// Mirrors the SDL mouse motion event layout needed by the native input adapter.
+priv struct SdlMouseMotionEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  which : @lib.SDL_MouseID
+  state : UInt
+  x : Float
+  y : Float
+  xrel : Float
+  yrel : Float
+}
+
+///|
+/// Mirrors the SDL mouse button event layout needed by the native input adapter.
+priv struct SdlMouseButtonEvent {
+  event_type : @lib.SDL_EventType
+  reserved : UInt
+  timestamp : UInt64
+  windowID : @lib.SDL_WindowID
+  which : @lib.SDL_MouseID
+  button : Byte
+  down : Bool
+  padding1 : Byte
+  padding2 : Byte
+  padding3 : Byte
+  x : Float
+  y : Float
+}
+
+///|
 /// Mirrors the SDL mouse wheel event layout needed by the native input adapter.
 priv struct SdlMouseWheelEvent {
   event_type : @lib.SDL_EventType
@@ -125,6 +157,64 @@ fn _touch_sdl_window_scoped_event_struct() -> Unit {
   ignore(event.reserved)
   ignore(event.timestamp)
   ignore(event.windowID)
+}
+
+///|
+/// Keeps the private SDL mouse motion mirror visible to MoonBit's field checks.
+fn _touch_sdl_mouse_motion_event_struct() -> Unit {
+  let event = SdlMouseMotionEvent::{
+    event_type: SDL_EVENT_MOUSE_MOTION,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    which: 0U,
+    state: 0U,
+    x: (0.0 : Float),
+    y: (0.0 : Float),
+    xrel: (0.0 : Float),
+    yrel: (0.0 : Float),
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.which)
+  ignore(event.state)
+  ignore(event.x)
+  ignore(event.y)
+  ignore(event.xrel)
+  ignore(event.yrel)
+}
+
+///|
+/// Keeps the private SDL mouse button mirror visible to MoonBit's field checks.
+fn _touch_sdl_mouse_button_event_struct() -> Unit {
+  let event = SdlMouseButtonEvent::{
+    event_type: SDL_EVENT_MOUSE_BUTTON_DOWN,
+    reserved: 0U,
+    timestamp: 0UL,
+    windowID: 0U,
+    which: 0U,
+    button: (1 : Byte),
+    down: true,
+    padding1: (0 : Byte),
+    padding2: (0 : Byte),
+    padding3: (0 : Byte),
+    x: (0.0 : Float),
+    y: (0.0 : Float),
+  }
+  ignore(event.event_type)
+  ignore(event.reserved)
+  ignore(event.timestamp)
+  ignore(event.windowID)
+  ignore(event.which)
+  ignore(event.button)
+  ignore(event.down)
+  ignore(event.padding1)
+  ignore(event.padding2)
+  ignore(event.padding3)
+  ignore(event.x)
+  ignore(event.y)
 }
 
 ///|
@@ -826,52 +916,86 @@ fn enqueue_sdl_mouse_button(
 }
 
 ///|
+/// Maps an SDL mouse button index to the shared Rhodonite input button enum.
+fn sdl_input_mouse_button(button : Byte) -> @input.MouseButton? {
+  match button.to_int() {
+    @lib.SDL_BUTTON_LEFT => Some(Left)
+    @lib.SDL_BUTTON_MIDDLE => Some(Middle)
+    @lib.SDL_BUTTON_RIGHT => Some(Right)
+    @lib.SDL_BUTTON_X1 => Some(Back)
+    @lib.SDL_BUTTON_X2 => Some(Forward)
+    _ => None
+  }
+}
+
+///|
+/// Syncs all normalized mouse buttons from an SDL button-state bitmask.
+fn enqueue_sdl_mouse_buttons_from_flags(
+  input : @input.InputState,
+  flags : UInt,
+  x : Float,
+  y : Float,
+) -> Unit {
+  enqueue_sdl_mouse_button(
+    input, flags, @lib.SDL_BUTTON_LMASK, Left, x, y,
+  )
+  enqueue_sdl_mouse_button(
+    input, flags, @lib.SDL_BUTTON_MMASK, Middle, x, y,
+  )
+  enqueue_sdl_mouse_button(
+    input, flags, @lib.SDL_BUTTON_RMASK, Right, x, y,
+  )
+  enqueue_sdl_mouse_button(
+    input, flags, @lib.SDL_BUTTON_X1MASK, Back, x, y,
+  )
+  enqueue_sdl_mouse_button(
+    input, flags, @lib.SDL_BUTTON_X2MASK, Forward, x, y,
+  )
+}
+
+///|
+/// Queues pointer position and button transitions from an SDL mouse motion event.
+fn enqueue_sdl_mouse_motion_event(
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+) -> Unit {
+  let motion : SdlMouseMotionEvent = @lib.unsafe_from_sdl_event(event)
+  input.enqueue_event(PointerMove(motion.x, motion.y))
+  enqueue_sdl_mouse_buttons_from_flags(
+    input, motion.state, motion.x, motion.y,
+  )
+}
+
+///|
+/// Queues one mouse button transition from an SDL mouse button event.
+fn enqueue_sdl_mouse_button_event(
+  input : @input.InputState,
+  event : @lib.SDL_Event,
+) -> Unit {
+  let button_event : SdlMouseButtonEvent = @lib.unsafe_from_sdl_event(event)
+  match sdl_input_mouse_button(button_event.button) {
+    Some(button) =>
+      if button_event.down {
+        input.enqueue_event(MouseDown(button, button_event.x, button_event.y))
+      } else {
+        input.enqueue_event(MouseUp(button, button_event.x, button_event.y))
+      }
+    None => ()
+  }
+}
+
+///|
 /// Queues SDL mouse position and button state for the next engine frame.
 fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
   let x = FixedArray::make(1, (0.0 : Float))
   let y = FixedArray::make(1, (0.0 : Float))
   let flags = @lib.sdl_GetMouseState(x, y)
+  let global_x = FixedArray::make(1, (0.0 : Float))
+  let global_y = FixedArray::make(1, (0.0 : Float))
+  let global_flags = @lib.sdl_GetGlobalMouseState(global_x, global_y)
+  let flags = flags | global_flags
   input.enqueue_event(PointerMove(x[0], y[0]))
-  enqueue_sdl_mouse_button(
-    input,
-    flags,
-    @lib.SDL_BUTTON_LMASK,
-    Left,
-    x[0],
-    y[0],
-  )
-  enqueue_sdl_mouse_button(
-    input,
-    flags,
-    @lib.SDL_BUTTON_MMASK,
-    Middle,
-    x[0],
-    y[0],
-  )
-  enqueue_sdl_mouse_button(
-    input,
-    flags,
-    @lib.SDL_BUTTON_RMASK,
-    Right,
-    x[0],
-    y[0],
-  )
-  enqueue_sdl_mouse_button(
-    input,
-    flags,
-    @lib.SDL_BUTTON_X1MASK,
-    Back,
-    x[0],
-    y[0],
-  )
-  enqueue_sdl_mouse_button(
-    input,
-    flags,
-    @lib.SDL_BUTTON_X2MASK,
-    Forward,
-    x[0],
-    y[0],
-  )
+  enqueue_sdl_mouse_buttons_from_flags(input, flags, x[0], y[0])
 }
 
 ///|
@@ -961,6 +1085,14 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
           if install_input {
             enqueue_sdl_mouse_wheel_event(input, event)
           }
+        SDL_EVENT_MOUSE_MOTION =>
+          if install_input {
+            enqueue_sdl_mouse_motion_event(input, event)
+          }
+        SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP =>
+          if install_input {
+            enqueue_sdl_mouse_button_event(input, event)
+          }
         SDL_EVENT_WINDOW_RESIZED
         | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
         | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED =>
@@ -1020,10 +1152,16 @@ fn handle_sdl_platform_event_for_on_demand(
       }
       false
     }
-    SDL_EVENT_MOUSE_MOTION
-    | SDL_EVENT_MOUSE_BUTTON_DOWN
-    | SDL_EVENT_MOUSE_BUTTON_UP => {
+    SDL_EVENT_MOUSE_MOTION => {
       if install_input {
+        enqueue_sdl_mouse_motion_event(input, event)
+        request_render("input")
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        enqueue_sdl_mouse_button_event(input, event)
         request_render("input")
       }
       false
@@ -1303,12 +1441,41 @@ fn handle_sdl_multi_window_event(
       }
       false
     }
-    SDL_EVENT_MOUSE_MOTION
-    | SDL_EVENT_MOUSE_BUTTON_DOWN
-    | SDL_EVENT_MOUSE_BUTTON_UP => {
+    SDL_EVENT_MOUSE_MOTION => {
       if install_input {
-        session.focused_window_id = Some(sdl_event_window_id(event))
-        request_render("input")
+        let window_id = sdl_event_window_id(event)
+        session.focused_window_id = Some(window_id)
+        match session.find_surface_index_by_window_id(window_id) {
+          Some(index) =>
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
+              Some(input) => {
+                enqueue_sdl_mouse_motion_event(input, event)
+                request_render("input")
+              }
+              None => ()
+            }
+          None => ()
+        }
+      }
+      false
+    }
+    SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP => {
+      if install_input {
+        let window_id = sdl_event_window_id(event)
+        session.focused_window_id = Some(window_id)
+        match session.find_surface_index_by_window_id(window_id) {
+          Some(index) =>
+            match
+              sdl_multi_window_engine_input_for_surface(session, engine, index) {
+              Some(input) => {
+                enqueue_sdl_mouse_button_event(input, event)
+                request_render("input")
+              }
+              None => ()
+            }
+          None => ()
+        }
       }
       false
     }
