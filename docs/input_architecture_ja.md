@@ -126,4 +126,4 @@ controller の操作は、左 button drag が yaw / pitch の orbit、中 button
 
 Multi-surface 設計では `Platform` は device/event loop、`Surface` は canvas/window/swapchain/input を所有する。`FrameState::input()` は surface-local input を返し、render path の camera/controller は `Engine::surface_input(surface_id)` または `frame.input()` を使う。canvas/window A の pointer event は canvas/window B の camera/controller に影響させない。
 
-単一 surface 向けには browser の `run_single_canvas_platform(...)` と SDL3 の `run_single_window_platform(...)` を使う。これらは旧 API 互換ではなく、multi-surface 設計上の thin wrapper として扱う。
+単一 surface 向けには browser の `run_single_canvas_platform(canvas, ...)` と SDL3 の `run_single_window_platform(window_title, width, height, ...)` を使う（いずれも `PlatformConfig` を組み立てずに `run_platform` へ委譲する thin wrapper）。これらは旧 API 互換ではなく、multi-surface 設計上の簡易 entry point として扱う。

@@ -39,7 +39,7 @@ pub fn run_sdl_metal_webgpu_input_render_loop(SdlMetalWebGpuNativeSession, @inpu
 
 pub fn run_sdl_metal_webgpu_render_loop(SdlMetalWebGpuNativeSession, (Float) -> Unit) -> SdlMetalWebGpuNativeSession raise Sdl3AppError
 
-pub async fn run_single_window_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Unit raise Sdl3AppError
+pub async fn run_single_window_platform(String, Int, Int, PlatformApp, PlatformOptions, init_log? : String) -> Unit raise Sdl3AppError
 
 // Errors
 pub(all) suberror Sdl3AppError {
