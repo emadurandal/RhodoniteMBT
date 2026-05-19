@@ -98,6 +98,20 @@ fn MultiSurfaceDemoState::handle_input_frame(
 }
 
 ///|
+/// Updates animation and ECS phases for every registered surface using engine frame time.
+fn MultiSurfaceDemoState::update_surface_frames(
+  self : MultiSurfaceDemoState,
+  frame : @app.FrameState,
+) -> Unit {
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    let demo = self.surfaces[i].demo
+    demo.update_scene(frame)
+    ignore(demo.scene.run_systems_for_phase(@app.phase_update(), frame))
+    ignore(demo.scene.run_systems_for_phase(@app.phase_post_update(), frame))
+  }
+}
+
+///|
 /// Renders the target surface demo into its current drawable.
 fn MultiSurfaceDemoState::render_surface_frame(
   self : MultiSurfaceDemoState,
@@ -110,9 +124,12 @@ fn MultiSurfaceDemoState::render_surface_frame(
         return
       }
       let surface_demo = self.ensure_surface(engine, id)
+      if !surface_demo.demo.scene.visible() {
+        return
+      }
       let surface = engine.surface(id).gpu_surface()
       let view = surface.acquire_view()
-      @scene_graph.render_frame_to_view(surface_demo.demo, view)
+      @scene_graph.render_current_frame_to_view(surface_demo.demo, view)
       @wgpu.textureView_release(view)
       surface.present()
     }
@@ -139,6 +156,9 @@ pub fn register_engine_handlers(
   })
   engine.add_phase_handler(@app.phase_input(), fn(engine, frame) {
     demo_state.handle_input_frame(engine, frame)
+  })
+  engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
+    demo_state.update_surface_frames(frame)
   })
   engine.add_phase_handler(
     @app.phase_render(),
