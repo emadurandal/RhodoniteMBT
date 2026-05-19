@@ -36,6 +36,25 @@ native entry packages still override it with the real browser or wgpu backend.
 - The root [`package.json`](package.json) does **not** set `"type": "module"`. Setting it can break mooncake prebuilds (e.g. `Milky2018/wgpu_mbt`) that use CommonJS `require`, because Node then treats the package as ESM.
 - JS artifacts built under [`moon.work`](moon.work) may be grouped under the **repository root `_build`**, not always next to each module (Vitest aliases and `src/main-*.ts` imports are written with that in mind).
 
+### npm package
+
+The TypeScript wrappers and the MoonBit JavaScript bridge they call are packaged
+for npm as [`rhodonite_mbt`](packages/rhodonite_mbt/). The package is ESM-only
+and exposes existing wrapper surfaces:
+
+```ts
+import { Vector3F } from "rhodonite_mbt/math";
+import { World } from "rhodonite_mbt/ecs";
+import { runSingleCanvasPlatform } from "rhodonite_mbt/app";
+```
+
+Build and inspect the npm package from the repository root:
+
+```bash
+pnpm run build:npm
+pnpm run pack:npm
+```
+
 ## Build & Run
 
 ### JS (browser)
@@ -136,3 +155,6 @@ files with exact or perceptual comparison. See [docs/image_regression_tests.md](
 ## Publish order (outline)
 
 When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/module_boundaries.md](docs/module_boundaries.md) — Release units.
+
+For npm, run `pnpm run publish:npm`; it rebuilds the release JS bridge and emits
+the `packages/rhodonite_mbt/dist` package before invoking `npm publish`.

@@ -1,0 +1,34 @@
+{
+  "name": "rhodonite_mbt",
+  "version": "0.0.0",
+  "description": "TypeScript wrappers and MoonBit JavaScript bridge for RhodoniteMBT.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./math": {
+      "types": "./dist/math/index.d.ts",
+      "import": "./dist/math/index.js"
+    },
+    "./ecs": {
+      "types": "./dist/ecs/index.d.ts",
+      "import": "./dist/ecs/index.js"
+    },
+    "./app": {
+      "types": "./dist/app/index.d.ts",
+      "import": "./dist/app/index.js"
+    }
+  },
+  "dependencies": {
+    "@webgpu/types": "^0.1.64"
+  }
+}
