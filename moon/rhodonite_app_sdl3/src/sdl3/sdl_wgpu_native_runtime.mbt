@@ -50,38 +50,6 @@ priv struct SdlMouseWheelEvent {
 }
 
 ///|
-/// Mirrors the SDL mouse motion event layout needed by the native input adapter.
-priv struct SdlMouseMotionEvent {
-  event_type : @lib.SDL_EventType
-  reserved : UInt
-  timestamp : UInt64
-  windowID : @lib.SDL_WindowID
-  which : @lib.SDL_MouseID
-  state : UInt
-  x : Float
-  y : Float
-  xrel : Float
-  yrel : Float
-}
-
-///|
-/// Mirrors the SDL mouse button event layout needed by the native input adapter.
-/// `down` uses `Byte` because MoonBit `Bool` is wider than C `bool` in FFI structs.
-priv struct SdlMouseButtonEvent {
-  event_type : @lib.SDL_EventType
-  reserved : UInt
-  timestamp : UInt64
-  windowID : @lib.SDL_WindowID
-  which : @lib.SDL_MouseID
-  button : Byte
-  down : Byte
-  clicks : Byte
-  padding : Byte
-  x : Float
-  y : Float
-}
-
-///|
 /// Mirrors the SDL window event layout needed for resize handling.
 priv struct SdlWindowEvent {
   event_type : @lib.SDL_EventType
@@ -185,62 +153,6 @@ fn _touch_sdl_mouse_wheel_event_struct() -> Unit {
   ignore(event.direction)
   ignore(event.mouse_x)
   ignore(event.mouse_y)
-}
-
-///|
-/// Keeps the private SDL mouse motion mirror visible to MoonBit's field checks.
-fn _touch_sdl_mouse_motion_event_struct() -> Unit {
-  let event = SdlMouseMotionEvent::{
-    event_type: SDL_EVENT_MOUSE_MOTION,
-    reserved: 0U,
-    timestamp: 0UL,
-    windowID: 0U,
-    which: 0U,
-    state: 0U,
-    x: (0.0 : Float),
-    y: (0.0 : Float),
-    xrel: (0.0 : Float),
-    yrel: (0.0 : Float),
-  }
-  ignore(event.event_type)
-  ignore(event.reserved)
-  ignore(event.timestamp)
-  ignore(event.windowID)
-  ignore(event.which)
-  ignore(event.state)
-  ignore(event.x)
-  ignore(event.y)
-  ignore(event.xrel)
-  ignore(event.yrel)
-}
-
-///|
-/// Keeps the private SDL mouse button mirror visible to MoonBit's field checks.
-fn _touch_sdl_mouse_button_event_struct() -> Unit {
-  let event = SdlMouseButtonEvent::{
-    event_type: SDL_EVENT_MOUSE_BUTTON_DOWN,
-    reserved: 0U,
-    timestamp: 0UL,
-    windowID: 0U,
-    which: 0U,
-    button: (0 : Byte),
-    down: (0 : Byte),
-    clicks: (0 : Byte),
-    padding: (0 : Byte),
-    x: (0.0 : Float),
-    y: (0.0 : Float),
-  }
-  ignore(event.event_type)
-  ignore(event.reserved)
-  ignore(event.timestamp)
-  ignore(event.windowID)
-  ignore(event.which)
-  ignore(event.button)
-  ignore(event.down)
-  ignore(event.clicks)
-  ignore(event.padding)
-  ignore(event.x)
-  ignore(event.y)
 }
 
 ///|
