@@ -212,6 +212,36 @@ describe("app-runtime Engine", () => {
 		expect(calls.at(-1)?.frameIndex).toBe(1);
 	});
 
+	it("attaches legacy surface state to fixed steps in multi-surface frames", async () => {
+		const engine = await createTestEngine();
+		const fixedFrames: Array<{
+			format: string;
+			surfaceChanged: boolean;
+			surfaceId: number | undefined;
+		}> = [];
+
+		engine.addPhaseHandler(Phase.FixedUpdate, (_engine, frame) => {
+			fixedFrames.push({
+				format: frame.surface.format,
+				surfaceChanged: frame.surfaceChanged,
+				surfaceId: frame.surfaceId,
+			});
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()));
+
+		const fixedSteps = engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(fixedSteps).toBe(1);
+		expect(fixedFrames).toEqual([
+			{
+				format: engine.format,
+				surfaceChanged: true,
+				surfaceId: undefined,
+			},
+		]);
+	});
+
 	it("exposes frame-begin, fixed-step, and render-frame groups separately", async () => {
 		const engine = await createTestEngine();
 		engine.initialize();

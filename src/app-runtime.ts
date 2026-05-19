@@ -1512,14 +1512,16 @@ export class Engine {
 			);
 			this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
 		}
-		this.timeState.pushFixedElapsed(elapsedSeconds);
-		const fixedSteps = this.timeState.drainReadyFixedFrames((fixedFrame) => {
-			this.runPhaseGroup(PhaseGroup.FixedStep, fixedFrame);
-		});
+		const fixedSteps = this.runReadyFixedSteps(
+			elapsedSeconds,
+			this.surfaceStateValue,
+			this.surfaceChangedValue,
+		);
 		this.runRenderFrameGroupForMultiSurface(baseFrame);
 		for (const surface of this.surfaces) {
 			surface.changed = false;
 		}
+		this.surfaceChangedValue = false;
 		return fixedSteps;
 	}
 
