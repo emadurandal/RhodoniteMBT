@@ -4,3 +4,5 @@ import {
   "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
 }
+
+supported_targets = "+js+native"

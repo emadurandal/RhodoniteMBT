@@ -4,3 +4,5 @@ import {
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/core/ref" @ref,
 }
+
+supported_targets = "+js+native"

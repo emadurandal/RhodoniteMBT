@@ -3,3 +3,5 @@ import {
   "emadurandal/rhodonite_webgpu/webgpu_objects" @raw,
   "emadurandal/rhodonite_webgpu/webgpu_enums" @enums,
 }
+
+supported_targets = "+js+native"

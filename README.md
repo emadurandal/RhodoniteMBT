@@ -21,11 +21,15 @@ Example from the repository root (update deps and check everything):
 ```bash
 moon update   # network may be required
 moon check --target all
+moon test --target all
 moon fmt
 moon info
 ```
 
 From [`justfile`](justfile), `just check-ws` runs `moon check --target all`.
+The WebGPU object package is a virtual package with a default fallback stub so
+workspace-wide checks/tests can build library packages directly; runnable JS and
+native entry packages still override it with the real browser or wgpu backend.
 
 ### Node, pnpm, and workspace output
 
@@ -89,7 +93,7 @@ executable path is needed.
 
 If the native build cannot find SDL3 headers, source
 [`scripts/setup-sdl3-env.sh`](scripts/setup-sdl3-env.sh) in the shell before
-running native commands:
+running native commands, including `moon test --target all`:
 
 ```bash
 source scripts/setup-sdl3-env.sh
