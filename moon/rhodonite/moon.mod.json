@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "deps": {
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"
@@ -14,5 +14,6 @@
   "license": "Apache-2.0",
   "keywords": ["rhodonite", "moonbit", "webgpu", "graphics"],
   "description": "Public facade over RhodoniteMBT modules with high-level app/runtime helpers.",
-  "source": "src"
+  "source": "src",
+  "preferred-target": "js"
 }

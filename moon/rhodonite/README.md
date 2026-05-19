@@ -4,6 +4,8 @@
 
 Public **facade** module for [RhodoniteMBT](https://github.com/emadurandal/RhodoniteMBT). It pulls in the workspace libraries as dependencies so `moon add emadurandal/rhodonite` can serve as a single entry point.
 
+The module declares `preferred-target: "js"` because its browser app packages are JavaScript-targeted. This keeps mooncakes publish verification on the supported backend.
+
 It also exposes early high-level runtime helpers:
 
 - `emadurandal/rhodonite/app` — `Engine`, `Scene`, `FrameState`, and `TimeState`
