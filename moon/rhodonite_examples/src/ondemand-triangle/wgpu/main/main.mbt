@@ -23,12 +23,13 @@ fn setup_engine(engine : @app.Engine) -> Bool {
 ///|
 /// Runs the SDL3 sample with the library on-demand platform loop.
 async fn run_sdl_wgpu_ondemand_triangle() -> Unit raise Error {
-  @sdl_app.run_platform(
-    @sdl_app.PlatformConfig::new(
-      "MoonBit wgpu + SDL3 (on-demand triangle)", 800, 600, "native: initializing SDL3 (ondemand-triangle demo)",
-    ),
+  @sdl_app.run_single_window_platform(
+    "MoonBit wgpu + SDL3 (on-demand triangle)",
+    800,
+    600,
     @sdl_app.PlatformApp::default_engine(setup_engine),
     @sdl_app.PlatformOptions::interactive_on_demand(),
+    init_log="native: initializing SDL3 (ondemand-triangle demo)",
   )
 }
 
