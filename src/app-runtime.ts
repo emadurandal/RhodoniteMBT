@@ -97,8 +97,10 @@ export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
 	readonly elapsedSeconds: number;
+	readonly surfaceId: SurfaceId | undefined;
 	readonly surface: SurfaceState;
 	readonly surfaceChanged: boolean;
+	readonly input: InputState | undefined;
 
 	constructor(
 		deltaSeconds: number,
@@ -106,12 +108,16 @@ export class FrameState {
 		elapsedSeconds: number,
 		surface: SurfaceState = SurfaceState.active(800, 600, "", 0),
 		surfaceChanged = false,
+		surfaceId: SurfaceId | undefined = undefined,
+		input: InputState | undefined = undefined,
 	) {
 		this.deltaSeconds = deltaSeconds;
 		this.frameIndex = frameIndex;
 		this.elapsedSeconds = elapsedSeconds;
+		this.surfaceId = surfaceId;
 		this.surface = surface;
 		this.surfaceChanged = surfaceChanged;
+		this.input = input;
 	}
 
 	withSurface(surface: SurfaceState, surfaceChanged: boolean): FrameState {
@@ -121,9 +127,30 @@ export class FrameState {
 			this.elapsedSeconds,
 			surface,
 			surfaceChanged,
+			this.surfaceId,
+			this.input,
+		);
+	}
+
+	withSurfaceView(
+		surfaceId: SurfaceId,
+		surface: SurfaceState,
+		surfaceChanged: boolean,
+		input: InputState,
+	): FrameState {
+		return new FrameState(
+			this.deltaSeconds,
+			this.frameIndex,
+			this.elapsedSeconds,
+			surface,
+			surfaceChanged,
+			surfaceId,
+			input,
 		);
 	}
 }
+
+export type SurfaceId = number;
 
 export class SurfaceState {
 	readonly width: number;
@@ -157,6 +184,72 @@ export class SurfaceState {
 
 	static suspended(generation: number): SurfaceState {
 		return new SurfaceState(0, 0, "", false, generation);
+	}
+
+	equals(other: SurfaceState): boolean {
+		return (
+			this.active === other.active &&
+			this.width === other.width &&
+			this.height === other.height &&
+			this.format === other.format &&
+			this.generation === other.generation
+		);
+	}
+}
+
+export class GpuSurface {
+	readonly canvas: HTMLCanvasElement;
+	readonly context: GPUCanvasContext;
+	readonly format: GPUTextureFormat;
+	private stateValue: SurfaceState;
+
+	constructor(
+		canvas: HTMLCanvasElement,
+		device: GPUDevice,
+		format: GPUTextureFormat = navigator.gpu.getPreferredCanvasFormat(),
+	) {
+		const context = canvas.getContext("webgpu");
+		if (context === null) {
+			throw new Error("WebGPU canvas context is not available.");
+		}
+		context.configure({ device, format, alphaMode: "opaque" });
+		this.canvas = canvas;
+		this.context = context;
+		this.format = format;
+		this.stateValue =
+			canvas.width > 0 && canvas.height > 0
+				? SurfaceState.active(canvas.width, canvas.height, format, 0)
+				: SurfaceState.suspended(0);
+	}
+
+	state(): SurfaceState {
+		return this.stateValue;
+	}
+
+	syncFromCanvas(): boolean {
+		const { width, height } = this.canvas;
+		const current = this.stateValue;
+		const next =
+			width > 0 && height > 0
+				? SurfaceState.active(width, height, this.format, current.generation)
+				: SurfaceState.suspended(current.generation);
+		if (current.equals(next)) {
+			return false;
+		}
+		this.stateValue =
+			width > 0 && height > 0
+				? SurfaceState.active(
+						width,
+						height,
+						this.format,
+						current.generation + 1,
+					)
+				: SurfaceState.suspended(current.generation + 1);
+		return true;
+	}
+
+	acquireView(): GPUTextureView {
+		return this.context.getCurrentTexture().createView();
 	}
 }
 
@@ -928,6 +1021,22 @@ export async function runPlatform(
 	return platform;
 }
 
+export async function runSingleCanvasPlatform(
+	canvas: HTMLCanvasElement,
+	app: PlatformApp,
+	options: PlatformOptions = PlatformOptions.interactive(),
+): Promise<Platform | undefined> {
+	return runPlatform(new PlatformConfig(canvas), app, options);
+}
+
+export function attachCanvasSurface(
+	engine: Engine,
+	canvas: HTMLCanvasElement,
+	options: { readonly scene?: RuntimeScene } = {},
+): SurfaceId {
+	return engine.addSurface(new GpuSurface(canvas, engine.device, engine.format), options);
+}
+
 export function syncBrowserEngineSurface(engine: Engine): void {
 	if (engine.canvas.width <= 0 || engine.canvas.height <= 0) {
 		engine.setSurfaceSuspended();
@@ -984,6 +1093,14 @@ export type CommonOrbitCameraHandlers<TWorld, TMainCamera, TComponent> = {
 	) => void;
 };
 
+type EngineSurface = {
+	readonly id: SurfaceId;
+	readonly gpuSurface: GpuSurface;
+	readonly input: InputState;
+	scene: RuntimeScene;
+	changed: boolean;
+};
+
 export class Engine {
 	readonly canvas: HTMLCanvasElement;
 	readonly adapter: GPUAdapter;
@@ -993,6 +1110,7 @@ export class Engine {
 	readonly format: GPUTextureFormat;
 	readonly input: InputState;
 	private readonly scenes: RuntimeScene[];
+	private readonly surfaces: EngineSurface[] = [];
 	private readonly timeState: TimeState;
 	private readonly phaseGroupsValue: PhaseGroupRecord[];
 	private readonly phaseHandlers: PhaseHandler[] = [];
@@ -1000,6 +1118,7 @@ export class Engine {
 	private initializing = false;
 	private initialized = false;
 	private mainSceneIndex = 0;
+	private nextSurfaceId = 1;
 	private surfaceStateValue: SurfaceState;
 	private surfaceChangedValue = true;
 	private renderRequestedValue = true;
@@ -1070,6 +1189,53 @@ export class Engine {
 
 	surfaceActive(): boolean {
 		return this.surfaceStateValue.active;
+	}
+
+	addSurface(
+		gpuSurface: GpuSurface,
+		options: { readonly scene?: RuntimeScene } = {},
+	): SurfaceId {
+		const id = this.nextSurfaceId;
+		this.nextSurfaceId += 1;
+		this.surfaces.push({
+			id,
+			gpuSurface,
+			input: new InputState(),
+			scene: options.scene ?? this.scenes[this.mainSceneIndex],
+			changed: true,
+		});
+		this.requestRender("surface");
+		return id;
+	}
+
+	removeSurface(surfaceId: SurfaceId): void {
+		const index = this.surfaces.findIndex((surface) => surface.id === surfaceId);
+		if (index < 0) {
+			return;
+		}
+		this.surfaces.splice(index, 1);
+		this.requestRender("surface");
+	}
+
+	surfaceInput(surfaceId: SurfaceId): InputState {
+		return this.requireSurface(surfaceId).input;
+	}
+
+	surfaceGpuSurface(surfaceId: SurfaceId): GpuSurface {
+		return this.requireSurface(surfaceId).gpuSurface;
+	}
+
+	setSurfaceScene(surfaceId: SurfaceId, scene: RuntimeScene): void {
+		this.requireSurface(surfaceId).scene = scene;
+		this.requestRender("surface-scene");
+	}
+
+	private requireSurface(surfaceId: SurfaceId): EngineSurface {
+		const surface = this.surfaces.find((candidate) => candidate.id === surfaceId);
+		if (surface === undefined) {
+			throw new Error(`Unknown engine surface '${surfaceId}'.`);
+		}
+		return surface;
 	}
 
 	setRenderWakeup(wakeup: (() => void) | undefined): void {
@@ -1174,7 +1340,7 @@ export class Engine {
 				"Engine.addCommonHandlers: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
 			);
 		}
-		this.addPhaseHandler(Phase.Input, (engine) => {
+		this.addPhaseHandler(Phase.Input, (engine, frame) => {
 			const camera = scene.mainCamera();
 			if (camera === null) {
 				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
@@ -1183,7 +1349,7 @@ export class Engine {
 				scene.world(),
 				camera,
 				orbitControllerComponent,
-				engine.input,
+				frame.input ?? engine.input,
 			);
 		});
 		if (homeComponent === undefined) {
@@ -1275,7 +1441,11 @@ export class Engine {
 
 	private runPhaseUnchecked(phase: PhaseKey, frame: FrameState): void {
 		this.runPhaseHandlers(phase, PhaseSlot.BeforeSystems, frame);
-		for (const scene of this.scenes) {
+		const scenes =
+			frame.surfaceId === undefined
+				? this.scenes
+				: [this.requireSurface(frame.surfaceId).scene];
+		for (const scene of scenes) {
 			if (this.sceneParticipatesInPhase(scene, phase)) {
 				scene.runSchedulePhase(phase, frame);
 			}
@@ -1323,6 +1493,36 @@ export class Engine {
 		return fixedSteps;
 	}
 
+	runMultiSurfaceFrame(elapsedSeconds: number): number {
+		this.ensureInitialized("Engine.runMultiSurfaceFrame");
+		if (this.surfaces.length === 0) {
+			return this.runFrame(elapsedSeconds);
+		}
+		this.consumeRenderRequested();
+		this.input.beginFrame();
+		const baseFrame = this.timeState.nextRenderFrame(elapsedSeconds);
+		for (const surface of this.surfaces) {
+			surface.changed = surface.gpuSurface.syncFromCanvas() || surface.changed;
+			surface.input.beginFrame();
+			const frame = baseFrame.withSurfaceView(
+				surface.id,
+				surface.gpuSurface.state(),
+				surface.changed,
+				surface.input,
+			);
+			this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
+		}
+		this.timeState.pushFixedElapsed(elapsedSeconds);
+		const fixedSteps = this.timeState.drainReadyFixedFrames((fixedFrame) => {
+			this.runPhaseGroup(PhaseGroup.FixedStep, fixedFrame);
+		});
+		this.runRenderFrameGroupForMultiSurface(baseFrame);
+		for (const surface of this.surfaces) {
+			surface.changed = false;
+		}
+		return fixedSteps;
+	}
+
 	private runRenderFrameGroupForSurface(frame: FrameState): void {
 		const phaseGroup = this.findPhaseGroup(
 			"Engine.runRenderFrameGroupForSurface",
@@ -1331,6 +1531,26 @@ export class Engine {
 		for (const phase of phaseGroup.phases) {
 			if (frame.surface.active || !phaseIsRenderPath(phase)) {
 				this.runPhase(phase, frame);
+			}
+		}
+	}
+
+	private runRenderFrameGroupForMultiSurface(baseFrame: FrameState): void {
+		for (const phase of this.phaseGroupOrder(PhaseGroup.RenderFrame)) {
+			for (const surface of this.surfaces) {
+				const state = surface.gpuSurface.state();
+				if (!state.active && phaseIsRenderPath(phase)) {
+					continue;
+				}
+				this.runPhase(
+					phase,
+					baseFrame.withSurfaceView(
+						surface.id,
+						state,
+						surface.changed,
+						surface.input,
+					),
+				);
 			}
 		}
 	}

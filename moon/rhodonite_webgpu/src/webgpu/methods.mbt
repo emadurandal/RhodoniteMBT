@@ -608,6 +608,114 @@ pub fn GPUContext::get(
 }
 
 ///|
+/// Returns the WebGPU instance used to create this shared device context.
+pub fn GPUDeviceContext::instance(self : GPUDeviceContext) -> GPUInstance {
+  self.instance
+}
+
+///|
+/// Returns the adapter used to create this shared device context.
+pub fn GPUDeviceContext::adapter(self : GPUDeviceContext) -> GPUAdapter {
+  self.adapter
+}
+
+///|
+/// Returns the shared device.
+pub fn GPUDeviceContext::device(self : GPUDeviceContext) -> GPUDevice {
+  self.device
+}
+
+///|
+/// Returns the shared queue.
+pub fn GPUDeviceContext::queue(self : GPUDeviceContext) -> GPUQueue {
+  self.queue
+}
+
+///|
+/// Returns the canvas/swapchain context backing this presentation surface.
+pub fn GPUSurface::canvas_context(self : GPUSurface) -> GPUCanvasContext {
+  self.context
+}
+
+///|
+/// Returns the preferred render target format for this presentation surface.
+pub fn GPUSurface::format(self : GPUSurface) -> String {
+  self.format
+}
+
+///|
+/// Returns the current drawable width in pixels.
+pub fn GPUSurface::width(self : GPUSurface) -> Int {
+  self.width
+}
+
+///|
+/// Returns the current drawable height in pixels.
+pub fn GPUSurface::height(self : GPUSurface) -> Int {
+  self.height
+}
+
+///|
+/// Reports whether this surface currently has a drawable extent.
+pub fn GPUSurface::active(self : GPUSurface) -> Bool {
+  self.active
+}
+
+///|
+/// Returns the surface generation incremented on resize or suspend.
+pub fn GPUSurface::generation(self : GPUSurface) -> Int {
+  self.generation
+}
+
+///|
+/// Reconfigures the surface to the given drawable size or suspends it at zero size.
+pub fn GPUSurface::resize(
+  self : GPUSurface,
+  device : GPUDevice,
+  width : Int,
+  height : Int,
+) -> Bool {
+  if width <= 0 || height <= 0 {
+    return self.suspend()
+  }
+  if self.active && self.width == width && self.height == height {
+    return false
+  }
+  self.context.resize(device, self.format, width, height)
+  self.format = self.context.get_format()
+  self.width = width
+  self.height = height
+  self.active = true
+  self.generation = self.generation + 1
+  true
+}
+
+///|
+/// Marks this surface as suspended because it has no drawable extent.
+pub fn GPUSurface::suspend(self : GPUSurface) -> Bool {
+  if !self.active {
+    return false
+  }
+  self.width = 0
+  self.height = 0
+  self.active = false
+  self.generation = self.generation + 1
+  true
+}
+
+///|
+/// Acquires the current drawable texture view for rendering.
+pub fn GPUSurface::acquire_view(self : GPUSurface) -> GPUTextureView {
+  self.context.get_current_texture().create_view()
+}
+
+///|
+/// Presents the most recently acquired drawable texture.
+pub fn GPUSurface::present(self : GPUSurface) -> Unit {
+  self.context.present()
+}
+
+///|
 /// Implements `GPUTexture::create_view`.
 pub fn GPUTexture::create_view(self : GPUTexture) -> GPUTextureView {
   @raw.webgpu_texture_create_view(self.raw)

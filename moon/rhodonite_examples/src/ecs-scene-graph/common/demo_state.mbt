@@ -120,6 +120,16 @@ fn DemoState::resize_depth_attachment(
 }
 
 ///|
+/// Recreates surface-sized render resources for callers that render into an external surface.
+pub fn DemoState::resize_surface_resources(
+  self : DemoState,
+  width : Int,
+  height : Int,
+) -> Unit {
+  self.resize_depth_attachment(width, height)
+}
+
+///|
 /// Applies surface changes to sample-owned render resources.
 fn DemoState::handle_surface_frame(
   self : DemoState,
@@ -128,6 +138,32 @@ fn DemoState::handle_surface_frame(
   if frame.surface_changed() && frame.surface_active() {
     self.resize_depth_attachment(frame.surface_width(), frame.surface_height())
   }
+}
+
+///|
+/// Applies surface-local input to the scene camera orbit controller.
+pub fn DemoState::update_camera_from_input(
+  self : DemoState,
+  input : @input.InputState,
+) -> Unit {
+  let camera = match self.scene.main_camera() {
+    Some(camera) => camera
+    None => abort("DemoState::update_camera_from_input requires a main camera")
+  }
+  ignore(
+    @ecs.update_orbit_camera_controller_from_mouse_frame(
+      self.scene.world(),
+      camera,
+      self.orbit_controller,
+      input.mouse_down(Left),
+      input.mouse_pressed(Left),
+      input.mouse_down(Middle),
+      input.mouse_pressed(Middle),
+      input.pointer_delta_x(),
+      input.pointer_delta_y(),
+      input.wheel_delta_y(),
+    ),
+  )
 }
 
 ///|

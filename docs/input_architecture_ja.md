@@ -108,6 +108,8 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 Native SDL3 の on-demand loop は mouse motion / button down / button up / wheel を input dirty event として扱い、`Engine::request_render("input")` で次フレームを起床する。実際の pointer 座標と button transition は render 直前の `SDL_GetMouseState` snapshot から enqueue するため、通常 loop と on-demand loop は同じ `InputState` 集約値を渡す。
 
+multi-window native loop も同様に、render 直前にフォーカス中 window の `SDL_GetMouseState` を surface-local `InputState` へ enqueue する。`PlatformOptions::interactive_on_demand()` の multi-window loop は single-window on-demand と同じく `SDL_WaitEventTimeout`、idle 検出、`Engine::render_requested()` / `continuous_render_requested()` 判定で必要なフレームだけ `run_multi_surface_frame` を実行する。SDL mouse button event の FFI mirror は C `bool` と同じ 1 バイト幅で読む。
+
 wheel delta は controller 側で同じ sensitivity を使えるよう、adapter 側で browser の `WheelEvent.deltaX/Y` に近い符号と大きさへ寄せる。native SDL3 adapter は wheel step を DOM wheel の pixel delta 相当に近づけるため 100 倍して enqueue し、通常スクロールの上方向が dolly-in になるよう `deltaY` を負方向へ正規化する。
 
 ## ECS camera controller
@@ -119,3 +121,9 @@ camera matrix の生成側は DOM や SDL3 を見ず、camera entity の `Transf
 TypeScript 実装の `ts-ecs-mass-cubes` は [`src/orbit-camera-controller.ts`](../src/orbit-camera-controller.ts) で MoonBit 側と同じ byte layout の `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` component を登録し、camera entity に保持する。`Engine.addCommonHandlers` が `Phase.Input` handler で `Engine.input` から `OrbitCameraController` component を更新し、`Phase.PostUpdate` scene systems で `OrbitCameraController + CameraHomeTransform` から `Transform3D` / `GlobalTransform` を更新する。MassCubes 固有の camera solver は `Phase.RenderExtract` scene systems で builtin `Camera` blob を更新し、render 側は `drainAndUploadCameraWrites` と draw に集中する。WASM host は host 側で所有する `InputState` の集約済み mouse frame 値だけを WASM import として渡し、WASM 側の `World` が camera entity と `OrbitCameraController` component を所有する。TypeScript runtime は [`installBrowserInputCallbacks`](../src/app-runtime.ts) を共通入口にして browser pointer event を同じ入力モデルへ正規化する。MoonBit native / JS 版の MassCubes は render path ではなく `phase_render_extract()` の sample-local ECS system で MassCubes 固有の framing を `GlobalTransform` と `Camera` blob に反映し、render では camera writes の upload と draw だけを行う。WASM / WASM-GC 版は host-driven のままだが、WASM export を update / render-extract / render に分け、render-extract で view/proj 生成、`World::set_camera_matrices`、packed camera blob row upload まで行う。host の render phase は WebGPU の render pass を発行する。
 
 controller の操作は、左 button drag が yaw / pitch の orbit、中 button drag が view-space の左右上下 pan、wheel が dolly scale である。中 button drag は右へ動かすと camera view を右へ、下へ動かすと camera view を下へ移動する。既定の dolly scale は `0.01` から `4.0` に clamp され、初期値 `1.0` から 100 倍相当まで寄れる。mass-cubes と scene-graph はどちらも orthographic projection を使うため、wheel の dolly は view-space camera state に加えて ortho 表示範囲にも反映し、前後移動として見た目に分かるようにする。
+
+## Multi-surface input note
+
+Multi-surface 設計では `Platform` は device/event loop、`Surface` は canvas/window/swapchain/input を所有する。`FrameState::input()` は surface-local input を返し、render path の camera/controller は `Engine::surface_input(surface_id)` または `frame.input()` を使う。canvas/window A の pointer event は canvas/window B の camera/controller に影響させない。
+
+単一 surface 向けには browser の `run_single_canvas_platform(...)` と SDL3 の `run_single_window_platform(...)` を使う。これらは旧 API 互換ではなく、multi-surface 設計上の thin wrapper として扱う。

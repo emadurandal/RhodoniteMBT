@@ -5,6 +5,8 @@ pub struct Engine {
   priv input_state : @input.InputState
   priv mut surface_state : SurfaceState
   priv mut surface_changed : Bool
+  priv mut next_surface_id : Int
+  priv surfaces : Array[EngineSurface]
   priv mut render_requested : Bool
   priv mut continuous_render_requested : Bool
   priv mut render_wakeup : (() -> Unit)?
@@ -32,6 +34,7 @@ pub fn Engine::new_with_main_scene(
 ) -> Engine {
   let (_device, _canvas_context, format, _queue) = gpu_context.get()
   let scenes : Array[Scene] = []
+  let surfaces : Array[EngineSurface] = []
   let phase_handlers : Array[PhaseHandler] = []
   scenes.push(main_scene)
   {
@@ -39,6 +42,8 @@ pub fn Engine::new_with_main_scene(
     input_state: @input.InputState::new(),
     surface_state: SurfaceState::new_active(800, 600, format, 0),
     surface_changed: true,
+    next_surface_id: 1,
+    surfaces,
     render_requested: true,
     continuous_render_requested: false,
     render_wakeup: None,
@@ -213,11 +218,14 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 ) -> Unit {
   self.add_phase_handler(
     phase,
-    fn(engine, _frame) {
+    fn(engine, frame) {
       let camera = scene_main_camera_or_abort(
         scene, "Engine::add_orbit_camera_controller_input_handler",
       )
-      let input = engine.input()
+      let input = match frame.input() {
+        Some(input) => input
+        None => engine.input()
+      }
       ignore(
         @ecs.update_orbit_camera_controller_from_mouse_frame(
           scene.world(),
@@ -516,11 +524,20 @@ fn Engine::run_phase_unchecked(
   frame : FrameState,
 ) -> Unit {
   self.run_before_systems(phase, frame)
-  for i = 0; i < self.scenes.length(); i = i + 1 {
-    let scene = self.scenes[i]
-    if self.scene_participates_in_phase(scene, phase) {
-      ignore(scene.run_systems_for_phase(phase, frame))
+  match frame.surface_id() {
+    Some(id) => {
+      let scene = self.surface(id).scene()
+      if self.scene_participates_in_phase(scene, phase) {
+        ignore(scene.run_systems_for_phase(phase, frame))
+      }
     }
+    None =>
+      for i = 0; i < self.scenes.length(); i = i + 1 {
+        let scene = self.scenes[i]
+        if self.scene_participates_in_phase(scene, phase) {
+          ignore(scene.run_systems_for_phase(phase, frame))
+        }
+      }
   }
   self.run_after_systems(phase, frame)
 }
@@ -605,6 +622,32 @@ fn Engine::run_render_frame_group_for_surface(
 }
 
 ///|
+/// Runs render-frame phases once per registered surface using surface-local frame state.
+fn Engine::run_render_frame_group_for_multi_surface(
+  self : Engine,
+  base_frame : FrameState,
+) -> Unit {
+  let phases = self.phase_group_order(phase_group_render_frame())
+  for i = 0; i < phases.length(); i = i + 1 {
+    let phase = phases[i]
+    for surface_index = 0
+        surface_index < self.surfaces.length()
+        surface_index = surface_index + 1 {
+      let surface = self.surfaces[surface_index]
+      if surface.state().active() || !phase_is_render_path(phase) {
+        let frame = base_frame.with_surface_view(
+          surface.id(),
+          surface.state(),
+          surface.changed,
+          surface.input(),
+        )
+        self.run_phase(phase, frame)
+      }
+    }
+  }
+}
+
+///|
 /// Runs each ready fixed-step frame after real elapsed time has accumulated.
 fn Engine::run_ready_fixed_steps(
   self : Engine,
@@ -635,6 +678,45 @@ pub fn Engine::run_frame(self : Engine, elapsed_seconds : Float) -> Int {
     elapsed_seconds, surface, surface_changed,
   )
   self.run_render_frame_group_for_surface(frame)
+  self.surface_changed = false
+  fixed_steps
+}
+
+///|
+/// Advances one engine tick and renders every registered platform surface.
+pub fn Engine::run_multi_surface_frame(
+  self : Engine,
+  elapsed_seconds : Float,
+) -> Int {
+  self.ensure_initialized("Engine::run_multi_surface_frame")
+  if self.surfaces.length() == 0 {
+    return self.run_frame(elapsed_seconds)
+  }
+  ignore(self.consume_render_requested())
+  self.input_state.begin_frame()
+  let base_frame = self.time_state.next_render_frame(elapsed_seconds)
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    let surface = self.surfaces[i]
+    surface.sync_from_gpu_surface()
+    surface.input().begin_frame()
+    let changed = surface.changed
+    let frame = base_frame.with_surface_view(
+      surface.id(),
+      surface.state(),
+      changed,
+      surface.input(),
+    )
+    self.run_phase_group(phase_group_frame_begin(), frame)
+  }
+  let fixed_steps = self.run_ready_fixed_steps(
+    elapsed_seconds,
+    self.surface_state,
+    self.surface_changed,
+  )
+  self.run_render_frame_group_for_multi_surface(base_frame)
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    ignore(self.surfaces[i].consume_changed())
+  }
   self.surface_changed = false
   fixed_steps
 }
