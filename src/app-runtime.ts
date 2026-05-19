@@ -1516,27 +1516,7 @@ export class Engine {
 		const fixedSteps = this.timeState.drainReadyFixedFrames((fixedFrame) => {
 			this.runPhaseGroup(PhaseGroup.FixedStep, fixedFrame);
 		});
-		for (const phase of this.phaseGroupOrder(PhaseGroup.RenderFrame)) {
-			if (phaseIsRenderPath(phase)) {
-				for (const surface of this.surfaces) {
-					const state = surface.gpuSurface.state();
-					if (!state.active) {
-						continue;
-					}
-					this.runPhase(
-						phase,
-						baseFrame.withSurfaceView(
-							surface.id,
-							state,
-							surface.changed,
-							surface.input,
-						),
-					);
-				}
-			} else {
-				this.runPhase(phase, baseFrame);
-			}
-		}
+		this.runRenderFrameGroupForMultiSurface(baseFrame);
 		for (const surface of this.surfaces) {
 			surface.changed = false;
 		}
@@ -1551,6 +1531,26 @@ export class Engine {
 		for (const phase of phaseGroup.phases) {
 			if (frame.surface.active || !phaseIsRenderPath(phase)) {
 				this.runPhase(phase, frame);
+			}
+		}
+	}
+
+	private runRenderFrameGroupForMultiSurface(baseFrame: FrameState): void {
+		for (const phase of this.phaseGroupOrder(PhaseGroup.RenderFrame)) {
+			for (const surface of this.surfaces) {
+				const state = surface.gpuSurface.state();
+				if (!state.active && phaseIsRenderPath(phase)) {
+					continue;
+				}
+				this.runPhase(
+					phase,
+					baseFrame.withSurfaceView(
+						surface.id,
+						state,
+						surface.changed,
+						surface.input,
+					),
+				);
 			}
 		}
 	}

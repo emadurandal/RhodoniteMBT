@@ -100,16 +100,18 @@ fn MultiSurfaceDemoState::handle_input_frame(
 }
 
 ///|
-/// Updates animation and ECS phases for every registered surface using engine frame time.
-fn MultiSurfaceDemoState::update_surface_frames(
+/// Updates animation for the surface targeted by the current engine frame.
+fn MultiSurfaceDemoState::update_surface_frame(
   self : MultiSurfaceDemoState,
+  engine : @app.Engine,
   frame : @app.FrameState,
 ) -> Unit {
-  for i = 0; i < self.surfaces.length(); i = i + 1 {
-    let demo = self.surfaces[i].demo
-    demo.update_scene(frame)
-    ignore(demo.scene.run_systems_for_phase(@app.phase_update(), frame))
-    ignore(demo.scene.run_systems_for_phase(@app.phase_post_update(), frame))
+  match frame.surface_id() {
+    Some(id) => {
+      let surface_demo = self.ensure_surface(engine, id)
+      surface_demo.demo.update_scene(frame)
+    }
+    None => ()
   }
 }
 
@@ -173,8 +175,8 @@ pub fn register_engine_handlers(
   engine.add_phase_handler(@app.phase_input(), fn(engine, frame) {
     demo_state.handle_input_frame(engine, frame)
   })
-  engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
-    demo_state.update_surface_frames(frame)
+  engine.add_phase_handler(@app.phase_update(), fn(engine, frame) {
+    demo_state.update_surface_frame(engine, frame)
   })
   engine.add_phase_handler(
     @app.phase_render(),

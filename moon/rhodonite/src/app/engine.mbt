@@ -622,6 +622,32 @@ fn Engine::run_render_frame_group_for_surface(
 }
 
 ///|
+/// Runs render-frame phases once per registered surface using surface-local frame state.
+fn Engine::run_render_frame_group_for_multi_surface(
+  self : Engine,
+  base_frame : FrameState,
+) -> Unit {
+  let phases = self.phase_group_order(phase_group_render_frame())
+  for i = 0; i < phases.length(); i = i + 1 {
+    let phase = phases[i]
+    for surface_index = 0
+        surface_index < self.surfaces.length()
+        surface_index = surface_index + 1 {
+      let surface = self.surfaces[surface_index]
+      if surface.state().active() || !phase_is_render_path(phase) {
+        let frame = base_frame.with_surface_view(
+          surface.id(),
+          surface.state(),
+          surface.changed,
+          surface.input(),
+        )
+        self.run_phase(phase, frame)
+      }
+    }
+  }
+}
+
+///|
 /// Runs each ready fixed-step frame after real elapsed time has accumulated.
 fn Engine::run_ready_fixed_steps(
   self : Engine,
@@ -687,28 +713,7 @@ pub fn Engine::run_multi_surface_frame(
     self.surface_state,
     self.surface_changed,
   )
-  let phases = self.phase_group_order(phase_group_render_frame())
-  for i = 0; i < phases.length(); i = i + 1 {
-    let phase = phases[i]
-    if phase_is_render_path(phase) {
-      for surface_index = 0
-          surface_index < self.surfaces.length()
-          surface_index = surface_index + 1 {
-        let surface = self.surfaces[surface_index]
-        if surface.state().active() {
-          let frame = base_frame.with_surface_view(
-            surface.id(),
-            surface.state(),
-            surface.changed,
-            surface.input(),
-          )
-          self.run_phase(phase, frame)
-        }
-      }
-    } else {
-      self.run_phase(phase, base_frame)
-    }
-  }
+  self.run_render_frame_group_for_multi_surface(base_frame)
   for i = 0; i < self.surfaces.length(); i = i + 1 {
     ignore(self.surfaces[i].consume_changed())
   }

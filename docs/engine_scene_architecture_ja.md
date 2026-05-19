@@ -190,9 +190,9 @@ WebGPU context、device、queue、surface、GPU resources は最終的には `En
 
 ## Multi-surface Platform
 
-`Platform` は WebGPU device / queue と event loop を共有所有し、`Surface` は canvas/window/swapchain と surface-local input を所有する。`Engine` は `SurfaceId` で登録された複数 surface view を持ち、1 tick で update/fixed update を共有してから active surface ごとに render path を実行する。
+`Platform` は WebGPU device / queue と event loop を共有所有し、`Surface` は canvas/window/swapchain と surface-local input を所有する。`Engine` は `SurfaceId` で登録された複数 surface view を持ち、1 tick で fixed update を共有したあと、render-frame group の各 phase を surface ごとに実行する（`phase_update` / `phase_post_update` も surface-local `FrameState` を使い、`set_surface_scene` で紐づけた scene の systems が走る。render path のみ suspended surface を skip する）。
 
-`FrameState` は render path では `surface_id`、`surface`、`input` を持つ。depth texture や drawable size に依存する renderer resource は engine/global 単位ではなく `SurfaceId` keyed に保持する。入力は標準で surface-local とし、canvas/window A の pointer event は canvas/window B の camera controller に影響させない。
+`FrameState` は surface-scoped phase では `surface_id`、`surface`、`input` を持つ。depth texture や drawable size に依存する renderer resource は engine/global 単位ではなく `SurfaceId` keyed に保持する。入力は標準で surface-local とし、canvas/window A の pointer event は canvas/window B の camera controller に影響させない。
 
 単一 surface 利用は引き続き主要ユースケースなので、browser は `run_single_canvas_platform(...)`、SDL3 は `run_single_window_platform(...)` を簡易 entry point として提供する。これらは互換 API ではなく、multi-surface 設計上の thin wrapper として扱う。
 
