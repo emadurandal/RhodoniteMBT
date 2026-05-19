@@ -242,6 +242,27 @@ describe("app-runtime Engine", () => {
 		]);
 	});
 
+	it("keeps surfaceChanged stable across render-frame phases in multi-surface frames", async () => {
+		const engine = await createTestEngine();
+		const renderSurfaceChanged: boolean[] = [];
+
+		engine.addPhaseHandler(Phase.Update, () => {
+			const surfaces = (
+				engine as unknown as { surfaces: Array<{ changed: boolean }> }
+			).surfaces;
+			surfaces[0]!.changed = false;
+		});
+		engine.addPhaseHandler(Phase.Render, (_engine, frame) => {
+			renderSurfaceChanged.push(frame.surfaceChanged);
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()));
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(renderSurfaceChanged).toEqual([true]);
+	});
+
 	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
 		const engine = await createTestEngine();
 		const sceneA = new Scene("surface-a", {});

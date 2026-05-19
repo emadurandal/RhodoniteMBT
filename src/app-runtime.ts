@@ -1527,10 +1527,11 @@ export class Engine {
 		for (const surface of this.surfaces) {
 			surface.changed = surface.gpuSurface.syncFromCanvas() || surface.changed;
 			surface.input.beginFrame();
+			const changed = surface.changed;
 			const frame = baseFrame.withSurfaceView(
 				surface.id,
 				surface.gpuSurface.state(),
-				surface.changed,
+				changed,
 				surface.input,
 			);
 			this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
@@ -1565,19 +1566,24 @@ export class Engine {
 			"Engine.runRenderFrameGroupForMultiSurface",
 			PhaseGroup.RenderFrame,
 		);
+		const surfaceViews = this.surfaces.map((surface) => ({
+			id: surface.id,
+			state: surface.gpuSurface.state(),
+			changed: surface.changed,
+			input: surface.input,
+		}));
 		for (const phase of phaseGroup.phases) {
-			for (const surface of this.surfaces) {
-				const state = surface.gpuSurface.state();
-				if (!state.active && phaseIsRenderPath(phase)) {
+			for (const surfaceView of surfaceViews) {
+				if (!surfaceView.state.active && phaseIsRenderPath(phase)) {
 					continue;
 				}
 				this.runPhase(
 					phase,
 					baseFrame.withSurfaceView(
-						surface.id,
-						state,
-						surface.changed,
-						surface.input,
+						surfaceView.id,
+						surfaceView.state,
+						surfaceView.changed,
+						surfaceView.input,
 					),
 				);
 			}
