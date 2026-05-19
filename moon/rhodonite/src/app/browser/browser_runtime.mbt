@@ -375,6 +375,37 @@ pub fn sync_browser_engine_surface(
 }
 
 ///|
+/// Synchronizes every attached browser canvas backing size to its GPU surface.
+fn MultiSurfacePlatform::sync_browser_gpu_surfaces(
+  self : MultiSurfacePlatform,
+) -> Unit {
+  let device = self.gpu.device()
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    let platform_surface = self.surfaces[i]
+    let width = browser_canvas_width(platform_surface.canvas)
+    let height = browser_canvas_height(platform_surface.canvas)
+    let changed = if width <= 0 || height <= 0 {
+      platform_surface.surface.suspend()
+    } else {
+      platform_surface.surface.resize(device, width, height)
+    }
+    if changed {
+      self.engine.request_render("surface")
+    }
+  }
+}
+
+///|
+/// Syncs canvas sizes and runs one multi-surface engine tick.
+fn MultiSurfacePlatform::run_frame_tick(
+  self : MultiSurfacePlatform,
+  delta_seconds : Float,
+) -> Unit {
+  self.sync_browser_gpu_surfaces()
+  ignore(self.engine.run_multi_surface_frame(delta_seconds))
+}
+
+///|
 /// Starts the standard browser frame loop for an initialized engine.
 pub fn start_browser_engine_loop(engine : @app.Engine) -> BrowserFrameLoop {
   start_browser_frame_loop(fn(delta_seconds) {
@@ -638,21 +669,13 @@ fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
     Loop =>
       Some(
         start_browser_frame_loop(fn(delta_seconds) {
-          ignore(
-            self.engine.run_multi_surface_frame(
-              Float::from_double(delta_seconds),
-            ),
-          )
+          self.run_frame_tick(Float::from_double(delta_seconds))
         }),
       )
     OnDemand => {
       let on_demand_loop = start_browser_on_demand_frame_loop(
         fn(delta_seconds) {
-          ignore(
-            self.engine.run_multi_surface_frame(
-              Float::from_double(delta_seconds),
-            ),
-          )
+          self.run_frame_tick(Float::from_double(delta_seconds))
         },
         fn() {
           self.engine.render_requested() ||
@@ -660,11 +683,12 @@ fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
         },
       )
       self.engine.set_render_wakeup(Some(fn() { on_demand_loop.request() }))
+      self.sync_browser_gpu_surfaces()
       on_demand_loop.request()
       Some(on_demand_loop)
     }
     SingleFrame => {
-      ignore(self.engine.run_multi_surface_frame((0.0 : Float)))
+      self.run_frame_tick((0.0 : Float))
       None
     }
   }
