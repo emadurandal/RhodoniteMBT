@@ -20,6 +20,7 @@ async fn create_webgpu_demo_state_async(
   match platform {
     Some(platform) => {
       ignore(platform.attach_canvas(second_canvas))
+      platform.launch()
       println("multi-surface-independent-input: DemoState ready")
     }
     None =>

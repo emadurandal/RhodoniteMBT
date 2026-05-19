@@ -61,6 +61,7 @@ pub struct MultiSurfacePlatform {
   priv options : PlatformOptions
   priv mut frame_loop : BrowserFrameLoop?
   priv mut disposed : Bool
+  priv mut launched : Bool
 }
 
 ///|
@@ -620,8 +621,19 @@ pub fn start_platform(
 }
 
 ///|
+/// Initializes the engine and starts the frame loop after all canvases are attached.
+pub fn MultiSurfacePlatform::launch(self : MultiSurfacePlatform) -> Unit {
+  if self.launched || self.disposed {
+    return
+  }
+  self.launched = true
+  self.engine.initialize()
+  self.start_frame_loop()
+}
+
+///|
 /// Starts the frame loop for a multi-surface browser platform.
-fn MultiSurfacePlatform::start(self : MultiSurfacePlatform) -> Unit {
+fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
   let frame_loop = match self.options.frame_mode {
     Loop =>
       Some(
@@ -682,6 +694,9 @@ pub fn MultiSurfacePlatform::attach_canvas(
 
 ///|
 /// Creates a browser platform from the first canvas and allows more canvases to attach later.
+///
+/// Call `MultiSurfacePlatform::launch` after attaching every canvas so `Engine::initialize`
+/// and the frame loop start with the final surface set (matching native multi-window setup).
 pub async fn run_multi_surface_platform(
   first_canvas : @wgpu.HTMLCanvasElement,
   app : PlatformApp,
@@ -707,6 +722,7 @@ pub async fn run_multi_surface_platform(
     options,
     frame_loop: None,
     disposed: false,
+    launched: false,
   }
   let id = engine.add_surface(surface)
   let input_binding = if options.install_input {
@@ -719,8 +735,6 @@ pub async fn run_multi_surface_platform(
     None
   }
   platform.surfaces.push({ id, canvas: first_canvas, surface, input_binding })
-  engine.initialize()
-  platform.start()
   Some(platform)
 }
 

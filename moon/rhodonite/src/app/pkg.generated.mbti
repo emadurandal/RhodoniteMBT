@@ -89,6 +89,7 @@ pub fn Engine::stop_continuous_render(Self, String) -> Unit
 pub fn Engine::surface(Self, SurfaceId) -> EngineSurface
 pub fn Engine::surface_active(Self) -> Bool
 pub fn Engine::surface_count(Self) -> Int
+pub fn Engine::surface_id_at(Self, Int) -> SurfaceId
 pub fn Engine::surface_input(Self, SurfaceId) -> @input.InputState
 pub fn Engine::surface_state(Self) -> SurfaceState
 

@@ -125,6 +125,15 @@ pub fn Engine::surface_count(self : Engine) -> Int {
 }
 
 ///|
+/// Returns the surface id at a zero-based index or aborts when out of range.
+pub fn Engine::surface_id_at(self : Engine, index : Int) -> SurfaceId {
+  if index < 0 || index >= self.surfaces.length() {
+    abort("Engine::surface_id_at: index out of range")
+  }
+  self.surfaces[index].id()
+}
+
+///|
 /// Returns a registered engine surface by id or aborts when missing.
 pub fn Engine::surface(self : Engine, id : SurfaceId) -> EngineSurface {
   match self.find_surface_index(id) {

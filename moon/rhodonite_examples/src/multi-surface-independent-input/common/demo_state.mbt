@@ -148,11 +148,25 @@ fn MultiSurfaceDemoState::release(self : MultiSurfaceDemoState) -> Unit {
 }
 
 ///|
+/// Creates scene graph demo state for every engine surface before the first frame.
+fn MultiSurfaceDemoState::prepare_all_surfaces(
+  self : MultiSurfaceDemoState,
+  engine : @app.Engine,
+) -> Unit {
+  for i = 0; i < engine.surface_count(); i = i + 1 {
+    ignore(self.ensure_surface(engine, engine.surface_id_at(i)))
+  }
+}
+
+///|
 /// Registers the multi-surface demo's engine phase handlers.
 pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : MultiSurfaceDemoState,
 ) -> Unit {
+  engine.add_phase_handler(@app.phase_startup(), fn(engine, _frame) {
+    demo_state.prepare_all_surfaces(engine)
+  })
   engine.add_phase_handler(@app.phase_surface(), fn(engine, frame) {
     demo_state.handle_surface_frame(engine, frame)
   })
