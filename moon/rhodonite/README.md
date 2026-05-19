@@ -77,6 +77,65 @@ options(
 )
 ```
 
+SDL3 native entry packages should also depend on
+`emadurandal/rhodonite_app_sdl3`. If the entry package imports
+`moonbitlang/async` directly, add that dependency as well.
+
+```json
+{
+  "deps": {
+    "emadurandal/rhodonite": "0.1.6",
+    "emadurandal/rhodonite_app_sdl3": "0.1.6",
+    "moonbitlang/async": "0.18.1"
+  },
+  "preferred-target": "native"
+}
+```
+
+For a local RhodoniteMBT checkout, use matching path dependencies for both
+facade and SDL3 modules.
+
+```json
+{
+  "deps": {
+    "emadurandal/rhodonite": {
+      "path": "../RhodoniteMBT/moon/rhodonite"
+    },
+    "emadurandal/rhodonite_app_sdl3": {
+      "path": "../RhodoniteMBT/moon/rhodonite_app_sdl3"
+    }
+  }
+}
+```
+
+The native entry package imports the facade app package and the SDL3 platform
+package, selects the native WebGPU object implementation, and links SDL3.
+
+```moonbit
+import {
+  "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_app_sdl3/sdl3" @sdl_app,
+  "moonbitlang/async" @async,
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": true,
+  link: {
+    "native": {
+        "cc-flags": "-I/opt/homebrew/include -I/usr/local/include",
+        "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3"
+    },
+  },
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
+)
+```
+
+SDL3 development headers and libraries must be installed on the host system,
+for example with `brew install sdl3` on macOS or `sudo apt install libsdl3-dev`
+on Debian/Ubuntu.
+
 The small curated facade package can be imported as `emadurandal/rhodonite/lib`.
 
 ```moonbit
@@ -90,6 +149,4 @@ If your MoonBit code directly imports lower-level packages such as
 `emadurandal/rhodonite_core/math/vector3`, or
 `emadurandal/rhodonite_webgpu/webgpu`, add the corresponding modules
 (`emadurandal/rhodonite_core` or `emadurandal/rhodonite_webgpu`) to the
-consuming module's `moon.mod.json` `deps` as well. For SDL3 native platform
-entry points, depend on `emadurandal/rhodonite_app_sdl3` and import
-`emadurandal/rhodonite_app_sdl3/sdl3`.
+consuming module's `moon.mod.json` `deps` as well.
