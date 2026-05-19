@@ -1561,7 +1561,11 @@ export class Engine {
 	}
 
 	private runRenderFrameGroupForMultiSurface(baseFrame: FrameState): void {
-		for (const phase of this.phaseGroupOrder(PhaseGroup.RenderFrame)) {
+		const phaseGroup = this.findPhaseGroup(
+			"Engine.runRenderFrameGroupForMultiSurface",
+			PhaseGroup.RenderFrame,
+		);
+		for (const phase of phaseGroup.phases) {
 			for (const surface of this.surfaces) {
 				const state = surface.gpuSurface.state();
 				if (!state.active && phaseIsRenderPath(phase)) {
