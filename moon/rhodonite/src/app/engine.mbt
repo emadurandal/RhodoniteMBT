@@ -627,7 +627,11 @@ fn Engine::run_render_frame_group_for_multi_surface(
   self : Engine,
   base_frame : FrameState,
 ) -> Unit {
-  let phases = self.phase_group_order(phase_group_render_frame())
+  let group_index = self.find_phase_group(
+    "Engine::run_render_frame_group_for_multi_surface",
+    phase_group_render_frame(),
+  )
+  let phases = self.phase_groups[group_index].phases
   for i = 0; i < phases.length(); i = i + 1 {
     let phase = phases[i]
     for surface_index = 0
