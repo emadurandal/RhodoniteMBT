@@ -6,11 +6,10 @@ import {
 	MouseButton,
 	Phase,
 	PhaseSlot,
+	PlatformApp,
+	PlatformConfig,
 	PlatformOptions,
-	Scene,
-	attachCanvasSurface,
-	installBrowserInputState,
-	startBrowserFrameLoop,
+	runMultiSurfacePlatform,
 	type FrameState,
 	type SurfaceId,
 } from "./app-runtime";
@@ -37,8 +36,6 @@ type DemoState = {
 	readonly indexBuffer: GPUBuffer;
 	readonly objectBuffer: GPUBuffer;
 	readonly bindGroup: GPUBindGroup;
-	readonly firstSurfaceId: SurfaceId;
-	readonly secondSurfaceId: SurfaceId;
 	readonly surfaces: SurfaceRenderState[];
 	frame: number;
 };
@@ -217,7 +214,7 @@ fn fragmentMain(in: VertexOut) -> @location(0) vec4<f32> {
 }`;
 }
 
-function createDemoState(engine: Engine): Omit<DemoState, "firstSurfaceId" | "secondSurfaceId"> {
+function createDemoStateForEngine(engine: Engine): DemoState {
 	const device = engine.device;
 	const shader = device.createShaderModule({ code: createShader() });
 	const objectBuffer = device.createBuffer({
@@ -268,6 +265,19 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		panX: 0,
 		panY: cameraPanY,
 	});
+}
+
+function surfaceStateIndex(demo: DemoState, id: SurfaceId): number {
+	return demo.surfaces.findIndex((surface) => surface.id === id);
+}
+
+function ensureSurfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState {
+	const index = surfaceStateIndex(demo, id);
+	if (index >= 0) {
+		return demo.surfaces[index]!;
+	}
+	addSurfaceState(demo, id, demo.engine.surfaceInput(id));
+	return demo.surfaces[demo.surfaces.length - 1]!;
 }
 
 function surfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState {
@@ -342,8 +352,9 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 	const gpuSurface: GpuSurface = demo.engine.surfaceGpuSurface(frame.surfaceId);
 	const colorView = gpuSurface.acquireView();
 	const encoder = demo.device.createCommandEncoder();
+	const surfaceIndex = surfaceStateIndex(demo, frame.surfaceId);
 	const clearValue =
-		frame.surfaceId === demo.firstSurfaceId
+		surfaceIndex === 0
 			? { r: 0.02, g: 0.04, b: 0.12, a: 1 }
 			: { r: 0.02, g: 0.11, b: 0.07, a: 1 };
 	const pass = encoder.beginRenderPass({
@@ -359,38 +370,47 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 	demo.queue.submit([encoder.finish()]);
 }
 
-async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): Promise<void> {
-	const engine = await Engine.create(first, { mainScene: new Scene("ts-multi-surface") });
-	const firstId = attachCanvasSurface(engine, first);
-	const secondId = attachCanvasSurface(engine, second);
-	const demo = { ...createDemoState(engine), firstSurfaceId: firstId, secondSurfaceId: secondId };
-	addSurfaceState(demo, firstId, engine.surfaceInput(firstId));
-	addSurfaceState(demo, secondId, engine.surfaceInput(secondId));
-	const options = PlatformOptions.interactive();
-	const bindings = [
-		installBrowserInputState(engine.surfaceInput(firstId), first, { keyboardTarget: options.keyboardTarget, onInput: () => engine.requestRender("input") }),
-		installBrowserInputState(engine.surfaceInput(secondId), second, { keyboardTarget: options.keyboardTarget, onInput: () => engine.requestRender("input") }),
-	];
+function registerEngineHandlers(engine: Engine, demo: DemoState): void {
+	engine.addPhaseHandler(Phase.Startup, () => {
+		for (let index = 0; index < engine.surfaceCount(); index += 1) {
+			ensureSurfaceState(demo, engine.surfaceIdAt(index));
+		}
+	});
 	engine.addPhaseHandler(Phase.Surface, (_engine, frame) => {
 		if (frame.surfaceId !== undefined) {
-			resizeDepthIfNeeded(demo, surfaceState(demo, frame.surfaceId), frame);
+			resizeDepthIfNeeded(demo, ensureSurfaceState(demo, frame.surfaceId), frame);
 		}
 	});
 	engine.addPhaseHandler(Phase.Input, (_engine, frame) => {
 		if (frame.surfaceId !== undefined) {
-			handleInput(surfaceState(demo, frame.surfaceId));
+			handleInput(ensureSurfaceState(demo, frame.surfaceId));
 		}
 	});
 	engine.addPhaseHandler(Phase.Render, (_engine, frame) => renderSurface(demo, frame), PhaseSlot.AfterSystems);
 	engine.addPhaseHandler(Phase.Shutdown, () => {
-		for (const binding of bindings) binding.dispose();
 		for (const surface of demo.surfaces) surface.depthTexture.destroy();
 		demo.vertexBuffer.destroy();
 		demo.indexBuffer.destroy();
 		demo.objectBuffer.destroy();
 	});
-	engine.initialize();
-	startBrowserFrameLoop((deltaSeconds) => engine.runMultiSurfaceFrame(deltaSeconds));
+}
+
+async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): Promise<void> {
+	const platform = await runMultiSurfacePlatform(
+		[
+			new PlatformConfig(first),
+			new PlatformConfig(second),
+		],
+		PlatformApp.defaultEngine((engine) => {
+			const demo = createDemoStateForEngine(engine);
+			registerEngineHandlers(engine, demo);
+		}),
+		PlatformOptions.interactive(),
+	);
+	if (platform === undefined) {
+		throw new Error("Failed to create TypeScript multi-surface platform.");
+	}
+	platform.launch();
 }
 
 window.addEventListener("load", () => {

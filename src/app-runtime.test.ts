@@ -12,6 +12,7 @@ import {
 	PlatformOptions,
 	defaultMaxFixedStepsPerFrame,
 	installBrowserInputCallbacks,
+	runMultiSurfacePlatform,
 	runPlatform,
 	startPlatform,
 	startBrowserFrameLoop,
@@ -558,5 +559,46 @@ describe("app-runtime Engine", () => {
 		platform?.dispose();
 
 		expect(calls).toEqual(["startup"]);
+	});
+
+	it("launches a browser multi-surface platform after attaching configured canvases", async () => {
+		const firstCanvas = fakeCanvas();
+		const secondCanvas = fakeCanvas();
+		const windowTarget = fakeEventTarget();
+		vi.stubGlobal("window", windowTarget);
+		stubAnimationFrame();
+		stubWebGpu();
+		const calls: string[] = [];
+
+		const platform = await runMultiSurfacePlatform(
+			[new PlatformConfig(firstCanvas), new PlatformConfig(secondCanvas)],
+			PlatformApp.defaultEngine((engine) => {
+				calls.push(`setup:${engine.surfaceCount()}`);
+				engine.addPhaseHandler(Phase.Startup, () => {
+					calls.push(`startup:${engine.surfaceCount()}`);
+					calls.push(`surface:${engine.surfaceIdAt(0)}`);
+					calls.push(`surface:${engine.surfaceIdAt(1)}`);
+				});
+				engine.addPhaseHandler(Phase.Render, (_engine, frame) => {
+					calls.push(`render:${frame.surfaceId}`);
+				});
+			}),
+			PlatformOptions.singleFrame(),
+		);
+
+		expect(platform).toBeDefined();
+		expect(calls).toEqual(["setup:0"]);
+
+		platform?.launch();
+		platform?.dispose();
+
+		expect(calls).toEqual([
+			"setup:0",
+			"startup:2",
+			"surface:1",
+			"surface:2",
+			"render:1",
+			"render:2",
+		]);
 	});
 });

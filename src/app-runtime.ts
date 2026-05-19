@@ -625,6 +625,100 @@ export type Platform = {
 	dispose: () => void;
 };
 
+type BrowserPlatformSurface = {
+	readonly id: SurfaceId;
+	readonly canvas: HTMLCanvasElement;
+	readonly gpuSurface: GpuSurface;
+	readonly inputBinding?: BrowserInputBinding;
+};
+
+export class MultiSurfacePlatform {
+	readonly engine: Engine;
+	private readonly options: PlatformOptions;
+	private readonly surfacesValue: BrowserPlatformSurface[] = [];
+	private frameLoopValue: BrowserFrameLoop | undefined;
+	private disposed = false;
+	private launched = false;
+
+	constructor(
+		engine: Engine,
+		options: PlatformOptions = PlatformOptions.interactive(),
+	) {
+		this.engine = engine;
+		this.options = options;
+	}
+
+	attachCanvas(canvas: HTMLCanvasElement): SurfaceId {
+		const gpuSurface = new GpuSurface(canvas, this.engine.device, this.engine.format);
+		return this.attachPreparedCanvas(canvas, gpuSurface);
+	}
+
+	launch(): void {
+		if (this.launched || this.disposed) {
+			return;
+		}
+		this.launched = true;
+		this.engine.initialize();
+		this.startFrameLoop();
+	}
+
+	dispose(): void {
+		if (this.disposed) {
+			return;
+		}
+		this.disposed = true;
+		this.engine.setRenderWakeup(undefined);
+		this.frameLoopValue?.stop();
+		for (const surface of this.surfacesValue) {
+			surface.inputBinding?.dispose();
+		}
+		if (this.launched) {
+			this.engine.shutdown();
+		}
+	}
+
+	private attachPreparedCanvas(
+		canvas: HTMLCanvasElement,
+		gpuSurface: GpuSurface,
+	): SurfaceId {
+		const id = this.engine.addSurface(gpuSurface);
+		const inputBinding = this.options.installInput
+			? installBrowserInputState(this.engine.surfaceInput(id), canvas, {
+					keyboardTarget: this.options.keyboardTarget,
+					onInput: () => this.engine.requestRender("input"),
+				})
+			: undefined;
+		this.surfacesValue.push({ id, canvas, gpuSurface, inputBinding });
+		return id;
+	}
+
+	private runFrameTick(deltaSeconds: number): void {
+		this.engine.runMultiSurfaceFrame(deltaSeconds);
+	}
+
+	private startFrameLoop(): void {
+		if (this.options.frameMode === "single-frame") {
+			this.runFrameTick(0);
+			return;
+		}
+		if (this.options.frameMode === "on-demand") {
+			const frameLoop = startBrowserOnDemandFrameLoop(
+				(deltaSeconds) => this.runFrameTick(deltaSeconds),
+				() =>
+					this.engine.renderRequested() ||
+					this.engine.continuousRenderRequested(),
+			);
+			this.engine.setRenderWakeup(() => frameLoop.request());
+			frameLoop.request();
+			this.frameLoopValue = frameLoop;
+			return;
+		}
+		this.frameLoopValue = startBrowserFrameLoop((deltaSeconds) =>
+			this.runFrameTick(deltaSeconds),
+		);
+	}
+}
+
 export class PlatformConfig {
 	readonly canvas: HTMLCanvasElement;
 	readonly mainScene: RuntimeScene | undefined;
@@ -1041,6 +1135,26 @@ export async function runSingleCanvasPlatform(
 	return runPlatform(new PlatformConfig(canvas), app, options);
 }
 
+export async function runMultiSurfacePlatform(
+	configs: readonly PlatformConfig[],
+	app: PlatformApp,
+	options: PlatformOptions = PlatformOptions.interactive(),
+): Promise<MultiSurfacePlatform | undefined> {
+	const firstConfig = configs[0];
+	if (firstConfig === undefined) {
+		return undefined;
+	}
+	const engine = await app.createEngine(firstConfig);
+	if (app.setupEngine(engine) === false) {
+		return undefined;
+	}
+	const platform = new MultiSurfacePlatform(engine, options);
+	for (const config of configs) {
+		platform.attachCanvas(config.canvas);
+	}
+	return platform;
+}
+
 export function attachCanvasSurface(
 	engine: Engine,
 	canvas: HTMLCanvasElement,
@@ -1235,6 +1349,18 @@ export class Engine {
 
 	surfaceGpuSurface(surfaceId: SurfaceId): GpuSurface {
 		return this.requireSurface(surfaceId).gpuSurface;
+	}
+
+	surfaceCount(): number {
+		return this.surfaces.length;
+	}
+
+	surfaceIdAt(index: number): SurfaceId {
+		const surface = this.surfaces[index];
+		if (surface === undefined) {
+			throw new Error(`Engine surface index '${index}' is out of range.`);
+		}
+		return surface.id;
 	}
 
 	setSurfaceScene(surfaceId: SurfaceId, scene: RuntimeScene): void {
