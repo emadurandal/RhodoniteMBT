@@ -1,4 +1,13 @@
 ///|
+/// Per-surface snapshot used for one render-frame group tick.
+priv struct RenderFrameSurfaceView {
+  id : SurfaceId
+  state : SurfaceState
+  changed : Bool
+  input_state : @input.InputState
+}
+
+///|
 /// Runtime that owns platform context, time state, and scenes.
 pub struct Engine {
   priv gpu_context : @wgpu.GPUContext
@@ -648,18 +657,28 @@ fn Engine::run_render_frame_group_for_multi_surface(
     phase_group_render_frame(),
   )
   let phases = self.phase_groups[group_index].phases
+  let surface_views : Array[RenderFrameSurfaceView] = []
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    let surface = self.surfaces[i]
+    surface_views.push({
+      id: surface.id(),
+      state: surface.state(),
+      changed: surface.changed,
+      input_state: surface.input(),
+    })
+  }
   for i = 0; i < phases.length(); i = i + 1 {
     let phase = phases[i]
-    for surface_index = 0
-        surface_index < self.surfaces.length()
-        surface_index = surface_index + 1 {
-      let surface = self.surfaces[surface_index]
-      if surface.state().active() || !phase_is_render_path(phase) {
+    for view_index = 0
+        view_index < surface_views.length()
+        view_index = view_index + 1 {
+      let view = surface_views[view_index]
+      if view.state.active() || !phase_is_render_path(phase) {
         let frame = base_frame.with_surface_view(
-          surface.id(),
-          surface.state(),
-          surface.changed,
-          surface.input(),
+          view.id,
+          view.state,
+          view.changed,
+          view.input_state,
         )
         self.run_phase(phase, frame)
       }
