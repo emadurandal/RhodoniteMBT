@@ -1,0 +1,107 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "emadurandal/rhodonite/app/browser"
+
+import {
+  "emadurandal/rhodonite/app",
+  "emadurandal/rhodonite_core/input",
+  "emadurandal/rhodonite_webgpu/webgpu",
+  "emadurandal/rhodonite_webgpu/webgpu_objects",
+}
+
+// Values
+pub fn browser_canvas_height(@webgpu_objects.HTMLCanvasElement) -> Int
+
+pub fn browser_canvas_width(@webgpu_objects.HTMLCanvasElement) -> Int
+
+pub async fn gpu_context_from_html_canvas(@webgpu_objects.HTMLCanvasElement) -> @webgpu.GPUContext
+
+pub async fn gpu_device_context_from_browser() -> @webgpu.GPUDeviceContext
+
+pub fn gpu_surface_from_html_canvas(@webgpu.GPUDeviceContext, @webgpu_objects.HTMLCanvasElement) -> @webgpu.GPUSurface
+
+pub fn install_browser_input(@app.Engine, @webgpu_objects.HTMLCanvasElement) -> BrowserInputBinding
+
+pub fn install_browser_surface_input(@input.InputState, @webgpu_objects.HTMLCanvasElement, () -> Unit) -> BrowserInputBinding
+
+pub async fn run_multi_surface_platform(Array[PlatformConfig], PlatformApp, PlatformOptions) -> MultiSurfacePlatform?
+
+pub async fn run_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Platform?
+
+pub async fn run_single_canvas_platform(@webgpu_objects.HTMLCanvasElement, PlatformApp, PlatformOptions) -> Platform?
+
+pub fn start_browser_engine_canvas_loop(@app.Engine, @webgpu_objects.HTMLCanvasElement) -> BrowserFrameLoop
+
+pub fn start_browser_engine_loop(@app.Engine) -> BrowserFrameLoop
+
+pub fn start_browser_engine_on_demand_canvas_loop(@app.Engine, @webgpu_objects.HTMLCanvasElement) -> BrowserFrameLoop
+
+pub fn start_browser_frame_loop((Double) -> Unit) -> BrowserFrameLoop
+
+pub fn start_browser_on_demand_frame_loop((Double) -> Unit, () -> Bool) -> BrowserFrameLoop
+
+pub fn start_platform(@app.Engine, @webgpu_objects.HTMLCanvasElement, PlatformOptions) -> Platform
+
+pub fn stop_platform(@webgpu_objects.HTMLCanvasElement) -> Unit
+
+pub fn sync_browser_engine_surface(@app.Engine, @webgpu_objects.HTMLCanvasElement) -> Unit
+
+// Errors
+
+// Types and methods
+pub type BrowserFrameLoop
+pub fn BrowserFrameLoop::request(Self) -> Unit
+pub fn BrowserFrameLoop::stop(Self) -> Unit
+
+pub type BrowserInputBinding
+pub fn BrowserInputBinding::dispose(Self) -> Unit
+
+pub(all) struct BrowserPlatformSurface {
+  id : @app.SurfaceId
+  canvas : @webgpu_objects.HTMLCanvasElement
+  surface : @webgpu.GPUSurface
+  mut input_binding : BrowserInputBinding?
+}
+
+pub enum FrameMode {
+  Loop
+  SingleFrame
+  OnDemand
+}
+
+pub struct MultiSurfacePlatform {
+  // private fields
+}
+pub fn MultiSurfacePlatform::attach_canvas(Self, @webgpu_objects.HTMLCanvasElement) -> @app.SurfaceId
+pub fn MultiSurfacePlatform::dispose(Self) -> Unit
+pub fn MultiSurfacePlatform::launch(Self) -> Unit
+
+pub struct Platform {
+  // private fields
+}
+pub fn Platform::dispose(Self) -> Unit
+
+pub struct PlatformApp {
+  // private fields
+}
+pub fn PlatformApp::default_engine((@app.Engine) -> Bool) -> Self
+pub fn PlatformApp::new((@webgpu.GPUContext) -> @app.Engine, (@app.Engine) -> Bool) -> Self
+
+pub struct PlatformConfig {
+  // private fields
+}
+pub fn PlatformConfig::new(@webgpu_objects.HTMLCanvasElement) -> Self
+
+pub struct PlatformOptions {
+  frame_mode : FrameMode
+  // private fields
+}
+pub fn PlatformOptions::interactive() -> Self
+pub fn PlatformOptions::interactive_on_demand() -> Self
+pub fn PlatformOptions::render_loop() -> Self
+pub fn PlatformOptions::render_on_demand() -> Self
+pub fn PlatformOptions::single_frame() -> Self
+
+// Type aliases
+
+// Traits
+

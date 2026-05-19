@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite_webgpu",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "deps": {
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"
