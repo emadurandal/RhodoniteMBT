@@ -904,7 +904,7 @@ fn enqueue_sdl_mouse_button(
   y : Float,
 ) -> Unit {
   let down = sdl_mouse_mask_has(flags, mask)
-  let was_down = input.mouse_down(button)
+  let was_down = input.mouse_down_including_queued(button)
   if down && !was_down {
     input.enqueue_event(MouseDown(button, x, y))
   } else if !down && was_down {
@@ -935,27 +935,27 @@ fn merge_sdl_mouse_button_flags(
   global_flags : UInt,
 ) -> UInt {
   let mut flags = local_flags
-  if input.mouse_down(Left) &&
+  if input.mouse_down_including_queued(Left) &&
     !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_LMASK) &&
     sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_LMASK) {
     flags = flags | @lib.SDL_BUTTON_LMASK
   }
-  if input.mouse_down(Middle) &&
+  if input.mouse_down_including_queued(Middle) &&
     !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_MMASK) &&
     sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_MMASK) {
     flags = flags | @lib.SDL_BUTTON_MMASK
   }
-  if input.mouse_down(Right) &&
+  if input.mouse_down_including_queued(Right) &&
     !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_RMASK) &&
     sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_RMASK) {
     flags = flags | @lib.SDL_BUTTON_RMASK
   }
-  if input.mouse_down(Back) &&
+  if input.mouse_down_including_queued(Back) &&
     !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_X1MASK) &&
     sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_X1MASK) {
     flags = flags | @lib.SDL_BUTTON_X1MASK
   }
-  if input.mouse_down(Forward) &&
+  if input.mouse_down_including_queued(Forward) &&
     !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_X2MASK) &&
     sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_X2MASK) {
     flags = flags | @lib.SDL_BUTTON_X2MASK
@@ -999,8 +999,10 @@ fn enqueue_sdl_mouse_button_event(
   match sdl_input_mouse_button(button_event.button) {
     Some(button) =>
       if button_event.down {
-        input.enqueue_event(MouseDown(button, button_event.x, button_event.y))
-      } else {
+        if !input.mouse_down_including_queued(button) {
+          input.enqueue_event(MouseDown(button, button_event.x, button_event.y))
+        }
+      } else if input.mouse_down_including_queued(button) {
         input.enqueue_event(MouseUp(button, button_event.x, button_event.y))
       }
     None => ()
