@@ -185,6 +185,16 @@ export class SurfaceState {
 	static suspended(generation: number): SurfaceState {
 		return new SurfaceState(0, 0, "", false, generation);
 	}
+
+	equals(other: SurfaceState): boolean {
+		return (
+			this.active === other.active &&
+			this.width === other.width &&
+			this.height === other.height &&
+			this.format === other.format &&
+			this.generation === other.generation
+		);
+	}
 }
 
 export class GpuSurface {
@@ -221,17 +231,20 @@ export class GpuSurface {
 		const current = this.stateValue;
 		const next =
 			width > 0 && height > 0
-				? SurfaceState.active(width, height, this.format, current.generation + 1)
-				: SurfaceState.suspended(current.generation + 1);
-		if (
-			current.active === next.active &&
-			current.width === next.width &&
-			current.height === next.height &&
-			current.format === next.format
-		) {
+				? SurfaceState.active(width, height, this.format, current.generation)
+				: SurfaceState.suspended(current.generation);
+		if (current.equals(next)) {
 			return false;
 		}
-		this.stateValue = next;
+		this.stateValue =
+			width > 0 && height > 0
+				? SurfaceState.active(
+						width,
+						height,
+						this.format,
+						current.generation + 1,
+					)
+				: SurfaceState.suspended(current.generation + 1);
 		return true;
 	}
 
