@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const packageRoot = path.join(root, "packages/rhodonite_mbt");
+const packageRoot = path.join(root, "packages/rhodonite-mbt");
 const buildSrc = path.join(packageRoot, ".build-src");
 const dist = path.join(packageRoot, "dist");
 

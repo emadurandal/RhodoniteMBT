@@ -114,7 +114,7 @@ The TypeScript wrapper in [`moon/rhodonite_core/src/ecs/ts/`](../moon/rhodonite_
 
 `GpuLayout` remains available as a layout/packing helper for builtin row formats and renderer code; it is no longer used to register ECS component storage.
 
-External TypeScript projects should import the npm build from `rhodonite_mbt/ecs`.
+External TypeScript projects should import the npm build from `rhodonite-mbt/ecs`.
 The npm package bundles the release MoonBit JS bridge used by the wrapper, so
 consumers do not need this repository's `_build` tree.
 

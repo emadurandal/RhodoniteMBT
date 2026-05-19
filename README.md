@@ -39,13 +39,13 @@ native entry packages still override it with the real browser or wgpu backend.
 ### npm package
 
 The TypeScript wrappers and the MoonBit JavaScript bridge they call are packaged
-for npm as [`rhodonite_mbt`](packages/rhodonite_mbt/). The package is ESM-only
+for npm as [`rhodonite-mbt`](packages/rhodonite-mbt/). The package is ESM-only
 and exposes existing wrapper surfaces:
 
 ```ts
-import { Vector3F } from "rhodonite_mbt/math";
-import { World } from "rhodonite_mbt/ecs";
-import { runSingleCanvasPlatform } from "rhodonite_mbt/app";
+import { Vector3F } from "rhodonite-mbt/math";
+import { World } from "rhodonite-mbt/ecs";
+import { runSingleCanvasPlatform } from "rhodonite-mbt/app";
 ```
 
 Build and inspect the npm package from the repository root:
@@ -157,4 +157,4 @@ files with exact or perceptual comparison. See [docs/image_regression_tests.md](
 When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/module_boundaries.md](docs/module_boundaries.md) — Release units.
 
 For npm, run `pnpm run publish:npm`; it rebuilds the release JS bridge and emits
-the `packages/rhodonite_mbt/dist` package before invoking `npm publish`.
+the `packages/rhodonite-mbt/dist` package before invoking `npm publish`.

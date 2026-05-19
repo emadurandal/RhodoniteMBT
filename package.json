@@ -39,8 +39,8 @@
     "bench:ecs:wasm": "bash scripts/run-ecs-bench.sh wasm-gc",
     "bench:ecs:wasm-gc": "bash scripts/run-ecs-bench.sh wasm-gc",
     "build:npm": "pnpm run build:core:js && node scripts/build-npm-package.mjs",
-    "pack:npm": "pnpm run build:npm && pnpm --dir packages/rhodonite_mbt pack",
-    "publish:npm": "pnpm run build:npm && pnpm --dir packages/rhodonite_mbt publish --access public",
+    "pack:npm": "pnpm run build:npm && pnpm --dir packages/rhodonite-mbt pack",
+    "publish:npm": "pnpm run build:npm && npm publish ./packages/rhodonite-mbt --access public",
     "publish:moon": "bash scripts/publish-rhodonite-mooncakes.sh"
   },
   "devDependencies": {

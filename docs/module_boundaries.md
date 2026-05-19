@@ -33,11 +33,11 @@ Run `moon publish` **once per module** below (from each module directory). Publi
 ## npm package
 
 The npm package is a separate release unit under
-[`packages/rhodonite_mbt/`](../packages/rhodonite_mbt/). It is named
-`rhodonite_mbt`, is ESM-only, and bundles the existing TypeScript wrappers plus
+[`packages/rhodonite-mbt/`](../packages/rhodonite-mbt/). It is named
+`rhodonite-mbt`, is ESM-only, and bundles the existing TypeScript wrappers plus
 the MoonBit release JS bridge generated from `emadurandal/rhodonite_core`.
 
-Use `pnpm run build:npm` to build `packages/rhodonite_mbt/dist`,
+Use `pnpm run build:npm` to build `packages/rhodonite-mbt/dist`,
 `pnpm run pack:npm` to create a local tarball, and `pnpm run publish:npm` to
 publish to npm. This npm flow does not publish mooncakes modules and does not
 include `emadurandal/rhodonite_examples`, native SDL3 runtime code, or demo

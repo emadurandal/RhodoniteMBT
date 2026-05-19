@@ -1,5 +1,5 @@
 {
-  "name": "rhodonite_mbt",
+  "name": "rhodonite-mbt",
   "version": "0.0.0",
   "description": "TypeScript wrappers and MoonBit JavaScript bridge for RhodoniteMBT.",
   "type": "module",
