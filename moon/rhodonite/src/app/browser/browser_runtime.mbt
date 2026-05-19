@@ -696,12 +696,12 @@ fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
 }
 
 ///|
-/// Attaches an additional canvas surface to a multi-surface browser platform.
-pub fn MultiSurfacePlatform::attach_canvas(
+/// Registers a browser canvas surface with the engine and optional input binding.
+fn MultiSurfacePlatform::attach_prepared_canvas(
   self : MultiSurfacePlatform,
   canvas : @wgpu.HTMLCanvasElement,
+  surface : @wgpu.GPUSurface,
 ) -> @app.SurfaceId {
-  let surface = gpu_surface_from_html_canvas(self.gpu, canvas)
   let id = self.engine.add_surface(surface)
   let input_binding = if self.options.install_input {
     Some(
@@ -717,16 +717,30 @@ pub fn MultiSurfacePlatform::attach_canvas(
 }
 
 ///|
-/// Creates a browser platform from the first canvas and allows more canvases to attach later.
+/// Attaches an additional canvas surface to a multi-surface browser platform.
+pub fn MultiSurfacePlatform::attach_canvas(
+  self : MultiSurfacePlatform,
+  canvas : @wgpu.HTMLCanvasElement,
+) -> @app.SurfaceId {
+  let surface = gpu_surface_from_html_canvas(self.gpu, canvas)
+  self.attach_prepared_canvas(canvas, surface)
+}
+
+///|
+/// Runs a browser platform from initial canvas surfaces and allows more canvases to attach later.
 ///
-/// Call `MultiSurfacePlatform::launch` after attaching every canvas so `Engine::initialize`
-/// and the frame loop start with the final surface set (matching native multi-window setup).
+/// Initial canvas surfaces are attached before `Engine::initialize` and the frame loop starts,
+/// matching native multi-window setup.
 pub async fn run_multi_surface_platform(
-  first_canvas : @wgpu.HTMLCanvasElement,
+  configs : Array[PlatformConfig],
   app : PlatformApp,
   options : PlatformOptions,
 ) -> MultiSurfacePlatform? {
+  if configs.length() == 0 {
+    return None
+  }
   let gpu = gpu_device_context_from_browser()
+  let first_canvas = configs[0].canvas
   let surface = gpu_surface_from_html_canvas(gpu, first_canvas)
   let ctx = @wgpu.create_webgpu_context(
     gpu.device(),
@@ -748,17 +762,11 @@ pub async fn run_multi_surface_platform(
     disposed: false,
     launched: false,
   }
-  let id = engine.add_surface(surface)
-  let input_binding = if options.install_input {
-    Some(
-      install_browser_surface_input(engine.surface_input(id), first_canvas, fn() {
-        engine.request_render("input")
-      }),
-    )
-  } else {
-    None
+  ignore(platform.attach_prepared_canvas(first_canvas, surface))
+  for i = 1; i < configs.length(); i = i + 1 {
+    ignore(platform.attach_canvas(configs[i].canvas))
   }
-  platform.surfaces.push({ id, canvas: first_canvas, surface, input_binding })
+  platform.launch()
   Some(platform)
 }
 

@@ -13,16 +13,15 @@ async fn create_webgpu_demo_state_async(
   second_canvas : @wgpu.HTMLCanvasElement,
 ) -> Unit {
   let platform = @app_browser.run_multi_surface_platform(
-    first_canvas,
+    [
+      @app_browser.PlatformConfig::new(first_canvas),
+      @app_browser.PlatformConfig::new(second_canvas),
+    ],
     @app_browser.PlatformApp::default_engine(setup_engine),
     @app_browser.PlatformOptions::interactive(),
   )
   match platform {
-    Some(platform) => {
-      ignore(platform.attach_canvas(second_canvas))
-      platform.launch()
-      println("multi-surface-independent-input: DemoState ready")
-    }
+    Some(_) => println("multi-surface-independent-input: DemoState ready")
     None =>
       println("multi-surface-independent-input: failed to create DemoState")
   }
