@@ -106,9 +106,9 @@ Pointer coordinates は canvas/window surface 座標で扱う。browser adapter 
 
 `pointer_delta_x/y` と `wheel_delta_x/y` はフレームごとに 0 に戻り、そのフレームで適用されたイベントの合計になる。button state はフレームをまたいで保持される。
 
-Native SDL3 の on-demand loop は mouse motion / button down / button up / wheel を input dirty event として扱い、`Engine::request_render("input")` で次フレームを起床する。実際の pointer 座標と button transition は render 直前の `SDL_GetMouseState` snapshot から enqueue するため、通常 loop と on-demand loop は同じ `InputState` 集約値を渡す。
+Native SDL3 の on-demand loop は mouse motion / button down / button up / wheel を input dirty event として扱い、`Engine::request_render("input")` で次フレームを起床する。pointer 座標と button transition は poll 時に SDL event payload（`SDL_EVENT_MOUSE_MOTION` の `state` / 座標、`SDL_EVENT_MOUSE_BUTTON_*` の `down` / 座標）から enqueue し、render 直前の `SDL_GetMouseState` snapshot で最終同期する。Linux Wayland では cached `SDL_GetMouseState` の button mask だけがドラッグ中に 0 になることがあるため、motion / button event からの同期が必須である。render 直前の補完では、engine 側で既に押下中とみなしているボタンだけ `SDL_GetGlobalMouseState` から mask を補う。desktop 全体の hardware state を無条件に OR すると、フォーカス喪失後に別アプリで押したボタンが phantom `MouseDown` になる。
 
-multi-window native loop も同様に、render 直前にフォーカス中 window の `SDL_GetMouseState` を surface-local `InputState` へ enqueue する。mouse motion / button SDL event は `windowID` の route と render 起床だけに使い、座標と button transition は event payload ではなく snapshot から読む。`PlatformOptions::interactive_on_demand()` の multi-window loop は single-window on-demand と同じく `SDL_WaitEventTimeout`、idle 検出、`Engine::render_requested()` / `continuous_render_requested()` 判定で必要なフレームだけ `run_multi_surface_frame` を実行する。
+multi-window native loop も同様に、poll 時に surface-local `InputState` へ motion / button event を enqueue し、render 直前にフォーカス中 window の mouse snapshot で補完する。`PlatformOptions::interactive_on_demand()` の multi-window loop は single-window on-demand と同じく `SDL_WaitEventTimeout`、idle 検出、`Engine::render_requested()` / `continuous_render_requested()` 判定で必要なフレームだけ `run_multi_surface_frame` を実行する。
 
 wheel delta は controller 側で同じ sensitivity を使えるよう、adapter 側で browser の `WheelEvent.deltaX/Y` に近い符号と大きさへ寄せる。native SDL3 adapter は wheel step を DOM wheel の pixel delta 相当に近づけるため 100 倍して enqueue し、通常スクロールの上方向が dolly-in になるよう `deltaY` を負方向へ正規化する。
 

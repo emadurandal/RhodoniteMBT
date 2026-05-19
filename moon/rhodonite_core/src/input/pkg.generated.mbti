@@ -30,6 +30,7 @@ pub fn InputState::key_released(Self, KeyCode) -> Bool
 pub fn InputState::keys_down(Self) -> Array[KeyCode]
 pub fn InputState::mouse_buttons_down(Self) -> Array[MouseButton]
 pub fn InputState::mouse_down(Self, MouseButton) -> Bool
+pub fn InputState::mouse_down_including_queued(Self, MouseButton) -> Bool
 pub fn InputState::mouse_pressed(Self, MouseButton) -> Bool
 pub fn InputState::mouse_released(Self, MouseButton) -> Bool
 pub fn InputState::new() -> Self

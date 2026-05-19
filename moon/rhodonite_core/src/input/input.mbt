@@ -757,6 +757,32 @@ pub fn InputState::mouse_down(self : InputState, button : MouseButton) -> Bool {
 }
 
 ///|
+/// Reports whether a mouse button is held in committed state or queued events.
+/// Adapters that enqueue multiple transitions before `begin_frame` should use
+/// this instead of `mouse_down` when deduplicating `MouseDown` / `MouseUp`.
+pub fn InputState::mouse_down_including_queued(
+  self : InputState,
+  button : MouseButton,
+) -> Bool {
+  let mut down = mouse_button_array_contains(self.mouse_buttons_down, button)
+  for i = 0; i < self.queued_events.length(); i = i + 1 {
+    match self.queued_events[i] {
+      MouseDown(queued_button, _, _) =>
+        if queued_button == button {
+          down = true
+        }
+      MouseUp(queued_button, _, _) =>
+        if queued_button == button {
+          down = false
+        }
+      FocusLost => down = false
+      _ => ()
+    }
+  }
+  down
+}
+
+///|
 /// Reports whether a mouse button transitioned from up to down this frame.
 pub fn InputState::mouse_pressed(
   self : InputState,

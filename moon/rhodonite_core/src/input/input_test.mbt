@@ -53,6 +53,28 @@ test "pointer mouse and wheel deltas reset every frame" {
 }
 
 ///|
+test "mouse down including queued reflects pending transitions" {
+  let input = InputState::new()
+  assert_true(!input.mouse_down(Left))
+  assert_true(!input.mouse_down_including_queued(Left))
+  input.enqueue_event(MouseDown(Left, (1.0 : Float), (2.0 : Float)))
+  assert_true(!input.mouse_down(Left))
+  assert_true(input.mouse_down_including_queued(Left))
+  input.enqueue_event(MouseUp(Left, (3.0 : Float), (4.0 : Float)))
+  assert_true(!input.mouse_down_including_queued(Left))
+}
+
+///|
+test "mouse down including queued deduplicates repeated down transitions" {
+  let input = InputState::new()
+  input.enqueue_event(MouseDown(Left, (0.0 : Float), (0.0 : Float)))
+  if !input.mouse_down_including_queued(Left) {
+    input.enqueue_event(MouseDown(Left, (1.0 : Float), (1.0 : Float)))
+  }
+  assert_eq(input.queued_event_count(), 1)
+}
+
+///|
 test "focus lost clears held input" {
   let input = InputState::new()
   let key = KeyCode::new("Space")
