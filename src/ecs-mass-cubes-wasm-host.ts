@@ -9,7 +9,7 @@ import {
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
-import { InputState, MouseButton, installBrowserInputState } from "./app-runtime";
+import { InputState, MouseButton, installBrowserInputState } from "../moon/rhodonite/src/app/ts/index.ts";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,
@@ -27,7 +27,7 @@ import {
 	writeHalf,
 	writeMassCubesDenseYTransformWaveToArrays,
 } from "./ecs-mass-cubes-transform-writer";
-import { requestLargeStorageBufferDevice } from "./webgpu-device-limits";
+import { requestLargeStorageBufferDevice } from "../moon/rhodonite/src/app/ts/index.ts";
 
 type GlobalTransformPrecisionMode =
 	| "all-f32"

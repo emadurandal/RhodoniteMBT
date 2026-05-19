@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InputState } from "./app-runtime";
+import { InputState } from "../moon/rhodonite/src/app/ts/index.ts";
 import { World } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	addCameraLensOrthographic,

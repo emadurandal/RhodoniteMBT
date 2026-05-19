@@ -1,4 +1,4 @@
-import { requestLargeStorageBufferDevice } from "./webgpu-device-limits";
+import { requestLargeStorageBufferDevice } from "./webgpu-device-limits.ts";
 
 export type EngineCallback = (engine: Engine, frame: FrameState) => void;
 

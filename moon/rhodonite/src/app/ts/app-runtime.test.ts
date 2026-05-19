@@ -17,7 +17,7 @@ import {
 	startPlatform,
 	startBrowserFrameLoop,
 	stopPlatform,
-} from "./app-runtime";
+} from "./index.ts";
 
 type FakeEventTarget = {
 	addEventListener: ReturnType<typeof vi.fn>;

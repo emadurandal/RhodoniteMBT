@@ -12,7 +12,7 @@ import {
 	runMultiSurfacePlatform,
 	type FrameState,
 	type SurfaceId,
-} from "./app-runtime";
+} from "../moon/rhodonite/src/app/ts/index.ts";
 
 type SurfaceRenderState = {
 	readonly id: SurfaceId;
