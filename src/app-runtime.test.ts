@@ -242,6 +242,28 @@ describe("app-runtime Engine", () => {
 		]);
 	});
 
+	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
+		const engine = await createTestEngine();
+		const sceneA = new Scene("surface-a", {});
+		const sceneB = new Scene("surface-b", {});
+		sceneA.setMainCamera("camera-a");
+
+		let orbitUpdateCount = 0;
+		engine.addCommonHandlers(sceneA, {
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.initialize();
+		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneA });
+		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
 	it("exposes frame-begin, fixed-step, and render-frame groups separately", async () => {
 		const engine = await createTestEngine();
 		engine.initialize();

@@ -208,6 +208,19 @@ pub fn Engine::add_phase_handler(
 }
 
 ///|
+/// Reports whether a surface-scoped frame should run handlers for `scene`.
+fn Engine::frame_targets_scene(
+  self : Engine,
+  frame : FrameState,
+  scene : Scene,
+) -> Bool {
+  match frame.surface_id() {
+    None => true
+    Some(id) => scene.same(self.surface(id).scene())
+  }
+}
+
+///|
 /// Appends the standard input handler for a scene main camera's orbit controller.
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
@@ -219,6 +232,9 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
   self.add_phase_handler(
     phase,
     fn(engine, frame) {
+      if !engine.frame_targets_scene(frame, scene) {
+        return
+      }
       let camera = scene_main_camera_or_abort(
         scene, "Engine::add_orbit_camera_controller_input_handler",
       )

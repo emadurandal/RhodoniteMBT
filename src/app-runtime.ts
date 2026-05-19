@@ -1250,6 +1250,13 @@ export class Engine {
 		return surface;
 	}
 
+	private frameTargetsScene(frame: FrameState, scene: RuntimeScene): boolean {
+		if (frame.surfaceId === undefined) {
+			return true;
+		}
+		return this.requireSurface(frame.surfaceId).scene === scene;
+	}
+
 	setRenderWakeup(wakeup: (() => void) | undefined): void {
 		this.renderWakeupValue = wakeup;
 	}
@@ -1353,15 +1360,19 @@ export class Engine {
 			);
 		}
 		this.addPhaseHandler(Phase.Input, (engine, frame) => {
+			if (!engine.frameTargetsScene(frame, scene)) {
+				return;
+			}
 			const camera = scene.mainCamera();
 			if (camera === null) {
 				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
 			}
+			const input = frame.input ?? engine.input;
 			updateOrbitCameraControllerFromInput(
 				scene.world(),
 				camera,
 				orbitControllerComponent,
-				frame.input ?? engine.input,
+				input,
 			);
 		});
 		if (homeComponent === undefined) {

@@ -1,6 +1,18 @@
 ///|
+/// Monotonic scene instance ids used to compare scenes by identity.
+let scene_instance_counter : @ref.Ref[Int] = @ref.new(0)
+
+///|
+/// Allocates the next unique scene instance id.
+fn alloc_scene_instance_id() -> Int {
+  scene_instance_counter.val = scene_instance_counter.val + 1
+  scene_instance_counter.val
+}
+
+///|
 /// Runtime scene instance that binds one ECS world to one system runner.
 pub struct Scene {
+  priv instance_id : Int
   priv name : String
   priv world : @ecs.World
   priv system_runner : @ecs.SystemRunner
@@ -29,6 +41,7 @@ pub fn Scene::new(name : String) -> Scene {
 /// Builds a scene around an already configured ECS world.
 pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
   {
+    instance_id: alloc_scene_instance_id(),
     name,
     world,
     system_runner: @ecs.SystemRunner::new(),
@@ -40,6 +53,12 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     orbit_camera_transform_registrations: [],
     orbit_camera_blob_sync_registrations: [],
   }
+}
+
+///|
+/// Reports whether two scenes are the same runtime instance.
+pub fn Scene::same(self : Scene, other : Scene) -> Bool {
+  self.instance_id == other.instance_id
 }
 
 ///|
