@@ -727,10 +727,10 @@ pub fn MultiSurfacePlatform::attach_canvas(
 }
 
 ///|
-/// Creates a browser platform from initial canvas surfaces and allows more canvases to attach later.
+/// Runs a browser platform from initial canvas surfaces and allows more canvases to attach later.
 ///
-/// Call `MultiSurfacePlatform::launch` after attaching every canvas so `Engine::initialize`
-/// and the frame loop start with the final surface set (matching native multi-window setup).
+/// Initial canvas surfaces are attached before `Engine::initialize` and the frame loop starts,
+/// matching native multi-window setup.
 pub async fn run_multi_surface_platform(
   configs : Array[PlatformConfig],
   app : PlatformApp,
@@ -766,6 +766,7 @@ pub async fn run_multi_surface_platform(
   for i = 1; i < configs.length(); i = i + 1 {
     ignore(platform.attach_canvas(configs[i].canvas))
   }
+  platform.launch()
   Some(platform)
 }
 

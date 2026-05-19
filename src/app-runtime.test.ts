@@ -587,9 +587,6 @@ describe("app-runtime Engine", () => {
 		);
 
 		expect(platform).toBeDefined();
-		expect(calls).toEqual(["setup:0"]);
-
-		platform?.launch();
 		platform?.dispose();
 
 		expect(calls).toEqual([

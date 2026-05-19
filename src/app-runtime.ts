@@ -1152,6 +1152,7 @@ export async function runMultiSurfacePlatform(
 	for (const config of configs) {
 		platform.attachCanvas(config.canvas);
 	}
+	platform.launch();
 	return platform;
 }
 

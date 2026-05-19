@@ -21,10 +21,7 @@ async fn create_webgpu_demo_state_async(
     @app_browser.PlatformOptions::interactive(),
   )
   match platform {
-    Some(platform) => {
-      platform.launch()
-      println("multi-surface-independent-input: DemoState ready")
-    }
+    Some(_) => println("multi-surface-independent-input: DemoState ready")
     None =>
       println("multi-surface-independent-input: failed to create DemoState")
   }

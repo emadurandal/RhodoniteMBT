@@ -410,7 +410,6 @@ async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): 
 	if (platform === undefined) {
 		throw new Error("Failed to create TypeScript multi-surface platform.");
 	}
-	platform.launch();
 }
 
 window.addEventListener("load", () => {
