@@ -37,6 +37,8 @@ type DemoState = {
 	readonly indexBuffer: GPUBuffer;
 	readonly objectBuffer: GPUBuffer;
 	readonly bindGroup: GPUBindGroup;
+	readonly firstSurfaceId: SurfaceId;
+	readonly secondSurfaceId: SurfaceId;
 	readonly surfaces: SurfaceRenderState[];
 	frame: number;
 };
@@ -215,7 +217,7 @@ fn fragmentMain(in: VertexOut) -> @location(0) vec4<f32> {
 }`;
 }
 
-function createDemoState(engine: Engine): DemoState {
+function createDemoState(engine: Engine): Omit<DemoState, "firstSurfaceId" | "secondSurfaceId"> {
 	const device = engine.device;
 	const shader = device.createShaderModule({ code: createShader() });
 	const objectBuffer = device.createBuffer({
@@ -340,8 +342,12 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 	const gpuSurface: GpuSurface = demo.engine.surfaceGpuSurface(frame.surfaceId);
 	const colorView = gpuSurface.acquireView();
 	const encoder = demo.device.createCommandEncoder();
+	const clearValue =
+		frame.surfaceId === demo.firstSurfaceId
+			? { r: 0.02, g: 0.04, b: 0.12, a: 1 }
+			: { r: 0.02, g: 0.11, b: 0.07, a: 1 };
 	const pass = encoder.beginRenderPass({
-		colorAttachments: [{ view: colorView, clearValue: frame.surfaceId === 1 ? { r: 0.02, g: 0.04, b: 0.12, a: 1 } : { r: 0.02, g: 0.11, b: 0.07, a: 1 }, loadOp: "clear", storeOp: "store" }],
+		colorAttachments: [{ view: colorView, clearValue, loadOp: "clear", storeOp: "store" }],
 		depthStencilAttachment: { view: surface.depthView, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" },
 	});
 	pass.setPipeline(demo.pipeline);
@@ -355,9 +361,9 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 
 async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): Promise<void> {
 	const engine = await Engine.create(first, { mainScene: new Scene("ts-multi-surface") });
-	const demo = createDemoState(engine);
 	const firstId = attachCanvasSurface(engine, first);
 	const secondId = attachCanvasSurface(engine, second);
+	const demo = { ...createDemoState(engine), firstSurfaceId: firstId, secondSurfaceId: secondId };
 	addSurfaceState(demo, firstId, engine.surfaceInput(firstId));
 	addSurfaceState(demo, secondId, engine.surfaceInput(secondId));
 	const options = PlatformOptions.interactive();
