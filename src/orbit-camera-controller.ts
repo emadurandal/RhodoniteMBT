@@ -1,4 +1,4 @@
-import { MouseButton, type InputState } from "./app-runtime";
+import { MouseButton, type InputState } from "../moon/rhodonite/src/app/ts/index.ts";
 import type {
 	ComponentTypeId,
 	EntityId,

@@ -28,7 +28,7 @@ import {
 	runBrowserWebGpuCanvasDemo,
 	runSingleCanvasPlatform,
 	type FrameState,
-} from "./app-runtime";
+} from "../moon/rhodonite/src/app/ts/index.ts";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,

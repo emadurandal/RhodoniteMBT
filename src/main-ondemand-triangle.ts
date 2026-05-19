@@ -8,7 +8,7 @@ import {
 	PlatformOptions,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
-} from "./app-runtime";
+} from "../moon/rhodonite/src/app/ts/index.ts";
 import {
 	createRgba8ReadbackTarget,
 	destroyReadbackTarget,
