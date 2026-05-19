@@ -524,11 +524,20 @@ fn Engine::run_phase_unchecked(
   frame : FrameState,
 ) -> Unit {
   self.run_before_systems(phase, frame)
-  for i = 0; i < self.scenes.length(); i = i + 1 {
-    let scene = self.scenes[i]
-    if self.scene_participates_in_phase(scene, phase) {
-      ignore(scene.run_systems_for_phase(phase, frame))
+  match frame.surface_id() {
+    Some(id) => {
+      let scene = self.surface(id).scene()
+      if self.scene_participates_in_phase(scene, phase) {
+        ignore(scene.run_systems_for_phase(phase, frame))
+      }
     }
+    None =>
+      for i = 0; i < self.scenes.length(); i = i + 1 {
+        let scene = self.scenes[i]
+        if self.scene_participates_in_phase(scene, phase) {
+          ignore(scene.run_systems_for_phase(phase, frame))
+        }
+      }
   }
   self.run_after_systems(phase, frame)
 }
@@ -683,7 +692,9 @@ pub fn Engine::run_multi_surface_frame(
   for i = 0; i < phases.length(); i = i + 1 {
     let phase = phases[i]
     if phase_is_render_path(phase) {
-      for surface_index = 0; surface_index < self.surfaces.length(); surface_index = surface_index + 1 {
+      for surface_index = 0
+          surface_index < self.surfaces.length()
+          surface_index = surface_index + 1 {
         let surface = self.surfaces[surface_index]
         if surface.state().active() {
           let frame = base_frame.with_surface_view(

@@ -135,7 +135,10 @@ pub fn Engine::surface(self : Engine, id : SurfaceId) -> EngineSurface {
 
 ///|
 /// Returns the surface-local input state for a registered surface.
-pub fn Engine::surface_input(self : Engine, id : SurfaceId) -> @input.InputState {
+pub fn Engine::surface_input(
+  self : Engine,
+  id : SurfaceId,
+) -> @input.InputState {
   self.surface(id).input()
 }
 
