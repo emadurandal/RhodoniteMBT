@@ -974,51 +974,6 @@ fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
 }
 
 ///|
-/// Converts an SDL mouse button index to the shared input button enum.
-fn mouse_button_from_sdl_button(button : Byte) -> @input.MouseButton {
-  if button.to_int() == 1 {
-    Left
-  } else if button.to_int() == 2 {
-    Middle
-  } else if button.to_int() == 3 {
-    Right
-  } else if button.to_int() == 4 {
-    Back
-  } else if button.to_int() == 5 {
-    Forward
-  } else {
-    Other(button.to_int())
-  }
-}
-
-///|
-/// Queues one SDL mouse motion event using event-local window coordinates.
-fn enqueue_sdl_mouse_motion_event(
-  input : @input.InputState,
-  event : @lib.SDL_Event,
-) -> Unit {
-  let motion : SdlMouseMotionEvent = @lib.unsafe_from_sdl_event(event)
-  input.enqueue_event(PointerMove(motion.x, motion.y))
-}
-
-///|
-/// Queues one SDL mouse button event using event-local window coordinates.
-fn enqueue_sdl_mouse_button_event(
-  input : @input.InputState,
-  event : @lib.SDL_Event,
-) -> Unit {
-  let button_event : SdlMouseButtonEvent = @lib.unsafe_from_sdl_event(event)
-  let button = mouse_button_from_sdl_button(button_event.button)
-  match event.get_type() {
-    SDL_EVENT_MOUSE_BUTTON_DOWN =>
-      input.enqueue_event(MouseDown(button, button_event.x, button_event.y))
-    SDL_EVENT_MOUSE_BUTTON_UP =>
-      input.enqueue_event(MouseUp(button, button_event.x, button_event.y))
-    _ => ()
-  }
-}
-
-///|
 /// Reports whether an SDL event means the native drawable size may have changed.
 fn sdl_event_is_resize(event_type : @lib.SDL_EventType) -> Bool {
   match event_type {
@@ -1441,24 +1396,7 @@ fn handle_sdl_multi_window_event(
     | SDL_EVENT_MOUSE_BUTTON_DOWN
     | SDL_EVENT_MOUSE_BUTTON_UP => {
       if install_input {
-        let window_id = sdl_event_window_id(event)
-        session.focused_window_id = Some(window_id)
-        match session.find_surface_index_by_window_id(window_id) {
-          Some(index) =>
-            match
-              sdl_multi_window_engine_input_for_surface(session, engine, index) {
-              Some(input) =>
-                match event_type {
-                  SDL_EVENT_MOUSE_MOTION =>
-                    enqueue_sdl_mouse_motion_event(input, event)
-                  SDL_EVENT_MOUSE_BUTTON_DOWN | SDL_EVENT_MOUSE_BUTTON_UP =>
-                    enqueue_sdl_mouse_button_event(input, event)
-                  _ => ()
-                }
-              None => ()
-            }
-          None => ()
-        }
+        session.focused_window_id = Some(sdl_event_window_id(event))
       }
       false
     }
