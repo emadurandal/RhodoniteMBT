@@ -1325,100 +1325,7 @@ fn handle_sdl_multi_window_event(
   engine : @app.Engine,
   event : @lib.SDL_Event,
   install_input : Bool,
-) -> Bool raise Sdl3AppError {
-  let event_type = event.get_type()
-  match event_type {
-    SDL_EVENT_QUIT => true
-    SDL_EVENT_WINDOW_CLOSE_REQUESTED => {
-      let window_id = sdl_event_window_id(event)
-      match session.find_surface_index_by_window_id(window_id) {
-        Some(index) =>
-          remove_sdl_multi_window_surface_at(session, engine, index)
-        None => ()
-      }
-      session.surfaces.length() == 0
-    }
-    SDL_EVENT_WINDOW_FOCUS_LOST => {
-      let window_id = sdl_event_window_id(event)
-      match session.find_surface_index_by_window_id(window_id) {
-        Some(index) =>
-          if install_input {
-            match
-              sdl_multi_window_engine_input_for_surface(session, engine, index) {
-              Some(input) => input.enqueue_event(FocusLost)
-              None => ()
-            }
-          }
-        None => ()
-      }
-      false
-    }
-    SDL_EVENT_KEY_DOWN | SDL_EVENT_KEY_UP => {
-      if install_input {
-        let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(
-          event,
-        )
-        session.focused_window_id = Some(key_event.windowID)
-        let target_index = match
-          session.find_surface_index_by_window_id(key_event.windowID) {
-          Some(index) => Some(index)
-          None => session.focused_surface_index()
-        }
-        match target_index {
-          Some(index) =>
-            match
-              sdl_multi_window_engine_input_for_surface(session, engine, index) {
-              Some(input) => enqueue_sdl_keyboard_event(input, event)
-              None => ()
-            }
-          None => ()
-        }
-      }
-      false
-    }
-    SDL_EVENT_MOUSE_WHEEL => {
-      if install_input {
-        let window_id = sdl_event_window_id(event)
-        session.focused_window_id = Some(window_id)
-        match session.find_surface_index_by_window_id(window_id) {
-          Some(index) =>
-            match
-              sdl_multi_window_engine_input_for_surface(session, engine, index) {
-              Some(input) => enqueue_sdl_mouse_wheel_event(input, event)
-              None => ()
-            }
-          None => ()
-        }
-      }
-      false
-    }
-    SDL_EVENT_MOUSE_MOTION
-    | SDL_EVENT_MOUSE_BUTTON_DOWN
-    | SDL_EVENT_MOUSE_BUTTON_UP => {
-      if install_input {
-        session.focused_window_id = Some(sdl_event_window_id(event))
-      }
-      false
-    }
-    SDL_EVENT_WINDOW_RESIZED
-    | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
-    | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {
-      if handle_sdl_multi_window_resize_event(session, event) {
-        engine.request_render("surface")
-      }
-      false
-    }
-    _ => false
-  }
-}
-
-///|
-/// Processes one SDL event for multi-window on-demand rendering.
-fn handle_sdl_multi_window_event_for_on_demand(
-  session : SdlMultiWindowPlatformSession,
-  engine : @app.Engine,
-  event : @lib.SDL_Event,
-  install_input : Bool,
+  request_render : (String) -> Unit,
 ) -> Bool raise Sdl3AppError {
   let event_type = event.get_type()
   match event_type {
@@ -1441,7 +1348,7 @@ fn handle_sdl_multi_window_event_for_on_demand(
               sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => {
                 input.enqueue_event(FocusLost)
-                engine.request_render("input")
+                request_render("input")
               }
               None => ()
             }
@@ -1467,7 +1374,7 @@ fn handle_sdl_multi_window_event_for_on_demand(
               sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => {
                 enqueue_sdl_keyboard_event(input, event)
-                engine.request_render("input")
+                request_render("input")
               }
               None => ()
             }
@@ -1486,7 +1393,7 @@ fn handle_sdl_multi_window_event_for_on_demand(
               sdl_multi_window_engine_input_for_surface(session, engine, index) {
               Some(input) => {
                 enqueue_sdl_mouse_wheel_event(input, event)
-                engine.request_render("input")
+                request_render("input")
               }
               None => ()
             }
@@ -1500,7 +1407,7 @@ fn handle_sdl_multi_window_event_for_on_demand(
     | SDL_EVENT_MOUSE_BUTTON_UP => {
       if install_input {
         session.focused_window_id = Some(sdl_event_window_id(event))
-        engine.request_render("input")
+        request_render("input")
       }
       false
     }
@@ -1508,7 +1415,7 @@ fn handle_sdl_multi_window_event_for_on_demand(
     | SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
     | SDL_EVENT_WINDOW_METAL_VIEW_RESIZED => {
       if handle_sdl_multi_window_resize_event(session, event) {
-        engine.request_render("surface")
+        request_render("surface")
       }
       false
     }
@@ -1532,11 +1439,12 @@ fn run_sdl_multi_window_on_demand_platform_loop(
       !engine.continuous_render_requested()
     if resumed_from_idle {
       if @lib.sdl_WaitEventTimeout(event, 100) {
-        if handle_sdl_multi_window_event_for_on_demand(
+        if handle_sdl_multi_window_event(
             session,
             engine,
             event,
             options.install_input,
+            fn(reason) { engine.request_render(reason) },
           ) {
           quit.val = true
         }
@@ -1547,11 +1455,12 @@ fn run_sdl_multi_window_on_demand_platform_loop(
       if event_type == SDL_EVENT_POLL_SENTINEL {
         break
       }
-      if handle_sdl_multi_window_event_for_on_demand(
+      if handle_sdl_multi_window_event(
           session,
           engine,
           event,
           options.install_input,
+          fn(reason) { engine.request_render(reason) },
         ) {
         quit.val = true
       }
@@ -1608,6 +1517,7 @@ fn run_sdl_multi_window_platform_loop(
               engine,
               event,
               options.install_input,
+              fn(_) { () },
             ) {
             quit.val = true
           }
