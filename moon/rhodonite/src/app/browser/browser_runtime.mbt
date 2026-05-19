@@ -235,10 +235,12 @@ pub fn gpu_surface_from_html_canvas(
   let webgpu_canvas_context = @wgpu.create_canvas_context(
     @wgpu.canvas_getContext(canvas),
   )
-  let format = gpu.instance().get_preferred_canvas_format_for_surface(
-    gpu.adapter(),
-    webgpu_canvas_context,
-  )
+  let format = gpu
+    .instance()
+    .get_preferred_canvas_format_for_surface(
+      gpu.adapter(),
+      webgpu_canvas_context,
+    )
   webgpu_canvas_context.configure(gpu.device(), format)
   @wgpu.create_gpu_surface(
     webgpu_canvas_context,
@@ -521,65 +523,9 @@ pub fn install_browser_input(
   engine : @app.Engine,
   canvas : @wgpu.HTMLCanvasElement,
 ) -> BrowserInputBinding {
-  let input = engine.input()
-  install_browser_input_callbacks(
-    canvas,
-    fn(code, shift, ctrl, alt, meta, repeat) {
-      input.enqueue_event(
-        KeyDown(
-          @input.KeyCode::new(code),
-          @input.Modifiers::new(shift, ctrl, alt, meta),
-          repeat,
-        ),
-      )
-      engine.request_render("input")
-    },
-    fn(code, shift, ctrl, alt, meta) {
-      input.enqueue_event(
-        KeyUp(
-          @input.KeyCode::new(code),
-          @input.Modifiers::new(shift, ctrl, alt, meta),
-        ),
-      )
-      engine.request_render("input")
-    },
-    fn(x, y) {
-      input.enqueue_event(
-        PointerMove(Float::from_double(x), Float::from_double(y)),
-      )
-      engine.request_render("input")
-    },
-    fn(button, x, y) {
-      input.enqueue_event(
-        MouseDown(
-          mouse_button_from_browser(button),
-          Float::from_double(x),
-          Float::from_double(y),
-        ),
-      )
-      engine.request_render("input")
-    },
-    fn(button, x, y) {
-      input.enqueue_event(
-        MouseUp(
-          mouse_button_from_browser(button),
-          Float::from_double(x),
-          Float::from_double(y),
-        ),
-      )
-      engine.request_render("input")
-    },
-    fn(delta_x, delta_y) {
-      input.enqueue_event(
-        Wheel(Float::from_double(delta_x), Float::from_double(delta_y)),
-      )
-      engine.request_render("input")
-    },
-    fn() {
-      input.enqueue_event(FocusLost)
-      engine.request_render("input")
-    },
-  )
+  install_browser_surface_input(engine.input(), canvas, fn() {
+    engine.request_render("input")
+  })
 }
 
 ///|
@@ -677,13 +623,16 @@ pub fn start_platform(
 /// Starts the frame loop for a multi-surface browser platform.
 fn MultiSurfacePlatform::start(self : MultiSurfacePlatform) -> Unit {
   let frame_loop = match self.options.frame_mode {
-    Loop => Some(start_browser_frame_loop(fn(delta_seconds) {
-      ignore(
-        self.engine.run_multi_surface_frame(
-          Float::from_double(delta_seconds),
-        ),
+    Loop =>
+      Some(
+        start_browser_frame_loop(fn(delta_seconds) {
+          ignore(
+            self.engine.run_multi_surface_frame(
+              Float::from_double(delta_seconds),
+            ),
+          )
+        }),
       )
-    }))
     OnDemand => {
       let on_demand_loop = start_browser_on_demand_frame_loop(
         fn(delta_seconds) {
@@ -720,11 +669,9 @@ pub fn MultiSurfacePlatform::attach_canvas(
   let id = self.engine.add_surface(surface)
   let input_binding = if self.options.install_input {
     Some(
-      install_browser_surface_input(
-        self.engine.surface_input(id),
-        canvas,
-        fn() { self.engine.request_render("input") },
-      ),
+      install_browser_surface_input(self.engine.surface_input(id), canvas, fn() {
+        self.engine.request_render("input")
+      }),
     )
   } else {
     None
@@ -764,11 +711,9 @@ pub async fn run_multi_surface_platform(
   let id = engine.add_surface(surface)
   let input_binding = if options.install_input {
     Some(
-      install_browser_surface_input(
-        engine.surface_input(id),
-        first_canvas,
-        fn() { engine.request_render("input") },
-      ),
+      install_browser_surface_input(engine.surface_input(id), first_canvas, fn() {
+        engine.request_render("input")
+      }),
     )
   } else {
     None
