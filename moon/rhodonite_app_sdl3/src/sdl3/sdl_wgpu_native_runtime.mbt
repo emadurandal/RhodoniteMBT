@@ -926,6 +926,44 @@ fn sdl_input_mouse_button(button : Byte) -> @input.MouseButton? {
 }
 
 ///|
+/// Merges window-local SDL button flags with global hardware state only for
+/// buttons already held in engine input. A full OR would treat desktop-wide
+/// presses in other applications as local MouseDown after FocusLost cleared state.
+fn merge_sdl_mouse_button_flags(
+  input : @input.InputState,
+  local_flags : UInt,
+  global_flags : UInt,
+) -> UInt {
+  let mut flags = local_flags
+  if input.mouse_down(Left) &&
+    !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_LMASK) &&
+    sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_LMASK) {
+    flags = flags | @lib.SDL_BUTTON_LMASK
+  }
+  if input.mouse_down(Middle) &&
+    !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_MMASK) &&
+    sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_MMASK) {
+    flags = flags | @lib.SDL_BUTTON_MMASK
+  }
+  if input.mouse_down(Right) &&
+    !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_RMASK) &&
+    sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_RMASK) {
+    flags = flags | @lib.SDL_BUTTON_RMASK
+  }
+  if input.mouse_down(Back) &&
+    !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_X1MASK) &&
+    sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_X1MASK) {
+    flags = flags | @lib.SDL_BUTTON_X1MASK
+  }
+  if input.mouse_down(Forward) &&
+    !sdl_mouse_mask_has(local_flags, @lib.SDL_BUTTON_X2MASK) &&
+    sdl_mouse_mask_has(global_flags, @lib.SDL_BUTTON_X2MASK) {
+    flags = flags | @lib.SDL_BUTTON_X2MASK
+  }
+  flags
+}
+
+///|
 /// Syncs all normalized mouse buttons from an SDL button-state bitmask.
 fn enqueue_sdl_mouse_buttons_from_flags(
   input : @input.InputState,
@@ -974,11 +1012,11 @@ fn enqueue_sdl_mouse_button_event(
 fn enqueue_sdl_mouse_state(input : @input.InputState) -> Unit {
   let x = FixedArray::make(1, (0.0 : Float))
   let y = FixedArray::make(1, (0.0 : Float))
-  let flags = @lib.sdl_GetMouseState(x, y)
+  let local_flags = @lib.sdl_GetMouseState(x, y)
   let global_x = FixedArray::make(1, (0.0 : Float))
   let global_y = FixedArray::make(1, (0.0 : Float))
   let global_flags = @lib.sdl_GetGlobalMouseState(global_x, global_y)
-  let flags = flags | global_flags
+  let flags = merge_sdl_mouse_button_flags(input, local_flags, global_flags)
   input.enqueue_event(PointerMove(x[0], y[0]))
   enqueue_sdl_mouse_buttons_from_flags(input, flags, x[0], y[0])
 }
