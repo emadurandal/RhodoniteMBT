@@ -2,6 +2,10 @@ import {
   "emadurandal/rhodonite_webgpu/webgpu_enums" @webgpu_enums,
 }
 
+supported_targets = "+js+native"
+
+warnings = "-unused_async-unused_error_type"
+
 options(
-  "virtual": { "has-default": false },
+  "virtual": { "has-default": true },
 )

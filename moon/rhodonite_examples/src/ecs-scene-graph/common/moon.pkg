@@ -10,3 +10,5 @@ import {
   "moonbitlang/core/math" @math,
   "moonbitlang/core/ref" @ref,
 }
+
+supported_targets = "+js+native"

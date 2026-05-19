@@ -12,6 +12,13 @@ RhodoniteMBT groups several modules in a [Moon workspace](https://docs.moonbitla
 | `emadurandal/rhodonite_webgpu` | [`moon/rhodonite_webgpu/`](../moon/rhodonite_webgpu/) | WebGPU abstraction (browser and native). |
 | `emadurandal/rhodonite_examples` | [`moon/rhodonite_examples/`](../moon/rhodonite_examples/) | Runnable samples and sample-only shared helpers (demo module). |
 
+`emadurandal/rhodonite_webgpu/webgpu_objects` is a virtual package. The root
+virtual package carries a fallback default implementation only so direct
+workspace commands such as `moon test --target all` can build library packages
+without choosing a backend. Runnable browser and native packages must continue
+to override it with `emadurandal/rhodonite_webgpu/webgpu_objects/js` or
+`emadurandal/rhodonite_webgpu/webgpu_objects/native`, respectively.
+
 ## Release units (what goes on mooncakes)
 
 Run `moon publish` **once per module** below (from each module directory). Publishing in dependency order (fewer deps first) is recommended.
@@ -54,7 +61,7 @@ During development, link workspace members with [`path` dependencies](https://do
 
 1. Logged in with `moon login` (mooncakes.io).
 2. From the root, run `moon fmt` and `moon info`; confirm only intended `.mbti` changes.
-3. From the root, `moon check --target all` passes.
+3. From the root, `moon check --target all` and `moon test --target all` pass.
 4. In the module you publish, update `deps` workspace members to registry versions in `moon.mod.json`.
 5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
