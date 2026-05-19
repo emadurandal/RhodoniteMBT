@@ -1497,8 +1497,7 @@ export class Engine {
 				surface.changed,
 				surface.input,
 			);
-			this.runPhase(Phase.Surface, frame);
-			this.runPhase(Phase.Input, frame);
+			this.runPhaseGroup(PhaseGroup.FrameBegin, frame);
 		}
 		this.timeState.pushFixedElapsed(elapsedSeconds);
 		const fixedSteps = this.timeState.drainReadyFixedFrames((fixedFrame) => {

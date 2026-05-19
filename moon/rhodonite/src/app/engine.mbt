@@ -680,8 +680,7 @@ pub fn Engine::run_multi_surface_frame(
       changed,
       surface.input(),
     )
-    self.run_phase(phase_surface(), frame)
-    self.run_phase(phase_input(), frame)
+    self.run_phase_group(phase_group_frame_begin(), frame)
   }
   let fixed_steps = self.run_ready_fixed_steps(
     elapsed_seconds,
