@@ -59,9 +59,8 @@ priv struct SdlMouseButtonEvent {
   which : @lib.SDL_MouseID
   button : Byte
   down : Bool
-  padding1 : Byte
-  padding2 : Byte
-  padding3 : Byte
+  clicks : Byte
+  padding : Byte
   x : Float
   y : Float
 }
@@ -197,9 +196,8 @@ fn _touch_sdl_mouse_button_event_struct() -> Unit {
     which: 0U,
     button: (1 : Byte),
     down: true,
-    padding1: (0 : Byte),
-    padding2: (0 : Byte),
-    padding3: (0 : Byte),
+    clicks: (1 : Byte),
+    padding: (0 : Byte),
     x: (0.0 : Float),
     y: (0.0 : Float),
   }
@@ -210,9 +208,8 @@ fn _touch_sdl_mouse_button_event_struct() -> Unit {
   ignore(event.which)
   ignore(event.button)
   ignore(event.down)
-  ignore(event.padding1)
-  ignore(event.padding2)
-  ignore(event.padding3)
+  ignore(event.clicks)
+  ignore(event.padding)
   ignore(event.x)
   ignore(event.y)
 }
@@ -936,21 +933,11 @@ fn enqueue_sdl_mouse_buttons_from_flags(
   x : Float,
   y : Float,
 ) -> Unit {
-  enqueue_sdl_mouse_button(
-    input, flags, @lib.SDL_BUTTON_LMASK, Left, x, y,
-  )
-  enqueue_sdl_mouse_button(
-    input, flags, @lib.SDL_BUTTON_MMASK, Middle, x, y,
-  )
-  enqueue_sdl_mouse_button(
-    input, flags, @lib.SDL_BUTTON_RMASK, Right, x, y,
-  )
-  enqueue_sdl_mouse_button(
-    input, flags, @lib.SDL_BUTTON_X1MASK, Back, x, y,
-  )
-  enqueue_sdl_mouse_button(
-    input, flags, @lib.SDL_BUTTON_X2MASK, Forward, x, y,
-  )
+  enqueue_sdl_mouse_button(input, flags, @lib.SDL_BUTTON_LMASK, Left, x, y)
+  enqueue_sdl_mouse_button(input, flags, @lib.SDL_BUTTON_MMASK, Middle, x, y)
+  enqueue_sdl_mouse_button(input, flags, @lib.SDL_BUTTON_RMASK, Right, x, y)
+  enqueue_sdl_mouse_button(input, flags, @lib.SDL_BUTTON_X1MASK, Back, x, y)
+  enqueue_sdl_mouse_button(input, flags, @lib.SDL_BUTTON_X2MASK, Forward, x, y)
 }
 
 ///|
@@ -961,9 +948,7 @@ fn enqueue_sdl_mouse_motion_event(
 ) -> Unit {
   let motion : SdlMouseMotionEvent = @lib.unsafe_from_sdl_event(event)
   input.enqueue_event(PointerMove(motion.x, motion.y))
-  enqueue_sdl_mouse_buttons_from_flags(
-    input, motion.state, motion.x, motion.y,
-  )
+  enqueue_sdl_mouse_buttons_from_flags(input, motion.state, motion.x, motion.y)
 }
 
 ///|
