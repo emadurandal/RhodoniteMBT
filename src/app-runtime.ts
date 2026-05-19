@@ -186,6 +186,17 @@ export class SurfaceState {
 		return new SurfaceState(0, 0, "", false, generation);
 	}
 
+	static fromDrawableSize(
+		width: number,
+		height: number,
+		format: string,
+		generation: number,
+	): SurfaceState {
+		return width > 0 && height > 0
+			? SurfaceState.active(width, height, format, generation)
+			: SurfaceState.suspended(generation);
+	}
+
 	equals(other: SurfaceState): boolean {
 		return (
 			this.active === other.active &&
@@ -216,10 +227,12 @@ export class GpuSurface {
 		this.canvas = canvas;
 		this.context = context;
 		this.format = format;
-		this.stateValue =
-			canvas.width > 0 && canvas.height > 0
-				? SurfaceState.active(canvas.width, canvas.height, format, 0)
-				: SurfaceState.suspended(0);
+		this.stateValue = SurfaceState.fromDrawableSize(
+			canvas.width,
+			canvas.height,
+			format,
+			0,
+		);
 	}
 
 	state(): SurfaceState {
@@ -229,22 +242,21 @@ export class GpuSurface {
 	syncFromCanvas(): boolean {
 		const { width, height } = this.canvas;
 		const current = this.stateValue;
-		const next =
-			width > 0 && height > 0
-				? SurfaceState.active(width, height, this.format, current.generation)
-				: SurfaceState.suspended(current.generation);
-		if (current.equals(next)) {
+		const unchanged = SurfaceState.fromDrawableSize(
+			width,
+			height,
+			this.format,
+			current.generation,
+		);
+		if (current.equals(unchanged)) {
 			return false;
 		}
-		this.stateValue =
-			width > 0 && height > 0
-				? SurfaceState.active(
-						width,
-						height,
-						this.format,
-						current.generation + 1,
-					)
-				: SurfaceState.suspended(current.generation + 1);
+		this.stateValue = SurfaceState.fromDrawableSize(
+			width,
+			height,
+			this.format,
+			current.generation + 1,
+		);
 		return true;
 	}
 
