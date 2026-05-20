@@ -2,11 +2,11 @@
 package "emadurandal/rhodonite_app_sdl3/sdl3"
 
 import {
-  "Kaida-Amethyst/sdl3/lib",
   "emadurandal/rhodonite/app",
   "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
   "emadurandal/rhodonite_webgpu/webgpu_objects",
+  "emadurandal/sdl3/lib",
   "moonbitlang/core/debug",
 }
 

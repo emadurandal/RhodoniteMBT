@@ -2,7 +2,7 @@
 
 > **Stability:** This project is in **early development**. APIs and behavior may change without notice and are **not** production-ready yet. Prefer following the [RhodoniteMBT](https://github.com/emadurandal/RhodoniteMBT) repository for the latest status.
 
-WebGPU abstraction for RhodoniteMBT (browser and native targets). Depends on registry packages such as `Milky2018/wgpu_mbt`; see `moon.mod.json` for versions. Native SDL windowing uses `Kaida-Amethyst/sdl3` from the consuming project (for example `emadurandal/rhodonite_examples`).
+WebGPU abstraction for RhodoniteMBT (browser and native targets). Depends on registry packages such as `Milky2018/wgpu_mbt`; see `moon.mod.json` for versions. Native SDL windowing uses `emadurandal/sdl3` from the consuming project (for example `emadurandal/rhodonite_examples`).
 
 ## Using from another MoonBit project
 
@@ -57,7 +57,7 @@ options(
 )
 ```
 
-For a native / wgpu entry package, select the native implementation. If you use SDL3 windowing, add `Kaida-Amethyst/sdl3` to the consuming module and provide the required link flags.
+For a native / wgpu entry package, select the native implementation. If you use SDL3 windowing directly, add `emadurandal/sdl3` to the consuming module and provide the required link flags.
 
 ```moonbit
 import {
@@ -78,4 +78,4 @@ options(
 )
 ```
 
-If your MoonBit code directly imports packages such as `moonbitlang/async`, `Milky2018/wgpu_mbt`, or `Kaida-Amethyst/sdl3`, add those packages to the consuming module's `moon.mod.json` `deps` as well. For packages that only import `rhodonite_webgpu`, the `emadurandal/rhodonite_webgpu` dependency is usually enough.
+If your MoonBit code directly imports packages such as `moonbitlang/async`, `Milky2018/wgpu_mbt`, or `emadurandal/sdl3`, add those packages to the consuming module's `moon.mod.json` `deps` as well. For packages that only import `rhodonite_webgpu`, the `emadurandal/rhodonite_webgpu` dependency is usually enough. `emadurandal/sdl3` owns the SDL3 C stubs and their `stub-cc-flags`; dependency stubs do not inherit flags from a consuming main package.

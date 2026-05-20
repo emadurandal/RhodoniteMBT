@@ -5,7 +5,9 @@ SDL3 native app runtime helpers for RhodoniteMBT.
 This module owns SDL3 window/event polling and native WebGPU surfaces (macOS
 Metal, Linux Wayland/X11 Vulkan)
 bootstrap used by native examples. The main public package is
-`emadurandal/rhodonite_app_sdl3/sdl3`.
+`emadurandal/rhodonite_app_sdl3/sdl3`. It uses `emadurandal/sdl3`, a
+Rhodonite-maintained fork of the SDL3 MoonBit binding whose C stub package owns
+the SDL3 include flags required on Homebrew-based macOS installations.
 
 The SDL3 session type is opaque. Callers use accessors such as `gpu_context()`,
 `surface_active()`, `surface_width()`, `surface_height()`, and
@@ -81,4 +83,7 @@ The `overrides` entry selects the native implementation of
 `emadurandal/rhodonite_webgpu/webgpu_objects`, which is required for runnable
 native entry packages. The SDL3 development package must also be installed on
 the host system, for example `brew install sdl3` on macOS or `sudo apt install
-libsdl3-dev` on Debian/Ubuntu.
+libsdl3-dev` on Debian/Ubuntu. Consumers do not need to pass SDL3
+`stub-cc-flags` from their main package; dependency stubs do not inherit those
+flags, so `emadurandal/sdl3` sets them in the package that owns the SDL3 C
+stubs.

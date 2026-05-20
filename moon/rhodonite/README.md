@@ -134,7 +134,9 @@ options(
 
 SDL3 development headers and libraries must be installed on the host system,
 for example with `brew install sdl3` on macOS or `sudo apt install libsdl3-dev`
-on Debian/Ubuntu.
+on Debian/Ubuntu. The SDL3 binding used by `rhodonite_app_sdl3` is
+`emadurandal/sdl3`, which sets SDL3 include paths on its own C stub package;
+consumer main packages do not need to propagate dependency `stub-cc-flags`.
 
 The small curated facade package can be imported as `emadurandal/rhodonite/lib`.
 

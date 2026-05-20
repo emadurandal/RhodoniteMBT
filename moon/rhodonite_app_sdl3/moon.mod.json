@@ -12,7 +12,9 @@
       "path": "../rhodonite_webgpu"
     },
     "Milky2018/wgpu_mbt": "0.12.11",
-    "Kaida-Amethyst/sdl3": "0.1.1"
+    "emadurandal/sdl3": {
+      "path": "../sdl3"
+    }
   },
   "readme": "README.md",
   "repository": "https://github.com/emadurandal/RhodoniteMBT",
