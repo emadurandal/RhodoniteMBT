@@ -1,5 +1,16 @@
 # SDL3 MoonBit Binding
 
+## RhodoniteMBT-specific fork
+
+`emadurandal/sdl3` is a RhodoniteMBT-specific fork of the SDL3 MoonBit binding.
+It exists so Rhodonite's native SDL3/WebGPU packages can publish a dependency
+whose C stubs carry the SDL3 include flags needed by Homebrew-based macOS
+builds.
+
+For general SDL3 MoonBit use, prefer the upstream package `Kaida-Amethyst/sdl3`.
+Use this fork only when you are depending on RhodoniteMBT native runtime
+packages or intentionally want the same build-flag behavior.
+
 ## Fork Notice
 
 This package is derived from `Kaida-Amethyst/sdl3` 0.1.1
