@@ -2,6 +2,7 @@
   "name": "rhodonite-mbt",
   "private": true,
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "build:moon": "cd moon/rhodonite_examples && moon build --target js",

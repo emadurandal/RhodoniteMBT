@@ -158,3 +158,9 @@ When publishing to the registry, run `moon publish` **per module** from shallow 
 
 For npm, run `pnpm run publish:npm`; it rebuilds the release JS bridge and emits
 the `packages/rhodonite-mbt/dist` package before invoking `npm publish`.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE). The MoonBit modules declare the same SPDX
+license in their `moon.mod.json` files, and the npm package includes its own
+copy of the license for package tarballs.

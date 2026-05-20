@@ -36,6 +36,8 @@ The npm package is a separate release unit under
 [`packages/rhodonite-mbt/`](../packages/rhodonite-mbt/). It is named
 `rhodonite-mbt`, is ESM-only, and bundles the existing TypeScript wrappers plus
 the MoonBit release JS bridge generated from `emadurandal/rhodonite_core`.
+It declares `Apache-2.0` in `package.json` and includes its own `LICENSE` file
+so npm tarballs carry the license text.
 
 Use `pnpm run build:npm` to build `packages/rhodonite-mbt/dist`,
 `pnpm run pack:npm` to create a local tarball, and `pnpm run publish:npm` to
@@ -79,3 +81,9 @@ During development, link workspace members with [`path` dependencies](https://do
 5. From each module directory, `moon publish` (e.g. `moon -C moon/rhodonite_webgpu publish`).
 
 From the repo root, [`scripts/publish-rhodonite-mooncakes.sh`](../scripts/publish-rhodonite-mooncakes.sh) runs `moon fmt`, `moon info`, `moon check --target all`, publishes core, temporarily rewrites `moon/rhodonite_webgpu/moon.mod.json`'s core path dep to semver, publishes webgpu, temporarily rewrites `moon/rhodonite/moon.mod.json` path deps to semver, publishes the facade, temporarily rewrites `moon/rhodonite_app_sdl3/moon.mod.json` path deps to semver, publishes the SDL3 app platform module, then restores the workspace files. Invoke via `just publish-mooncakes` or `pnpm run publish:moon`. Does **not** publish `rhodonite_examples`. Use `PUBLISH_MOON_DOWNSTREAM_ONLY=1` when core/webgpu are already published, or `PUBLISH_MOON_APP_SDL3_ONLY=1` to retry only the SDL3 app platform module.
+
+## License
+
+The repository is licensed under Apache-2.0 via the root
+[`LICENSE`](../LICENSE). Published MoonBit modules declare `Apache-2.0` in
+their `moon.mod.json` files.
