@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// World-space affine matrix view for legacy row callbacks. The builtin ECS component now stores
 /// only an 8-byte packed-blob reference; matrix payloads live in the world's u32 transform blob.

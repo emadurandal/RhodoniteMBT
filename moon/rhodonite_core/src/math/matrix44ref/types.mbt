@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Borrowed 4×4 matrix in **column-major** order (`values[col * 4 + row]`). The view
 /// must hold **16** elements of type `T` (`Float`, `Double`, ...), **or** (Float only) one

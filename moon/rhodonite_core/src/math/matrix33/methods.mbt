@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `Matrix33::new_col_major`.
 pub fn[T] Matrix33::new_col_major(

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 fn assert_double_near(actual : Double, expected : Double) -> Unit raise {
   let diff = if actual > expected {

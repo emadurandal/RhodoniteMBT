@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 test "put_u16_le_mut_view writes through view offset" {
   let bytes = FixedArray::make(6, (0 : Byte))

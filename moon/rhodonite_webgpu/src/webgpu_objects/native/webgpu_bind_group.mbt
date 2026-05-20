@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `bindGroupLayout_release`.
 pub fn bindGroupLayout_release(layout : GPUBindGroupLayout) -> Unit {

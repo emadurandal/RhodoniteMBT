@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Mutable render-frame and fixed-step clocks used by the engine runner.
 pub struct TimeState {

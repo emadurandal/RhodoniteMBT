@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `GlobalTransformBlobStore::new`.
 fn GlobalTransformBlobStore::new() -> GlobalTransformBlobStore {

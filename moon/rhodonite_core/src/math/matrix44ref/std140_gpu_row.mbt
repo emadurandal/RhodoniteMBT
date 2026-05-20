@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Views one GPU-side std140 `mat4x4<f32>` row (`row.length() == 64`) as a column-major [`Matrix44RefF`].
 /// Reads/writes go through the byte row (little-endian `f32` slots); no separate float backing.

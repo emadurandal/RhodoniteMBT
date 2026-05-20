@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `GPUInstance::get_preferred_canvas_format`.
 pub fn GPUInstance::get_preferred_canvas_format(self : GPUInstance) -> String {

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `host_now_ms`.
 fn host_now_ms() -> Double = "rhodonite_ecs_mass_cubes_host" "now_ms"

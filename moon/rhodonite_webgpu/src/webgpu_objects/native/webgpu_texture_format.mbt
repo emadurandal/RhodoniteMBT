@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `texture_format_from_string`.
 fn texture_format_from_string(format : String) -> @wgpu.TextureFormat {

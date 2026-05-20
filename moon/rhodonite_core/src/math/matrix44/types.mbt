@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// 4×4 matrix in **column-major** order (`data[c * 4 + r]` = row `r`, column `c`).
 /// `T` is expected to be a numeric field (`Float`, `Double`, ...).

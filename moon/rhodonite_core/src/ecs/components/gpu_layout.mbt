@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Rounds `value` up to the next multiple of `align` (used for WGSL struct stride alignment).
 fn align_up(value : Int, align : Int) -> Int {

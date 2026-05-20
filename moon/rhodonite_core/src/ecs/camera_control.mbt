@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Byte stride for the library orbit camera controller component.
 let orbit_camera_controller_stride : Int = 80

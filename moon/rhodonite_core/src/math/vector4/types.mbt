@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// 4D vector; components live in `FixedArray[T]`.
 /// `T` is expected to be floating-point (`Float`, `Double`, ...).

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 test "Vector4::new and x y z w" {
   let v = Vector4::new(1, 2, 3, 4)

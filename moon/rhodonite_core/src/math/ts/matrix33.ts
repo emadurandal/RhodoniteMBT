@@ -1,3 +1,6 @@
+// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+// SPDX-License-Identifier: Apache-2.0
+
 import type { MoonMat3F } from "@moon/rhodonite_core/math/js_bridge";
 import {
 	m3f_add,

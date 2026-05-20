@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Handle returned by the browser requestAnimationFrame loop helper.
 pub type BrowserFrameLoop

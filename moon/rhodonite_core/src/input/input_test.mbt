@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 test "canonical key codes use browser physical names" {
   assert_eq(KeyCode::key_w().name(), "KeyW")
