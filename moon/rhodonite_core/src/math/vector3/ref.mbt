@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Borrowed 3-vector as a [`MutArrayView`] over storage; for `T = [`Byte`]` the
 /// view length must be **12** (three little-endian `f32`).

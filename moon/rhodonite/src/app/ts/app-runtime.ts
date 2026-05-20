@@ -1,3 +1,6 @@
+// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+// SPDX-License-Identifier: Apache-2.0
+
 import { requestLargeStorageBufferDevice } from "./webgpu-device-limits.ts";
 
 export type EngineCallback = (engine: Engine, frame: FrameState) => void;

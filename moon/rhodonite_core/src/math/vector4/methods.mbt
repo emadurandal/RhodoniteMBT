@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `Vector4::new`.
 pub fn[T] Vector4::new(x : T, y : T, z : T, w : T) -> Vector4[T] {

@@ -74,6 +74,9 @@ After changing source code that can affect sample rendering, always run the visu
 - Block-oriented style; blocks are separated by `///|` and order does not matter; refactor block-by-block when useful.
 - When adding or editing MoonBit code, always place a documentation comment (`///` / `///|`) immediately before every `struct` and `fn` (including methods on types), briefly stating purpose and any non-obvious behavior or invariants.
 - Prefer moving deprecated code into `deprecated.mbt` per directory.
+- For any source file you create or edit in this repo, add the following copyright header at the top:
+  - MoonBit: `/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `/// SPDX-License-Identifier: Apache-2.0`
+  - Other source files (TypeScript/JavaScript/C): `// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `// SPDX-License-Identifier: Apache-2.0`
 
 ## JS bridge and TypeScript wrappers
 

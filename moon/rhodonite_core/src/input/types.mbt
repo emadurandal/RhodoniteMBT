@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Platform-stable keyboard key identifier. Use physical key names such as
 /// `KeyW`, `ArrowLeft`, or `Space` so browser `KeyboardEvent.code` and native

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///| Shared SDL3 + native wgpu app bootstrap (macOS Metal, Linux Wayland/X11 Vulkan).
 
 ///|

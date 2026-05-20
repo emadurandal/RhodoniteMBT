@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `component_less`.
 fn component_less(a : ComponentTypeId, b : ComponentTypeId) -> Bool {

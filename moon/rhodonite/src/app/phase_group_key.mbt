@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Open phase group identifier used by external drivers to choose a clock domain.
 pub(all) struct PhaseGroupKey {

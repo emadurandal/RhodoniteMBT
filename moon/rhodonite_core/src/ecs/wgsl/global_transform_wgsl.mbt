@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Returns the WGSL storage-buffer binding declaration expected by
 /// `global_transform_helpers`.

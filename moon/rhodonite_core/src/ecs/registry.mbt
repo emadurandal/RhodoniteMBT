@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Creates an empty registry; call `register_*` before spawning entities that use those components.
 fn ComponentRegistry::new() -> ComponentRegistry {

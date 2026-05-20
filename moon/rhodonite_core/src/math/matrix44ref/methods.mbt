@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Implements `mat4_minor_ref`.
 fn[T : Mul + Add + Sub + Matrix44RefElem] mat4_minor_ref(

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// CPU-only parent link: stores the parent's dense slot index and generation (same logical fields as [`EntityId`] in `ecs`).
 

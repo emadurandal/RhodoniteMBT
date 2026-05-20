@@ -1,3 +1,6 @@
+// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+// SPDX-License-Identifier: Apache-2.0
+
 /** Generated MoonBit js_bridge bindings (`moon build --target js --release`). */
 declare module "@moon/rhodonite_core/math/js_bridge" {
 	export type MoonVecF = { data: number[] };

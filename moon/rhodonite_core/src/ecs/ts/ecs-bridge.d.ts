@@ -1,3 +1,6 @@
+// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+// SPDX-License-Identifier: Apache-2.0
+
 /** Generated MoonBit ECS js_bridge bindings (`moon build --target js --release`). */
 declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonBool = boolean | 0 | 1;

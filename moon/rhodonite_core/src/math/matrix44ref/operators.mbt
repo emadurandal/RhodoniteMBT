@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 pub impl[T : Eq + Matrix44RefElem] Eq for Matrix44Ref[T] with equal(self, other) {
   self.at(0, 0) == other.at(0, 0) &&

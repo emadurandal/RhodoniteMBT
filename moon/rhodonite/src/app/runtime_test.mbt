@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 test "default phase groups split frame begin fixed step and render frame" {
   assert_true(default_frame_begin_phases() == [phase_surface(), phase_input()])

@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// CPU-side payload for the builtin Camera component. Camera matrices live in the
 /// world's packed u32 camera blob; this row only stores the blob word offset.

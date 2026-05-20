@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Scalar and vector kinds sized for std140-like layouts (`Vec3` uses 16-byte slots including padding).
 pub(all) enum GpuFieldKind {
