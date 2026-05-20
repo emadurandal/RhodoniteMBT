@@ -1,0 +1,16 @@
+import {
+  "moonbitlang/core/encoding/utf8" @encoding/utf8,
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": false,
+  link: {
+    "native": {
+      "flags": [ "-lSDL3", "-lSDL3_image" ],
+      "stub-cc-flags": "-I/opt/homebrew/include -I/usr/local/include",
+    },
+  },
+  "native-stub": [ "wrap.c" ],
+)

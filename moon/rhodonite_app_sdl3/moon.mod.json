@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite_app_sdl3",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "deps": {
     "emadurandal/rhodonite": {
       "path": "../rhodonite"
@@ -12,7 +12,9 @@
       "path": "../rhodonite_webgpu"
     },
     "Milky2018/wgpu_mbt": "0.12.11",
-    "Kaida-Amethyst/sdl3": "0.1.1"
+    "emadurandal/sdl3": {
+      "path": "../sdl3"
+    }
   },
   "readme": "README.md",
   "repository": "https://github.com/emadurandal/RhodoniteMBT",

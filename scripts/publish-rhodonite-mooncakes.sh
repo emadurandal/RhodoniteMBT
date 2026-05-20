@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Publish emadurandal/rhodonite_core, rhodonite_webgpu, rhodonite (facade),
-# and rhodonite_app_sdl3 to mooncakes.
+# Publish emadurandal/sdl3, rhodonite_core, rhodonite_webgpu,
+# rhodonite (facade), and rhodonite_app_sdl3 to mooncakes.
 # Does NOT publish rhodonite_examples (samples remain repo-only).
 #
 # Prerequisites: run `moon login` once; network access for the registry.
 # Run from repository root (directory containing moon.work).
 #
 # Environment:
-#   PUBLISH_MOON_DOWNSTREAM_ONLY=1  Skip publishing rhodonite_core and rhodonite_webgpu;
+#   PUBLISH_MOON_DOWNSTREAM_ONLY=1  Skip publishing emadurandal/sdl3,
+#                                    rhodonite_core, and rhodonite_webgpu;
 #                                    publish rhodonite and rhodonite_app_sdl3.
 #                                    Use when deps are already on the registry.
 #   PUBLISH_MOON_APP_SDL3_ONLY=1    Skip core/webgpu/facade; publish only
@@ -66,10 +67,22 @@ echo "==> moon check --target all"
 moon check --target all
 
 if [[ "${PUBLISH_MOON_APP_SDL3_ONLY:-}" == "1" ]]; then
-  echo "==> PUBLISH_MOON_APP_SDL3_ONLY=1: skip rhodonite_core / rhodonite_webgpu / rhodonite publish"
+  echo "==> PUBLISH_MOON_APP_SDL3_ONLY=1: skip emadurandal/sdl3 / rhodonite_core / rhodonite_webgpu / rhodonite publish"
 elif [[ "${PUBLISH_MOON_DOWNSTREAM_ONLY:-}" == "1" ]]; then
-  echo "==> PUBLISH_MOON_DOWNSTREAM_ONLY=1: skip rhodonite_core / rhodonite_webgpu publish (already on registry)"
+  echo "==> PUBLISH_MOON_DOWNSTREAM_ONLY=1: skip emadurandal/sdl3 / rhodonite_core / rhodonite_webgpu publish (already on registry)"
 else
+  echo "==> Publish emadurandal/sdl3"
+  moon -C moon/sdl3 publish
+
+  echo "==> moon update (refresh local registry index for freshly published sdl3)"
+  moon update
+
+  WAIT="${MOON_PUBLISH_INDEX_WAIT_SECONDS:-8}"
+  if [[ "${WAIT}" != "0" ]]; then
+    echo "==> Waiting ${WAIT}s for registry index (override with MOON_PUBLISH_INDEX_WAIT_SECONDS=0)"
+    sleep "${WAIT}"
+  fi
+
   echo "==> Publish emadurandal/rhodonite_core"
   moon -C moon/rhodonite_core publish
 
@@ -188,17 +201,20 @@ app_path = root / "moon" / "rhodonite_app_sdl3" / "moon.mod.json"
 facade_path = root / "moon" / "rhodonite" / "moon.mod.json"
 core_path = root / "moon" / "rhodonite_core" / "moon.mod.json"
 webgpu_path = root / "moon" / "rhodonite_webgpu" / "moon.mod.json"
+sdl3_path = root / "moon" / "sdl3" / "moon.mod.json"
 
 app = json.loads(app_path.read_text(encoding="utf-8"))
 facade_ver = json.loads(facade_path.read_text(encoding="utf-8"))["version"]
 core_ver = json.loads(core_path.read_text(encoding="utf-8"))["version"]
 webgpu_ver = json.loads(webgpu_path.read_text(encoding="utf-8"))["version"]
+sdl3_ver = json.loads(sdl3_path.read_text(encoding="utf-8"))["version"]
 
 deps = app.get("deps") or {}
 required = [
     "emadurandal/rhodonite",
     "emadurandal/rhodonite_core",
     "emadurandal/rhodonite_webgpu",
+    "emadurandal/sdl3",
 ]
 missing = [name for name in required if name not in deps]
 if missing:
@@ -212,12 +228,14 @@ if missing:
 deps["emadurandal/rhodonite"] = facade_ver
 deps["emadurandal/rhodonite_core"] = core_ver
 deps["emadurandal/rhodonite_webgpu"] = webgpu_ver
+deps["emadurandal/sdl3"] = sdl3_ver
 app["deps"] = deps
 
 app_path.write_text(json.dumps(app, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(
     "Patched rhodonite_app_sdl3 deps to "
-    f"rhodonite={facade_ver}, rhodonite_core={core_ver}, rhodonite_webgpu={webgpu_ver}"
+    f"rhodonite={facade_ver}, rhodonite_core={core_ver}, "
+    f"rhodonite_webgpu={webgpu_ver}, sdl3={sdl3_ver}"
 )
 PY
 
@@ -227,4 +245,4 @@ moon update
 echo "==> Publish emadurandal/rhodonite_app_sdl3"
 moon -C moon/rhodonite_app_sdl3 publish
 
-echo "Done. All four library modules published (examples excluded)."
+echo "Done. All five library modules published (examples excluded)."

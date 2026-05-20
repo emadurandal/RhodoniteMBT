@@ -6,6 +6,7 @@ A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser
 
 | Module | Description |
 |--------|-------------|
+| `emadurandal/sdl3` | SDL3 MoonBit binding fork used by native runtime ([`moon/sdl3`](moon/sdl3)) |
 | `emadurandal/rhodonite` | Public facade and high-level app/runtime helpers ([`moon/rhodonite`](moon/rhodonite)) |
 | `emadurandal/rhodonite_app_sdl3` | SDL3 native app runtime helpers |
 | `emadurandal/rhodonite_core` | Core (vectors, JS bridge, binary buffer writes, etc.) |
@@ -110,14 +111,10 @@ The native demo scripts use `moon run --target native --release` from
 [`moon/rhodonite_examples`](moon/rhodonite_examples), so no manual `_build`
 executable path is needed.
 
-If the native build cannot find SDL3 headers, source
-[`scripts/setup-sdl3-env.sh`](scripts/setup-sdl3-env.sh) in the shell before
-running native commands, including `moon test --target all`:
-
-```bash
-source scripts/setup-sdl3-env.sh
-pnpm run dev:native:basic-triangle
-```
+Native SDL3 headers are compiled through the workspace `emadurandal/sdl3` fork,
+which passes Homebrew include directories to its C stubs. The helper
+[`scripts/setup-sdl3-env.sh`](scripts/setup-sdl3-env.sh) remains available only
+for unusual local toolchain layouts.
 
 For a debug native build while iterating, run the package directly without
 `--release`, for example:

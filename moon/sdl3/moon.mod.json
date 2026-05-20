@@ -1,0 +1,11 @@
+{
+  "name": "emadurandal/sdl3",
+  "version": "0.1.2",
+  "readme": "README.md",
+  "repository": "https://github.com/emadurandal/RhodoniteMBT",
+  "license": "Apache-2.0",
+  "keywords": ["SDL3", "rhodonite"],
+  "description": "SDL3 MoonBit binding fork with native stub build flag fixes.",
+  "source": "",
+  "preferred-target": "native"
+}

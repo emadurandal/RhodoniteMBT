@@ -1,6 +1,6 @@
 {
   "name": "rhodonite-mbt",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "TypeScript wrappers and MoonBit JavaScript bridge for RhodoniteMBT.",
   "license": "Apache-2.0",
   "type": "module",

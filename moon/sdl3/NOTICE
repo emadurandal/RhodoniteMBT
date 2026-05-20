@@ -1,0 +1,7 @@
+emadurandal/sdl3
+
+This package is derived from Kaida-Amethyst/sdl3 0.1.1:
+https://github.com/moonbit-community/sdl3.mbt
+
+The original package is licensed under Apache-2.0. RhodoniteMBT maintains this
+fork to adjust native stub build flags for SDL3 headers.

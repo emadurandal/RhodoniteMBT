@@ -116,7 +116,7 @@ Then install the generated tarball into another project with your package
 manager, for example:
 
 ```bash
-pnpm add /path/to/RhodoniteMBT/packages/rhodonite-mbt/rhodonite-mbt-0.1.7.tgz
+pnpm add /path/to/RhodoniteMBT/packages/rhodonite-mbt/rhodonite-mbt-0.1.8.tgz
 ```
 
 ## License

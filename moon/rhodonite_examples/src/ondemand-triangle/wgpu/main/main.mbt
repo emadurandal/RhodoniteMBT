@@ -3,13 +3,11 @@
 
 ///| SDL3 window (`SDL_WINDOW_METAL`) + `SDL_Metal_*` `CAMetalLayer` -> wgpu surface.
 
-///| Docs: [Kaida-Amethyst/sdl3@0.1.1](https://mooncakes.io/docs/Kaida-Amethyst/sdl3@0.1.1), [sdl3.mbt repo](https://github.com/moonbit-community/sdl3.mbt)
+///| Docs: [emadurandal/sdl3@0.1.2](https://mooncakes.io/docs/emadurandal/sdl3@0.1.2), [sdl3.mbt repo](https://github.com/moonbit-community/sdl3.mbt)
 
 ///|
 
-///| **Build**: SDL3 development headers required (e.g. `brew install sdl3`). Prefer visible `pkg-config`. See mooncakes
-
-///| `Kaida-Amethyst/sdl3/env.sh` (`pkg-config --cflags sdl3` in `CC_FLAGS`).
+///| **Build**: SDL3 development headers required (e.g. `brew install sdl3`). The `emadurandal/sdl3` binding carries SDL3 stub include flags.
 
 ///|
 /// Creates DemoState and registers engine handlers.

@@ -1,4 +1,5 @@
 members = [
+  "./moon/sdl3",
   "./moon/rhodonite",
   "./moon/rhodonite_app_sdl3",
   "./moon/rhodonite_core",

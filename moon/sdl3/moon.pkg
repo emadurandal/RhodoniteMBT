@@ -1,0 +1,9 @@
+import {
+  "emadurandal/sdl3/lib",
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": false,
+)
