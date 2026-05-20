@@ -1,6 +1,7 @@
 # RhodoniteMBT
 
-A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
+RhodoniteMBT is a 3D graphcs library.
+This is a monorepo of the library using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
 
 ## Modules
 
