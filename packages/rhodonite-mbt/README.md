@@ -118,3 +118,7 @@ manager, for example:
 ```bash
 pnpm add /path/to/RhodoniteMBT/packages/rhodonite-mbt/rhodonite-mbt-0.1.7.tgz
 ```
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

@@ -2,10 +2,12 @@
   "name": "rhodonite-mbt",
   "version": "0.1.7",
   "description": "TypeScript wrappers and MoonBit JavaScript bridge for RhodoniteMBT.",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
+    "LICENSE",
     "README.md"
   ],
   "main": "./dist/index.js",
