@@ -34,7 +34,7 @@ depend on.
   "name": "your-org/your-module",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite_app_sdl3": "0.1.7"
+    "emadurandal/rhodonite_app_sdl3": "0.1.8"
   },
   "source": "src",
   "preferred-target": "native"

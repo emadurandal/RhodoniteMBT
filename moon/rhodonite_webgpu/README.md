@@ -13,7 +13,7 @@ In the consuming project's `moon.mod.json`, add this module to `deps`. When usin
   "name": "your-org/your-module",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite_webgpu": "0.1.7"
+    "emadurandal/rhodonite_webgpu": "0.1.8"
   },
   "source": "src"
 }

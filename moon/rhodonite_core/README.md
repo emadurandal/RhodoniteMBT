@@ -15,7 +15,7 @@ depend on.
   "name": "your-org/your-module",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite_core": "0.1.7"
+    "emadurandal/rhodonite_core": "0.1.8"
   },
   "source": "src"
 }

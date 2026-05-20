@@ -28,7 +28,7 @@ want to depend on.
   "name": "your-org/your-module",
   "version": "0.1.0",
   "deps": {
-    "emadurandal/rhodonite": "0.1.7"
+    "emadurandal/rhodonite": "0.1.8"
   },
   "source": "src",
   "preferred-target": "js"
@@ -84,8 +84,8 @@ SDL3 native entry packages should also depend on
 ```json
 {
   "deps": {
-    "emadurandal/rhodonite": "0.1.7",
-    "emadurandal/rhodonite_app_sdl3": "0.1.7",
+    "emadurandal/rhodonite": "0.1.8",
+    "emadurandal/rhodonite_app_sdl3": "0.1.8",
     "moonbitlang/async": "0.18.1"
   },
   "preferred-target": "native"
