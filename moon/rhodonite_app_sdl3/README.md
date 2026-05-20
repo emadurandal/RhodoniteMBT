@@ -20,3 +20,65 @@ than as fatal errors.
 The Wayland/X11 native surface C helper is active only on Linux. Other native
 hosts export no-op/null ABI stubs so the macOS Metal path does not require SDL3
 headers while compiling Linux-only helper code.
+
+## Using from another MoonBit project
+
+In the consuming project's `moon.mod.json`, add this module to `deps`. When
+using the mooncakes registry package, specify the published version you want to
+depend on.
+
+```json
+{
+  "name": "your-org/your-module",
+  "version": "0.1.0",
+  "deps": {
+    "emadurandal/rhodonite_app_sdl3": "0.1.7"
+  },
+  "source": "src",
+  "preferred-target": "native"
+}
+```
+
+When using a local RhodoniteMBT checkout as a workspace or path dependency,
+specify the local path in `moon.mod.json`.
+
+```json
+{
+  "deps": {
+    "emadurandal/rhodonite_app_sdl3": {
+      "path": "../RhodoniteMBT/moon/rhodonite_app_sdl3"
+    }
+  }
+}
+```
+
+Native SDL3 entry packages usually import the high-level app facade, this SDL3
+platform package, and `moonbitlang/async`. If your code imports those packages
+directly, add them to the consuming module's `moon.mod.json` `deps` as well.
+
+```moonbit
+import {
+  "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_app_sdl3/sdl3" @sdl_app,
+  "moonbitlang/async" @async,
+}
+
+supported_targets = "native"
+
+options(
+  "is-main": true,
+  link: {
+    "native": {
+        "cc-flags": "-I/opt/homebrew/include -I/usr/local/include",
+        "cc-link-flags": "-L/opt/homebrew/lib -L/usr/local/lib -lSDL3"
+    },
+  },
+  overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
+)
+```
+
+The `overrides` entry selects the native implementation of
+`emadurandal/rhodonite_webgpu/webgpu_objects`, which is required for runnable
+native entry packages. The SDL3 development package must also be installed on
+the host system, for example `brew install sdl3` on macOS or `sudo apt install
+libsdl3-dev` on Debian/Ubuntu.

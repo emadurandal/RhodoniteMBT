@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite_app_sdl3",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "deps": {
     "emadurandal/rhodonite": {
       "path": "../rhodonite"

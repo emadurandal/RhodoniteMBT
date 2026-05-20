@@ -1,6 +1,6 @@
 {
   "name": "emadurandal/rhodonite",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "deps": {
     "emadurandal/rhodonite_core": {
       "path": "../rhodonite_core"

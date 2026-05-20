@@ -79,6 +79,8 @@ After changing source code that can affect sample rendering, always run the visu
 
 When MoonBit code has a corresponding **`js_bridge`** and/or **TypeScript wrapper** (facades, `src/main-*.ts`, Vitest glue, etc.), keep **their contracts in sync** with the MoonBit side (exports, calling conventions, data layout, and error paths). Land coordinated updates in the same change when possible. Before finishing, **confirm the workspace still builds and tests cleanly** for the affected targets—for example `moon check --target all` plus the relevant `pnpm` scripts (JS demos, `pnpm run test:core:js`, etc.).
 
+When changing library source that is exposed through the npm package, always check whether [`scripts/build-npm-package.mjs`](scripts/build-npm-package.mjs) also needs updates. This is required when TypeScript wrapper locations, public npm entrypoints, MoonBit JS bridge package paths, generated bridge filenames, copied source filters, import rewriting rules, or bundled type declarations change. For npm-facing changes, run `pnpm run build:npm` and preferably `pnpm run pack:npm` before finishing.
+
 ## Tooling
 
 - `moon fmt` — formatting.
