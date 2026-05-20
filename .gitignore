@@ -13,6 +13,15 @@ dist-ssr
 _build
 *.local
 
+# Local secrets and registry credentials
+.env
+.env.*
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+
 # Editor directories and files
 .idea
 .vscode/
