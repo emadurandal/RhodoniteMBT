@@ -323,6 +323,7 @@ moon fmt
 moon check --target all
 pnpm run test:core:mbt
 pnpm run test:core:js
+pnpm run test:app:ts
 pnpm run test:examples:visual
 ```
 
