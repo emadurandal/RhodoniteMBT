@@ -720,44 +720,24 @@ pub fn create_demo_state_for_scene(
   )
   let camera = world.create_entity()
   ignore(
-    world.set_transform_trs(
-      camera,
-      (0.0 : Float),
-      (0.0 : Float),
-      (16.0 : Float),
-      0.0,
-      0.0,
-      0.0,
-      1.0,
-      (1.0 : Float),
-      (1.0 : Float),
-      (1.0 : Float),
-    ),
-  )
-  ignore(world.set_global_transform(camera, @m44.Matrix44F::identity()))
-  ignore(
-    @ecs.add_orbit_camera_controller_with_distance(
+    @ecs.setup_orbit_orthographic_camera(
       world,
       camera,
       orbit_controller,
-      0.0,
-      camera_elevation_rad,
-      (16.0 : Float),
-    ),
-  )
-  ignore(
-    @ecs.set_camera_home_from_current_transform(world, camera, camera_home),
-  )
-  ignore(
-    @ecs.add_camera_lens_orthographic(
-      world,
-      camera,
+      camera_home,
       camera_lens,
-      (0.1 : Float),
-      (80.0 : Float),
-      Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
-      (1.0 : Float),
-      (0.0 : Float),
+      @ecs.OrbitOrthographicCameraDesc::new(
+        0.0,
+        camera_elevation_rad,
+        (0.0 : Float),
+        (0.0 : Float),
+        (1.0 : Float),
+        (16.0 : Float),
+        (0.1 : Float),
+        (80.0 : Float),
+        Float::from_double(canvas_width.to_double() / canvas_height.to_double()),
+        (1.0 : Float),
+      ),
     ),
   )
   let (camera_yaw, camera_pitch, camera_pan_x, camera_pan_y, camera_dolly) = @ecs.orbit_camera_transform(
