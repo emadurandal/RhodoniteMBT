@@ -9,13 +9,12 @@ import {
 	globalTransformRefInstanceVertexBufferLayout,
 	globalTransformWordsBindGroup,
 	globalTransformWordsBindingDefault,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
-import {
 	createOrbitCameraController,
 	type OrbitCameraController,
-} from "./orbit-camera-controller";
+} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import { updateOrbitCameraControllerFromInput } from "../moon/rhodonite/src/app/ts/index.ts";
 
-export { updateOrbitCameraControllerFromInput } from "./orbit-camera-controller";
+export { updateOrbitCameraControllerFromInput };
 export type { OrbitCameraController };
 
 export const MASS_CUBES_ENTITY_COUNT = 800_000;

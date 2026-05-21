@@ -3,16 +3,35 @@
 
 import "./style.css";
 import {
+	World,
+	cameraHelpersDefault,
+	cameraWordsBindGroup,
+	cameraWordsBindingDefault,
+	createCameraWordsBuffer,
+	drainAndUploadCameraWrites,
+	addOrbitCameraControllerWithPose,
+	registerCameraHomeTransformComponent,
+	registerCameraLensComponent,
+	registerOrbitCameraControllerComponent,
+	setCameraHomeFromCurrentTransform,
+	setCameraLensOrthographic,
+	syncOrbitCameraBlobComponent,
+	syncOrbitCameraTransformComponent,
+	type ComponentTypeId,
+	type EntityId,
+} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import {
 	Engine,
 	GpuSurface,
 	InputState,
-	MouseButton,
 	Phase,
 	PhaseSlot,
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
+	Scene,
 	runMultiSurfacePlatform,
+	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 	type SurfaceId,
 } from "../moon/rhodonite/src/app/ts/index.ts";
@@ -20,14 +39,15 @@ import {
 type SurfaceRenderState = {
 	readonly id: SurfaceId;
 	readonly input: InputState;
+	readonly scene: Scene<World, EntityId>;
+	readonly world: World;
+	readonly camera: EntityId;
+	readonly orbitControllerComponent: ComponentTypeId;
+	readonly cameraLensComponent: ComponentTypeId;
+	readonly cameraStorage: GPUBuffer;
+	readonly cameraBindGroup: GPUBindGroup;
 	depthTexture: GPUTexture;
 	depthView: GPUTextureView;
-	yaw: number;
-	pitch: number;
-	dolly: number;
-	baseDistance: number;
-	panX: number;
-	panY: number;
 };
 
 type DemoState = {
@@ -109,93 +129,13 @@ function rotateY(angle: number): Float32Array {
 	return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
 }
 
-function normalize(v: [number, number, number]): [number, number, number] {
-	const len = Math.hypot(v[0], v[1], v[2]) || 1;
-	return [v[0] / len, v[1] / len, v[2] / len];
-}
-
-function cross(a: [number, number, number], b: [number, number, number]): [number, number, number] {
-	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-function dot(a: [number, number, number], b: [number, number, number]): number {
-	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function lookAt(eye: [number, number, number], center: [number, number, number], up: [number, number, number]): Float32Array {
-	const f = normalize([center[0] - eye[0], center[1] - eye[1], center[2] - eye[2]]);
-	const s = normalize(cross(f, up));
-	const u = cross(s, f);
-	return new Float32Array([
-		s[0], u[0], -f[0], 0,
-		s[1], u[1], -f[1], 0,
-		s[2], u[2], -f[2], 0,
-		-dot(s, eye), -dot(u, eye), dot(f, eye), 1,
-	]);
-}
-
-function orthographic(aspect: number, halfHeight: number, near = 0.1, far = 50): Float32Array {
-	const halfWidth = halfHeight * aspect;
-	const left = -halfWidth;
-	const right = halfWidth;
-	const bottom = -halfHeight;
-	const top = halfHeight;
-	return new Float32Array([
-		2 / (right - left), 0, 0, 0,
-		0, 2 / (top - bottom), 0, 0,
-		0, 0, 1 / (near - far), 0,
-		-(right + left) / (right - left),
-		-(top + bottom) / (top - bottom),
-		near / (near - far),
-		1,
-	]);
-}
-
-function quatMul(
-	a: readonly [number, number, number, number],
-	b: readonly [number, number, number, number],
-): [number, number, number, number] {
-	const [ax, ay, az, aw] = a;
-	const [bx, by, bz, bw] = b;
-	return [
-		aw * bx + ax * bw + ay * bz - az * by,
-		aw * by - ax * bz + ay * bw + az * bx,
-		aw * bz + ax * by - ay * bx + az * bw,
-		aw * bw - ax * bx - ay * by - az * bz,
-	];
-}
-
-function quatX(angle: number): [number, number, number, number] {
-	const half = angle * 0.5;
-	return [Math.sin(half), 0, 0, Math.cos(half)];
-}
-
-function quatY(angle: number): [number, number, number, number] {
-	const half = angle * 0.5;
-	return [0, Math.sin(half), 0, Math.cos(half)];
-}
-
-function quatRotateVec3(
-	q: readonly [number, number, number, number],
-	x: number,
-	y: number,
-	z: number,
-): [number, number, number] {
-	const [qx, qy, qz, qw] = q;
-	const tx = 2 * (qy * z - qz * y);
-	const ty = 2 * (qz * x - qx * z);
-	const tz = 2 * (qx * y - qy * x);
-	return [
-		x + qw * tx + (qy * tz - qz * ty),
-		y + qw * ty + (qz * tx - qx * tz),
-		z + qw * tz + (qx * ty - qy * tx),
-	];
-}
-
 function createShader(): string {
-	return `
+	return (
+		cameraWordsBindingDefault() +
+		cameraHelpersDefault() +
+		`
 struct ObjectData {
-  mvp: mat4x4<f32>,
+  model: mat4x4<f32>,
   color: vec4<f32>,
 };
 @group(0) @binding(0) var<storage, read> objects: array<ObjectData>;
@@ -206,15 +146,17 @@ struct VertexOut {
 @vertex
 fn vertexMain(@location(0) localPos: vec3<f32>, @builtin(instance_index) instanceIndex: u32) -> VertexOut {
   let object = objects[instanceIndex];
+  let camera = rn_load_camera(0u);
   var out: VertexOut;
-  out.position = object.mvp * vec4<f32>(localPos, 1.0);
+  out.position = camera.view_proj * object.model * vec4<f32>(localPos, 1.0);
   out.color = object.color;
   return out;
 }
 @fragment
 fn fragmentMain(in: VertexOut) -> @location(0) vec4<f32> {
   return in.color;
-}`;
+}`
+	);
 }
 
 function createDemoStateForEngine(engine: Engine): DemoState {
@@ -256,18 +198,90 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const cameraElevation = 0.38;
 	const cameraPanY = -2.0 / Math.cos(cameraElevation);
 	const cameraDistance = 5.6 - cameraPanY * Math.sin(cameraElevation);
+	const world = World.new();
+	const scene = new Scene<World, EntityId>(`ts-multi-surface-${id}`, world);
+	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
+	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
+	const cameraLensComponent = registerCameraLensComponent(world);
+	const camera = world.createEntity();
+	const cameraQx = -Math.sin(cameraElevation * 0.5);
+	const cameraQw = Math.cos(cameraElevation * 0.5);
+	if (!world.setTransformTrs(camera, 0, 2, 5.6, cameraQx, 0, 0, cameraQw, 1, 1, 1)) {
+		throw new Error("Failed to add camera Transform3D.");
+	}
+	if (!world.setGlobalTransform(camera, identity())) {
+		throw new Error("Failed to add camera GlobalTransform.");
+	}
+	if (
+		!addOrbitCameraControllerWithPose(
+			world,
+			camera,
+			orbitControllerComponent,
+			0,
+			cameraElevation,
+			0,
+			cameraPanY,
+			1,
+			cameraDistance,
+		)
+	) {
+		throw new Error("Failed to add OrbitCameraController.");
+	}
+	if (!setCameraHomeFromCurrentTransform(world, camera, cameraHomeComponent)) {
+		throw new Error("Failed to add CameraHomeTransform.");
+	}
+	if (
+		!setCameraLensOrthographic(
+			world,
+			camera,
+			cameraLensComponent,
+			0.1,
+			50,
+			1,
+			3.8,
+			0,
+		)
+	) {
+		throw new Error("Failed to add CameraLens.");
+	}
+	scene.setMainCamera(camera);
+	scene.addCommonSystems({
+		orbitControllerComponent,
+		homeComponent: cameraHomeComponent,
+		updateOrbitCameraControllerFromInput:
+			updateOrbitCameraControllerComponentFromInput,
+		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+	});
+	scene.installCommonSystems({ transformPropagation: false });
+	syncOrbitCameraTransformComponent(
+		world,
+		camera,
+		orbitControllerComponent,
+		cameraHomeComponent,
+	);
+	syncOrbitCameraBlobComponent(
+		world,
+		camera,
+		orbitControllerComponent,
+		cameraLensComponent,
+	);
+	const cameraStorage = createCameraWordsBuffer(demo.device, world);
+	drainAndUploadCameraWrites(demo.queue, cameraStorage, world);
+	const cameraBindGroup = cameraWordsBindGroup(demo.device, demo.pipeline, cameraStorage);
 	demo.surfaces.push({
 		id,
 		input,
+		scene,
+		world,
+		camera,
+		orbitControllerComponent,
+		cameraLensComponent,
+		cameraStorage,
+		cameraBindGroup,
 		depthTexture: texture,
 		depthView: view,
-		yaw: 0,
-		pitch: cameraElevation,
-		dolly: 1,
-		baseDistance: cameraDistance,
-		panX: 0,
-		panY: cameraPanY,
 	});
+	demo.engine.setSurfaceScene(id, scene);
 }
 
 function surfaceStateIndex(demo: DemoState, id: SurfaceId): number {
@@ -292,45 +306,45 @@ function surfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState {
 }
 
 function handleInput(surface: SurfaceRenderState): void {
-	const input = surface.input;
-	if (input.mouseDown(MouseButton.Left) && !input.mousePressed(MouseButton.Left)) {
-		surface.yaw += input.pointerDeltaX() * 0.006;
-		surface.pitch = Math.max(-1.25, Math.min(1.25, surface.pitch + input.pointerDeltaY() * 0.006));
-	}
-	if (input.mouseDown(MouseButton.Middle) && !input.mousePressed(MouseButton.Middle)) {
-		surface.panX += input.pointerDeltaX() * 0.01 * surface.dolly;
-		surface.panY -= input.pointerDeltaY() * 0.01 * surface.dolly;
-	}
-	if (input.wheelDeltaY() !== 0) {
-		surface.dolly = Math.max(0.01, Math.min(4, surface.dolly + input.wheelDeltaY() * 0.001 * surface.dolly));
-	}
+	updateOrbitCameraControllerComponentFromInput(
+		surface.world,
+		surface.camera,
+		surface.orbitControllerComponent,
+		surface.input,
+	);
 }
 
 function writeObjects(demo: DemoState, surface: SurfaceRenderState, frame: FrameState): void {
 	const t = frame.elapsedSeconds;
 	const aspect = Math.max(frame.surface.width, 1) / Math.max(frame.surface.height, 1);
-	const q = quatMul(quatY(-surface.yaw), quatX(-surface.pitch));
-	const [dx, dy, dz] = quatRotateVec3(q, -surface.panX, -surface.panY, 0);
-	const eye: [number, number, number] = [
-		dx,
-		dy,
-		dz + surface.baseDistance,
-	];
-	const forward = quatRotateVec3(q, 0, 0, -1);
-	const up = quatRotateVec3(q, 0, 1, 0);
-	const target: [number, number, number] = [
-		eye[0] + forward[0],
-		eye[1] + forward[1],
-		eye[2] + forward[2],
-	];
-	const vp = multiply(orthographic(aspect, 3.8 * surface.dolly), lookAt(eye, target, up));
+	if (
+		!setCameraLensOrthographic(
+			surface.world,
+			surface.camera,
+			surface.cameraLensComponent,
+			0.1,
+			50,
+			aspect,
+			3.8,
+			0,
+		)
+	) {
+		throw new Error("Failed to update CameraLens.");
+	}
+	syncOrbitCameraBlobComponent(
+		surface.world,
+		surface.camera,
+		surface.orbitControllerComponent,
+		surface.cameraLensComponent,
+	);
+	drainAndUploadCameraWrites(demo.queue, surface.cameraStorage, surface.world);
 	const sun = multiply(rotateY(t * 0.35), scale(0.55));
 	const earth = multiply(multiply(rotateY(t * 0.9), translate(2.35, 0, 0)), multiply(rotateY(t * 2.2), scale(0.22)));
 	const moon = multiply(earth, multiply(multiply(rotateY(t * 2.8), translate(1.05, 0, 0)), scale(0.11)));
 	const colors = [[1, 0.65, 0.15, 1], [0.2, 0.55, 1, 1], [1, 0, 1, 1]];
 	const out = new Float32Array(OBJECT_STRIDE_FLOATS * 3);
 	for (const [index, model] of [sun, earth, moon].entries()) {
-		out.set(multiply(vp, model), index * OBJECT_STRIDE_FLOATS);
+		out.set(model, index * OBJECT_STRIDE_FLOATS);
 		out.set(colors[index], index * OBJECT_STRIDE_FLOATS + 16);
 	}
 	demo.queue.writeBuffer(demo.objectBuffer, 0, out);
@@ -366,6 +380,7 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 	});
 	pass.setPipeline(demo.pipeline);
 	pass.setBindGroup(0, demo.bindGroup);
+	pass.setBindGroup(1, surface.cameraBindGroup);
 	pass.setVertexBuffer(0, demo.vertexBuffer);
 	pass.setIndexBuffer(demo.indexBuffer, "uint16");
 	pass.drawIndexed(INDEX_COUNT, 3);
@@ -391,7 +406,10 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	});
 	engine.addPhaseHandler(Phase.Render, (_engine, frame) => renderSurface(demo, frame), PhaseSlot.AfterSystems);
 	engine.addPhaseHandler(Phase.Shutdown, () => {
-		for (const surface of demo.surfaces) surface.depthTexture.destroy();
+		for (const surface of demo.surfaces) {
+			surface.depthTexture.destroy();
+			surface.cameraStorage.destroy();
+		}
 		demo.vertexBuffer.destroy();
 		demo.indexBuffer.destroy();
 		demo.objectBuffer.destroy();
