@@ -2,4 +2,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export * from "./app-runtime.ts";
+export * from "./orbit-camera-input.ts";
 export * from "./webgpu-device-limits.ts";

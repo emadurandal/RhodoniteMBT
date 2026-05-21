@@ -9,6 +9,14 @@ import {
 	cameraWordsBindingDefault,
 	createCameraWordsBuffer,
 	drainAndUploadCameraWrites,
+	addOrbitCameraControllerWithPose,
+	registerCameraHomeTransformComponent,
+	registerCameraLensComponent,
+	registerOrbitCameraControllerComponent,
+	setCameraHomeFromCurrentTransform,
+	setCameraLensOrthographic,
+	syncOrbitCameraBlobComponent,
+	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -23,20 +31,10 @@ import {
 	PlatformOptions,
 	Scene,
 	runMultiSurfacePlatform,
+	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 	type SurfaceId,
 } from "../moon/rhodonite/src/app/ts/index.ts";
-import {
-	addOrbitCameraControllerWithPose,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
-	setCameraHomeFromCurrentTransform,
-	setCameraLensOrthographic,
-	syncOrbitCameraBlobComponent,
-	syncOrbitCameraTransformComponent,
-	updateOrbitCameraControllerComponentFromInput,
-} from "./orbit-camera-controller";
 
 type SurfaceRenderState = {
 	readonly id: SurfaceId;

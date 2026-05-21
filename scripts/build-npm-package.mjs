@@ -69,6 +69,10 @@ function rewriteTsFile(filePath) {
     '"@moon/rhodonite_core/ecs/js_bridge"',
     '"../internal/ecs/js_bridge.js"',
   );
+  text = text.replaceAll(
+    '"../../../../rhodonite_core/src/ecs/ts/index.ts"',
+    '"../ecs/index.ts"',
+  );
   text = text.replaceAll(/(from\s+["'][^"']+)\.ts(["'])/g, "$1.js$2");
   text = text.replaceAll(/(export\s+[^"']*from\s+["'][^"']+)\.ts(["'])/g, "$1.js$2");
   writeFileSync(filePath, text);

@@ -11,10 +11,20 @@ import {
 	drainAndUploadCameraWrites,
 	uploadGlobalTransformWrites,
 	writeGlobalTransformBlobRangeByRefs,
+	addCameraLensOrthographic,
+	addOrbitCameraControllerWithDistance,
+	mat4Inverse,
+	readOrbitCameraControllerComponent,
+	registerCameraHomeTransformComponent,
+	registerCameraLensComponent,
+	registerOrbitCameraControllerComponent,
+	setCameraHomeFromCurrentTransform,
+	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
 	type GlobalTransformBlobWriter,
 	type GlobalTransformDenseLayout,
+	type OrbitCameraController,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	createRgba8ReadbackTarget,
@@ -30,6 +40,7 @@ import {
 	PlatformOptions,
 	runBrowserWebGpuCanvasDemo,
 	runSingleCanvasPlatform,
+	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 } from "../moon/rhodonite/src/app/ts/index.ts";
 import {
@@ -50,20 +61,6 @@ import {
 	type MassCubesRenderResources,
 } from "./ecs-mass-cubes-renderer";
 import { writeMassCubesDenseYTransformWaveToByteView } from "./ecs-mass-cubes-transform-writer";
-import {
-	addCameraLensOrthographic,
-	addOrbitCameraControllerWithDistance,
-	mat4Inverse,
-	readOrbitCameraControllerComponent,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
-	setCameraHomeFromCurrentTransform,
-	syncOrbitCameraTransformComponent,
-	updateOrbitCameraControllerComponentFromInput,
-	type OrbitCameraController,
-} from "./orbit-camera-controller";
-
 type GlobalTransformPrecisionMode =
 	| "all-f32"
 	| "all-f16"
