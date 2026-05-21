@@ -150,23 +150,6 @@ pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
 }
 
 ///|
-/// Implements `create_demo_state_for_device`.
-pub fn create_demo_state_for_device(
-  device : @wgpu.GPUDevice,
-  queue : @wgpu.GPUQueue,
-  format : String,
-  context? : @wgpu.GPUCanvasContext? = None,
-) -> DemoState {
-  create_demo_state_for_scene(
-    @app.Scene::new("ecs-scene-graph"),
-    device,
-    queue,
-    format,
-    context~,
-  )
-}
-
-///|
 /// Implements `create_demo_state_for_scene`.
 pub fn create_demo_state_for_scene(
   scene : @app.Scene,
