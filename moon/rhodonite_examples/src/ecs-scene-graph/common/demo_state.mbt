@@ -128,13 +128,6 @@ pub fn DemoState::update_camera_from_input(
 }
 
 ///|
-/// Implements `create_demo_state`.
-pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
-  let engine = @app.Engine::new(context)
-  create_demo_state_for_engine(engine)
-}
-
-///|
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
   let (device, canvas_context, format, queue) = engine.gpu_context().get()
@@ -146,23 +139,6 @@ pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
       format,
       context=Some(canvas_context),
     ),
-  )
-}
-
-///|
-/// Implements `create_demo_state_for_device`.
-pub fn create_demo_state_for_device(
-  device : @wgpu.GPUDevice,
-  queue : @wgpu.GPUQueue,
-  format : String,
-  context? : @wgpu.GPUCanvasContext? = None,
-) -> DemoState {
-  create_demo_state_for_scene(
-    @app.Scene::new("ecs-scene-graph"),
-    device,
-    queue,
-    format,
-    context~,
   )
 }
 

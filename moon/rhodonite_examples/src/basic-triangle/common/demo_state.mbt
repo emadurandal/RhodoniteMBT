@@ -31,18 +31,6 @@ pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
 }
 
 ///|
-/// Implements `create_demo_state_for_device`.
-pub fn create_demo_state_for_device(
-  device : @wgpu.GPUDevice,
-  queue : @wgpu.GPUQueue,
-  format : String,
-  context? : @wgpu.GPUCanvasContext? = None,
-) -> DemoState {
-  let pipeline = create_pipeline(device, format)
-  { context, device, queue, pipeline }
-}
-
-///|
 /// Implements `create_pipeline`.
 fn create_pipeline(
   device : @wgpu.GPUDevice,
