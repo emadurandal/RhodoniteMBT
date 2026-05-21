@@ -57,6 +57,7 @@ Camera control is split into source, transform, lens, and GPU blob stages:
 - `OrbitCameraController` is a user-registered CPU component created with `register_orbit_camera_controller_component`. It stores yaw/pitch, pan, dolly, distance, sensitivities, clamps, and a one-shot reset request flag.
 - `CameraHomeTransform` is a user-registered CPU component created with `register_camera_home_transform_component`. It stores a 48-byte local `Transform3D` snapshot used as the reset target.
 - `CameraLens` is a user-registered CPU component created with `register_camera_lens_component`. It stores projection kind, near/far, aspect, FOV or orthographic half-height, and flags.
+- `OrbitOrthographicCameraDesc` plus `setup_orbit_orthographic_camera` initializes a camera entity's `Transform3D`, parentless `GlobalTransform`, `OrbitCameraController`, `CameraHomeTransform`, `CameraLens`, and initial builtin `Camera` blob in one call. `OrbitOrthographicCameraDesc::new_yz_pitched` covers the common yaw-zero sample camera that starts at a fixed Y/Z position.
 - `orbit_camera_transform_system` applies `OrbitCameraController` to the camera entity's `Transform3D` and mirrors the parentless result into `GlobalTransform`. If `request_orbit_camera_reset` was called, the system restores `Transform3D` from `CameraHomeTransform` and clears the request.
 - `camera_blob_sync_system` reads `GlobalTransform + CameraLens`, builds `view = inverse(GlobalTransform)` and a perspective or orthographic projection, then writes the builtin `Camera` blob with `World::set_camera_matrices`.
 

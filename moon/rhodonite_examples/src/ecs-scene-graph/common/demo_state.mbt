@@ -218,66 +218,22 @@ pub fn create_demo_state_for_scene(
   ignore(world.set_child_of(earth, sun))
   ignore(world.set_child_of(moon, earth))
   scene.set_main_camera(Some(camera))
-  let camera_pan_y = Float::from_double(-2.0 / @math.cos(camera_elevation_rad))
-  let camera_distance = Float::from_double(
-    5.6 - camera_pan_y.to_double() * @math.sin(camera_elevation_rad),
-  )
-  let camera_qx = -@math.sin(camera_elevation_rad * 0.5)
-  let camera_qw = @math.cos(camera_elevation_rad * 0.5)
   ignore(
-    world.set_transform_trs(
-      camera,
-      (0.0 : Float),
-      (2.0 : Float),
-      (5.6 : Float),
-      camera_qx,
-      0.0,
-      0.0,
-      camera_qw,
-      (1.0 : Float),
-      (1.0 : Float),
-      (1.0 : Float),
-    ),
-  )
-  ignore(world.set_global_transform(camera, id_m))
-  ignore(
-    @ecs.add_orbit_camera_controller_with_pose(
+    @ecs.setup_orbit_orthographic_camera(
       world,
       camera,
       orbit_controller,
-      0.0,
-      camera_elevation_rad,
-      (0.0 : Float),
-      camera_pan_y,
-      (1.0 : Float),
-      camera_distance,
-    ),
-  )
-  ignore(
-    @ecs.set_camera_home_from_current_transform(world, camera, camera_home),
-  )
-  ignore(
-    @ecs.add_camera_lens_orthographic(
-      world,
-      camera,
+      camera_home,
       camera_lens,
-      (0.1 : Float),
-      (50.0 : Float),
-      (1.0 : Float),
-      (3.8 : Float),
-      (0.0 : Float),
-    ),
-  )
-  ignore(
-    world.set_camera_matrices(
-      camera,
-      id_m,
-      id_m,
-      (0.1 : Float),
-      (50.0 : Float),
-      (1.0 : Float),
-      @ecs.camera_projection_orthographic(),
-      (0.0 : Float),
+      @ecs.OrbitOrthographicCameraDesc::new_yz_pitched(
+        camera_elevation_rad,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
     ),
   )
   let vertex_bytes = FixedArray::make(

@@ -160,6 +160,83 @@ pub fn register_camera_lens_component(world : World) -> ComponentTypeId {
 }
 
 ///|
+/// Describes the initial ECS components for an orbit-controlled orthographic camera.
+pub(all) struct OrbitOrthographicCameraDesc {
+  priv yaw : Double
+  priv pitch : Double
+  priv pan_x : Float
+  priv pan_y : Float
+  priv dolly : Float
+  priv distance : Float
+  priv near : Float
+  priv far : Float
+  priv aspect : Float
+  priv ortho_half_height : Float
+  priv flags : Float
+}
+
+///|
+/// Builds an orbit orthographic camera description from explicit orbit pose and lens values.
+pub fn OrbitOrthographicCameraDesc::new(
+  yaw : Double,
+  pitch : Double,
+  pan_x : Float,
+  pan_y : Float,
+  dolly : Float,
+  distance : Float,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  ortho_half_height : Float,
+  flags? : Float = (0.0 : Float),
+) -> OrbitOrthographicCameraDesc {
+  {
+    yaw,
+    pitch,
+    pan_x,
+    pan_y,
+    dolly,
+    distance,
+    near,
+    far,
+    aspect,
+    ortho_half_height,
+    flags,
+  }
+}
+
+///|
+/// Builds a yaw-zero orbit camera description that starts at the given Y/Z position.
+pub fn OrbitOrthographicCameraDesc::new_yz_pitched(
+  pitch : Double,
+  position_y : Float,
+  position_z : Float,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  ortho_half_height : Float,
+  flags? : Float = (0.0 : Float),
+) -> OrbitOrthographicCameraDesc {
+  let pan_y = Float::from_double(-position_y.to_double() / @math.cos(pitch))
+  let distance = Float::from_double(
+    position_z.to_double() - pan_y.to_double() * @math.sin(pitch),
+  )
+  OrbitOrthographicCameraDesc::new(
+    0.0,
+    pitch,
+    (0.0 : Float),
+    pan_y,
+    (1.0 : Float),
+    distance,
+    near,
+    far,
+    aspect,
+    ortho_half_height,
+    flags~,
+  )
+}
+
+///|
 /// Clamps a floating-point value between lower and upper bounds.
 fn clamp_float(value : Float, lo : Float, hi : Float) -> Float {
   if value < lo {
@@ -551,6 +628,121 @@ pub fn add_camera_lens_orthographic(
   )
   @writes.put_f32_le(bytes, lens_flags_offset, flags.to_double())
   world.add_component_bytes(camera, lens_component, bytes)
+}
+
+///|
+/// Derives the local TRS written by the orbit camera transform system for one description.
+fn orbit_camera_desc_trs(
+  desc : OrbitOrthographicCameraDesc,
+) -> (Float, Float, Float, Double, Double, Double, Double) {
+  let (qx0, qy0, qz0, qw0) = quat_y(-desc.yaw)
+  let (qx1, qy1, qz1, qw1) = quat_x(-desc.pitch)
+  let (qx, qy, qz, qw) = quat_mul(qx0, qy0, qz0, qw0, qx1, qy1, qz1, qw1)
+  let (dx, dy, dz) = quat_rotate_vec3(
+    qx,
+    qy,
+    qz,
+    qw,
+    -desc.pan_x.to_double(),
+    -desc.pan_y.to_double(),
+    0.0,
+  )
+  (
+    Float::from_double(dx),
+    Float::from_double(dy),
+    Float::from_double(dz) + desc.distance,
+    qx,
+    qy,
+    qz,
+    qw,
+  )
+}
+
+///|
+/// Builds the orthographic projection matrix for one orbit camera description.
+fn orbit_orthographic_camera_desc_projection(
+  desc : OrbitOrthographicCameraDesc,
+) -> @m44.Matrix44F {
+  let half_h = desc.ortho_half_height * desc.dolly
+  let half_w = half_h * desc.aspect
+  @m44.Matrix44::ortho(-half_w, half_w, -half_h, half_h, desc.near, desc.far)
+}
+
+///|
+/// Sets Transform3D, GlobalTransform, orbit/home/lens components, and initial Camera blob.
+pub fn setup_orbit_orthographic_camera(
+  world : World,
+  camera : EntityId,
+  orbit_component : ComponentTypeId,
+  home_component : ComponentTypeId,
+  lens_component : ComponentTypeId,
+  desc : OrbitOrthographicCameraDesc,
+) -> Bool {
+  let (px, py, pz, qx, qy, qz, qw) = orbit_camera_desc_trs(desc)
+  let local_matrix = @comp.Transform3D::local_matrix_from_component_view(
+    @comp.transform3d_trs_bytes(
+      px,
+      py,
+      pz,
+      qx,
+      qy,
+      qz,
+      qw,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    )[:],
+  )
+  let view = match local_matrix.inverse() {
+    Some(view) => view
+    None => return false
+  }
+  world.set_transform_trs(
+    camera,
+    px,
+    py,
+    pz,
+    qx,
+    qy,
+    qz,
+    qw,
+    (1.0 : Float),
+    (1.0 : Float),
+    (1.0 : Float),
+  ) &&
+  world.set_global_transform(camera, local_matrix) &&
+  add_orbit_camera_controller_with_pose(
+    world,
+    camera,
+    orbit_component,
+    desc.yaw,
+    desc.pitch,
+    desc.pan_x,
+    desc.pan_y,
+    desc.dolly,
+    desc.distance,
+  ) &&
+  set_camera_home_from_current_transform(world, camera, home_component) &&
+  add_camera_lens_orthographic(
+    world,
+    camera,
+    lens_component,
+    desc.near,
+    desc.far,
+    desc.aspect,
+    desc.ortho_half_height,
+    desc.flags,
+  ) &&
+  world.set_camera_matrices(
+    camera,
+    view,
+    orbit_orthographic_camera_desc_projection(desc),
+    desc.near,
+    desc.far,
+    desc.aspect,
+    camera_projection_orthographic(),
+    desc.flags,
+  )
 }
 
 ///|
