@@ -278,23 +278,11 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 pub fn Engine::add_common_handlers(
   self : Engine,
   scene : Scene,
-  transform_propagation? : Bool = false,
-  orbit_component? : @ecs.ComponentTypeId? = None,
-  home_component? : @ecs.ComponentTypeId? = None,
-  lens_component? : @ecs.ComponentTypeId? = None,
+  transform_propagation? : Bool = true,
 ) -> Unit {
-  let orbit_component = match orbit_component {
-    Some(_) => orbit_component
-    None => scene.inferred_common_orbit_component()
-  }
-  let home_component = match home_component {
-    Some(_) => home_component
-    None => scene.inferred_common_home_component(orbit_component)
-  }
-  let lens_component = match lens_component {
-    Some(_) => lens_component
-    None => scene.inferred_common_lens_component(orbit_component)
-  }
+  let orbit_component = scene.inferred_common_orbit_component()
+  let home_component = scene.inferred_common_home_component(orbit_component)
+  let lens_component = scene.inferred_common_lens_component(orbit_component)
   scene.add_common_systems(
     transform_propagation~,
     orbit_component~,
