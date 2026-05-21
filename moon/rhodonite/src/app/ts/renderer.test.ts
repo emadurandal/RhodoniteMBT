@@ -269,6 +269,47 @@ describe("Renderer TypeScript renderable API", () => {
 		expect(device.queue.writes[1]?.bytes.byteLength).toBe(24);
 	});
 
+	it("skips renderables that lack GlobalTransform", () => {
+		const { device, renderer } = testRenderer();
+		const world = World.new();
+		const scene = new Scene<World, EntityId>("render-test", world);
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+		const renderable = registerRenderableComponent(world);
+		const mesh = renderer.registerStaticIndexedMesh(
+			new Uint8Array([1, 2, 3, 4, 5, 6]),
+			new Uint8Array([0, 0, 1, 0, 2, 0]),
+			3,
+		);
+		const material = renderer.registerUnlitMaterial(
+			UnlitMaterialDesc.new(0.25, 0.5, 0.75),
+		);
+		const colorView = { kind: "color" } as unknown as GPUTextureView;
+
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 100, 1, 1, 0),
+		).toBe(true);
+		expect(
+			addRenderable(
+				world,
+				entity,
+				renderable,
+				RenderableDesc.new(mesh, material),
+			),
+		).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			false,
+		);
+
+		renderer.renderSceneRenderables(scene, renderable, colorView);
+
+		const drawCalls = device.encoders[0]?.pass.calls.filter(
+			(call) => call.name === "drawIndexed",
+		);
+		expect(drawCalls).toEqual([]);
+	});
+
 	it("extracts visible renderables into one draw call per entity", () => {
 		const { device, renderer } = testRenderer();
 		const world = World.new();

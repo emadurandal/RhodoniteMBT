@@ -13,6 +13,7 @@ import {
 	globalTransformRefInstanceVertexBufferLayout,
 	globalTransformWordsBindGroup,
 	globalTransformWordsBindingDefault,
+	Query,
 	type ComponentTypeId,
 	type EntityId,
 	type World,
@@ -662,26 +663,38 @@ export class Renderer {
 		renderable: RenderableComponent,
 	): RendererDrawItem[] {
 		const items: RendererDrawItem[] = [];
-		for (const entity of renderable.entities()) {
-			if (!world.isAlive(entity) || !world.hasComponent(entity, renderable.id())) {
-				continue;
-			}
-			const bytes = world.componentBytesCopy(entity, renderable.id());
-			if (bytes === null || bytes.byteLength < RENDERABLE_COMPONENT_STRIDE) {
-				continue;
-			}
-			const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-			const meshIndex = view.getUint32(0, true);
-			const materialIndex = view.getUint32(4, true);
-			const flags = view.getUint32(8, true);
-			if (
-				(flags & RENDERABLE_VISIBLE_BIT) !== 0 &&
-				this.meshes[meshIndex] !== undefined &&
-				this.materials[materialIndex] !== undefined
-			) {
-				items.push({ entity, meshIndex, materialIndex });
-			}
-		}
+		Query.new([renderable.id(), world.globalTransformComponent()]).forEach(
+			world,
+			(row) => {
+				row.read(renderable.id(), (bytes) => {
+					if (bytes.length < RENDERABLE_COMPONENT_STRIDE) {
+						return;
+					}
+					const payload = bytes.asUint8Array() ?? bytes.toUint8ArrayCopy();
+					const view = new DataView(
+						payload.buffer,
+						payload.byteOffset,
+						payload.byteLength,
+					);
+					const flags = new RenderableFlags(view.getUint32(8, true));
+					if (!flags.contains(renderableFlagsVisible())) {
+						return;
+					}
+					const meshIndex = view.getUint32(0, true);
+					const materialIndex = view.getUint32(4, true);
+					if (
+						this.meshes[meshIndex] !== undefined &&
+						this.materials[materialIndex] !== undefined
+					) {
+						items.push({
+							entity: row.entity(),
+							meshIndex,
+							materialIndex,
+						});
+					}
+				});
+			},
+		);
 		return items;
 	}
 
