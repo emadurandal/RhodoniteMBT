@@ -19,8 +19,6 @@ pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
 
 pub fn create_demo_state_for_scene(@app.Scene, @webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
-pub fn demo_state_release(DemoState) -> Unit
-
 pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState) -> Unit
@@ -34,23 +32,11 @@ pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
 // Types and methods
 pub(all) struct DemoState {
   context : @webgpu.GPUCanvasContext?
-  device : @webgpu.GPUDevice
-  queue : @webgpu.GPUQueue
-  pipeline : @webgpu.GPURenderPipeline
-  mut depth_texture : @webgpu.GPUTexture
-  mut depth_view : @webgpu_objects.GPUTextureView
-  vertex_buffer : @webgpu.GPUBuffer
-  instance_buffer : @webgpu.GPUBuffer
-  index_buffer : @webgpu.GPUBuffer
-  transform_storage : @webgpu.GPUBuffer
-  camera_storage : @webgpu.GPUBuffer
-  bind_transforms : @webgpu.GPUBindGroup
-  bind_camera : @webgpu.GPUBindGroup
-  layout_transforms : @webgpu.GPUBindGroupLayout
-  layout_camera : @webgpu.GPUBindGroupLayout
+  renderer : @app.Renderer
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
+  renderable : @app.RenderableComponent
   orbit_controller : @ecs.ComponentTypeId
   camera_home : @ecs.ComponentTypeId
   camera_lens : @ecs.ComponentTypeId

@@ -538,9 +538,3 @@ pub fn register_engine_handlers(
 pub fn DemoState::release(self : DemoState) -> Unit {
   self.renderer.release()
 }
-
-///|
-/// Implements `demo_state_release`.
-pub fn demo_state_release(demo_state : DemoState) -> Unit {
-  demo_state.release()
-}
