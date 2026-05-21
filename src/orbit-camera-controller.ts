@@ -41,6 +41,7 @@ const LENS_FOV_Y_RAD_OFFSET = 16;
 const LENS_ORTHO_HALF_HEIGHT_OFFSET = 20;
 const LENS_FLAGS_OFFSET = 24;
 
+const CAMERA_PROJECTION_PERSPECTIVE = 0;
 const CAMERA_PROJECTION_ORTHOGRAPHIC = 1;
 
 export type OrbitCameraController = {
@@ -181,6 +182,28 @@ export function addOrbitCameraControllerWithDistance(
 	);
 }
 
+export function addOrbitCameraControllerWithPose(
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+	yaw: number,
+	pitch: number,
+	panX: number,
+	panY: number,
+	dolly: number,
+	distance: number,
+): boolean {
+	const controller = createOrbitCameraController(pitch, yaw);
+	controller.panX = panX;
+	controller.panY = panY;
+	controller.dolly = dolly;
+	return world.addComponentBytes(
+		camera,
+		component,
+		orbitCameraControllerBytes(controller, distance, false),
+	);
+}
+
 export function setCameraHomeFromCurrentTransform(
 	world: World,
 	camera: EntityId,
@@ -214,6 +237,30 @@ export function addCameraLensOrthographic(
 	writeF32(bytes, LENS_FOV_Y_RAD_OFFSET, 1);
 	writeF32(bytes, LENS_ORTHO_HALF_HEIGHT_OFFSET, orthoHalfHeight);
 	writeF32(bytes, LENS_FLAGS_OFFSET, flags);
+	return world.addComponentBytes(camera, lensComponent, bytes);
+}
+
+export function setCameraLensOrthographic(
+	world: World,
+	camera: EntityId,
+	lensComponent: ComponentTypeId,
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags: number,
+): boolean {
+	const bytes = new Uint8Array(CAMERA_LENS_STRIDE);
+	writeF32(bytes, LENS_PROJECTION_KIND_OFFSET, CAMERA_PROJECTION_ORTHOGRAPHIC);
+	writeF32(bytes, LENS_NEAR_OFFSET, near);
+	writeF32(bytes, LENS_FAR_OFFSET, far);
+	writeF32(bytes, LENS_ASPECT_OFFSET, aspect);
+	writeF32(bytes, LENS_FOV_Y_RAD_OFFSET, 1);
+	writeF32(bytes, LENS_ORTHO_HALF_HEIGHT_OFFSET, orthoHalfHeight);
+	writeF32(bytes, LENS_FLAGS_OFFSET, flags);
+	if (world.hasComponent(camera, lensComponent)) {
+		return world.setComponentBytes(camera, lensComponent, bytes);
+	}
 	return world.addComponentBytes(camera, lensComponent, bytes);
 }
 
@@ -375,6 +422,172 @@ function localMatrixFromTrs(
 		pz,
 		1,
 	]);
+}
+
+function mat4Inverse(m: Float32Array): Float32Array | null {
+	const a00 = m[0] ?? 0;
+	const a01 = m[1] ?? 0;
+	const a02 = m[2] ?? 0;
+	const a03 = m[3] ?? 0;
+	const a10 = m[4] ?? 0;
+	const a11 = m[5] ?? 0;
+	const a12 = m[6] ?? 0;
+	const a13 = m[7] ?? 0;
+	const a20 = m[8] ?? 0;
+	const a21 = m[9] ?? 0;
+	const a22 = m[10] ?? 0;
+	const a23 = m[11] ?? 0;
+	const a30 = m[12] ?? 0;
+	const a31 = m[13] ?? 0;
+	const a32 = m[14] ?? 0;
+	const a33 = m[15] ?? 0;
+	const b00 = a00 * a11 - a01 * a10;
+	const b01 = a00 * a12 - a02 * a10;
+	const b02 = a00 * a13 - a03 * a10;
+	const b03 = a01 * a12 - a02 * a11;
+	const b04 = a01 * a13 - a03 * a11;
+	const b05 = a02 * a13 - a03 * a12;
+	const b06 = a20 * a31 - a21 * a30;
+	const b07 = a20 * a32 - a22 * a30;
+	const b08 = a20 * a33 - a23 * a30;
+	const b09 = a21 * a32 - a22 * a31;
+	const b10 = a21 * a33 - a23 * a31;
+	const b11 = a22 * a33 - a23 * a32;
+	let det =
+		b00 * b11 -
+		b01 * b10 +
+		b02 * b09 +
+		b03 * b08 -
+		b04 * b07 +
+		b05 * b06;
+	if (Math.abs(det) <= Number.EPSILON) {
+		return null;
+	}
+	det = 1 / det;
+	return new Float32Array([
+		(a11 * b11 - a12 * b10 + a13 * b09) * det,
+		(a02 * b10 - a01 * b11 - a03 * b09) * det,
+		(a31 * b05 - a32 * b04 + a33 * b03) * det,
+		(a22 * b04 - a21 * b05 - a23 * b03) * det,
+		(a12 * b08 - a10 * b11 - a13 * b07) * det,
+		(a00 * b11 - a02 * b08 + a03 * b07) * det,
+		(a32 * b02 - a30 * b05 - a33 * b01) * det,
+		(a20 * b05 - a22 * b02 + a23 * b01) * det,
+		(a10 * b10 - a11 * b08 + a13 * b06) * det,
+		(a01 * b08 - a00 * b10 - a03 * b06) * det,
+		(a30 * b04 - a31 * b02 + a33 * b00) * det,
+		(a21 * b02 - a20 * b04 - a23 * b00) * det,
+		(a11 * b07 - a10 * b09 - a12 * b06) * det,
+		(a00 * b09 - a01 * b07 + a02 * b06) * det,
+		(a31 * b01 - a30 * b03 - a32 * b00) * det,
+		(a20 * b03 - a21 * b01 + a22 * b00) * det,
+	]);
+}
+
+function orthographicProjection(
+	aspect: number,
+	halfHeight: number,
+	near: number,
+	far: number,
+): Float32Array {
+	const halfWidth = halfHeight * aspect;
+	const left = -halfWidth;
+	const right = halfWidth;
+	const bottom = -halfHeight;
+	const top = halfHeight;
+	return new Float32Array([
+		2 / (right - left),
+		0,
+		0,
+		0,
+		0,
+		2 / (top - bottom),
+		0,
+		0,
+		0,
+		0,
+		1 / (near - far),
+		0,
+		-(right + left) / (right - left),
+		-(top + bottom) / (top - bottom),
+		near / (near - far),
+		1,
+	]);
+}
+
+function perspectiveProjection(
+	aspect: number,
+	fovYRad: number,
+	near: number,
+	far: number,
+): Float32Array {
+	const f = 1 / Math.tan(fovYRad * 0.5);
+	return new Float32Array([
+		f / aspect,
+		0,
+		0,
+		0,
+		0,
+		f,
+		0,
+		0,
+		0,
+		0,
+		far / (near - far),
+		-1,
+		0,
+		0,
+		(near * far) / (near - far),
+		0,
+	]);
+}
+
+export function syncOrbitCameraBlobComponent(
+	world: World,
+	camera: EntityId,
+	orbitComponent: ComponentTypeId,
+	lensComponent: ComponentTypeId,
+): void {
+	const pose = readOrbitCameraPoseComponent(world, camera, orbitComponent);
+	const lensBytes = componentBytesOrThrow(
+		world,
+		camera,
+		lensComponent,
+		"syncOrbitCameraBlobComponent",
+	);
+	const q = quatMul(quatY(-pose.yaw), quatX(-pose.pitch));
+	const [dx, dy, dz] = quatRotateVec3(q, -pose.panX, -pose.panY, 0);
+	const view = mat4Inverse(
+		localMatrixFromTrs(dx, dy, dz + pose.distance, q[0], q[1], q[2], q[3], 1, 1, 1),
+	);
+	if (view === null) {
+		throw new Error("Failed to invert Camera GlobalTransform.");
+	}
+	const projectionKind = readF32(lensBytes, LENS_PROJECTION_KIND_OFFSET);
+	const near = readF32(lensBytes, LENS_NEAR_OFFSET);
+	const far = readF32(lensBytes, LENS_FAR_OFFSET);
+	const aspect = readF32(lensBytes, LENS_ASPECT_OFFSET);
+	const fovYRad = readF32(lensBytes, LENS_FOV_Y_RAD_OFFSET);
+	const orthoHalfHeight = readF32(lensBytes, LENS_ORTHO_HALF_HEIGHT_OFFSET);
+	const flags = readF32(lensBytes, LENS_FLAGS_OFFSET);
+	const proj =
+		projectionKind === CAMERA_PROJECTION_PERSPECTIVE
+			? perspectiveProjection(aspect, fovYRad, near, far)
+			: orthographicProjection(aspect, orthoHalfHeight * pose.dolly, near, far);
+	if (
+		!world.setCameraMatrices(
+			camera,
+			view,
+			proj,
+			near,
+			far,
+			aspect,
+			projectionKind,
+			flags,
+		)
+	) {
+		throw new Error("Failed to update Camera matrices.");
+	}
 }
 
 function localMatrixFromTransformBytes(bytes: Uint8Array): Float32Array {

@@ -7,12 +7,15 @@ import { World } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	addCameraLensOrthographic,
 	addOrbitCameraControllerWithDistance,
+	addOrbitCameraControllerWithPose,
 	createOrbitCameraController,
 	readOrbitCameraControllerComponent,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
 	registerOrbitCameraControllerComponent,
 	setCameraHomeFromCurrentTransform,
+	setCameraLensOrthographic,
+	syncOrbitCameraBlobComponent,
 	syncOrbitCameraTransformComponent,
 	updateOrbitCameraControllerComponentFromInput,
 	updateOrbitCameraControllerFromInput,
@@ -48,5 +51,25 @@ describe("OrbitCameraController", () => {
 		expect(updateOrbitCameraControllerComponentFromInput(world, camera, orbit, input)).toBe(true);
 		syncOrbitCameraTransformComponent(world, camera, orbit, home);
 		expect(readOrbitCameraControllerComponent(world, camera, orbit).dolly).toBeCloseTo(0.01);
+	});
+
+	it("syncs orbit camera pose and lens into the builtin Camera blob", () => {
+		const world = World.new();
+		const camera = world.createEntity();
+		const orbit = registerOrbitCameraControllerComponent(world);
+		const lens = registerCameraLensComponent(world);
+
+		expect(
+			addOrbitCameraControllerWithPose(world, camera, orbit, 0.25, 0.42, 1, -2, 1.5, 12),
+		).toBe(true);
+		expect(setCameraLensOrthographic(world, camera, lens, 0.1, 80, 16 / 9, 3.8, 0)).toBe(true);
+
+		syncOrbitCameraBlobComponent(world, camera, orbit, lens);
+
+		const writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.byteOffset()).toBe(0);
+		expect(writes[0]?.bytes().length).toBe(72 * 4);
+		expect(writes[0]?.bytes().getF32(0)).not.toBeCloseTo(1);
 	});
 });
