@@ -11,6 +11,7 @@ import {
 	installFakeWebGpuConstants,
 } from "../test-utils/fake-webgpu.ts";
 import {
+	CubeMeshDesc,
 	InstanceBufferHandle,
 	MaterialHandle,
 	MeshHandle,
@@ -20,6 +21,11 @@ import {
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
+	cubeIndexCount,
+	cubeIndexU16Bytes,
+	cubeMeshDesc,
+	cubeVertexCount,
+	cubeVertexPositionBytes,
 	registerRenderableComponent,
 	renderableComponentBytes,
 	renderableComponentStride,
@@ -121,6 +127,27 @@ describe("Renderer TypeScript renderable API", () => {
 		expect(unlit.flags()).toBe(0xffffffff);
 	});
 
+	it("builds shared-corner cube mesh descriptors", () => {
+		const desc = cubeMeshDesc(CubeMeshDesc.new(0.5));
+		const vertices = desc.vertices();
+		const indices = desc.indicesU16();
+
+		expect(cubeVertexCount()).toBe(8);
+		expect(cubeIndexCount()).toBe(36);
+		expect(vertices.byteLength).toBe(8 * 12);
+		expect(indices.byteLength).toBe(36 * 2);
+		expect(f32At(vertices, 0)).toBe(-0.5);
+		expect(f32At(vertices, 4)).toBe(-0.5);
+		expect(f32At(vertices, 8)).toBe(-0.5);
+		expect(f32At(vertices, 84)).toBe(-0.5);
+		expect(f32At(vertices, 88)).toBe(0.5);
+		expect(f32At(vertices, 92)).toBe(0.5);
+		expect(Array.from(indices.slice(0, 6))).toEqual([0, 0, 1, 0, 2, 0]);
+		expect(Array.from(indices.slice(70, 72))).toEqual([3, 0]);
+		expect(cubeVertexPositionBytes(CubeMeshDesc.new(0.5))).toEqual(vertices);
+		expect(cubeIndexU16Bytes()).toEqual(indices);
+	});
+
 	it("registers a renderable CPU component and writes add/set rows", () => {
 		const world = World.new();
 		const renderable = registerRenderableComponent(world);
@@ -209,6 +236,16 @@ describe("Renderer TypeScript renderable API", () => {
 		).toEqual([
 			[0, device.buffers[0], 0, 6],
 			[1, device.buffers[2], 0, 48],
+		]);
+	});
+
+	it("registers cube meshes through the descriptor path", () => {
+		const { device, renderer } = testRenderer();
+		const mesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.5));
+
+		expect(mesh.index()).toBe(0);
+		expect(device.queue.writes.map((write) => write.bytes.byteLength)).toEqual([
+			96, 72,
 		]);
 	});
 

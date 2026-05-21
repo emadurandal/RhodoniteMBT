@@ -62,16 +62,7 @@ let canvas_width : UInt = @mass_shared.canvas_width()
 let canvas_height : UInt = @mass_shared.canvas_height()
 
 ///|
-let vertex_stride_local : Int = @mass_shared.vertex_stride_local()
-
-///|
 let instance_stride : Int = @mass_shared.instance_stride()
-
-///|
-let verts_per_cube : Int = @mass_shared.verts_per_cube()
-
-///|
-let index_u16_count : Int = @mass_shared.index_u16_count()
 
 ///|
 let camera_elevation_rad : Double = @mass_shared.camera_elevation_rad()
@@ -102,48 +93,6 @@ fn camera_matrices(
   dolly : Double,
 ) -> (@m44.Matrix44F, @m44.Matrix44F, Float, Float, Float) {
   @mass_shared.camera_matrices(entity_count, yaw, pitch, pan_x, pan_y, dolly)
-}
-
-///|
-/// Implements `cube_local_corners`.
-fn cube_local_corners() -> Array[(Double, Double, Double)] {
-  [
-    (-1.0, -1.0, -1.0),
-    (1.0, -1.0, -1.0),
-    (1.0, 1.0, -1.0),
-    (-1.0, 1.0, -1.0),
-    (-1.0, -1.0, 1.0),
-    (1.0, -1.0, 1.0),
-    (1.0, 1.0, 1.0),
-    (-1.0, 1.0, 1.0),
-  ]
-}
-
-///|
-/// Implements `index_cube_u16_bytes`.
-fn index_cube_u16_bytes() -> FixedArray[Byte] {
-  let buf = FixedArray::make(72, (0 : Byte))
-  let idx : Array[UInt] = [
-    0U, 1U, 2U, 2U, 3U, 0U, 4U, 5U, 6U, 6U, 7U, 4U, 0U, 4U, 7U, 7U, 3U, 0U, 1U, 5U,
-    6U, 6U, 2U, 1U, 0U, 1U, 5U, 5U, 4U, 0U, 3U, 2U, 6U, 6U, 7U, 3U,
-  ]
-  for i = 0; i < index_u16_count; i = i + 1 {
-    @writes.put_u16_le(buf, i * 2, idx[i])
-  }
-  buf
-}
-
-///|
-/// Implements `write_vertex_positions_only`.
-fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
-  let corners = cube_local_corners()
-  for vi = 0; vi < verts_per_cube; vi = vi + 1 {
-    let (lx, ly, lz) = corners[vi]
-    let base = vi * vertex_stride_local
-    @writes.put_f32_le(buf, base + 0, lx * scale)
-    @writes.put_f32_le(buf, base + 4, ly * scale)
-    @writes.put_f32_le(buf, base + 8, lz * scale)
-  }
 }
 
 ///|
@@ -630,24 +579,13 @@ pub fn create_demo_state_for_scene(
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
-  let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
-    array_stride: vertex_stride_local.to_uint64(),
-    step_mode: @wgpu.GPUVertexStepMode::Vertex,
-    attributes: [
-      {
-        format: @wgpu.GPUVertexFormat::Float32x3,
-        offset: 0UL,
-        shader_location: 0U,
-      },
-    ],
-  }
   let renderer = @app.Renderer::new(
     device,
     queue,
     format,
     canvas_width.reinterpret_as_int(),
     canvas_height.reinterpret_as_int(),
-    vertex_layout_vertices,
+    @app.cube_position3_vertex_layout(),
   )
   let world = scene.world()
   let gt = world.global_transform_component()
@@ -746,14 +684,8 @@ pub fn create_demo_state_for_scene(
     ),
   )
   scene.set_main_camera(Some(camera))
-  let vertex_bytes = FixedArray::make(
-    verts_per_cube * vertex_stride_local,
-    (0 : Byte),
-  )
-  write_vertex_positions_only(vertex_bytes, 0.42)
-  let index_bytes = index_cube_u16_bytes()
-  let mesh = renderer.register_static_indexed_mesh(
-    vertex_bytes, index_bytes, index_u16_count,
+  let mesh = renderer.register_cube_mesh(
+    desc=@app.CubeMeshDesc::new(half_extent=0.42),
   )
   let instances = renderer.register_static_instance_buffer(instance_bytes)
   let writes0 = update_and_drain_global_transforms(

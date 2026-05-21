@@ -348,10 +348,11 @@ pnpm run test:examples:visual
 - `InstanceBufferHandle`
 - `RenderableDesc` と `Renderable` ECS component helper（CPU payload は `mesh_index: u32` + `material_index: u32` + `flags: u32` + reserved）
 - `UnlitMaterialDesc`
+- `StaticIndexedMeshDesc` と Cube などの標準 primitive mesh helper
 - renderer-owned mesh/material/instance-buffer resource table
 - unlit static indexed mesh pipeline
 
-初期 Renderer は intentionally narrow です。通常 path では visible flag を持つ `Renderable + GlobalTransform` entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。MassCubes のような大量描画 path では sample が transform refs + color の instance buffer を作り、Renderer が所有する instance buffer として登録して 1 mesh を N instance で描画します。Material 登録は `UnlitMaterialDesc` descriptor 経由に寄せ、alpha / flags は後続の blending や material option の拡張点として保持しています。TypeScript/npm wrapper は MoonBit app JS bridge ではなく、browser の DOM `GPUDevice` / `GPUQueue` を直接受け取る pure TypeScript 実装として同じ API 形状、component payload layout、instance buffer layout を公開します。Texture、skinning、transparent sorting、shadow、LOD はまだ入れていません。
+初期 Renderer は intentionally narrow です。通常 path では visible flag を持つ `Renderable + GlobalTransform` entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。MassCubes のような大量描画 path では sample が transform refs + color の instance buffer を作り、Renderer が所有する instance buffer として登録して 1 mesh を N instance で描画します。Cube は `Renderable` component ではなく、`StaticIndexedMeshDesc` 経由で `MeshHandle` を作る標準 primitive mesh helper として facade `app` に置きます。将来 Sphere などを追加する場合も同じ descriptor 経路に載せ、`Renderable` は shape を知らない `MeshHandle + MaterialHandle + flags` の参照 component のまま保ちます。Material 登録は `UnlitMaterialDesc` descriptor 経由に寄せ、alpha / flags は後続の blending や material option の拡張点として保持しています。TypeScript/npm wrapper は MoonBit app JS bridge ではなく、browser の DOM `GPUDevice` / `GPUQueue` を直接受け取る pure TypeScript 実装として同じ API 形状、component payload layout、instance buffer layout、primitive mesh helper を公開します。Texture、skinning、transparent sorting、shadow、LOD はまだ入れていません。
 
 ## Open Questions
 

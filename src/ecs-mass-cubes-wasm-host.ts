@@ -8,9 +8,11 @@ import {
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
 import {
+	CubeMeshDesc,
 	InputState,
 	MouseButton,
 	Renderer,
+	cubePosition3VertexLayout,
 	installBrowserInputState,
 	type InstanceBufferHandle,
 	type MeshHandle,
@@ -23,9 +25,6 @@ import {
 	MASS_CUBES_GRID_SPACING,
 	createMassCubesInstanceBytesFromRefs,
 	gridSideLen,
-	massCubesIndexU16Bytes,
-	massCubesVertexPositionBytes,
-	MASS_CUBES_INDEX_U16_COUNT,
 } from "./ecs-mass-cubes-renderer";
 import {
 	createMassCubesHalfArray,
@@ -361,20 +360,13 @@ async function createDemoState(
 		targetFormat,
 		MASS_CUBES_CANVAS_WIDTH,
 		MASS_CUBES_CANVAS_HEIGHT,
-		{
-			arrayStride: 12,
-			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-		},
+		cubePosition3VertexLayout(),
 	);
 	renderer.ensureStorageBuffers({
 		transformWords: transformLayout.wordCapacity,
 		cameraWords: CAMERA_WORD_COUNT,
 	});
-	const cubeMesh = renderer.registerStaticIndexedMesh(
-		massCubesVertexPositionBytes(0.42),
-		massCubesIndexU16Bytes(),
-		MASS_CUBES_INDEX_U16_COUNT,
-	);
+	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const instanceBuffer = renderer.registerStaticInstanceBuffer(
 		createMassCubesInstanceBytesFromRefs(transformLayout.refs),
 	);

@@ -37,27 +37,9 @@ pub fn canvas_height() -> UInt {
 }
 
 ///|
-/// Returns the local vertex byte stride for the cube mesh.
-pub fn vertex_stride_local() -> Int {
-  12
-}
-
-///|
 /// Returns the per-instance byte stride for transform refs and color.
 pub fn instance_stride() -> Int {
   24
-}
-
-///|
-/// Returns the vertex count for the cube corner mesh.
-pub fn verts_per_cube() -> Int {
-  8
-}
-
-///|
-/// Returns the u16 index count for the cube mesh.
-pub fn index_u16_count() -> Int {
-  36
 }
 
 ///|

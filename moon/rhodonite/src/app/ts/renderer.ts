@@ -24,6 +24,9 @@ const RENDERABLE_COMPONENT_STRIDE = 16;
 const RENDERER_INSTANCE_STRIDE = 24;
 const RENDERABLE_COMPONENT_NAME = "RhodoniteRenderable";
 const RENDERABLE_VISIBLE_BIT = 1;
+const PRIMITIVE_POSITION3_VERTEX_STRIDE = 12;
+const CUBE_VERTEX_COUNT = 8;
+const CUBE_INDEX_COUNT = 36;
 
 type RendererMesh = {
 	readonly vertexBuffer: GPUBuffer;
@@ -82,6 +85,134 @@ export class InstanceBufferHandle {
 	index(): number {
 		return this.indexValue;
 	}
+}
+
+export class StaticIndexedMeshDesc {
+	private readonly verticesValue: Uint8Array;
+	private readonly indicesU16Value: Uint8Array;
+	private readonly indexCountValue: number;
+	private readonly vertexLayoutValue: GPUVertexBufferLayout;
+
+	constructor(
+		vertices: Uint8Array,
+		indicesU16: Uint8Array,
+		indexCount: number,
+		vertexLayout: GPUVertexBufferLayout,
+	) {
+		this.verticesValue = vertices;
+		this.indicesU16Value = indicesU16;
+		this.indexCountValue = indexCount;
+		this.vertexLayoutValue = vertexLayout;
+	}
+
+	static new(
+		vertices: Uint8Array,
+		indicesU16: Uint8Array,
+		indexCount: number,
+		vertexLayout: GPUVertexBufferLayout,
+	): StaticIndexedMeshDesc {
+		return new StaticIndexedMeshDesc(
+			vertices,
+			indicesU16,
+			indexCount,
+			vertexLayout,
+		);
+	}
+
+	vertices(): Uint8Array {
+		return this.verticesValue;
+	}
+
+	indicesU16(): Uint8Array {
+		return this.indicesU16Value;
+	}
+
+	indexCount(): number {
+		return this.indexCountValue;
+	}
+
+	vertexLayout(): GPUVertexBufferLayout {
+		return this.vertexLayoutValue;
+	}
+}
+
+export function primitivePosition3VertexStride(): number {
+	return PRIMITIVE_POSITION3_VERTEX_STRIDE;
+}
+
+export function primitivePosition3VertexLayout(): GPUVertexBufferLayout {
+	return {
+		arrayStride: PRIMITIVE_POSITION3_VERTEX_STRIDE,
+		stepMode: "vertex",
+		attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+	};
+}
+
+export class CubeMeshDesc {
+	private readonly halfExtentValue: number;
+
+	constructor(halfExtent = 1) {
+		this.halfExtentValue = halfExtent;
+	}
+
+	static new(halfExtent = 1): CubeMeshDesc {
+		return new CubeMeshDesc(halfExtent);
+	}
+
+	halfExtent(): number {
+		return this.halfExtentValue;
+	}
+}
+
+export function cubePosition3VertexLayout(): GPUVertexBufferLayout {
+	return primitivePosition3VertexLayout();
+}
+
+export function cubeVertexCount(): number {
+	return CUBE_VERTEX_COUNT;
+}
+
+export function cubeIndexCount(): number {
+	return CUBE_INDEX_COUNT;
+}
+
+export function cubeVertexPositionBytes(
+	desc: CubeMeshDesc = CubeMeshDesc.new(),
+): Uint8Array {
+	const bytes = new Uint8Array(
+		CUBE_VERTEX_COUNT * PRIMITIVE_POSITION3_VERTEX_STRIDE,
+	);
+	const view = new DataView(bytes.buffer);
+	const halfExtent = desc.halfExtent();
+	cubeLocalCorners().forEach(([x, y, z], vertexIndex) => {
+		const base = vertexIndex * PRIMITIVE_POSITION3_VERTEX_STRIDE;
+		view.setFloat32(base, x * halfExtent, true);
+		view.setFloat32(base + 4, y * halfExtent, true);
+		view.setFloat32(base + 8, z * halfExtent, true);
+	});
+	return bytes;
+}
+
+export function cubeIndexU16Bytes(): Uint8Array {
+	const indices = [
+		0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0, 1, 5, 6, 6, 2,
+		1, 0, 1, 5, 5, 4, 0, 3, 2, 6, 6, 7, 3,
+	];
+	const bytes = new Uint8Array(CUBE_INDEX_COUNT * 2);
+	const view = new DataView(bytes.buffer);
+	indices.forEach((index, i) => view.setUint16(i * 2, index, true));
+	return bytes;
+}
+
+export function cubeMeshDesc(
+	desc: CubeMeshDesc = CubeMeshDesc.new(),
+): StaticIndexedMeshDesc {
+	return StaticIndexedMeshDesc.new(
+		cubeVertexPositionBytes(desc),
+		cubeIndexU16Bytes(),
+		CUBE_INDEX_COUNT,
+		cubePosition3VertexLayout(),
+	);
 }
 
 export class RenderableFlags {
@@ -369,6 +500,18 @@ export class Renderer {
 			indexCount,
 		});
 		return new MeshHandle(index);
+	}
+
+	registerStaticIndexedMeshDesc(desc: StaticIndexedMeshDesc): MeshHandle {
+		return this.registerStaticIndexedMesh(
+			desc.vertices(),
+			desc.indicesU16(),
+			desc.indexCount(),
+		);
+	}
+
+	registerCubeMesh(desc: CubeMeshDesc = CubeMeshDesc.new()): MeshHandle {
+		return this.registerStaticIndexedMeshDesc(cubeMeshDesc(desc));
 	}
 
 	registerUnlitMaterial(desc: UnlitMaterialDesc): MaterialHandle {
@@ -732,6 +875,19 @@ export class Renderer {
 
 function entityKey(entity: EntityId): string {
 	return `${entity.index()}:${entity.generation()}`;
+}
+
+function cubeLocalCorners(): [number, number, number][] {
+	return [
+		[-1, -1, -1],
+		[1, -1, -1],
+		[1, 1, -1],
+		[-1, 1, -1],
+		[-1, -1, 1],
+		[1, -1, 1],
+		[1, 1, 1],
+		[-1, 1, 1],
+	];
 }
 
 function createRenderableUnlitPipeline(

@@ -12,6 +12,18 @@ import {
 // Values
 pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
 
+pub fn cube_index_count() -> Int
+
+pub fn cube_index_u16_bytes() -> FixedArray[Byte]
+
+pub fn cube_mesh_desc(desc? : CubeMeshDesc) -> StaticIndexedMeshDesc
+
+pub fn cube_position3_vertex_layout() -> @webgpu_enums.GPUVertexBufferLayout
+
+pub fn cube_vertex_count() -> Int
+
+pub fn cube_vertex_position_bytes(desc? : CubeMeshDesc) -> FixedArray[Byte]
+
 pub fn default_fixed_step_phases() -> Array[@ecs.PhaseKey]
 
 pub fn default_frame_begin_phases() -> Array[@ecs.PhaseKey]
@@ -52,6 +64,10 @@ pub fn phase_surface() -> @ecs.PhaseKey
 
 pub fn phase_update() -> @ecs.PhaseKey
 
+pub fn primitive_position3_vertex_layout() -> @webgpu_enums.GPUVertexBufferLayout
+
+pub fn primitive_position3_vertex_stride() -> Int
+
 pub fn register_renderable_component(@ecs.World) -> RenderableComponent
 
 pub fn renderable_component_bytes(RenderableDesc) -> FixedArray[Byte]
@@ -80,6 +96,12 @@ pub(all) struct CommonHandlersOptions {
 }
 pub fn CommonHandlersOptions::default() -> Self
 pub fn CommonHandlersOptions::new(transform_propagation? : Bool) -> Self
+
+pub(all) struct CubeMeshDesc {
+  // private fields
+}
+pub fn CubeMeshDesc::half_extent(Self) -> Double
+pub fn CubeMeshDesc::new(half_extent? : Double) -> Self
 
 pub struct Engine {
   // private fields
@@ -211,7 +233,9 @@ pub struct Renderer {
 }
 pub fn Renderer::device(Self) -> @webgpu.GPUDevice
 pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, String, Int, Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
+pub fn Renderer::register_cube_mesh(Self, desc? : CubeMeshDesc) -> MeshHandle
 pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray[Byte], Int) -> MeshHandle
+pub fn Renderer::register_static_indexed_mesh_desc(Self, StaticIndexedMeshDesc) -> MeshHandle
 pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> InstanceBufferHandle
 pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
@@ -244,6 +268,15 @@ pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
+
+pub(all) struct StaticIndexedMeshDesc {
+  // private fields
+}
+pub fn StaticIndexedMeshDesc::index_count(Self) -> Int
+pub fn StaticIndexedMeshDesc::indices_u16(Self) -> FixedArray[Byte]
+pub fn StaticIndexedMeshDesc::new(FixedArray[Byte], FixedArray[Byte], Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
+pub fn StaticIndexedMeshDesc::vertex_layout(Self) -> @webgpu_enums.GPUVertexBufferLayout
+pub fn StaticIndexedMeshDesc::vertices(Self) -> FixedArray[Byte]
 
 pub(all) struct SurfaceId {
   value : Int
