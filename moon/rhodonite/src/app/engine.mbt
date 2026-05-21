@@ -283,6 +283,18 @@ pub fn Engine::add_common_handlers(
   home_component? : @ecs.ComponentTypeId? = None,
   lens_component? : @ecs.ComponentTypeId? = None,
 ) -> Unit {
+  let orbit_component = match orbit_component {
+    Some(_) => orbit_component
+    None => scene.inferred_common_orbit_component()
+  }
+  let home_component = match home_component {
+    Some(_) => home_component
+    None => scene.inferred_common_home_component(orbit_component)
+  }
+  let lens_component = match lens_component {
+    Some(_) => lens_component
+    None => scene.inferred_common_lens_component(orbit_component)
+  }
   scene.add_common_systems(
     transform_propagation~,
     orbit_component~,

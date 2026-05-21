@@ -220,6 +220,108 @@ fn Scene::has_camera_blob_sync_registration(
 }
 
 ///|
+/// Merges inferred component ids and aborts when a scene has multiple candidates.
+fn merge_inferred_common_component(
+  caller : String,
+  field : String,
+  current : @ecs.ComponentTypeId?,
+  next : @ecs.ComponentTypeId,
+) -> @ecs.ComponentTypeId? {
+  match current {
+    Some(component) =>
+      if component == next {
+        current
+      } else {
+        abort(
+          caller + ": cannot infer " + field + " from multiple registrations",
+        )
+      }
+    None => Some(next)
+  }
+}
+
+///|
+/// Infers the scene's registered orbit camera component from standard systems.
+fn Scene::inferred_common_orbit_component(
+  self : Scene,
+) -> @ecs.ComponentTypeId? {
+  let mut component : @ecs.ComponentTypeId? = None
+  for i = 0; i < self.orbit_camera_transform_registrations.length(); i = i + 1 {
+    component = merge_inferred_common_component(
+      "Scene::inferred_common_orbit_component",
+      "orbit_component",
+      component,
+      self.orbit_camera_transform_registrations[i].orbit_component,
+    )
+  }
+  for i = 0; i < self.orbit_camera_blob_sync_registrations.length(); i = i + 1 {
+    component = merge_inferred_common_component(
+      "Scene::inferred_common_orbit_component",
+      "orbit_component",
+      component,
+      self.orbit_camera_blob_sync_registrations[i].orbit_component,
+    )
+  }
+  component
+}
+
+///|
+/// Infers the registered home component paired with an orbit camera component.
+fn Scene::inferred_common_home_component(
+  self : Scene,
+  orbit_component : @ecs.ComponentTypeId?,
+) -> @ecs.ComponentTypeId? {
+  match orbit_component {
+    Some(orbit) => {
+      let mut component : @ecs.ComponentTypeId? = None
+      for i = 0
+          i < self.orbit_camera_transform_registrations.length()
+          i = i + 1 {
+        let reg = self.orbit_camera_transform_registrations[i]
+        if reg.orbit_component == orbit {
+          component = merge_inferred_common_component(
+            "Scene::inferred_common_home_component",
+            "home_component",
+            component,
+            reg.home_component,
+          )
+        }
+      }
+      component
+    }
+    None => None
+  }
+}
+
+///|
+/// Infers the registered lens component paired with an orbit camera component.
+fn Scene::inferred_common_lens_component(
+  self : Scene,
+  orbit_component : @ecs.ComponentTypeId?,
+) -> @ecs.ComponentTypeId? {
+  match orbit_component {
+    Some(orbit) => {
+      let mut component : @ecs.ComponentTypeId? = None
+      for i = 0
+          i < self.orbit_camera_blob_sync_registrations.length()
+          i = i + 1 {
+        let reg = self.orbit_camera_blob_sync_registrations[i]
+        if reg.orbit_component == orbit {
+          component = merge_inferred_common_component(
+            "Scene::inferred_common_lens_component",
+            "lens_component",
+            component,
+            reg.lens_component,
+          )
+        }
+      }
+      component
+    }
+    None => None
+  }
+}
+
+///|
 /// Adds the Camera blob synchronization system for one engine phase.
 pub fn Scene::add_camera_blob_sync_system(
   self : Scene,

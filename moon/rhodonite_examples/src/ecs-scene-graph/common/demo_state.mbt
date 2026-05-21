@@ -697,13 +697,7 @@ pub fn register_engine_handlers(
   engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
     demo_state.handle_surface_frame(frame)
   })
-  engine.add_common_handlers(
-    demo_state.scene,
-    transform_propagation=true,
-    orbit_component=Some(demo_state.orbit_controller),
-    home_component=Some(demo_state.camera_home),
-    lens_component=Some(demo_state.camera_lens),
-  )
+  engine.add_common_handlers(demo_state.scene)
   engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })
