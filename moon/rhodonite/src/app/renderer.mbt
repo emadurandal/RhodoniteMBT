@@ -521,8 +521,8 @@ fn Renderer::build_instance_bytes(
 }
 
 ///|
-/// Renders all valid Renderable entities in `scene` to `color_view`.
-pub fn Renderer::render_scene(
+/// Renders all visible Renderable entities in `scene` to `color_view`.
+pub fn Renderer::render_scene_renderables(
   self : Renderer,
   scene : Scene,
   renderable : RenderableComponent,
@@ -621,8 +621,8 @@ pub fn Renderer::render_scene(
 }
 
 ///|
-/// Renders one static indexed mesh using a renderer-owned instance buffer.
-pub fn Renderer::render_static_indexed_mesh_instances(
+/// Renders one mesh using a renderer-owned instance buffer.
+pub fn Renderer::render_instanced_mesh(
   self : Renderer,
   scene : Scene,
   mesh : MeshHandle,

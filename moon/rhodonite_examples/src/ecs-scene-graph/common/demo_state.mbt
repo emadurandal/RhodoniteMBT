@@ -502,7 +502,7 @@ pub fn DemoState::render_scene(
   scene : @app.Scene,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
-  self.renderer.render_scene(scene, self.renderable, color_view)
+  self.renderer.render_scene_renderables(scene, self.renderable, color_view)
   @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 

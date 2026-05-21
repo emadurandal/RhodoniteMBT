@@ -1039,7 +1039,7 @@ pub fn DemoState::render_scene(
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   self.sync_mass_cubes_camera_blob()
-  self.renderer.render_static_indexed_mesh_instances(
+  self.renderer.render_instanced_mesh(
     scene,
     self.mesh,
     self.instances,

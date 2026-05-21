@@ -214,8 +214,8 @@ pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray
 pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> InstanceBufferHandle
 pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
-pub fn Renderer::render_scene(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
-pub fn Renderer::render_static_indexed_mesh_instances(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_instanced_mesh(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_scene_renderables(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
 pub fn Renderer::update_static_instance_buffer(Self, InstanceBufferHandle, FixedArray[Byte]) -> Bool
 pub fn Renderer::upload_global_transform_writes(Self, @ecs.World, Array[@ecs.GpuWriteView]) -> Unit
