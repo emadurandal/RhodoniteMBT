@@ -219,6 +219,24 @@ export function setCameraHomeFromCurrentTransform(
 	return world.addComponentBytes(camera, homeComponent, bytes);
 }
 
+function cameraLensOrthographicBytes(
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags: number,
+): Uint8Array {
+	const bytes = new Uint8Array(CAMERA_LENS_STRIDE);
+	writeF32(bytes, LENS_PROJECTION_KIND_OFFSET, CAMERA_PROJECTION_ORTHOGRAPHIC);
+	writeF32(bytes, LENS_NEAR_OFFSET, near);
+	writeF32(bytes, LENS_FAR_OFFSET, far);
+	writeF32(bytes, LENS_ASPECT_OFFSET, aspect);
+	writeF32(bytes, LENS_FOV_Y_RAD_OFFSET, 1);
+	writeF32(bytes, LENS_ORTHO_HALF_HEIGHT_OFFSET, orthoHalfHeight);
+	writeF32(bytes, LENS_FLAGS_OFFSET, flags);
+	return bytes;
+}
+
 export function addCameraLensOrthographic(
 	world: World,
 	camera: EntityId,
@@ -229,15 +247,11 @@ export function addCameraLensOrthographic(
 	orthoHalfHeight: number,
 	flags: number,
 ): boolean {
-	const bytes = new Uint8Array(CAMERA_LENS_STRIDE);
-	writeF32(bytes, LENS_PROJECTION_KIND_OFFSET, CAMERA_PROJECTION_ORTHOGRAPHIC);
-	writeF32(bytes, LENS_NEAR_OFFSET, near);
-	writeF32(bytes, LENS_FAR_OFFSET, far);
-	writeF32(bytes, LENS_ASPECT_OFFSET, aspect);
-	writeF32(bytes, LENS_FOV_Y_RAD_OFFSET, 1);
-	writeF32(bytes, LENS_ORTHO_HALF_HEIGHT_OFFSET, orthoHalfHeight);
-	writeF32(bytes, LENS_FLAGS_OFFSET, flags);
-	return world.addComponentBytes(camera, lensComponent, bytes);
+	return world.addComponentBytes(
+		camera,
+		lensComponent,
+		cameraLensOrthographicBytes(near, far, aspect, orthoHalfHeight, flags),
+	);
 }
 
 export function setCameraLensOrthographic(
@@ -250,14 +264,13 @@ export function setCameraLensOrthographic(
 	orthoHalfHeight: number,
 	flags: number,
 ): boolean {
-	const bytes = new Uint8Array(CAMERA_LENS_STRIDE);
-	writeF32(bytes, LENS_PROJECTION_KIND_OFFSET, CAMERA_PROJECTION_ORTHOGRAPHIC);
-	writeF32(bytes, LENS_NEAR_OFFSET, near);
-	writeF32(bytes, LENS_FAR_OFFSET, far);
-	writeF32(bytes, LENS_ASPECT_OFFSET, aspect);
-	writeF32(bytes, LENS_FOV_Y_RAD_OFFSET, 1);
-	writeF32(bytes, LENS_ORTHO_HALF_HEIGHT_OFFSET, orthoHalfHeight);
-	writeF32(bytes, LENS_FLAGS_OFFSET, flags);
+	const bytes = cameraLensOrthographicBytes(
+		near,
+		far,
+		aspect,
+		orthoHalfHeight,
+		flags,
+	);
 	if (world.hasComponent(camera, lensComponent)) {
 		return world.setComponentBytes(camera, lensComponent, bytes);
 	}
