@@ -4,12 +4,12 @@
 import "./style.css";
 import {
 	World,
-	addOrbitCameraControllerWithPose,
+	createOrbitOrthographicCameraDescFromYzPosition,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
 	registerOrbitCameraControllerComponent,
-	setCameraHomeFromCurrentTransform,
 	setCameraLensOrthographic,
+	setupOrbitOrthographicCamera,
 	syncOrbitCameraBlobComponent,
 	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
@@ -194,8 +194,6 @@ function createRenderableObject(
 
 function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): void {
 	const cameraElevation = 0.38;
-	const cameraPanY = -2.0 / Math.cos(cameraElevation);
-	const cameraDistance = 5.6 - cameraPanY * Math.sin(cameraElevation);
 	const world = World.new();
 	const scene = new Scene<World, EntityId>(`ts-multi-surface-${id}`, world);
 	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
@@ -203,45 +201,25 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const cameraLensComponent = registerCameraLensComponent(world);
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
-	const cameraQx = -Math.sin(cameraElevation * 0.5);
-	const cameraQw = Math.cos(cameraElevation * 0.5);
-	if (!world.setTransformTrs(camera, 0, 2, 5.6, cameraQx, 0, 0, cameraQw, 1, 1, 1)) {
-		throw new Error("Failed to add camera Transform3D.");
-	}
-	if (!world.setGlobalTransform(camera, identity())) {
-		throw new Error("Failed to add camera GlobalTransform.");
-	}
 	if (
-		!addOrbitCameraControllerWithPose(
+		!setupOrbitOrthographicCamera(
 			world,
 			camera,
 			orbitControllerComponent,
-			0,
-			cameraElevation,
-			0,
-			cameraPanY,
-			1,
-			cameraDistance,
-		)
-	) {
-		throw new Error("Failed to add OrbitCameraController.");
-	}
-	if (!setCameraHomeFromCurrentTransform(world, camera, cameraHomeComponent)) {
-		throw new Error("Failed to add CameraHomeTransform.");
-	}
-	if (
-		!setCameraLensOrthographic(
-			world,
-			camera,
+			cameraHomeComponent,
 			cameraLensComponent,
-			0.1,
-			50,
-			1,
-			3.8,
-			0,
+			createOrbitOrthographicCameraDescFromYzPosition(
+				cameraElevation,
+				2,
+				5.6,
+				0.1,
+				50,
+				1,
+				3.8,
+			),
 		)
 	) {
-		throw new Error("Failed to add CameraLens.");
+		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
 	scene.addCommonSystems({

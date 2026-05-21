@@ -240,3 +240,49 @@ test "orbit camera blob sync applies orthographic dolly scale" {
     None => abort("expected camera gpu row")
   }
 }
+
+///|
+test "setup orbit orthographic camera initializes transform components and camera blob" {
+  let world = World::new()
+  let orbit = register_orbit_camera_controller_component(world)
+  let home = register_camera_home_transform_component(world)
+  let lens = register_camera_lens_component(world)
+  let camera = world.create_entity()
+  let pitch = 0.38
+  assert_true(
+    setup_orbit_orthographic_camera(
+      world,
+      camera,
+      orbit,
+      home,
+      lens,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        pitch,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  let (_yaw, stored_pitch, _pan_x, pan_y, dolly, _distance) = orbit_camera_pose(
+    world, camera, orbit,
+  )
+  let expected_pan_y = Float::from_double(-2.0 / @math.cos(pitch))
+  assert_eq(stored_pitch, Float::from_double(pitch))
+  assert_true(pan_y > expected_pan_y - (0.00001 : Float))
+  assert_true(pan_y < expected_pan_y + (0.00001 : Float))
+  assert_eq(dolly, (1.0 : Float))
+  assert_true(world.has_component(camera, home))
+  assert_true(world.has_component(camera, lens))
+  match world.camera_gpu_row(camera) {
+    Some(bytes) =>
+      assert_true(
+        @comp.camera_view_proj_from_gpu_bytes(bytes) !=
+        @m44.Matrix44F::identity(),
+      )
+    None => abort("expected camera gpu row")
+  }
+}

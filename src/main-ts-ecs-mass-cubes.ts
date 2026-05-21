@@ -5,16 +5,15 @@ import "./style.css";
 import {
 	World,
 	computeGlobalTransformUploadRange,
+	createOrbitOrthographicCameraDesc,
 	detectDenseGlobalTransformLayout,
 	writeGlobalTransformBlobRangeByRefs,
-	addCameraLensOrthographic,
-	addOrbitCameraControllerWithDistance,
 	mat4Inverse,
 	readOrbitCameraControllerComponent,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
 	registerOrbitCameraControllerComponent,
-	setCameraHomeFromCurrentTransform,
+	setupOrbitOrthographicCamera,
 	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
@@ -346,40 +345,28 @@ function createDemoStateForEngine(
 	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
 	const cameraLensComponent = registerCameraLensComponent(world);
 	const camera = world.createEntity();
-	if (!world.setTransformTrs(camera, 0, 0, 16, 0, 0, 0, 1, 1, 1, 1)) {
-		throw new Error("Failed to add camera Transform3D.");
-	}
-	if (!world.addComponent(camera, world.globalTransformComponent())) {
-		throw new Error("Failed to add camera GlobalTransform.");
-	}
 	if (
-		!addOrbitCameraControllerWithDistance(
+		!setupOrbitOrthographicCamera(
 			world,
 			camera,
 			orbitControllerComponent,
-			0,
-			MASS_CUBES_CAMERA_ELEVATION_RAD,
-			16,
-		)
-	) {
-		throw new Error("Failed to add OrbitCameraController.");
-	}
-	if (!setCameraHomeFromCurrentTransform(world, camera, cameraHomeComponent)) {
-		throw new Error("Failed to add CameraHomeTransform.");
-	}
-	if (
-		!addCameraLensOrthographic(
-			world,
-			camera,
+			cameraHomeComponent,
 			cameraLensComponent,
-			0.1,
-			80,
-			MASS_CUBES_CANVAS_WIDTH / MASS_CUBES_CANVAS_HEIGHT,
-			1,
-			0,
+			createOrbitOrthographicCameraDesc(
+				0,
+				MASS_CUBES_CAMERA_ELEVATION_RAD,
+				0,
+				0,
+				1,
+				16,
+				0.1,
+				80,
+				MASS_CUBES_CANVAS_WIDTH / MASS_CUBES_CANVAS_HEIGHT,
+				1,
+			),
 		)
 	) {
-		throw new Error("Failed to add CameraLens.");
+		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.addCommonSystems({
 		orbitControllerComponent,

@@ -51,6 +51,8 @@ pub fn request_orbit_camera_reset(World, EntityId, ComponentTypeId) -> Bool
 
 pub fn set_camera_home_from_current_transform(World, EntityId, ComponentTypeId) -> Bool
 
+pub fn setup_orbit_orthographic_camera(World, EntityId, ComponentTypeId, ComponentTypeId, ComponentTypeId, OrbitOrthographicCameraDesc) -> Bool
+
 pub fn transform_propagation_system(World, PhaseKey) -> System
 
 pub fn update_orbit_camera_controller_from_mouse_frame(World, EntityId, ComponentTypeId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
@@ -138,6 +140,12 @@ pub(all) struct GpuWriteView {
   byte_offset : Int
   bytes : ArrayView[Byte]
 }
+
+pub(all) struct OrbitOrthographicCameraDesc {
+  // private fields
+}
+pub fn OrbitOrthographicCameraDesc::new(Double, Double, Float, Float, Float, Float, Float, Float, Float, Float, flags? : Float) -> Self
+pub fn OrbitOrthographicCameraDesc::new_yz_pitched(Double, Float, Float, Float, Float, Float, Float, flags? : Float) -> Self
 
 #alias(GlobalTransformBlobResizeEvent)
 pub(all) struct PackedGpuBlobResizeEvent {

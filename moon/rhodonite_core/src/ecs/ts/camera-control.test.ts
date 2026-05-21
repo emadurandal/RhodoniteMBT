@@ -8,6 +8,7 @@ import {
 	addOrbitCameraControllerWithDistance,
 	addOrbitCameraControllerWithPose,
 	createOrbitCameraController,
+	createOrbitOrthographicCameraDescFromYzPosition,
 	readOrbitCameraControllerComponent,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
@@ -15,6 +16,7 @@ import {
 	requestOrbitCameraReset,
 	setCameraHomeFromCurrentTransform,
 	setCameraLensOrthographic,
+	setupOrbitOrthographicCamera,
 	syncOrbitCameraBlobComponent,
 	syncOrbitCameraTransformComponent,
 	updateOrbitCameraControllerComponentFromMouseFrame,
@@ -84,6 +86,38 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(writes[0]?.byteOffset()).toBe(0);
 		expect(writes[0]?.bytes().length).toBe(72 * 4);
 		expect(writes[0]?.bytes().getF32(0)).not.toBeCloseTo(1);
+	});
+
+	it("sets up an orbit orthographic camera from a pitched Y/Z position", () => {
+		const world = World.new();
+		const camera = world.createEntity();
+		const orbit = registerOrbitCameraControllerComponent(world);
+		const home = registerCameraHomeTransformComponent(world);
+		const lens = registerCameraLensComponent(world);
+
+		expect(
+			setupOrbitOrthographicCamera(
+				world,
+				camera,
+				orbit,
+				home,
+				lens,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(true);
+
+		const pose = readOrbitCameraControllerComponent(world, camera, orbit);
+		expect(pose.pitch).toBeCloseTo(0.38);
+		expect(pose.panY).toBeCloseTo(-2 / Math.cos(0.38));
+		expect(world.drainCameraBlobWriteViews()).toHaveLength(1);
 	});
 
 	it("resets orbit camera state from its home transform", () => {

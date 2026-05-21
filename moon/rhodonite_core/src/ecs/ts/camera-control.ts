@@ -70,6 +70,20 @@ export type OrbitCameraInputFrame = {
 	readonly wheelDeltaY: number;
 };
 
+export type OrbitOrthographicCameraDesc = {
+	readonly yaw: number;
+	readonly pitch: number;
+	readonly panX: number;
+	readonly panY: number;
+	readonly dolly: number;
+	readonly distance: number;
+	readonly near: number;
+	readonly far: number;
+	readonly aspect: number;
+	readonly orthoHalfHeight: number;
+	readonly flags: number;
+};
+
 export function createOrbitCameraController(
 	pitch: number,
 	yaw = 0,
@@ -240,6 +254,61 @@ export function setCameraHomeFromCurrentTransform(
 		return world.setComponentBytes(camera, homeComponent, bytes);
 	}
 	return world.addComponentBytes(camera, homeComponent, bytes);
+}
+
+export function createOrbitOrthographicCameraDesc(
+	yaw: number,
+	pitch: number,
+	panX: number,
+	panY: number,
+	dolly: number,
+	distance: number,
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags = 0,
+): OrbitOrthographicCameraDesc {
+	return {
+		yaw,
+		pitch,
+		panX,
+		panY,
+		dolly,
+		distance,
+		near,
+		far,
+		aspect,
+		orthoHalfHeight,
+		flags,
+	};
+}
+
+export function createOrbitOrthographicCameraDescFromYzPosition(
+	pitch: number,
+	positionY: number,
+	positionZ: number,
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags = 0,
+): OrbitOrthographicCameraDesc {
+	const panY = -positionY / Math.cos(pitch);
+	const distance = positionZ - panY * Math.sin(pitch);
+	return createOrbitOrthographicCameraDesc(
+		0,
+		pitch,
+		0,
+		panY,
+		1,
+		distance,
+		near,
+		far,
+		aspect,
+		orthoHalfHeight,
+		flags,
+	);
 }
 
 function cameraLensBytes(
@@ -634,6 +703,87 @@ function orthographicProjection(
 		near / (near - far),
 		1,
 	]);
+}
+
+function orbitOrthographicCameraDescTrs(
+	desc: OrbitOrthographicCameraDesc,
+): {
+	px: number;
+	py: number;
+	pz: number;
+	qx: number;
+	qy: number;
+	qz: number;
+	qw: number;
+} {
+	const q = quatMul(quatY(-desc.yaw), quatX(-desc.pitch));
+	const [dx, dy, dz] = quatRotateVec3(q, -desc.panX, -desc.panY, 0);
+	return {
+		px: dx,
+		py: dy,
+		pz: dz + desc.distance,
+		qx: q[0],
+		qy: q[1],
+		qz: q[2],
+		qw: q[3],
+	};
+}
+
+export function setupOrbitOrthographicCamera(
+	world: World,
+	camera: EntityId,
+	orbitComponent: ComponentTypeId,
+	homeComponent: ComponentTypeId,
+	lensComponent: ComponentTypeId,
+	desc: OrbitOrthographicCameraDesc,
+): boolean {
+	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
+	const local = localMatrixFromTrs(px, py, pz, qx, qy, qz, qw, 1, 1, 1);
+	const view = mat4Inverse(local);
+	if (view === null) {
+		return false;
+	}
+	return (
+		world.setTransformTrs(camera, px, py, pz, qx, qy, qz, qw, 1, 1, 1) &&
+		world.setGlobalTransform(camera, local) &&
+		addOrbitCameraControllerWithPose(
+			world,
+			camera,
+			orbitComponent,
+			desc.yaw,
+			desc.pitch,
+			desc.panX,
+			desc.panY,
+			desc.dolly,
+			desc.distance,
+		) &&
+		setCameraHomeFromCurrentTransform(world, camera, homeComponent) &&
+		addCameraLensOrthographic(
+			world,
+			camera,
+			lensComponent,
+			desc.near,
+			desc.far,
+			desc.aspect,
+			desc.orthoHalfHeight,
+			desc.flags,
+		) &&
+		world.setCameraMatrices(
+			camera,
+			view,
+			orthographicProjection(
+				desc.aspect,
+				desc.orthoHalfHeight * desc.dolly,
+				desc.near,
+				desc.far,
+			),
+			desc.near,
+			desc.far,
+			desc.aspect,
+			CAMERA_PROJECTION_ORTHOGRAPHIC,
+			desc.flags,
+		)
+	);
 }
 
 function perspectiveProjection(

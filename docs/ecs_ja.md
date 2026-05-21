@@ -50,6 +50,19 @@ flowchart LR
 | 2 | `ChildOf` | CPU SoA | parent `EntityId` の index/generation。 |
 | 3 | `Camera` | CPU SoA ref + packed blob | CPU row は `{ word_offset }`。camera bytes は Camera blob。 |
 
+## Camera Control
+
+camera control は source、transform、lens、GPU blob の段階に分かれます。
+
+- `OrbitCameraController` は `register_orbit_camera_controller_component` で作る user-registered CPU component です。yaw/pitch、pan、dolly、distance、感度、clamp、one-shot reset request flag を保持します。
+- `CameraHomeTransform` は `register_camera_home_transform_component` で作る user-registered CPU component です。reset 先として使う 48-byte local `Transform3D` snapshot を保持します。
+- `CameraLens` は `register_camera_lens_component` で作る user-registered CPU component です。projection kind、near/far、aspect、FOV または orthographic half-height、flags を保持します。
+- `OrbitOrthographicCameraDesc` と `setup_orbit_orthographic_camera` は、camera entity の `Transform3D`、parentless `GlobalTransform`、`OrbitCameraController`、`CameraHomeTransform`、`CameraLens`、初期 builtin `Camera` blob をまとめて初期化します。`OrbitOrthographicCameraDesc::new_yz_pitched` は yaw-zero で固定 Y/Z 位置から始める sample camera 向けの convenience constructor です。
+- `orbit_camera_transform_system` は `OrbitCameraController` を camera entity の `Transform3D` に反映し、parentless な結果を `GlobalTransform` に mirror します。`request_orbit_camera_reset` 済みの場合は `CameraHomeTransform` から `Transform3D` を復元し、request を clear します。
+- `camera_blob_sync_system` は `GlobalTransform + CameraLens` から `view = inverse(GlobalTransform)` と perspective / orthographic projection を作り、`World::set_camera_matrices` で builtin `Camera` blob を書きます。
+
+推奨 frame order は input/controller update、`orbit_camera_transform_system`、camera が parent hierarchy に参加する場合は transform propagation、render extraction 中の `camera_blob_sync_system` です。render preparation はこれまで通り `drain_camera_blob_write_views` で `Camera` blob writes を drain/upload します。
+
 ## Query
 
 `Query::new(required)` は `QueryRow` を返します。`QueryRow::read(component, f)` / `write(component, f)` は closure の中だけ CPU row bytes を貸し出します。
