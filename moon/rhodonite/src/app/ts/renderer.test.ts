@@ -7,6 +7,11 @@ import {
 	World,
 } from "../../../../rhodonite_core/src/ecs/ts/index.ts";
 import {
+	FakeDevice,
+	installFakeWebGpuConstants,
+} from "../test-utils/fake-webgpu.ts";
+import {
+	InstanceBufferHandle,
 	MaterialHandle,
 	MeshHandle,
 	Renderer,
@@ -24,190 +29,6 @@ import {
 	setRenderable,
 } from "./index.ts";
 
-type FakeBuffer = GPUBuffer & {
-	readonly id: number;
-	readonly descriptor: GPUBufferDescriptor;
-	destroyed: boolean;
-};
-
-type FakeTexture = GPUTexture & {
-	readonly descriptor: GPUTextureDescriptor;
-	readonly view: GPUTextureView;
-	destroyed: boolean;
-};
-
-type FakeWrite = {
-	readonly buffer: FakeBuffer;
-	readonly offset: number;
-	readonly bytes: Uint8Array;
-};
-
-type FakeRenderPassCall = {
-	readonly name: string;
-	readonly args: readonly unknown[];
-};
-
-class FakeQueue {
-	readonly writes: FakeWrite[] = [];
-	readonly submissions: GPUCommandBuffer[][] = [];
-
-	writeBuffer(
-		buffer: GPUBuffer,
-		bufferOffset: GPUSize64,
-		data: AllowSharedBufferSource | ArrayBufferView,
-		dataOffset = 0,
-		size?: GPUSize64,
-	): void {
-		const bytes = data instanceof ArrayBuffer
-			? new Uint8Array(data)
-			: new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-		const copy = bytes.slice(
-			dataOffset,
-			size === undefined ? undefined : dataOffset + size,
-		);
-		this.writes.push({
-			buffer: buffer as FakeBuffer,
-			offset: Number(bufferOffset),
-			bytes: copy,
-		});
-	}
-
-	submit(commandBuffers: Iterable<GPUCommandBuffer>): void {
-		this.submissions.push(Array.from(commandBuffers));
-	}
-}
-
-class FakeRenderPass {
-	readonly calls: FakeRenderPassCall[] = [];
-
-	setPipeline(pipeline: GPURenderPipeline): void {
-		this.record("setPipeline", pipeline);
-	}
-
-	setBindGroup(index: number, bindGroup: GPUBindGroup): void {
-		this.record("setBindGroup", index, bindGroup);
-	}
-
-	setIndexBuffer(
-		buffer: GPUBuffer,
-		indexFormat: GPUIndexFormat,
-		offset?: GPUSize64,
-		size?: GPUSize64,
-	): void {
-		this.record("setIndexBuffer", buffer, indexFormat, offset, size);
-	}
-
-	setVertexBuffer(
-		slot: GPUIndex32,
-		buffer: GPUBuffer | null,
-		offset?: GPUSize64,
-		size?: GPUSize64,
-	): void {
-		this.record("setVertexBuffer", slot, buffer, offset, size);
-	}
-
-	drawIndexed(
-		indexCount: GPUSize32,
-		instanceCount?: GPUSize32,
-		firstIndex?: GPUSize32,
-		baseVertex?: GPUSignedOffset32,
-		firstInstance?: GPUSize32,
-	): void {
-		this.record(
-			"drawIndexed",
-			indexCount,
-			instanceCount,
-			firstIndex,
-			baseVertex,
-			firstInstance,
-		);
-	}
-
-	end(): void {
-		this.record("end");
-	}
-
-	private record(name: string, ...args: unknown[]): void {
-		this.calls.push({ name, args });
-	}
-}
-
-class FakeCommandEncoder {
-	readonly pass = new FakeRenderPass();
-	renderPassDescriptor: GPURenderPassDescriptor | null = null;
-
-	beginRenderPass(descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
-		this.renderPassDescriptor = descriptor;
-		return this.pass as unknown as GPURenderPassEncoder;
-	}
-
-	finish(): GPUCommandBuffer {
-		return { encoder: this } as unknown as GPUCommandBuffer;
-	}
-}
-
-class FakeDevice {
-	readonly buffers: FakeBuffer[] = [];
-	readonly textures: FakeTexture[] = [];
-	readonly bindGroups: GPUBindGroup[] = [];
-	readonly encoders: FakeCommandEncoder[] = [];
-	readonly queue = new FakeQueue();
-	private nextBufferId = 1;
-
-	createShaderModule(descriptor: GPUShaderModuleDescriptor): GPUShaderModule {
-		return { descriptor } as unknown as GPUShaderModule;
-	}
-
-	createRenderPipeline(descriptor: GPURenderPipelineDescriptor): GPURenderPipeline {
-		return {
-			descriptor,
-			getBindGroupLayout: (index: number) => ({ index }),
-		} as unknown as GPURenderPipeline;
-	}
-
-	createTexture(descriptor: GPUTextureDescriptor): GPUTexture {
-		const texture = {
-			descriptor,
-			view: { texture: descriptor } as unknown as GPUTextureView,
-			destroyed: false,
-			createView() {
-				return this.view;
-			},
-			destroy() {
-				this.destroyed = true;
-			},
-		} as FakeTexture;
-		this.textures.push(texture);
-		return texture;
-	}
-
-	createBuffer(descriptor: GPUBufferDescriptor): GPUBuffer {
-		const buffer = {
-			id: this.nextBufferId,
-			descriptor,
-			destroyed: false,
-			destroy() {
-				this.destroyed = true;
-			},
-		} as FakeBuffer;
-		this.nextBufferId += 1;
-		this.buffers.push(buffer);
-		return buffer;
-	}
-
-	createBindGroup(descriptor: GPUBindGroupDescriptor): GPUBindGroup {
-		const bindGroup = { descriptor } as unknown as GPUBindGroup;
-		this.bindGroups.push(bindGroup);
-		return bindGroup;
-	}
-
-	createCommandEncoder(): GPUCommandEncoder {
-		const encoder = new FakeCommandEncoder();
-		this.encoders.push(encoder);
-		return encoder as unknown as GPUCommandEncoder;
-	}
-}
-
 function renderableBytes(
 	mesh: number,
 	material: number,
@@ -216,18 +37,6 @@ function renderableBytes(
 	return renderableComponentBytes(
 		RenderableDesc.new(new MeshHandle(mesh), new MaterialHandle(material), flags),
 	);
-}
-
-function installWebGpuConstants(): void {
-	vi.stubGlobal("GPUBufferUsage", {
-		VERTEX: 1,
-		COPY_DST: 2,
-		INDEX: 4,
-		STORAGE: 8,
-	});
-	vi.stubGlobal("GPUTextureUsage", {
-		RENDER_ATTACHMENT: 1,
-	});
 }
 
 function testRenderer(device = new FakeDevice()): {
@@ -263,7 +72,7 @@ function f32At(bytes: Uint8Array, offset: number): number {
 
 describe("Renderer TypeScript renderable API", () => {
 	beforeEach(() => {
-		installWebGpuConstants();
+		installFakeWebGpuConstants();
 	});
 
 	afterEach(() => {
@@ -401,6 +210,63 @@ describe("Renderer TypeScript renderable API", () => {
 			[0, device.buffers[0], 0, 6],
 			[1, device.buffers[2], 0, 48],
 		]);
+	});
+
+	it("skips prepared instanced draws when handles or instance counts are invalid", () => {
+		const { device, renderer } = testRenderer();
+		const mesh = renderer.registerStaticIndexedMesh(
+			new Uint8Array([1, 2, 3, 4, 5, 6]),
+			new Uint8Array([0, 0, 1, 0, 2, 0]),
+			3,
+		);
+		const instances = renderer.registerStaticInstanceBuffer(new Uint8Array(24));
+		const colorView = { kind: "color" } as unknown as GPUTextureView;
+
+		renderer.renderPreparedInstancedMesh(new MeshHandle(99), instances, 1, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, new InstanceBufferHandle(99), 1, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 0, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 2, colorView);
+
+		expect(device.encoders).toHaveLength(0);
+		expect(device.queue.submissions).toHaveLength(0);
+	});
+
+	it("skips prepared instanced draws when depth resources are inactive", () => {
+		const { device, renderer } = testRenderer();
+		const mesh = renderer.registerStaticIndexedMesh(
+			new Uint8Array([1, 2, 3, 4, 5, 6]),
+			new Uint8Array([0, 0, 1, 0, 2, 0]),
+			3,
+		);
+		const instances = renderer.registerStaticInstanceBuffer(new Uint8Array(24));
+		const colorView = { kind: "color" } as unknown as GPUTextureView;
+
+		renderer.resizeSurfaceResources(0, 32);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 1, colorView);
+
+		expect(device.textures[0]?.destroyed).toBe(true);
+		expect(device.encoders).toHaveLength(0);
+		expect(device.queue.submissions).toHaveLength(0);
+	});
+
+	it("guards static instance buffer updates by handle and capacity", () => {
+		const { device, renderer } = testRenderer();
+		const instances = renderer.registerStaticInstanceBuffer(new Uint8Array(24));
+
+		expect(renderer.updateStaticInstanceBuffer(new InstanceBufferHandle(99), new Uint8Array(4))).toBe(
+			false,
+		);
+		expect(renderer.updateStaticInstanceBuffer(instances, new Uint8Array(48))).toBe(
+			false,
+		);
+		expect(device.queue.writes).toHaveLength(1);
+
+		expect(renderer.updateStaticInstanceBuffer(instances, new Uint8Array(24))).toBe(
+			true,
+		);
+		expect(device.queue.writes).toHaveLength(2);
+		expect(device.queue.writes[1]?.buffer).toBe(device.buffers[0]);
+		expect(device.queue.writes[1]?.bytes.byteLength).toBe(24);
 	});
 
 	it("extracts visible renderables into one draw call per entity", () => {
