@@ -340,15 +340,16 @@ pnpm run test:examples:visual
 
 ### Phase 5: Mesh / Material / Renderable
 
-`Engine` / `Scene` の境界が固まったため、Phase 5 の最小版として facade `app` package に engine-owned な `Renderer` と `Renderable` component helper を追加しました。Phase 4 の `DemoState` が持っていた WebGPU buffer / pipeline / depth attachment / transform-camera upload の責務を、まず [`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) で Renderer 側へ移しています。
+`Engine` / `Scene` の境界が固まったため、Phase 5 の最小版として facade `app` package に engine-owned な `Renderer` と `Renderable` component helper を追加しました。Phase 4 の `DemoState` が持っていた WebGPU pipeline / depth attachment / transform-camera upload の責務を、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) で Renderer 側へ移しています。
 
 - `MeshHandle`
 - `MaterialHandle`
 - `Renderable` ECS component helper（CPU payload は `mesh_index: u32` + `material_index: u32`）
 - renderer-owned mesh/material resource table
+- renderer-owned instance vertex buffer table
 - unlit static indexed mesh pipeline
 
-初期 Renderer は intentionally narrow です。`Renderable + GlobalTransform` を持つ entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。Texture、skinning、instancing、transparent sorting、shadow、LOD、TypeScript/npm wrapper への公開はまだ入れていません。`ecs-mass-cubes` は特殊な instancing / packed transform path を持つため、今回の移行対象外です。
+初期 Renderer は intentionally narrow です。通常 path では `Renderable + GlobalTransform` を持つ entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。MassCubes のような大量描画 path では sample が transform refs + color の instance buffer を作り、Renderer が所有する instance buffer として登録して 1 mesh を N instance で描画します。Texture、skinning、transparent sorting、shadow、LOD、TypeScript/npm wrapper への公開はまだ入れていません。
 
 ## Open Questions
 

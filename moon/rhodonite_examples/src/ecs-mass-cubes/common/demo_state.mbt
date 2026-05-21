@@ -63,9 +63,6 @@ let verts_per_cube : Int = @mass_shared.verts_per_cube()
 let index_u16_count : Int = @mass_shared.index_u16_count()
 
 ///|
-let index_buffer_byte_length : UInt64 = (index_u16_count * 2).to_uint64()
-
-///|
 let camera_elevation_rad : Double = @mass_shared.camera_elevation_rad()
 
 ///|
@@ -473,28 +470,16 @@ fn update_and_drain_global_transforms(
 /// Defines `DemoState`.
 pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
-  device : @wgpu.GPUDevice
-  queue : @wgpu.GPUQueue
-  pipeline : @wgpu.GPURenderPipeline
-  mut depth_texture : @wgpu.GPUTexture
-  mut depth_view : @wgpu.GPUTextureView
-  vertex_buffer : @wgpu.GPUBuffer
-  instance_buffer : @wgpu.GPUBuffer
-  index_buffer : @wgpu.GPUBuffer
-  transform_storage : @wgpu.GPUBuffer
-  camera_storage : @wgpu.GPUBuffer
-  bind_transforms : @wgpu.GPUBindGroup
-  bind_camera : @wgpu.GPUBindGroup
-  layout_transforms : @wgpu.GPUBindGroupLayout
-  layout_camera : @wgpu.GPUBindGroupLayout
+  renderer : @app.Renderer
   scene : @app.Scene
+  mesh : @app.MeshHandle
+  instances : @app.InstanceBufferHandle
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
   transform_refs : FixedArray[Byte]
   transform_upload_range : @ecs.GlobalTransformUploadRange
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
-  bind_group_offsets : Array[UInt]
   orbit_controller : @ecs.ComponentTypeId
   camera_home : @ecs.ComponentTypeId
   camera_lens : @ecs.ComponentTypeId
@@ -505,78 +490,17 @@ pub(all) struct DemoState {
 }
 
 ///|
-/// Recreates the depth attachment for the current drawable size.
-fn DemoState::resize_depth_attachment(
-  self : DemoState,
-  width : Int,
-  height : Int,
-) -> Unit {
-  if width <= 0 || height <= 0 {
-    return
-  }
-  @wgpu.textureView_release(self.depth_view)
-  self.depth_texture.release()
-  self.depth_texture = self.device.create_texture(
-    width.reinterpret_as_uint(),
-    height.reinterpret_as_uint(),
-    "depth24plus",
-    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
-  )
-  self.depth_view = self.depth_texture.create_view()
-}
-
-///|
 /// Applies surface changes to sample-owned render resources.
 fn DemoState::handle_surface_frame(
   self : DemoState,
   frame : @app.FrameState,
 ) -> Unit {
   if frame.surface_changed() && frame.surface_active() {
-    self.resize_depth_attachment(frame.surface_width(), frame.surface_height())
+    self.renderer.resize_surface_resources(
+      frame.surface_width(),
+      frame.surface_height(),
+    )
   }
-}
-
-///|
-/// Implements `ecs_mass_shader_wgsl`.
-fn ecs_mass_shader_wgsl() -> String {
-  let prefix_bindings = @ecs_wgsl.global_transform_words_binding_default() +
-    @ecs_wgsl.camera_words_binding_default()
-  let prefix = prefix_bindings
-  let suffix =
-    #|
-    #|struct VertexOut {
-    #|  @builtin(position) position: vec4<f32>,
-    #|  @location(0) color: vec3<f32>,
-    #|};
-    #|
-    #|@vertex
-    #|fn vertexMain(
-    #|  @location(0) local_pos: vec3<f32>,
-    #|  @location(1) transform_ref: vec2<u32>,
-    #|  @location(2) color: vec3<f32>,
-    #|) -> VertexOut {
-    #|  let world_pos = rn_transform_point(
-    #|    rn_load_global_transform(transform_ref),
-    #|    local_pos,
-    #|  );
-    #|  let camera = rn_load_camera(0u);
-    #|  let clip = camera.view_proj * world_pos;
-    #|  var o: VertexOut;
-    #|  o.position = clip;
-    #|  o.color = color;
-    #|  return o;
-    #|}
-    #|
-    #|@fragment
-    #|fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-    #|  return vec4<f32>(color, 1.0);
-    #|}
-    #|
-  let code = prefix +
-    @ecs_wgsl.global_transform_helpers_default() +
-    @ecs_wgsl.camera_helpers_default() +
-    suffix
-  code
 }
 
 ///|
@@ -713,7 +637,6 @@ pub fn create_demo_state_for_scene(
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
-  let shader = device.create_shader_module(ecs_mass_shader_wgsl())
   let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
     array_stride: vertex_stride_local.to_uint64(),
     step_mode: @wgpu.GPUVertexStepMode::Vertex,
@@ -725,30 +648,14 @@ pub fn create_demo_state_for_scene(
       },
     ],
   }
-  let vertex_layout_instances = @wgpu.global_transform_ref_instance_vertex_buffer_layout(
-    instance_stride.to_uint64(),
-    1U,
-    0UL,
-    [
-      {
-        format: @wgpu.GPUVertexFormat::Float32x3,
-        offset: 8UL,
-        shader_location: 2U,
-      },
-    ],
+  let renderer = @app.Renderer::new(
+    device,
+    queue,
+    format,
+    canvas_width.reinterpret_as_int(),
+    canvas_height.reinterpret_as_int(),
+    vertex_layout_vertices,
   )
-  let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
-    vertex: shader,
-    fragment: shader,
-    topology: @wgpu.GPUPrimitiveTopology::TriangleList,
-    formats: [format],
-    vertex_buffers: [vertex_layout_vertices, vertex_layout_instances],
-    depth_stencil_format: Some("depth24plus"),
-  }
-  let pipeline = device.create_render_pipeline(pipeline_descriptor)
-  @wgpu.shaderModule_release(shader)
-  let layout_transforms = pipeline.get_bind_group_layout(0U)
-  let layout_camera = pipeline.get_bind_group_layout(1U)
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
@@ -866,65 +773,33 @@ pub fn create_demo_state_for_scene(
     ),
   )
   scene.set_main_camera(Some(camera))
-  let transform_storage = device.create_global_transform_words_buffer(world)
-  let camera_storage = device.create_camera_words_buffer(world)
-  let bind_transforms = device.create_global_transform_words_bind_group(
-    pipeline, transform_storage, 0U, 0U,
-  )
-  let bind_camera = device.create_camera_words_bind_group(
-    pipeline, camera_storage, 1U, 0U,
-  )
-  let vusage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let vertex_byte_len = (verts_per_cube * vertex_stride_local).to_uint64()
-  let vertex_buffer = device.create_buffer(vertex_byte_len, vusage)
   let vertex_bytes = FixedArray::make(
     verts_per_cube * vertex_stride_local,
     (0 : Byte),
   )
   write_vertex_positions_only(vertex_bytes, 0.42)
-  queue.write_buffer_from_fixed_array(vertex_buffer, 0UL, vertex_bytes)
-  let instance_buffer = device.create_buffer(inst_bytes_len.to_uint64(), vusage)
-  queue.write_buffer_from_fixed_array(instance_buffer, 0UL, instance_bytes)
-  let iusage = @wgpu.GPU_BUFFER_USAGE_INDEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-  let index_buffer = device.create_buffer(index_buffer_byte_length, iusage)
   let index_bytes = index_cube_u16_bytes()
-  queue.write_buffer_from_fixed_array(index_buffer, 0UL, index_bytes)
-  let depth_texture = device.create_texture(
-    canvas_width,
-    canvas_height,
-    "depth24plus",
-    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+  let mesh = renderer.register_static_indexed_mesh(
+    vertex_bytes, index_bytes, index_u16_count,
   )
-  let depth_view = depth_texture.create_view()
+  let instances = renderer.register_static_instance_buffer(instance_bytes)
   let writes0 = update_and_drain_global_transforms(
     world, tf, gt, per_side, 0.0, transform_refs, transform_upload_range, dense_transform_layout,
     true,
   )
-  queue.upload_global_transform_writes(transform_storage, writes0)
+  renderer.upload_global_transform_writes(world, writes0)
   let demo_state : DemoState = {
     context,
-    device,
-    queue,
-    pipeline,
-    depth_texture,
-    depth_view,
-    vertex_buffer,
-    instance_buffer,
-    index_buffer,
-    transform_storage,
-    camera_storage,
-    bind_transforms,
-    bind_camera,
-    layout_transforms,
-    layout_camera,
+    renderer,
     scene,
+    mesh,
+    instances,
     gt,
     tf,
     per_side,
     transform_refs,
     transform_upload_range,
     dense_transform_layout,
-    bind_group_offsets: [],
     orbit_controller,
     camera_home,
     camera_lens,
@@ -946,7 +821,6 @@ pub fn create_demo_state_for_scene(
       @app.FrameState::new((0.0 : Float), 0, 0.0),
     ),
   )
-  queue.drain_and_upload_camera_writes(camera_storage, world)
   demo_state
 }
 
@@ -1043,7 +917,7 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.device)
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
   if record_perf {
@@ -1052,7 +926,7 @@ pub fn render_current_frame(
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.device)
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   canvas_context.present()
 }
 
@@ -1076,7 +950,7 @@ pub fn DemoState::update_scene(
     self.dense_transform_layout,
     false,
   )
-  self.queue.upload_global_transform_writes(self.transform_storage, writes)
+  self.renderer.upload_global_transform_writes(world, writes)
 }
 
 ///|
@@ -1164,58 +1038,15 @@ pub fn DemoState::render_scene(
   scene : @app.Scene,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
-  let world = scene.world()
   self.sync_mass_cubes_camera_blob()
-  self.queue.drain_and_upload_global_transform_writes(
-    self.transform_storage,
-    world,
+  self.renderer.render_static_indexed_mesh_instances(
+    scene,
+    self.mesh,
+    self.instances,
+    entity_count,
+    color_view,
   )
-  self.queue.drain_and_upload_camera_writes(self.camera_storage, world)
-  let encoder = self.device.create_command_encoder()
-  let render_pass = encoder.begin_render_pass({
-    color_attachments: [
-      Some({
-        view: color_view,
-        clear_value: Some({ r: 0.03, g: 0.04, b: 0.09, a: 1.0 }),
-        load_op: @wgpu.GPULoadOp::Clear,
-        store_op: @wgpu.GPUStoreOp::Store,
-      }),
-    ],
-    depth_stencil_attachment: Some({
-      view: self.depth_view,
-      depth_clear_value: Some(1.0),
-      depth_load_op: @wgpu.GPULoadOp::Clear,
-      depth_store_op: @wgpu.GPUStoreOp::Store,
-    }),
-  })
-  render_pass.set_pipeline(self.pipeline)
-  render_pass.set_bind_group(0U, self.bind_transforms, self.bind_group_offsets)
-  render_pass.set_bind_group(1U, self.bind_camera, self.bind_group_offsets)
-  render_pass.set_index_buffer(
-    self.index_buffer,
-    @wgpu.GPUIndexFormat::Uint16,
-    0UL,
-    index_buffer_byte_length,
-  )
-  render_pass.set_vertex_buffer(
-    0,
-    self.vertex_buffer,
-    0UL,
-    (verts_per_cube * vertex_stride_local).to_uint64(),
-  )
-  render_pass.set_vertex_buffer(
-    1,
-    self.instance_buffer,
-    0UL,
-    (entity_count * instance_stride).to_uint64(),
-  )
-  render_pass.draw_indexed(index_u16_count, instance_count=entity_count)
-  render_pass.end()
-  render_pass.release()
-  let command_buffer = encoder.finish()
-  self.queue.submit(command_buffer)
-  encoder.release()
-  @native_gpu_queue.wait_native_gpu_queue(self.device)
+  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 
 ///|
@@ -1251,18 +1082,7 @@ pub fn register_engine_handlers(
 ///|
 /// Implements `DemoState::release`.
 pub fn DemoState::release(self : DemoState) -> Unit {
-  @wgpu.bindGroup_release(self.bind_transforms)
-  @wgpu.bindGroup_release(self.bind_camera)
-  @wgpu.bindGroupLayout_release(self.layout_transforms)
-  @wgpu.bindGroupLayout_release(self.layout_camera)
-  self.index_buffer.release()
-  self.instance_buffer.release()
-  self.vertex_buffer.release()
-  self.transform_storage.release()
-  self.camera_storage.release()
-  @wgpu.textureView_release(self.depth_view)
-  self.depth_texture.release()
-  self.pipeline.release()
+  self.renderer.release()
 }
 
 ///|

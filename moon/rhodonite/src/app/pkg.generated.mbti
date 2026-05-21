@@ -154,6 +154,11 @@ pub fn FrameState::surface_id(Self) -> SurfaceId?
 pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 
+pub(all) struct InstanceBufferHandle {
+  // private fields
+} derive(Eq)
+pub fn InstanceBufferHandle::index(Self) -> Int
+
 pub(all) struct MaterialHandle {
   // private fields
 } derive(Eq)
@@ -185,10 +190,14 @@ pub struct Renderer {
 pub fn Renderer::device(Self) -> @webgpu.GPUDevice
 pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, String, Int, Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
 pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray[Byte], Int) -> MeshHandle
+pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> InstanceBufferHandle
 pub fn Renderer::register_unlit_material(Self, Double, Double, Double) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
 pub fn Renderer::render_scene(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_static_indexed_mesh_instances(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
+pub fn Renderer::update_static_instance_buffer(Self, InstanceBufferHandle, FixedArray[Byte]) -> Bool
+pub fn Renderer::upload_global_transform_writes(Self, @ecs.World, Array[@ecs.GpuWriteView]) -> Unit
 
 pub struct Scene {
   // private fields

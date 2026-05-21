@@ -6,6 +6,18 @@
 let renderer_instance_stride : Int = 24
 
 ///|
+/// Handle for a renderer-owned instance vertex buffer.
+pub(all) struct InstanceBufferHandle {
+  priv index : Int
+} derive(Eq)
+
+///|
+/// Returns the renderer-local slot index for diagnostics and tests.
+pub fn InstanceBufferHandle::index(self : InstanceBufferHandle) -> Int {
+  self.index
+}
+
+///|
 /// Static indexed mesh resource owned by `Renderer`.
 priv struct RendererMesh {
   vertex_buffer : @wgpu.GPUBuffer
@@ -21,6 +33,13 @@ priv struct RendererMaterial {
   r : Double
   g : Double
   b : Double
+}
+
+///|
+/// Renderer-owned instance vertex buffer with the Renderable v1 row layout.
+priv struct RendererInstanceBuffer {
+  buffer : @wgpu.GPUBuffer
+  byte_capacity : Int
 }
 
 ///|
@@ -41,12 +60,13 @@ pub struct Renderer {
   priv mut depth_view : @wgpu.GPUTextureView?
   priv meshes : Array[RendererMesh]
   priv materials : Array[RendererMaterial]
+  priv instance_buffers : Array[RendererInstanceBuffer]
   priv mut transform_storage : @wgpu.GPUBuffer?
   priv mut camera_storage : @wgpu.GPUBuffer?
   priv mut bind_transforms : @wgpu.GPUBindGroup?
   priv mut bind_camera : @wgpu.GPUBindGroup?
-  priv mut instance_buffer : @wgpu.GPUBuffer?
-  priv mut instance_byte_capacity : Int
+  priv mut renderable_instance_buffer : @wgpu.GPUBuffer?
+  priv mut renderable_instance_byte_capacity : Int
   priv mut transform_word_capacity : Int
   priv mut camera_word_capacity : Int
 }
@@ -153,12 +173,13 @@ pub fn Renderer::new(
     depth_view: None,
     meshes: [],
     materials: [],
+    instance_buffers: [],
     transform_storage: None,
     camera_storage: None,
     bind_transforms: None,
     bind_camera: None,
-    instance_buffer: None,
-    instance_byte_capacity: 0,
+    renderable_instance_buffer: None,
+    renderable_instance_byte_capacity: 0,
     transform_word_capacity: 0,
     camera_word_capacity: 0,
   }
@@ -241,6 +262,41 @@ pub fn Renderer::register_unlit_material(
 }
 
 ///|
+/// Registers a renderer-owned instance buffer using the v1 instance row layout.
+pub fn Renderer::register_static_instance_buffer(
+  self : Renderer,
+  instance_bytes : FixedArray[Byte],
+) -> InstanceBufferHandle {
+  let usage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
+  let buffer = self.device.create_buffer(
+    instance_bytes.length().to_uint64(),
+    usage,
+  )
+  self.queue.write_buffer_from_fixed_array(buffer, 0UL, instance_bytes)
+  let index = self.instance_buffers.length()
+  self.instance_buffers.push({ buffer, byte_capacity: instance_bytes.length() })
+  { index, }
+}
+
+///|
+/// Updates a renderer-owned instance buffer if the new bytes fit its capacity.
+pub fn Renderer::update_static_instance_buffer(
+  self : Renderer,
+  handle : InstanceBufferHandle,
+  instance_bytes : FixedArray[Byte],
+) -> Bool {
+  if !self.has_instance_buffer(handle.index) {
+    return false
+  }
+  let entry = self.instance_buffers[handle.index]
+  if instance_bytes.length() > entry.byte_capacity {
+    return false
+  }
+  self.queue.write_buffer_from_fixed_array(entry.buffer, 0UL, instance_bytes)
+  true
+}
+
+///|
 /// Reports whether `index` addresses a registered mesh.
 fn Renderer::has_mesh(self : Renderer, index : Int) -> Bool {
   index >= 0 && index < self.meshes.length()
@@ -250,6 +306,12 @@ fn Renderer::has_mesh(self : Renderer, index : Int) -> Bool {
 /// Reports whether `index` addresses a registered material.
 fn Renderer::has_material(self : Renderer, index : Int) -> Bool {
   index >= 0 && index < self.materials.length()
+}
+
+///|
+/// Reports whether `index` addresses a registered instance buffer.
+fn Renderer::has_instance_buffer(self : Renderer, index : Int) -> Bool {
+  index >= 0 && index < self.instance_buffers.length()
 }
 
 ///|
@@ -279,15 +341,16 @@ fn Renderer::ensure_instance_buffer(
   if byte_length <= 0 {
     return None
   }
-  if self.instance_buffer is None || byte_length > self.instance_byte_capacity {
-    release_buffer(self.instance_buffer)
+  if self.renderable_instance_buffer is None ||
+    byte_length > self.renderable_instance_byte_capacity {
+    release_buffer(self.renderable_instance_buffer)
     let usage = @wgpu.GPU_BUFFER_USAGE_VERTEX | @wgpu.GPU_BUFFER_USAGE_COPY_DST
-    self.instance_buffer = Some(
+    self.renderable_instance_buffer = Some(
       self.device.create_buffer(byte_length.to_uint64(), usage),
     )
-    self.instance_byte_capacity = byte_length
+    self.renderable_instance_byte_capacity = byte_length
   }
-  self.instance_buffer
+  self.renderable_instance_buffer
 }
 
 ///|
@@ -337,6 +400,20 @@ fn Renderer::ensure_scene_buffers(self : Renderer, world : @ecs.World) -> Unit {
 }
 
 ///|
+/// Uploads explicit GlobalTransform write views into the renderer-owned storage.
+pub fn Renderer::upload_global_transform_writes(
+  self : Renderer,
+  world : @ecs.World,
+  writes : Array[@ecs.GpuWriteView],
+) -> Unit {
+  self.ensure_scene_buffers(world)
+  match self.transform_storage {
+    Some(buffer) => self.queue.upload_global_transform_writes(buffer, writes)
+    None => ()
+  }
+}
+
+///|
 /// Extracts valid Renderable rows from a scene world.
 fn Renderer::extract_draw_items(
   self : Renderer,
@@ -362,31 +439,58 @@ fn Renderer::extract_draw_items(
 }
 
 ///|
+/// RGB tuple used while building v1 instance bytes.
+priv struct RendererInstanceColor {
+  r : Double
+  g : Double
+  b : Double
+}
+
+///|
+/// Builds v1 instance bytes from entities and per-instance colors.
+fn build_renderer_instance_bytes(
+  world : @ecs.World,
+  entities : Array[@ecs.EntityId],
+  colors : Array[RendererInstanceColor],
+) -> FixedArray[Byte] {
+  let bytes = FixedArray::make(
+    entities.length() * renderer_instance_stride,
+    (0 : Byte),
+  )
+  world.write_global_transform_refs_into(
+    entities, bytes, renderer_instance_stride, 0,
+  )
+  let color_count = if colors.length() < entities.length() {
+    colors.length()
+  } else {
+    entities.length()
+  }
+  for i = 0; i < color_count; i = i + 1 {
+    let base = i * renderer_instance_stride
+    @writes.put_f32_le(bytes, base + 8, colors[i].r)
+    @writes.put_f32_le(bytes, base + 12, colors[i].g)
+    @writes.put_f32_le(bytes, base + 16, colors[i].b)
+  }
+  bytes
+}
+
+///|
 /// Builds the transient per-frame instance buffer bytes for draw items.
 fn Renderer::build_instance_bytes(
   self : Renderer,
   world : @ecs.World,
   items : Array[RendererDrawItem],
 ) -> FixedArray[Byte] {
-  let bytes = FixedArray::make(
-    items.length() * renderer_instance_stride,
-    (0 : Byte),
-  )
   let entities : Array[@ecs.EntityId] = []
   for i = 0; i < items.length(); i = i + 1 {
     entities.push(items[i].entity)
   }
-  world.write_global_transform_refs_into(
-    entities, bytes, renderer_instance_stride, 0,
-  )
+  let colors : Array[RendererInstanceColor] = []
   for i = 0; i < items.length(); i = i + 1 {
     let material = self.materials[items[i].material_index]
-    let base = i * renderer_instance_stride
-    @writes.put_f32_le(bytes, base + 8, material.r)
-    @writes.put_f32_le(bytes, base + 12, material.g)
-    @writes.put_f32_le(bytes, base + 16, material.b)
+    colors.push({ r: material.r, g: material.g, b: material.b })
   }
-  bytes
+  build_renderer_instance_bytes(world, entities, colors)
 }
 
 ///|
@@ -490,17 +594,108 @@ pub fn Renderer::render_scene(
 }
 
 ///|
+/// Renders one static indexed mesh using a renderer-owned instance buffer.
+pub fn Renderer::render_static_indexed_mesh_instances(
+  self : Renderer,
+  scene : Scene,
+  mesh : MeshHandle,
+  instances : InstanceBufferHandle,
+  instance_count : Int,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  if instance_count <= 0 ||
+    !self.has_mesh(mesh.index) ||
+    !self.has_instance_buffer(instances.index) {
+    return
+  }
+  let depth_view = match self.depth_view {
+    Some(view) => view
+    None => return
+  }
+  let instance_entry = self.instance_buffers[instances.index]
+  let instance_byte_length = instance_count * renderer_instance_stride
+  if instance_byte_length > instance_entry.byte_capacity {
+    return
+  }
+  let world = scene.world()
+  self.ensure_scene_buffers(world)
+  match self.transform_storage {
+    Some(buffer) =>
+      self.queue.drain_and_upload_global_transform_writes(buffer, world)
+    None => ()
+  }
+  match self.camera_storage {
+    Some(buffer) => self.queue.drain_and_upload_camera_writes(buffer, world)
+    None => ()
+  }
+  let mesh_entry = self.meshes[mesh.index]
+  let encoder = self.device.create_command_encoder()
+  let render_pass = encoder.begin_render_pass({
+    color_attachments: [
+      Some({
+        view: color_view,
+        clear_value: Some({ r: 0.03, g: 0.04, b: 0.09, a: 1.0 }),
+        load_op: @wgpu.GPULoadOp::Clear,
+        store_op: @wgpu.GPUStoreOp::Store,
+      }),
+    ],
+    depth_stencil_attachment: Some({
+      view: depth_view,
+      depth_clear_value: Some(1.0),
+      depth_load_op: @wgpu.GPULoadOp::Clear,
+      depth_store_op: @wgpu.GPUStoreOp::Store,
+    }),
+  })
+  render_pass.set_pipeline(self.pipeline)
+  match self.bind_transforms {
+    Some(group) => render_pass.set_bind_group(0U, group, [])
+    None => ()
+  }
+  match self.bind_camera {
+    Some(group) => render_pass.set_bind_group(1U, group, [])
+    None => ()
+  }
+  render_pass.set_index_buffer(
+    mesh_entry.index_buffer,
+    @wgpu.GPUIndexFormat::Uint16,
+    0UL,
+    mesh_entry.index_byte_length,
+  )
+  render_pass.set_vertex_buffer(
+    0,
+    mesh_entry.vertex_buffer,
+    0UL,
+    mesh_entry.vertex_byte_length,
+  )
+  render_pass.set_vertex_buffer(
+    1,
+    instance_entry.buffer,
+    0UL,
+    instance_byte_length.to_uint64(),
+  )
+  render_pass.draw_indexed(mesh_entry.index_count, instance_count~)
+  render_pass.end()
+  render_pass.release()
+  let command_buffer = encoder.finish()
+  self.queue.submit(command_buffer)
+  encoder.release()
+}
+
+///|
 /// Releases renderer-owned GPU resources.
 pub fn Renderer::release(self : Renderer) -> Unit {
   for i = 0; i < self.meshes.length(); i = i + 1 {
     self.meshes[i].vertex_buffer.release()
     self.meshes[i].index_buffer.release()
   }
+  for i = 0; i < self.instance_buffers.length(); i = i + 1 {
+    self.instance_buffers[i].buffer.release()
+  }
   release_bind_group(self.bind_transforms)
   release_bind_group(self.bind_camera)
   release_buffer(self.transform_storage)
   release_buffer(self.camera_storage)
-  release_buffer(self.instance_buffer)
+  release_buffer(self.renderable_instance_buffer)
   match self.depth_view {
     Some(view) => @wgpu.textureView_release(view)
     None => ()
