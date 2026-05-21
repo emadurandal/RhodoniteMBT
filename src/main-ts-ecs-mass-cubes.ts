@@ -443,6 +443,13 @@ function createDemoStateForEngine(
 	) {
 		throw new Error("Failed to add CameraLens.");
 	}
+	scene.addCommonSystems({
+		orbitControllerComponent,
+		homeComponent: cameraHomeComponent,
+		updateOrbitCameraControllerFromInput:
+			updateOrbitCameraControllerComponentFromInput,
+		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+	});
 	pushCameraMatrices(
 		world,
 		camera,
@@ -493,13 +500,7 @@ function createDemoStateForEngine(
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.addCommonHandlers(demoState.scene, {
-		orbitControllerComponent: demoState.orbitControllerComponent,
-		homeComponent: demoState.cameraHomeComponent,
-		updateOrbitCameraControllerFromInput:
-			updateOrbitCameraControllerComponentFromInput,
-		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-	});
+	engine.addCommonHandlers(demoState.scene, { transformPropagation: false });
 	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
