@@ -3,4 +3,5 @@
 
 export * from "./app-runtime.ts";
 export * from "./orbit-camera-input.ts";
+export * from "./renderer.ts";
 export * from "./webgpu-device-limits.ts";
