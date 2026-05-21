@@ -11,8 +11,6 @@ import {
 }
 
 // Values
-pub fn create_demo_state(@webgpu.GPUContext) -> DemoState?
-
 pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
 pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
@@ -51,4 +49,3 @@ pub fn DemoState::update_scene(Self, @app.FrameState) -> Unit
 // Type aliases
 
 // Traits
-
