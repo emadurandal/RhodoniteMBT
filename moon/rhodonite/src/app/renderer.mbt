@@ -268,8 +268,8 @@ pub fn Renderer::resize_surface_resources(
 }
 
 ///|
-/// Registers a static indexed u16 mesh.
-pub fn Renderer::register_static_indexed_mesh(
+/// Registers raw static indexed u16 mesh bytes.
+fn Renderer::register_static_indexed_mesh_bytes(
   self : Renderer,
   vertices : FixedArray[Byte],
   indices_u16 : FixedArray[Byte],
@@ -296,6 +296,39 @@ pub fn Renderer::register_static_indexed_mesh(
     index_count,
   })
   { index, }
+}
+
+///|
+/// Registers a static indexed u16 mesh.
+pub fn Renderer::register_static_indexed_mesh(
+  self : Renderer,
+  vertices : FixedArray[Byte],
+  indices_u16 : FixedArray[Byte],
+  index_count : Int,
+) -> MeshHandle {
+  self.register_static_indexed_mesh_bytes(vertices, indices_u16, index_count)
+}
+
+///|
+/// Registers a static indexed u16 mesh from a CPU mesh descriptor.
+pub fn Renderer::register_static_indexed_mesh_desc(
+  self : Renderer,
+  desc : StaticIndexedMeshDesc,
+) -> MeshHandle {
+  self.register_static_indexed_mesh_bytes(
+    desc.vertices,
+    desc.indices_u16,
+    desc.index_count,
+  )
+}
+
+///|
+/// Registers a position-only cube primitive mesh.
+pub fn Renderer::register_cube_mesh(
+  self : Renderer,
+  desc? : CubeMeshDesc = CubeMeshDesc::new(),
+) -> MeshHandle {
+  self.register_static_indexed_mesh_desc(cube_mesh_desc(desc~))
 }
 
 ///|

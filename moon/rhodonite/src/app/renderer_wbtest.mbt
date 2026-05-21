@@ -12,6 +12,26 @@ test "unlit material description exposes constructor accessors" {
 }
 
 ///|
+test "cube mesh descriptor exposes position-only shared-corner geometry" {
+  let desc = cube_mesh_desc(desc=CubeMeshDesc::new(half_extent=0.5))
+  let vertices = desc.vertices()
+  let indices = desc.indices_u16()
+  assert_true(cube_vertex_count() == 8)
+  assert_true(desc.index_count() == 36)
+  assert_true(vertices.length() == 8 * primitive_position3_vertex_stride())
+  assert_true(indices.length() == 36 * 2)
+  assert_true(@writes.get_f32_le(vertices, 0) == -0.5)
+  assert_true(@writes.get_f32_le(vertices, 4) == -0.5)
+  assert_true(@writes.get_f32_le(vertices, 8) == -0.5)
+  assert_true(@writes.get_f32_le(vertices, 84) == -0.5)
+  assert_true(@writes.get_f32_le(vertices, 88) == 0.5)
+  assert_true(@writes.get_f32_le(vertices, 92) == 0.5)
+  assert_true(indices[0].to_uint() == 0U)
+  assert_true(indices[2].to_uint() == 1U)
+  assert_true(indices[70].to_uint() == 3U)
+}
+
+///|
 test "renderer instance bytes store transform refs and colors" {
   let world = @ecs.World::new()
   let entities = world.spawn_transform_global_batch(2, fn(

@@ -73,7 +73,7 @@ flowchart LR
 - **Allowed**: `rhodonite_examples` may depend on `emadurandal/rhodonite` for high-level app/platform samples while still importing lower libraries directly for focused low-level WebGPU and ECS examples.
 - **Disallowed**: `rhodonite_webgpu` depending on `rhodonite_examples`.
 - **Input adapters**: platform-independent input state lives in `rhodonite_core/input`; browser platform lives in `emadurandal/rhodonite/app/browser`, and SDL3 native platform lives in `emadurandal/rhodonite_app_sdl3/sdl3`.
-- **Renderable ownership**: facade `emadurandal/rhodonite/app` owns the minimal `Renderer`, `MeshHandle`, `MaterialHandle`, `InstanceBufferHandle`, `RenderableDesc`, `UnlitMaterialDesc`, and `Renderable` component helper. Its TypeScript wrapper mirrors that API shape with a DOM WebGPU implementation. `rhodonite_core/ecs` remains renderer-agnostic CPU storage and does not know mesh/material/instance-buffer handle semantics.
+- **Renderable ownership**: facade `emadurandal/rhodonite/app` owns the minimal `Renderer`, `MeshHandle`, `MaterialHandle`, `InstanceBufferHandle`, `RenderableDesc`, `UnlitMaterialDesc`, standard primitive mesh helpers such as Cube, and the `Renderable` component helper. Its TypeScript wrapper mirrors that API shape with a DOM WebGPU implementation. `rhodonite_core/ecs` remains renderer-agnostic CPU storage and does not know mesh/material/instance-buffer handle semantics.
 
 During development, link workspace members with [`path` dependencies](https://docs.moonbitlang.com/en/stable/toolchain/moon/module.html#dependency-management). Before publishing, replace `path` entries in dependents’ `moon.mod.json` with **semver** strings (use `moon work sync` if needed).
 

@@ -9,58 +9,7 @@ let canvas_width : UInt = 800U
 let canvas_height : UInt = 600U
 
 ///|
-let vertex_stride_local : Int = 12
-
-///|
-let verts_per_cube : Int = 8
-
-///|
-let index_u16_count : Int = 36
-
-///|
 let camera_elevation_rad : Double = 0.38
-
-///|
-/// Implements `cube_local_corners`.
-fn cube_local_corners() -> Array[(Double, Double, Double)] {
-  [
-    (-1.0, -1.0, -1.0),
-    (1.0, -1.0, -1.0),
-    (1.0, 1.0, -1.0),
-    (-1.0, 1.0, -1.0),
-    (-1.0, -1.0, 1.0),
-    (1.0, -1.0, 1.0),
-    (1.0, 1.0, 1.0),
-    (-1.0, 1.0, 1.0),
-  ]
-}
-
-///|
-/// Implements `index_cube_u16_bytes`.
-fn index_cube_u16_bytes() -> FixedArray[Byte] {
-  let buf = FixedArray::make(72, (0 : Byte))
-  let idx : Array[UInt] = [
-    0U, 1U, 2U, 2U, 3U, 0U, 4U, 5U, 6U, 6U, 7U, 4U, 0U, 4U, 7U, 7U, 3U, 0U, 1U, 5U,
-    6U, 6U, 2U, 1U, 0U, 1U, 5U, 5U, 4U, 0U, 3U, 2U, 6U, 6U, 7U, 3U,
-  ]
-  for i = 0; i < index_u16_count; i = i + 1 {
-    @writes.put_u16_le(buf, i * 2, idx[i])
-  }
-  buf
-}
-
-///|
-/// Implements `write_vertex_positions_only`.
-fn write_vertex_positions_only(buf : FixedArray[Byte], scale : Double) -> Unit {
-  let corners = cube_local_corners()
-  for vi = 0; vi < verts_per_cube; vi = vi + 1 {
-    let (lx, ly, lz) = corners[vi]
-    let base = vi * vertex_stride_local
-    @writes.put_f32_le(buf, base + 0, lx * scale)
-    @writes.put_f32_le(buf, base + 4, ly * scale)
-    @writes.put_f32_le(buf, base + 8, lz * scale)
-  }
-}
 
 ///|
 /// Defines `DemoState`.
@@ -151,24 +100,13 @@ pub fn create_demo_state_for_scene(
   format : String,
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
-  let vertex_layout_vertices : @wgpu.GPUVertexBufferLayout = {
-    array_stride: vertex_stride_local.to_uint64(),
-    step_mode: @wgpu.GPUVertexStepMode::Vertex,
-    attributes: [
-      {
-        format: @wgpu.GPUVertexFormat::Float32x3,
-        offset: 0UL,
-        shader_location: 0U,
-      },
-    ],
-  }
   let renderer = @app.Renderer::new(
     device,
     queue,
     format,
     canvas_width.reinterpret_as_int(),
     canvas_height.reinterpret_as_int(),
-    vertex_layout_vertices,
+    @app.cube_position3_vertex_layout(),
   )
   let world = scene.world()
   let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
@@ -212,14 +150,8 @@ pub fn create_demo_state_for_scene(
       ),
     ),
   )
-  let vertex_bytes = FixedArray::make(
-    verts_per_cube * vertex_stride_local,
-    (0 : Byte),
-  )
-  write_vertex_positions_only(vertex_bytes, 0.42)
-  let index_bytes = index_cube_u16_bytes()
-  let cube_mesh = renderer.register_static_indexed_mesh(
-    vertex_bytes, index_bytes, index_u16_count,
+  let cube_mesh = renderer.register_cube_mesh(
+    desc=@app.CubeMeshDesc::new(half_extent=0.42),
   )
   let sun_material = renderer.register_unlit_material(
     @app.UnlitMaterialDesc::new(1.0, 0.65, 0.15),

@@ -16,6 +16,7 @@ import {
 	type EntityId,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
+	CubeMeshDesc,
 	Engine,
 	InputState,
 	MaterialHandle,
@@ -31,6 +32,7 @@ import {
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
+	cubePosition3VertexLayout,
 	registerRenderableComponent,
 	runMultiSurfacePlatform,
 	updateOrbitCameraControllerComponentFromInput,
@@ -68,8 +70,6 @@ type DemoState = {
 	rendererHeight: number;
 };
 
-const INDEX_COUNT = 36;
-
 function requireCanvas(id: string): HTMLCanvasElement {
 	const element = document.getElementById(id);
 	if (!(element instanceof HTMLCanvasElement)) {
@@ -78,26 +78,8 @@ function requireCanvas(id: string): HTMLCanvasElement {
 	return element;
 }
 
-function cubeVertices(): Float32Array {
-	return new Float32Array([
-		-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
-		-1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-	]);
-}
-
-function cubeIndices(): Uint16Array {
-	return new Uint16Array([
-		0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0,
-		1, 5, 6, 6, 2, 1, 0, 1, 5, 5, 4, 0, 3, 2, 6, 6, 7, 3,
-	]);
-}
-
 function identity(): Float32Array {
 	return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-}
-
-function bytesOf(view: Float32Array | Uint16Array): Uint8Array {
-	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 }
 
 function setYRotationTrs(
@@ -136,16 +118,9 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		engine.format,
 		surface.width,
 		surface.height,
-		{
-			arrayStride: 12,
-			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-		},
+		cubePosition3VertexLayout(),
 	);
-	const cubeMesh = renderer.registerStaticIndexedMesh(
-		bytesOf(cubeVertices()),
-		bytesOf(cubeIndices()),
-		INDEX_COUNT,
-	);
+	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const sunMaterial = renderer.registerUnlitMaterial(
 		UnlitMaterialDesc.new(1.0, 0.65, 0.15),
 	);

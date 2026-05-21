@@ -27,6 +27,7 @@ import {
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
 import {
+	CubeMeshDesc,
 	Engine,
 	type InstanceBufferHandle,
 	type MeshHandle,
@@ -36,6 +37,7 @@ import {
 	Scene,
 	PlatformApp,
 	PlatformOptions,
+	cubePosition3VertexLayout,
 	runBrowserWebGpuCanvasDemo,
 	runSingleCanvasPlatform,
 	updateOrbitCameraControllerComponentFromInput,
@@ -48,13 +50,10 @@ import {
 	MASS_CUBES_CUBE_SCALE,
 	MASS_CUBES_ENTITY_COUNT,
 	MASS_CUBES_GRID_SPACING,
-	MASS_CUBES_INDEX_U16_COUNT,
 	MASS_CUBES_INSTANCE_STRIDE,
 	gridSideLen,
 	instanceColorRgb,
-	massCubesIndexU16Bytes,
 	massCubesCameraMatrices,
-	massCubesVertexPositionBytes,
 	writeF32,
 } from "./ecs-mass-cubes-renderer";
 import { writeMassCubesDenseYTransformWaveToByteView } from "./ecs-mass-cubes-transform-writer";
@@ -392,16 +391,9 @@ function createDemoStateForEngine(
 		targetFormat,
 		MASS_CUBES_CANVAS_WIDTH,
 		MASS_CUBES_CANVAS_HEIGHT,
-		{
-			arrayStride: 12,
-			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-		},
+		cubePosition3VertexLayout(),
 	);
-	const cubeMesh = renderer.registerStaticIndexedMesh(
-		massCubesVertexPositionBytes(0.42),
-		massCubesIndexU16Bytes(),
-		MASS_CUBES_INDEX_U16_COUNT,
-	);
+	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const instanceBuffer = renderer.registerStaticInstanceBuffer(instanceData);
 
 	const demoState: DemoState = {

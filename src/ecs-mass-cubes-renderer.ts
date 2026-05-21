@@ -10,10 +10,7 @@ export type { OrbitCameraController };
 export const MASS_CUBES_ENTITY_COUNT = 800_000;
 export const MASS_CUBES_CANVAS_WIDTH = 800;
 export const MASS_CUBES_CANVAS_HEIGHT = 600;
-export const MASS_CUBES_VERTEX_STRIDE_LOCAL = 12;
 export const MASS_CUBES_INSTANCE_STRIDE = 24;
-export const MASS_CUBES_VERTS_PER_CUBE = 8;
-export const MASS_CUBES_INDEX_U16_COUNT = 36;
 export const MASS_CUBES_CAMERA_ELEVATION_RAD = 0.42;
 export const MASS_CUBES_GRID_SPACING = 0.14;
 export const MASS_CUBES_CUBE_SCALE = 0.055;
@@ -27,14 +24,6 @@ export function gridSideLen(count: number): number {
 
 export function writeF32(bytes: Uint8Array, offset: number, value: number): void {
 	new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setFloat32(
-		offset,
-		value,
-		true,
-	);
-}
-
-export function writeU16(bytes: Uint8Array, offset: number, value: number): void {
-	new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint16(
 		offset,
 		value,
 		true,
@@ -260,40 +249,4 @@ export function massCubesCameraMatrices(
 		projectionKind: 1,
 		flags: 0,
 	};
-}
-
-function cubeLocalCorners(): [number, number, number][] {
-	return [
-		[-1, -1, -1],
-		[1, -1, -1],
-		[1, 1, -1],
-		[-1, 1, -1],
-		[-1, -1, 1],
-		[1, -1, 1],
-		[1, 1, 1],
-		[-1, 1, 1],
-	];
-}
-
-export function massCubesVertexPositionBytes(scale: number): Uint8Array {
-	const bytes = new Uint8Array(
-		MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
-	);
-	cubeLocalCorners().forEach(([x, y, z], vertexIndex) => {
-		const base = vertexIndex * MASS_CUBES_VERTEX_STRIDE_LOCAL;
-		writeF32(bytes, base, x * scale);
-		writeF32(bytes, base + 4, y * scale);
-		writeF32(bytes, base + 8, z * scale);
-	});
-	return bytes;
-}
-
-export function massCubesIndexU16Bytes(): Uint8Array {
-	const indices = [
-		0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0, 1, 5, 6, 6, 2,
-		1, 0, 1, 5, 5, 4, 0, 3, 2, 6, 6, 7, 3,
-	];
-	const bytes = new Uint8Array(indices.length * 2);
-	indices.forEach((index, i) => writeU16(bytes, i * 2, index));
-	return bytes;
 }
