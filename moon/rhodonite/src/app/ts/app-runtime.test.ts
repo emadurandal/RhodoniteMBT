@@ -274,12 +274,13 @@ describe("app-runtime Engine", () => {
 		sceneA.setMainCamera("camera-a");
 
 		let orbitUpdateCount = 0;
-		engine.addCommonHandlers(sceneA, {
+		sceneA.addCommonSystems({
 			orbitControllerComponent: "orbit",
 			updateOrbitCameraControllerFromInput: () => {
 				orbitUpdateCount += 1;
 			},
 		});
+		engine.addCommonHandlers(sceneA);
 		engine.initialize();
 		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneA });
 		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
