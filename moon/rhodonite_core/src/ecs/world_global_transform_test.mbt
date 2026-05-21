@@ -19,7 +19,7 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 test "GlobalTransform fp16 world uses 24 byte packed blob slots" {
   let world = World::new_with_global_transform_format(Affine3x4F16)
   let gt_id = world.global_transform_component()
-  assert_eq(world.component_cpu_stride(gt_id), Some(8))
+  assert_true(world.component_cpu_stride(gt_id) is Some(8))
   let entity = world.create_entity()
   let m = @m44.Matrix44::new_col_major(
     (1.0 : Float),

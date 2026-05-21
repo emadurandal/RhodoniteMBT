@@ -12,6 +12,11 @@ import {
 
 supported_targets = "native"
 
+// Runtime entry points are async to match the facade even when the native setup
+// path currently completes synchronously.
+
+warnings = "-unused_async"
+
 options(
   overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/native" ],
   link: {

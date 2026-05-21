@@ -2,9 +2,23 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+/// Error raised when JS code reaches native-only WebGPU surface APIs.
+suberror NativeSurfaceUnavailable {
+  NativeSurfaceUnavailable(String)
+} derive(Debug)
+
+///|
+/// Aborts when JS code reaches native-only WebGPU surface APIs.
+fn[T] native_surface_unavailable() -> T raise Error {
+  raise NativeSurfaceUnavailable(
+    "native WebGPU surface APIs are only available in the native backend",
+  )
+}
+
+///|
 /// Implements `create_native_webgpu_instance`.
 pub fn create_native_webgpu_instance() -> WebGPUInstance raise Error {
-  abort("create_native_webgpu_instance is only available in the native backend")
+  native_surface_unavailable()
 }
 
 ///|
@@ -56,9 +70,7 @@ pub fn native_webgpu_instance_request_adapter_for_canvas(
   _instance : WebGPUInstance,
   _canvas : WebGPUCanvasContext,
 ) -> WebGPUAdapter raise Error {
-  abort(
-    "native_webgpu_instance_request_adapter_for_canvas is only available in the native backend",
-  )
+  native_surface_unavailable()
 }
 
 ///|
@@ -119,9 +131,7 @@ pub fn webgpu_instance_release(_instance : WebGPUInstance) -> Unit {
 pub fn native_webgpu_instance_request_adapter(
   _instance : WebGPUInstance,
 ) -> WebGPUAdapter raise Error {
-  abort(
-    "native_webgpu_instance_request_adapter is only available in the native backend",
-  )
+  native_surface_unavailable()
 }
 
 ///|
@@ -129,7 +139,5 @@ pub fn native_webgpu_instance_request_adapter(
 pub fn native_webgpu_adapter_request_device(
   _adapter : WebGPUAdapter,
 ) -> WebGPUDevice raise Error {
-  abort(
-    "native_webgpu_adapter_request_device is only available in the native backend",
-  )
+  native_surface_unavailable()
 }

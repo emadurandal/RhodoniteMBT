@@ -5,7 +5,7 @@
 test "builtin Camera uses ComponentTypeId index 3" {
   let world = World::new()
   assert_eq(world.camera_component().index, 3)
-  assert_eq(world.component_cpu_stride(world.camera_component()), Some(4))
+  assert_true(world.component_cpu_stride(world.camera_component()) is Some(4))
 }
 
 ///|
@@ -93,8 +93,8 @@ test "orbit camera reset restores home Transform3D" {
   assert_true(
     runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
   )
-  assert_eq(
-    orbit_camera_pose(world, camera, orbit),
+  assert_true(
+    orbit_camera_pose(world, camera, orbit) ==
     (
       (0.0 : Float),
       (0.0 : Float),

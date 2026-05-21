@@ -21,7 +21,7 @@ test "SystemRunner permits set_component_bytes without structural write" {
     ),
   )
   match world.component_bytes(e, qa) {
-    Some(bytes) => assert_eq(bytes, bytes4(8, 7, 6, 5))
+    Some(bytes) => assert_true(bytes == bytes4(8, 7, 6, 5))
     None => abort("expected SystemRunnerSetComponentA bytes")
   }
 }
@@ -353,7 +353,7 @@ test "Nested SystemRunner::run_phase restores outer system access declarations" 
     ),
   )
   match world.component_bytes(e, qa) {
-    Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
+    Some(bytes) => assert_true(bytes == bytes4(3, 3, 3, 3))
     None => abort("expected NestedRunnerOuterA bytes")
   }
 }

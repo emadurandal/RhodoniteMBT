@@ -41,7 +41,18 @@ enum GlobalTransformPrecisionMode {
 } derive(Eq)
 
 ///|
-let global_transform_precision_mode : GlobalTransformPrecisionMode = AllF16
+/// Selects the source-level precision mode for the MassCubes sample.
+fn configured_global_transform_precision_mode() -> GlobalTransformPrecisionMode {
+  match 1 {
+    0 => AllF32
+    1 => AllF16
+    2 => FirstHalfF32SecondHalfF16
+    _ => EvenIdF32OddIdF16
+  }
+}
+
+///|
+let global_transform_precision_mode : GlobalTransformPrecisionMode = configured_global_transform_precision_mode()
 
 ///|
 /// Canvas resolution (matches demo HTML).

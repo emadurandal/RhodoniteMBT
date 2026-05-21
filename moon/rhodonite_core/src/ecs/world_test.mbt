@@ -12,7 +12,7 @@ test "World exposes component metadata without exposing registry mutation" {
     }
     None => abort("expected component metadata")
   }
-  assert_eq(world.component_cpu_stride(cpu), Some(4))
+  assert_true(world.component_cpu_stride(cpu) is Some(4))
   assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
 }
 
@@ -27,14 +27,14 @@ test "CPU components move entities between archetypes and preserve bytes" {
   assert_true(world.has_component(entity, transform))
   assert_true(world.has_component(entity, material))
   match world.component_bytes(entity, transform) {
-    Some(bytes) => assert_eq(bytes, bytes4(1, 2, 3, 4))
+    Some(bytes) => assert_true(bytes == bytes4(1, 2, 3, 4))
     None => abort("missing transform bytes")
   }
   assert_true(world.remove_component(entity, transform))
   assert_true(!world.has_component(entity, transform))
   assert_true(world.has_component(entity, material))
   match world.component_bytes(entity, material) {
-    Some(bytes) => assert_eq(bytes, bytes4(5, 6, 7, 8))
+    Some(bytes) => assert_true(bytes == bytes4(5, 6, 7, 8))
     None => abort("missing material bytes")
   }
 }
@@ -46,7 +46,7 @@ test "add_component and add_component_bytes support CPU components" {
   let cpu_entity = world.create_entity()
   assert_true(world.add_component(cpu_entity, cpu))
   match world.component_bytes(cpu_entity, cpu) {
-    Some(bytes) => assert_eq(bytes, bytes4(0, 0, 0, 0))
+    Some(bytes) => assert_true(bytes == bytes4(0, 0, 0, 0))
     None => abort("expected AddComponentCpu bytes")
   }
   assert_true(!world.add_component(cpu_entity, cpu))
@@ -63,7 +63,7 @@ test "add_component_bytes rejects invalid byte lengths before mutating ownership
   assert_true(!world.has_component(cpu_entity, cpu))
   assert_true(world.add_component_bytes(cpu_entity, cpu, bytes4(1, 2, 3, 4)))
   match world.component_bytes(cpu_entity, cpu) {
-    Some(bytes) => assert_eq(bytes, bytes4(1, 2, 3, 4))
+    Some(bytes) => assert_true(bytes == bytes4(1, 2, 3, 4))
     None => abort("expected AddComponentBytesCpuStride bytes")
   }
 }
@@ -106,7 +106,7 @@ test "set_component_bytes updates existing component without archetype migration
     None => abort("expected location before set")
   }
   match world.component_bytes(e, qa) {
-    Some(bytes) => assert_eq(bytes, bytes4(9, 10, 11, 12))
+    Some(bytes) => assert_true(bytes == bytes4(9, 10, 11, 12))
     None => abort("expected SetComponentA bytes")
   }
   assert_true(!world.add_component_bytes(e, qa, bytes4(0, 0, 0, 0)))
