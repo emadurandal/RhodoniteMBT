@@ -274,17 +274,37 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 }
 
 ///|
+/// Options for installing standard engine handlers and scene systems.
+pub(all) struct CommonHandlersOptions {
+  transform_propagation : Bool
+}
+
+///|
+/// Builds common handler options with standard systems enabled by default.
+pub fn CommonHandlersOptions::new(
+  transform_propagation? : Bool = true,
+) -> CommonHandlersOptions {
+  { transform_propagation, }
+}
+
+///|
+/// Returns default common handler options.
+pub fn CommonHandlersOptions::default() -> CommonHandlersOptions {
+  CommonHandlersOptions::new()
+}
+
+///|
 /// Adds standard engine handlers and scene systems shared by ECS samples.
 pub fn Engine::add_common_handlers(
   self : Engine,
   scene : Scene,
-  transform_propagation? : Bool = true,
+  options? : CommonHandlersOptions = CommonHandlersOptions::default(),
 ) -> Unit {
   let orbit_component = scene.inferred_common_orbit_component()
   let home_component = scene.inferred_common_home_component(orbit_component)
   let lens_component = scene.inferred_common_lens_component(orbit_component)
   scene.add_common_systems(
-    transform_propagation~,
+    transform_propagation=options.transform_propagation,
     orbit_component~,
     home_component~,
     lens_component~,
