@@ -252,9 +252,9 @@ Browser JS export も sample-local state の名前に合わせ、`create_webgpu_
 
 ECS sample の `DemoState` は `World` と `SystemRunner` を直接所有せず、`Scene` を render source として持ちます。`basic-triangle` のような低レベル WebGPU sample は ECS scene data を使わないため、`Engine` の main scene は実行境界としてのみ使います。`ecs-scene-graph` の `DemoState` は `phase_update()` handler で animated scene entity を更新し、`phase_render()` handler でその frame の描画だけを行います。
 
-TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) と [`src/main-ts-multi-surface-independent-input.ts`](../src/main-ts-multi-surface-independent-input.ts) も同じ作法に寄せています。[`moon/rhodonite/src/app/ts/`](../moon/rhodonite/src/app/ts/) が TypeScript 用の lightweight wrapper として `SurfaceState`、`FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`Engine`、browser platform helper、browser device limit helper、orbit camera input adapter を提供し、single-surface sample は `runSingleCanvasPlatform(canvas, app, options)`、multi-surface sample は `runMultiSurfacePlatform(configs, app, options)` に browser lifecycle を委譲します。`runPlatform` は canvas 単位で active platform を管理するため、複数 canvas は相互に独立して差し替えられます。`runSingleCanvasPlatform` は default scene で十分な単一 canvas sample 向けの thin wrapper です。`runMultiSurfacePlatform` は `PlatformApp` の `setupEngine` 後に全 canvas surface を engine に attach し、`Engine.initialize()` と multi-surface frame loop まで開始します。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、camera entity は `Transform3D` / `GlobalTransform` / `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` / builtin `Camera` を所有します。`OrbitCameraController`、`CameraHomeTransform`、`CameraLens` の TypeScript helper は [`moon/rhodonite_core/src/ecs/ts/camera-control.ts`](../moon/rhodonite_core/src/ecs/ts/camera-control.ts) にあり、MoonBit の `rhodonite_core/ecs` camera control と同じ byte layout を使います。`DemoState` は `renderScene(demo_state, scene, colorView)` で scene を render source として扱います。この wrapper は browser WebGPU の async device creation を扱うため、MoonBit の `Engine::new(context)` と完全な API 互換ではありませんが、phase group、surface snapshot、phase lifecycle は同じです。handler 登録 API は `addPhaseHandler` です。TypeScript 側も `Scene.addCommonSystems` に orbit camera component と callback を登録し、`Engine.addCommonHandlers(scene, { transformPropagation: false })` が scene 側の登録情報から orbit camera 入力 handler を追加します。MassCubes 固有 camera solver は render-extract scene systems に置きます。
+TypeScript-only sample の [`src/main-ts-ecs-mass-cubes.ts`](../src/main-ts-ecs-mass-cubes.ts) と [`src/main-ts-multi-surface-independent-input.ts`](../src/main-ts-multi-surface-independent-input.ts) も同じ作法に寄せています。[`moon/rhodonite/src/app/ts/`](../moon/rhodonite/src/app/ts/) が TypeScript 用の lightweight wrapper として `SurfaceState`、`FrameState`、`TimeState`、`PhaseKey`、`PhaseGroupKey`、`PhaseSlot`、`Scene`、`Engine`、`Renderer`、`Renderable` component helper、browser platform helper、browser device limit helper、orbit camera input adapter を提供し、single-surface sample は `runSingleCanvasPlatform(canvas, app, options)`、multi-surface sample は `runMultiSurfacePlatform(configs, app, options)` に browser lifecycle を委譲します。`runPlatform` は canvas 単位で active platform を管理するため、複数 canvas は相互に独立して差し替えられます。`runSingleCanvasPlatform` は default scene で十分な単一 canvas sample 向けの thin wrapper です。`runMultiSurfacePlatform` は `PlatformApp` の `setupEngine` 後に全 canvas surface を engine に attach し、`Engine.initialize()` と multi-surface frame loop まで開始します。`Scene` は `world()`、`setMainCamera()`、`mainCamera()`、enabled/visible state を持ち、camera entity は `Transform3D` / `GlobalTransform` / `OrbitCameraController` / `CameraHomeTransform` / `CameraLens` / builtin `Camera` を所有します。`OrbitCameraController`、`CameraHomeTransform`、`CameraLens` の TypeScript helper は [`moon/rhodonite_core/src/ecs/ts/camera-control.ts`](../moon/rhodonite_core/src/ecs/ts/camera-control.ts) にあり、MoonBit の `rhodonite_core/ecs` camera control と同じ byte layout を使います。`ts-multi-surface-independent-input` は `Renderer::renderSceneRenderables` 相当の TypeScript wrapper を使い、MoonBit 側と同じ `Renderable` payload layout、GlobalTransform storage、Camera storage を render source として扱います。`ts-ecs-mass-cubes` は transform refs + color の instance buffer を `Renderer.registerStaticInstanceBuffer` へ登録し、`Renderer.renderInstancedMesh` 相当の TypeScript wrapper で大量 instance を描画します。WASM / WASM-GC host も host-owned transform/camera bytes を `Renderer.ensureStorageBuffers`、`Renderer.uploadGlobalTransformBytes`、`Renderer.uploadCameraBytes`、`Renderer.renderPreparedInstancedMesh` に渡して描画します。この wrapper は browser WebGPU の async device creation と DOM の `GPUDevice` を直接扱うため、MoonBit の `Engine::new(context)` / `Renderer::new(@wgpu.GPUDevice, ...)` と完全な ABI 互換ではありませんが、phase group、surface snapshot、phase lifecycle、Renderable component layout、instanced mesh layout は同じです。handler 登録 API は `addPhaseHandler` です。TypeScript 側も `Scene.addCommonSystems` に orbit camera component と callback を登録し、`Engine.addCommonHandlers(scene, { transformPropagation: false })` が scene 側の登録情報から orbit camera 入力 handler を追加します。MassCubes 固有 camera solver は render-extract scene systems に置きます。
 
-[`ecs-mass-cubes` の WASM/TypeScript host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。WASM ABI は update / render-extract / render に分け、MoonBit JS/native 版と同じく MassCubes camera solver を render-extract 相当に閉じ込めます。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
+[`ecs-mass-cubes` の WASM host-driven variants](../moon/rhodonite_examples/src/ecs-mass-cubes/wasm/) は、MoonBit 側が WebGPU `GPUContext` を持たず TypeScript host が描画ループを所有するため、この `Engine(GPUContext)` runtime にはまだ直接載せていません。WASM ABI は update / render-extract / render に分け、MoonBit JS/native 版と同じく MassCubes camera solver を render-extract 相当に閉じ込めます。ただし host render phase は専用 WebGPU pipeline ではなく `app/ts` の `Renderer` に統一し、WASM が書いた transform/camera bytes を Renderer-owned storage に upload して描画します。将来 `Engine` から platform/GPU context を分離した runner を用意するまでは例外として扱います。
 
 ### 現在の Phase 2 state
 
@@ -323,6 +323,7 @@ moon fmt
 moon check --target all
 pnpm run test:core:mbt
 pnpm run test:core:js
+pnpm run test:app:ts
 pnpm run test:examples:visual
 ```
 
@@ -340,22 +341,23 @@ pnpm run test:examples:visual
 
 ### Phase 5: Mesh / Material / Renderable
 
-`Engine` / `Scene` の境界が固まってから、engine-owned な汎用 `Renderer` と描画対象の高レベル abstraction を追加します。Phase 4 の `DemoState` は汎用 renderer ではないため、Phase 5 では resource table と `Renderable` component を導入するタイミングで `Engine` が抱える `Renderer` を設計します。
+`Engine` / `Scene` の境界が固まったため、Phase 5 の最小版として facade `app` package に engine-owned な `Renderer` と `Renderable` component helper を追加しました。Phase 4 の `DemoState` が持っていた WebGPU pipeline / depth attachment / transform-camera upload の責務を、[`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) と [`ecs-mass-cubes`](../moon/rhodonite_examples/src/ecs-mass-cubes/) で Renderer 側へ移しています。
 
 - `MeshHandle`
 - `MaterialHandle`
-- `TextureHandle`
-- `Renderable` ECS component
-- renderer resource table
-- pipeline cache
+- `InstanceBufferHandle`
+- `RenderableDesc` と `Renderable` ECS component helper（CPU payload は `mesh_index: u32` + `material_index: u32` + `flags: u32` + reserved）
+- `UnlitMaterialDesc`
+- renderer-owned mesh/material/instance-buffer resource table
+- unlit static indexed mesh pipeline
 
-この phase で初めて、sample code から直接 WebGPU buffer / pipeline を組む量を大きく減らします。
+初期 Renderer は intentionally narrow です。通常 path では visible flag を持つ `Renderable + GlobalTransform` entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。MassCubes のような大量描画 path では sample が transform refs + color の instance buffer を作り、Renderer が所有する instance buffer として登録して 1 mesh を N instance で描画します。Material 登録は `UnlitMaterialDesc` descriptor 経由に寄せ、alpha / flags は後続の blending や material option の拡張点として保持しています。TypeScript/npm wrapper は MoonBit app JS bridge ではなく、browser の DOM `GPUDevice` / `GPUQueue` を直接受け取る pure TypeScript 実装として同じ API 形状、component payload layout、instance buffer layout を公開します。Texture、skinning、transparent sorting、shadow、LOD はまだ入れていません。
 
 ## Open Questions
 
 - `Scene::world()` をどの程度公開するか。
 - browser/native の platform runner を facade に公開するか、examples/common に置くか。
-- `Renderer::render_scene` が直接 ECS query するか、`phase_render_extract()` / `PhaseSlot` 上の renderer task として extraction layer を用意するか。
+- `Renderer::render_scene_renderables` が直接 ECS query するか、`phase_render_extract()` / `PhaseSlot` 上の renderer task として extraction layer を用意するか。
 
 Resolved in Phase 3:
 

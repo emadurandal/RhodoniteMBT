@@ -11,6 +11,10 @@ import {
 
 supported_targets = "native"
 
+// The black-box tests in this package import the sample packages and WebGPU facade.
+
+warnings = "-unused_package"
+
 options(
   "native-stub": [ "visual_file_io_native.c" ],
   link: {

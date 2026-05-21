@@ -130,6 +130,12 @@ moon run --target native src/basic-triangle/wgpu/main
 pnpm run test:core:js
 ```
 
+### App TypeScript Runtime / Renderer
+
+```bash
+pnpm run test:app:ts
+```
+
 ### Core (MoonBit tests)
 
 ```bash

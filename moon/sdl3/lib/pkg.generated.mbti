@@ -2,6 +2,7 @@
 package "emadurandal/sdl3/lib"
 
 import {
+  "moonbitlang/core/debug",
   "moonbitlang/core/ref",
 }
 
@@ -2378,7 +2379,7 @@ pub struct SDL_KeyboardEvent {
   repeat : Bool
 } derive(Eq)
 
-pub struct SDL_Keycode(UInt) derive(Eq, Show)
+pub struct SDL_Keycode(UInt) derive(Eq, @debug.Debug)
 
 pub struct SDL_Keymod(UInt16) derive(Eq)
 

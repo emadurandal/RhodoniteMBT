@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+///
 /// Simple DirectMedia Layer
 /// Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 /// 
@@ -29,7 +32,7 @@
 pub struct SDL_Scancode(UInt) derive(Eq)
 
 ///|
-pub struct SDL_Keycode(UInt) derive(Eq, Show)
+pub struct SDL_Keycode(UInt) derive(Eq, Debug)
 
 ///|
 pub struct SDL_Keymod(UInt16) derive(Eq)

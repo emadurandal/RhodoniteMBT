@@ -4,6 +4,10 @@ import {
 
 supported_targets = "js"
 
+// The black-box tests in this package import `@app`.
+
+warnings = "-unused_package"
+
 options(
   overrides: [ "emadurandal/rhodonite_webgpu/webgpu_objects/js" ],
 )

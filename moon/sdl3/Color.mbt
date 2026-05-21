@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 /// Color representation supporting both predefined colors and custom RGB/RGBA values
 pub(all) enum Color {
@@ -127,7 +130,7 @@ pub(all) enum Color {
   Honeydew
   Transparent
   RGB(Byte, Byte, Byte)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Convert color to RGB bytes (red, green, blue)

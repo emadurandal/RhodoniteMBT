@@ -11,12 +11,12 @@ fn vertex_layout_to_ffi(
   let attrs = lb.attributes.map(fn(a) {
     VertexAttributeFFI::{
       formatTag: a.format.to_js_tag(),
-      offset: a.offset.to_uint().to_int(),
+      offset: a.offset.to_uint().reinterpret_as_int(),
       shaderLocation: a.shader_location,
     }
   })
   VertexBufferLayoutFFI::{
-    arrayStride: lb.array_stride.to_uint().to_int(),
+    arrayStride: lb.array_stride.to_uint().reinterpret_as_int(),
     stepModeTag: lb.step_mode.to_js_tag(),
     attributes: attrs,
   }

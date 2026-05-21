@@ -7,6 +7,11 @@ import {
 
 supported_targets = "native"
 
+// Native implementations keep async signatures and placeholder resource structs
+// aligned with the public WebGPU facade even where the wgpu_mbt path is synchronous.
+
+warnings = "-unused_async-struct_never_constructed"
+
 options(
   implement: "emadurandal/rhodonite_webgpu/webgpu_objects",
   "native-stub": [ "rhodonite_wgpu_queue.c" ],

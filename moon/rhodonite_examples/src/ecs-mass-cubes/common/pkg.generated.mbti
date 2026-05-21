@@ -37,28 +37,16 @@ pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView, record_pe
 // Types and methods
 pub(all) struct DemoState {
   context : @webgpu.GPUCanvasContext?
-  device : @webgpu.GPUDevice
-  queue : @webgpu.GPUQueue
-  pipeline : @webgpu.GPURenderPipeline
-  mut depth_texture : @webgpu.GPUTexture
-  mut depth_view : @webgpu_objects.GPUTextureView
-  vertex_buffer : @webgpu.GPUBuffer
-  instance_buffer : @webgpu.GPUBuffer
-  index_buffer : @webgpu.GPUBuffer
-  transform_storage : @webgpu.GPUBuffer
-  camera_storage : @webgpu.GPUBuffer
-  bind_transforms : @webgpu.GPUBindGroup
-  bind_camera : @webgpu.GPUBindGroup
-  layout_transforms : @webgpu.GPUBindGroupLayout
-  layout_camera : @webgpu.GPUBindGroupLayout
+  renderer : @app.Renderer
   scene : @app.Scene
+  mesh : @app.MeshHandle
+  instances : @app.InstanceBufferHandle
   gt : @ecs.ComponentTypeId
   tf : @ecs.ComponentTypeId
   per_side : Int
   transform_refs : FixedArray[Byte]
   transform_upload_range : @ecs.GlobalTransformUploadRange
   dense_transform_layout : @ecs.GlobalTransformDenseLayout?
-  bind_group_offsets : Array[UInt]
   orbit_controller : @ecs.ComponentTypeId
   camera_home : @ecs.ComponentTypeId
   camera_lens : @ecs.ComponentTypeId
@@ -76,4 +64,3 @@ type GlobalTransformPrecisionMode derive(Eq)
 // Type aliases
 
 // Traits
-

@@ -53,4 +53,4 @@ Renderer upload は builtin blob API を使います。
 
 ## Tests
 
-主要な期待値は `ecs_test.mbt` と TypeScript wrapper の `world.test.ts` にあります。変更後は `moon check --target all`、`pnpm run test:core:mbt`、`pnpm run test:core:js` を通します。rendering に影響する変更では visual regression も確認します。
+主要な期待値は `ecs_test.mbt` と TypeScript wrapper の `world.test.ts` にあります。app runtime / Renderer TypeScript wrapper の期待値は `moon/rhodonite/src/app/ts/*.test.ts` にあります。変更後は `moon check --target all`、`pnpm run test:core:mbt`、`pnpm run test:core:js`、必要に応じて `pnpm run test:app:ts` を通します。rendering に影響する変更では visual regression も確認します。

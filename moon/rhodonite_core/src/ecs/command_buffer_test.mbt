@@ -75,7 +75,7 @@ test "CommandBuffer applies queued component writes and reports failed commands"
   )
   assert_eq(queued_count, 2)
   match world.component_bytes(e, qa) {
-    Some(bytes) => assert_eq(bytes, bytes4(3, 3, 3, 3))
+    Some(bytes) => assert_true(bytes == bytes4(3, 3, 3, 3))
     None => abort("expected CommandBufferWriteA bytes")
   }
 }
@@ -120,7 +120,7 @@ test "CommandBuffer create_entity reserves id and applies components after query
   assert_true(world.is_alive(spawned))
   assert_true(world.has_component(spawned, qb))
   match world.component_bytes(spawned, qb) {
-    Some(bytes) => assert_eq(bytes, bytes4(9, 8, 7, 6))
+    Some(bytes) => assert_true(bytes == bytes4(9, 8, 7, 6))
     None => abort("expected CommandCreateSpawned bytes")
   }
 }

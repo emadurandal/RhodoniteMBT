@@ -167,14 +167,30 @@ function writeEntrypoints() {
 }
 
 function runTsc() {
+  const tscArgs = ["-p", path.join(packageRoot, "tsconfig.build.json")];
+  const localTsc = path.join(
+    root,
+    "node_modules/.bin",
+    process.platform === "win32" ? "tsc.cmd" : "tsc",
+  );
+  if (existsSync(localTsc)) {
+    const local = spawnSync(localTsc, tscArgs, {
+      cwd: root,
+      stdio: "inherit",
+    });
+    if (local.status === 0) {
+      return;
+    }
+  }
   const result = spawnSync(
     "pnpm",
-    ["exec", "tsc", "-p", path.join(packageRoot, "tsconfig.build.json")],
+    ["exec", "tsc", ...tscArgs],
     { cwd: root, stdio: "inherit" },
   );
-  if (result.status !== 0) {
-    throw new Error("TypeScript npm package build failed.");
+  if (result.status === 0) {
+    return;
   }
+  throw new Error("TypeScript npm package build failed.");
 }
 
 function prependWebGpuTypeReferences() {

@@ -7,7 +7,7 @@
 pub type OpaquePtr
 
 ///|
-pub fn opaque_ptr_to_c(ptr : OpaquePtr) -> @c.OpaquePtr = "%identity"
+fn opaque_ptr_to_c(ptr : OpaquePtr) -> @c.OpaquePtr = "%identity"
 
 ///|
 /// Returns whether an opaque native pointer is null.

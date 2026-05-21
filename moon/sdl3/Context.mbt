@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 pub struct Context {
   windows : Array[Window]
@@ -6,7 +9,7 @@ pub struct Context {
 ///|
 pub suberror InitializeSDLError {
   InitializeSDLError(String)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Create a new context.
@@ -23,7 +26,7 @@ pub fn Context::new() -> Context raise {
 ///|
 pub suberror CreateWindowError {
   CreateWindowError(String)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Create a new window.

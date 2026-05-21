@@ -4,11 +4,6 @@
 import "./style.css";
 import {
 	World,
-	cameraHelpersDefault,
-	cameraWordsBindGroup,
-	cameraWordsBindingDefault,
-	createCameraWordsBuffer,
-	drainAndUploadCameraWrites,
 	addOrbitCameraControllerWithPose,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
@@ -22,19 +17,32 @@ import {
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	Engine,
-	GpuSurface,
 	InputState,
+	MaterialHandle,
+	MeshHandle,
 	Phase,
 	PhaseSlot,
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
+	RenderableComponent,
+	RenderableDesc,
+	Renderer,
 	Scene,
+	UnlitMaterialDesc,
+	addRenderable,
+	registerRenderableComponent,
 	runMultiSurfacePlatform,
 	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 	type SurfaceId,
 } from "../moon/rhodonite/src/app/ts/index.ts";
+
+type DemoObjects = {
+	readonly sun: EntityId;
+	readonly earth: EntityId;
+	readonly moon: EntityId;
+};
 
 type SurfaceRenderState = {
 	readonly id: SurfaceId;
@@ -44,28 +52,23 @@ type SurfaceRenderState = {
 	readonly camera: EntityId;
 	readonly orbitControllerComponent: ComponentTypeId;
 	readonly cameraLensComponent: ComponentTypeId;
-	readonly cameraStorage: GPUBuffer;
-	readonly cameraBindGroup: GPUBindGroup;
-	depthTexture: GPUTexture;
-	depthView: GPUTextureView;
+	readonly renderableComponent: RenderableComponent;
+	readonly objects: DemoObjects;
 };
 
 type DemoState = {
 	readonly engine: Engine;
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly pipeline: GPURenderPipeline;
-	readonly vertexBuffer: GPUBuffer;
-	readonly indexBuffer: GPUBuffer;
-	readonly objectBuffer: GPUBuffer;
-	readonly bindGroup: GPUBindGroup;
+	readonly renderer: Renderer;
+	readonly cubeMesh: MeshHandle;
+	readonly sunMaterial: MaterialHandle;
+	readonly earthMaterial: MaterialHandle;
+	readonly moonMaterial: MaterialHandle;
 	readonly surfaces: SurfaceRenderState[];
-	frame: number;
+	rendererWidth: number;
+	rendererHeight: number;
 };
 
 const INDEX_COUNT = 36;
-const OBJECT_STRIDE_FLOATS = 20;
-const OBJECT_STRIDE_BYTES = OBJECT_STRIDE_FLOATS * 4;
 
 function requireCanvas(id: string): HTMLCanvasElement {
 	const element = document.getElementById(id);
@@ -93,108 +96,103 @@ function identity(): Float32Array {
 	return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 }
 
-function multiply(a: Float32Array, b: Float32Array): Float32Array {
-	const out = new Float32Array(16);
-	for (let col = 0; col < 4; col += 1) {
-		for (let row = 0; row < 4; row += 1) {
-			out[col * 4 + row] =
-				a[0 * 4 + row] * b[col * 4 + 0] +
-				a[1 * 4 + row] * b[col * 4 + 1] +
-				a[2 * 4 + row] * b[col * 4 + 2] +
-				a[3 * 4 + row] * b[col * 4 + 3];
-		}
-	}
-	return out;
+function bytesOf(view: Float32Array | Uint16Array): Uint8Array {
+	return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 }
 
-function translate(x: number, y: number, z: number): Float32Array {
-	const m = identity();
-	m[12] = x;
-	m[13] = y;
-	m[14] = z;
-	return m;
-}
-
-function scale(s: number): Float32Array {
-	const m = identity();
-	m[0] = s;
-	m[5] = s;
-	m[10] = s;
-	return m;
-}
-
-function rotateY(angle: number): Float32Array {
-	const c = Math.cos(angle);
-	const s = Math.sin(angle);
-	return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]);
-}
-
-function createShader(): string {
-	return (
-		cameraWordsBindingDefault() +
-		cameraHelpersDefault() +
-		`
-struct ObjectData {
-  model: mat4x4<f32>,
-  color: vec4<f32>,
-};
-@group(0) @binding(0) var<storage, read> objects: array<ObjectData>;
-struct VertexOut {
-  @builtin(position) position: vec4<f32>,
-  @location(0) color: vec4<f32>,
-};
-@vertex
-fn vertexMain(@location(0) localPos: vec3<f32>, @builtin(instance_index) instanceIndex: u32) -> VertexOut {
-  let object = objects[instanceIndex];
-  let camera = rn_load_camera(0u);
-  var out: VertexOut;
-  out.position = camera.view_proj * object.model * vec4<f32>(localPos, 1.0);
-  out.color = object.color;
-  return out;
-}
-@fragment
-fn fragmentMain(in: VertexOut) -> @location(0) vec4<f32> {
-  return in.color;
-}`
+function setYRotationTrs(
+	world: World,
+	entity: EntityId,
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	scale: number,
+): void {
+	const half = yaw * 0.5;
+	const ok = world.setTransformTrs(
+		entity,
+		x,
+		y,
+		z,
+		0,
+		Math.sin(half),
+		0,
+		Math.cos(half),
+		scale,
+		scale,
+		scale,
 	);
+	if (!ok) {
+		throw new Error("Failed to update Transform3D.");
+	}
 }
 
 function createDemoStateForEngine(engine: Engine): DemoState {
-	const device = engine.device;
-	const shader = device.createShaderModule({ code: createShader() });
-	const objectBuffer = device.createBuffer({
-		size: OBJECT_STRIDE_BYTES * 3,
-		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-	});
-	const pipeline = device.createRenderPipeline({
-		layout: "auto",
-		vertex: {
-			module: shader,
-			entryPoint: "vertexMain",
-			buffers: [{ arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] }],
+	const surface = engine.surfaceState();
+	const renderer = new Renderer(
+		engine.device,
+		engine.queue,
+		engine.format,
+		surface.width,
+		surface.height,
+		{
+			arrayStride: 12,
+			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
 		},
-		fragment: { module: shader, entryPoint: "fragmentMain", targets: [{ format: engine.format }] },
-		primitive: { topology: "triangle-list" },
-		depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" },
-	});
-	const bindGroup = device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(0),
-		entries: [{ binding: 0, resource: { buffer: objectBuffer } }],
-	});
-	const vertexBuffer = device.createBuffer({ size: cubeVertices().byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-	engine.queue.writeBuffer(vertexBuffer, 0, cubeVertices());
-	const indexBuffer = device.createBuffer({ size: cubeIndices().byteLength, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-	engine.queue.writeBuffer(indexBuffer, 0, cubeIndices());
-	return { engine, device, queue: engine.queue, pipeline, vertexBuffer, indexBuffer, objectBuffer, bindGroup, surfaces: [], frame: 0 };
+	);
+	const cubeMesh = renderer.registerStaticIndexedMesh(
+		bytesOf(cubeVertices()),
+		bytesOf(cubeIndices()),
+		INDEX_COUNT,
+	);
+	const sunMaterial = renderer.registerUnlitMaterial(
+		UnlitMaterialDesc.new(1.0, 0.65, 0.15),
+	);
+	const earthMaterial = renderer.registerUnlitMaterial(
+		UnlitMaterialDesc.new(0.2, 0.55, 1.0),
+	);
+	const moonMaterial = renderer.registerUnlitMaterial(
+		UnlitMaterialDesc.new(1.0, 0.0, 1.0),
+	);
+	return {
+		engine,
+		renderer,
+		cubeMesh,
+		sunMaterial,
+		earthMaterial,
+		moonMaterial,
+		surfaces: [],
+		rendererWidth: surface.width,
+		rendererHeight: surface.height,
+	};
 }
 
-function createDepth(device: GPUDevice, width: number, height: number): { texture: GPUTexture; view: GPUTextureView } {
-	const texture = device.createTexture({ size: [Math.max(width, 1), Math.max(height, 1)], format: "depth24plus", usage: GPUTextureUsage.RENDER_ATTACHMENT });
-	return { texture, view: texture.createView() };
+function createRenderableObject(
+	demo: DemoState,
+	world: World,
+	renderableComponent: RenderableComponent,
+	material: MaterialHandle,
+): EntityId {
+	const entity = world.createEntity();
+	setYRotationTrs(world, entity, 0, 0, 0, 0, 1);
+	if (!world.setGlobalTransform(entity, identity())) {
+		throw new Error("Failed to add GlobalTransform.");
+	}
+	if (
+		!addRenderable(
+			world,
+			entity,
+			renderableComponent,
+			RenderableDesc.new(demo.cubeMesh, material),
+		)
+	) {
+		throw new Error("Failed to add Renderable.");
+	}
+	return entity;
 }
 
 function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): void {
-	const { texture, view } = createDepth(demo.device, 800, 600);
 	const cameraElevation = 0.38;
 	const cameraPanY = -2.0 / Math.cos(cameraElevation);
 	const cameraDistance = 5.6 - cameraPanY * Math.sin(cameraElevation);
@@ -203,6 +201,7 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
 	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
 	const cameraLensComponent = registerCameraLensComponent(world);
+	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 	const cameraQx = -Math.sin(cameraElevation * 0.5);
 	const cameraQw = Math.cos(cameraElevation * 0.5);
@@ -265,9 +264,27 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		orbitControllerComponent,
 		cameraLensComponent,
 	);
-	const cameraStorage = createCameraWordsBuffer(demo.device, world);
-	drainAndUploadCameraWrites(demo.queue, cameraStorage, world);
-	const cameraBindGroup = cameraWordsBindGroup(demo.device, demo.pipeline, cameraStorage);
+	const objects = {
+		sun: createRenderableObject(
+			demo,
+			world,
+			renderableComponent,
+			demo.sunMaterial,
+		),
+		earth: createRenderableObject(
+			demo,
+			world,
+			renderableComponent,
+			demo.earthMaterial,
+		),
+		moon: createRenderableObject(
+			demo,
+			world,
+			renderableComponent,
+			demo.moonMaterial,
+		),
+	};
+	world.updateGlobalTransformsFromTransforms();
 	demo.surfaces.push({
 		id,
 		input,
@@ -276,10 +293,8 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		camera,
 		orbitControllerComponent,
 		cameraLensComponent,
-		cameraStorage,
-		cameraBindGroup,
-		depthTexture: texture,
-		depthView: view,
+		renderableComponent,
+		objects,
 	});
 	demo.engine.setSurfaceScene(id, scene);
 }
@@ -297,14 +312,6 @@ function ensureSurfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState 
 	return demo.surfaces[demo.surfaces.length - 1]!;
 }
 
-function surfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState {
-	const state = demo.surfaces.find((surface) => surface.id === id);
-	if (state === undefined) {
-		throw new Error(`Unknown surface ${id}`);
-	}
-	return state;
-}
-
 function handleInput(surface: SurfaceRenderState): void {
 	updateOrbitCameraControllerComponentFromInput(
 		surface.world,
@@ -314,7 +321,7 @@ function handleInput(surface: SurfaceRenderState): void {
 	);
 }
 
-function writeObjects(demo: DemoState, surface: SurfaceRenderState, frame: FrameState): void {
+function writeScene(surface: SurfaceRenderState, frame: FrameState): void {
 	const t = frame.elapsedSeconds;
 	const aspect = Math.max(frame.surface.width, 1) / Math.max(frame.surface.height, 1);
 	if (
@@ -337,55 +344,58 @@ function writeObjects(demo: DemoState, surface: SurfaceRenderState, frame: Frame
 		surface.orbitControllerComponent,
 		surface.cameraLensComponent,
 	);
-	drainAndUploadCameraWrites(demo.queue, surface.cameraStorage, surface.world);
-	const sun = multiply(rotateY(t * 0.35), scale(0.55));
-	const earth = multiply(multiply(rotateY(t * 0.9), translate(2.35, 0, 0)), multiply(rotateY(t * 2.2), scale(0.22)));
-	const moon = multiply(earth, multiply(multiply(rotateY(t * 2.8), translate(1.05, 0, 0)), scale(0.11)));
-	const colors = [[1, 0.65, 0.15, 1], [0.2, 0.55, 1, 1], [1, 0, 1, 1]];
-	const out = new Float32Array(OBJECT_STRIDE_FLOATS * 3);
-	for (const [index, model] of [sun, earth, moon].entries()) {
-		out.set(model, index * OBJECT_STRIDE_FLOATS);
-		out.set(colors[index], index * OBJECT_STRIDE_FLOATS + 16);
-	}
-	demo.queue.writeBuffer(demo.objectBuffer, 0, out);
+	const earthAngle = t * 0.9;
+	const moonAngle = t * 2.8;
+	const earthX = Math.cos(earthAngle) * 2.35;
+	const earthZ = Math.sin(earthAngle) * 2.35;
+	const moonX = earthX + Math.cos(moonAngle) * 1.05;
+	const moonZ = earthZ + Math.sin(moonAngle) * 1.05;
+	setYRotationTrs(surface.world, surface.objects.sun, 0, 0, 0, t * 0.35, 0.55);
+	setYRotationTrs(
+		surface.world,
+		surface.objects.earth,
+		earthX,
+		0,
+		earthZ,
+		t * 2.2,
+		0.22,
+	);
+	setYRotationTrs(
+		surface.world,
+		surface.objects.moon,
+		moonX,
+		0,
+		moonZ,
+		t * 4.1,
+		0.11,
+	);
+	surface.world.updateGlobalTransformsFromTransforms();
 }
 
-function resizeDepthIfNeeded(demo: DemoState, surface: SurfaceRenderState, frame: FrameState): void {
-	if (!frame.surfaceChanged || !frame.surface.active) {
+function resizeRendererIfNeeded(demo: DemoState, frame: FrameState): void {
+	const width = Math.max(frame.surface.width, 1);
+	const height = Math.max(frame.surface.height, 1);
+	if (demo.rendererWidth === width && demo.rendererHeight === height) {
 		return;
 	}
-	surface.depthTexture.destroy();
-	const depth = createDepth(demo.device, frame.surface.width, frame.surface.height);
-	surface.depthTexture = depth.texture;
-	surface.depthView = depth.view;
+	demo.renderer.resizeSurfaceResources(width, height);
+	demo.rendererWidth = width;
+	demo.rendererHeight = height;
 }
 
 function renderSurface(demo: DemoState, frame: FrameState): void {
 	if (frame.surfaceId === undefined || !frame.surface.active) {
 		return;
 	}
-	const surface = surfaceState(demo, frame.surfaceId);
-	writeObjects(demo, surface, frame);
-	const gpuSurface: GpuSurface = demo.engine.surfaceGpuSurface(frame.surfaceId);
-	const colorView = gpuSurface.acquireView();
-	const encoder = demo.device.createCommandEncoder();
-	const surfaceIndex = surfaceStateIndex(demo, frame.surfaceId);
-	const clearValue =
-		surfaceIndex === 0
-			? { r: 0.02, g: 0.04, b: 0.12, a: 1 }
-			: { r: 0.02, g: 0.11, b: 0.07, a: 1 };
-	const pass = encoder.beginRenderPass({
-		colorAttachments: [{ view: colorView, clearValue, loadOp: "clear", storeOp: "store" }],
-		depthStencilAttachment: { view: surface.depthView, depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" },
-	});
-	pass.setPipeline(demo.pipeline);
-	pass.setBindGroup(0, demo.bindGroup);
-	pass.setBindGroup(1, surface.cameraBindGroup);
-	pass.setVertexBuffer(0, demo.vertexBuffer);
-	pass.setIndexBuffer(demo.indexBuffer, "uint16");
-	pass.drawIndexed(INDEX_COUNT, 3);
-	pass.end();
-	demo.queue.submit([encoder.finish()]);
+	const surface = ensureSurfaceState(demo, frame.surfaceId);
+	writeScene(surface, frame);
+	resizeRendererIfNeeded(demo, frame);
+	const colorView = demo.engine.surfaceGpuSurface(frame.surfaceId).acquireView();
+	demo.renderer.renderSceneRenderables(
+		surface.scene,
+		surface.renderableComponent,
+		colorView,
+	);
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {
@@ -396,7 +406,7 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	});
 	engine.addPhaseHandler(Phase.Surface, (_engine, frame) => {
 		if (frame.surfaceId !== undefined) {
-			resizeDepthIfNeeded(demo, ensureSurfaceState(demo, frame.surfaceId), frame);
+			ensureSurfaceState(demo, frame.surfaceId);
 		}
 	});
 	engine.addPhaseHandler(Phase.Input, (_engine, frame) => {
@@ -404,15 +414,13 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 			handleInput(ensureSurfaceState(demo, frame.surfaceId));
 		}
 	});
-	engine.addPhaseHandler(Phase.Render, (_engine, frame) => renderSurface(demo, frame), PhaseSlot.AfterSystems);
+	engine.addPhaseHandler(
+		Phase.Render,
+		(_engine, frame) => renderSurface(demo, frame),
+		PhaseSlot.AfterSystems,
+	);
 	engine.addPhaseHandler(Phase.Shutdown, () => {
-		for (const surface of demo.surfaces) {
-			surface.depthTexture.destroy();
-			surface.cameraStorage.destroy();
-		}
-		demo.vertexBuffer.destroy();
-		demo.indexBuffer.destroy();
-		demo.objectBuffer.destroy();
+		demo.renderer.release();
 	});
 }
 
@@ -438,8 +446,11 @@ window.addEventListener("load", () => {
 		document.body.innerHTML = "<h1>WebGPU is not supported in this browser.</h1>";
 		return;
 	}
-	Promise.resolve(initialize(requireCanvas("webgpu-canvas-a"), requireCanvas("webgpu-canvas-b"))).catch((error: unknown) => {
+	Promise.resolve(
+		initialize(requireCanvas("webgpu-canvas-a"), requireCanvas("webgpu-canvas-b")),
+	).catch((error: unknown) => {
 		console.error("Failed to initialize TypeScript multi-surface demo:", error);
-		document.body.innerHTML = "<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
+		document.body.innerHTML =
+			"<h1>Failed to initialize WebGPU. Check the console for errors.</h1>";
 	});
 });

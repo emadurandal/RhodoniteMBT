@@ -1,3 +1,6 @@
+/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
+/// SPDX-License-Identifier: Apache-2.0
+
 ///|
 fn main_err() -> Unit raise {
   let ctx = @sdl3.Context::new()
@@ -16,7 +19,7 @@ fn main_err() -> Unit raise {
         let kevent : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(
           event.0,
         )
-        println(kevent.key)
+        println(@lib.sdl_GetKeyName(kevent.key))
       }
     }
   }

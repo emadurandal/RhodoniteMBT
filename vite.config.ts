@@ -24,6 +24,8 @@ export default defineConfig({
 				ecsSceneGraph: "demos/ecs-scene-graph.html",
 				ondemandTriangle: "demos/ondemand-triangle.html",
 				tsEcsMassCubes: "demos/ts-ecs-mass-cubes.html",
+				tsMultiSurfaceIndependentInput:
+					"demos/ts-multi-surface-independent-input.html",
 				tsOndemandTriangle: "demos/ts-ondemand-triangle.html",
 				wasmEcsMassCubes: "demos/wasm-ecs-mass-cubes.html",
 				wasmGcEcsMassCubes: "demos/wasm-gc-ecs-mass-cubes.html",
