@@ -340,16 +340,15 @@ pnpm run test:examples:visual
 
 ### Phase 5: Mesh / Material / Renderable
 
-`Engine` / `Scene` の境界が固まってから、engine-owned な汎用 `Renderer` と描画対象の高レベル abstraction を追加します。Phase 4 の `DemoState` は汎用 renderer ではないため、Phase 5 では resource table と `Renderable` component を導入するタイミングで `Engine` が抱える `Renderer` を設計します。
+`Engine` / `Scene` の境界が固まったため、Phase 5 の最小版として facade `app` package に engine-owned な `Renderer` と `Renderable` component helper を追加しました。Phase 4 の `DemoState` が持っていた WebGPU buffer / pipeline / depth attachment / transform-camera upload の責務を、まず [`ecs-scene-graph`](../moon/rhodonite_examples/src/ecs-scene-graph/) で Renderer 側へ移しています。
 
 - `MeshHandle`
 - `MaterialHandle`
-- `TextureHandle`
-- `Renderable` ECS component
-- renderer resource table
-- pipeline cache
+- `Renderable` ECS component helper（CPU payload は `mesh_index: u32` + `material_index: u32`）
+- renderer-owned mesh/material resource table
+- unlit static indexed mesh pipeline
 
-この phase で初めて、sample code から直接 WebGPU buffer / pipeline を組む量を大きく減らします。
+初期 Renderer は intentionally narrow です。`Renderable + GlobalTransform` を持つ entity を query し、scene の builtin Camera blob と GlobalTransform blob を upload して、unlit `u16` indexed mesh を描画します。Texture、skinning、instancing、transparent sorting、shadow、LOD、TypeScript/npm wrapper への公開はまだ入れていません。`ecs-mass-cubes` は特殊な instancing / packed transform path を持つため、今回の移行対象外です。
 
 ## Open Questions
 

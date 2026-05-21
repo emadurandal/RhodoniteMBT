@@ -5,9 +5,13 @@ import {
   "emadurandal/rhodonite_core/ecs",
   "emadurandal/rhodonite_core/input",
   "emadurandal/rhodonite_webgpu/webgpu",
+  "emadurandal/rhodonite_webgpu/webgpu_enums",
+  "emadurandal/rhodonite_webgpu/webgpu_objects",
 }
 
 // Values
+pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, MeshHandle, MaterialHandle) -> Bool
+
 pub fn default_fixed_step_phases() -> Array[@ecs.PhaseKey]
 
 pub fn default_frame_begin_phases() -> Array[@ecs.PhaseKey]
@@ -47,6 +51,18 @@ pub fn phase_startup() -> @ecs.PhaseKey
 pub fn phase_surface() -> @ecs.PhaseKey
 
 pub fn phase_update() -> @ecs.PhaseKey
+
+pub fn register_renderable_component(@ecs.World) -> RenderableComponent
+
+pub fn renderable_component_bytes(MeshHandle, MaterialHandle) -> FixedArray[Byte]
+
+pub fn renderable_component_stride() -> Int
+
+pub fn renderable_material_handle_from_view(ArrayView[Byte]) -> MaterialHandle
+
+pub fn renderable_mesh_handle_from_view(ArrayView[Byte]) -> MeshHandle
+
+pub fn set_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, MeshHandle, MaterialHandle) -> Bool
 
 // Errors
 
@@ -138,6 +154,16 @@ pub fn FrameState::surface_id(Self) -> SurfaceId?
 pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
 
+pub(all) struct MaterialHandle {
+  // private fields
+} derive(Eq)
+pub fn MaterialHandle::index(Self) -> Int
+
+pub(all) struct MeshHandle {
+  // private fields
+} derive(Eq)
+pub fn MeshHandle::index(Self) -> Int
+
 pub(all) struct PhaseGroupKey {
   name : String
 } derive(Eq)
@@ -147,6 +173,22 @@ pub(all) enum PhaseSlot {
   BeforeSystems
   AfterSystems
 } derive(Eq)
+
+pub(all) struct RenderableComponent {
+  // private fields
+}
+pub fn RenderableComponent::id(Self) -> @ecs.ComponentTypeId
+
+pub struct Renderer {
+  // private fields
+}
+pub fn Renderer::device(Self) -> @webgpu.GPUDevice
+pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, String, Int, Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
+pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray[Byte], Int) -> MeshHandle
+pub fn Renderer::register_unlit_material(Self, Double, Double, Double) -> MaterialHandle
+pub fn Renderer::release(Self) -> Unit
+pub fn Renderer::render_scene(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
 
 pub struct Scene {
   // private fields
