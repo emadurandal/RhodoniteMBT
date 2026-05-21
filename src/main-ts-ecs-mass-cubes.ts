@@ -5,11 +5,7 @@ import "./style.css";
 import {
 	World,
 	computeGlobalTransformUploadRange,
-	createCameraWordsBuffer,
-	createGlobalTransformWordsBuffer,
 	detectDenseGlobalTransformLayout,
-	drainAndUploadCameraWrites,
-	uploadGlobalTransformWrites,
 	writeGlobalTransformBlobRangeByRefs,
 	addCameraLensOrthographic,
 	addOrbitCameraControllerWithDistance,
@@ -33,8 +29,11 @@ import {
 } from "./visual-regression/webgpu-readback";
 import {
 	Engine,
+	type InstanceBufferHandle,
+	type MeshHandle,
 	Phase,
 	PhaseSlot,
+	Renderer,
 	Scene,
 	PlatformApp,
 	PlatformOptions,
@@ -50,15 +49,14 @@ import {
 	MASS_CUBES_CUBE_SCALE,
 	MASS_CUBES_ENTITY_COUNT,
 	MASS_CUBES_GRID_SPACING,
+	MASS_CUBES_INDEX_U16_COUNT,
 	MASS_CUBES_INSTANCE_STRIDE,
-	createMassCubesRenderResourcesFromCameraStorage,
 	gridSideLen,
 	instanceColorRgb,
+	massCubesIndexU16Bytes,
 	massCubesCameraMatrices,
-	releaseMassCubesRenderResources,
-	renderMassCubesScene,
+	massCubesVertexPositionBytes,
 	writeF32,
-	type MassCubesRenderResources,
 } from "./ecs-mass-cubes-renderer";
 import { writeMassCubesDenseYTransformWaveToByteView } from "./ecs-mass-cubes-transform-writer";
 type GlobalTransformPrecisionMode =
@@ -73,8 +71,9 @@ type DemoState = {
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
-	readonly render: MassCubesRenderResources;
-	readonly transformStorage: GPUBuffer;
+	readonly renderer: Renderer;
+	readonly cubeMesh: MeshHandle;
+	readonly instanceBuffer: InstanceBufferHandle;
 	readonly scene: Scene<World, EntityId>;
 	readonly orbitControllerComponent: ComponentTypeId;
 	readonly cameraHomeComponent: ComponentTypeId;
@@ -85,7 +84,6 @@ type DemoState = {
 	readonly denseTransformLayout: GlobalTransformDenseLayout | null;
 	readonly perSide: number;
 	snapshotColorView?: GPUTextureView;
-	snapshotDepthView?: GPUTextureView;
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
@@ -232,9 +230,8 @@ function pushCameraMatrices(
 
 function uploadInitialGlobalTransforms(demoState: DemoState): void {
 	const world = demoState.scene.world();
-	uploadGlobalTransformWrites(
-		demoState.queue,
-		demoState.transformStorage,
+	demoState.renderer.uploadGlobalTransformWrites(
+		world,
 		writeGlobalTransformBlobRangeByRefs(world, {
 			refs: demoState.transformRefs,
 			count: MASS_CUBES_ENTITY_COUNT,
@@ -253,9 +250,8 @@ function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
 	const world = demoState.scene.world();
 	if (demoState.denseTransformLayout !== null) {
 		const denseLayout = demoState.denseTransformLayout;
-		uploadGlobalTransformWrites(
-			demoState.queue,
-			demoState.transformStorage,
+		demoState.renderer.uploadGlobalTransformWrites(
+			world,
 			world.writeGlobalTransformBlobRangeViews(
 				demoState.transformWordUploadFirst,
 				demoState.transformWordUploadCount,
@@ -272,9 +268,8 @@ function updateAndDrainGlobalTransforms(demoState: DemoState, t: number): void {
 		);
 		return;
 	}
-	uploadGlobalTransformWrites(
-		demoState.queue,
-		demoState.transformStorage,
+	demoState.renderer.uploadGlobalTransformWrites(
+		world,
 		writeGlobalTransformBlobRangeByRefs(world, {
 			refs: demoState.transformRefs,
 			count: MASS_CUBES_ENTITY_COUNT,
@@ -347,7 +342,6 @@ function createDemoStateForEngine(
 		MASS_CUBES_ENTITY_COUNT,
 		denseTransformLayout,
 	);
-	const transformStorage = createGlobalTransformWordsBuffer(device, world);
 	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
 	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
 	const cameraLensComponent = registerCameraLensComponent(world);
@@ -404,24 +398,33 @@ function createDemoStateForEngine(
 		),
 	);
 	scene.setMainCamera(camera);
-	const cameraStorage = createCameraWordsBuffer(device, world);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
-	const render = createMassCubesRenderResourcesFromCameraStorage({
+	const renderer = new Renderer(
 		device,
 		queue,
 		targetFormat,
-		transformStorage,
-		cameraStorage,
-		instanceData,
-	});
+		MASS_CUBES_CANVAS_WIDTH,
+		MASS_CUBES_CANVAS_HEIGHT,
+		{
+			arrayStride: 12,
+			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+		},
+	);
+	const cubeMesh = renderer.registerStaticIndexedMesh(
+		massCubesVertexPositionBytes(0.42),
+		massCubesIndexU16Bytes(),
+		MASS_CUBES_INDEX_U16_COUNT,
+	);
+	const instanceBuffer = renderer.registerStaticInstanceBuffer(instanceData);
 
 	const demoState: DemoState = {
 		canvas,
 		context,
 		device,
 		queue,
-		render,
-		transformStorage,
+		renderer,
+		cubeMesh,
+		instanceBuffer,
 		scene,
 		orbitControllerComponent,
 		cameraHomeComponent,
@@ -432,14 +435,12 @@ function createDemoStateForEngine(
 		denseTransformLayout,
 		perSide,
 		snapshotColorView: undefined,
-		snapshotDepthView: undefined,
 		frame: 0,
 		lastFrameStartMs: -1,
 		cpuFrameStartMs: -1,
 	};
 	addMassCubesCameraSyncSystem(demoState);
 	uploadInitialGlobalTransforms(demoState);
-	drainAndUploadCameraWrites(queue, render.cameraBuffer, world);
 	return demoState;
 }
 
@@ -500,24 +501,17 @@ function renderScene(
 	scene: Scene<World, EntityId>,
 	colorView: GPUTextureView,
 ): void {
-	const world = scene.world();
-	drainAndUploadCameraWrites(
-		demoState.queue,
-		demoState.render.cameraBuffer,
-		world,
-	);
-	renderMassCubesScene({
-		device: demoState.device,
-		queue: demoState.queue,
-		render: demoState.render,
+	demoState.renderer.renderInstancedMesh(
+		scene,
+		demoState.cubeMesh,
+		demoState.instanceBuffer,
+		MASS_CUBES_ENTITY_COUNT,
 		colorView,
-		depthView: demoState.snapshotDepthView,
-	});
+	);
 }
 
 function releaseDemoState(demoState: DemoState): void {
-	releaseMassCubesRenderResources(demoState.render);
-	demoState.transformStorage.destroy();
+	demoState.renderer.release();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
@@ -533,10 +527,8 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	const target = createRgba8ReadbackTarget(demoState.device, MASS_CUBES_CANVAS_WIDTH, MASS_CUBES_CANVAS_HEIGHT);
 	try {
 		demoState.snapshotColorView = target.view;
-		demoState.snapshotDepthView = target.depthView;
 		engine.runFrame(0);
 		demoState.snapshotColorView = undefined;
-		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
 			demoState.device,
 			demoState.queue,
@@ -546,7 +538,6 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 		);
 	} finally {
 		demoState.snapshotColorView = undefined;
-		demoState.snapshotDepthView = undefined;
 		engine.shutdown();
 		destroyReadbackTarget(target);
 	}

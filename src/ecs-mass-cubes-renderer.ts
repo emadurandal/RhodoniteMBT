@@ -201,13 +201,13 @@ function createMassCubesRenderResourcesInternal(
 		size: MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 	});
-	queue.writeBuffer(vertexBuffer, 0, vertexPositionBytes(0.42));
+	queue.writeBuffer(vertexBuffer, 0, massCubesVertexPositionBytes(0.42));
 	const instanceBuffer = device.createBuffer({
 		size: instanceData.byteLength,
 		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 	});
 	queue.writeBuffer(instanceBuffer, 0, instanceData);
-	const indexData = indexCubeU16Bytes();
+	const indexData = massCubesIndexU16Bytes();
 	const indexBuffer = device.createBuffer({
 		size: indexData.byteLength,
 		usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
@@ -510,7 +510,7 @@ function cubeLocalCorners(): [number, number, number][] {
 	];
 }
 
-function vertexPositionBytes(scale: number): Uint8Array {
+export function massCubesVertexPositionBytes(scale: number): Uint8Array {
 	const bytes = new Uint8Array(
 		MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
 	);
@@ -523,7 +523,7 @@ function vertexPositionBytes(scale: number): Uint8Array {
 	return bytes;
 }
 
-function indexCubeU16Bytes(): Uint8Array {
+export function massCubesIndexU16Bytes(): Uint8Array {
 	const indices = [
 		0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 4, 7, 7, 3, 0, 1, 5, 6, 6, 2,
 		1, 0, 1, 5, 5, 4, 0, 3, 2, 6, 6, 7, 3,
