@@ -472,18 +472,14 @@ fn Renderer::extract_draw_items(
   @ecs.Query::new([renderable.id, world.global_transform_component()]).for_each(
     world,
     row => {
-      let mut mesh_index = -1
-      let mut material_index = -1
-      row.read(renderable.id, bytes => {
-        mesh_index = renderable_mesh_handle_from_view(bytes).index
-        material_index = renderable_material_handle_from_view(bytes).index
-      })
       row.read(renderable.id, bytes => {
         let flags = renderable_flags_from_view(bytes)
-        if flags.contains(renderable_flags_visible()) &&
-          self.has_mesh(mesh_index) &&
-          self.has_material(material_index) {
-          items.push({ entity: row.entity(), mesh_index, material_index })
+        if flags.contains(renderable_flags_visible()) {
+          let mesh_index = renderable_mesh_handle_from_view(bytes).index
+          let material_index = renderable_material_handle_from_view(bytes).index
+          if self.has_mesh(mesh_index) && self.has_material(material_index) {
+            items.push({ entity: row.entity(), mesh_index, material_index })
+          }
         }
       })
     },
