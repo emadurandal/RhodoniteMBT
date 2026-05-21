@@ -362,17 +362,7 @@ export function setCameraLensOrthographic(
 	return world.addComponentBytes(camera, lensComponent, bytes);
 }
 
-export function readOrbitCameraControllerComponent(
-	world: World,
-	camera: EntityId,
-	component: ComponentTypeId,
-): OrbitCameraController {
-	const bytes = componentBytesOrThrow(
-		world,
-		camera,
-		component,
-		"readOrbitCameraControllerComponent",
-	);
+function readOrbitCameraControllerFromBytes(bytes: Uint8Array): OrbitCameraController {
 	return {
 		yaw: readF32(bytes, ORBIT_YAW_OFFSET),
 		pitch: readF32(bytes, ORBIT_PITCH_OFFSET),
@@ -389,22 +379,42 @@ export function readOrbitCameraControllerComponent(
 	};
 }
 
+export function readOrbitCameraControllerComponent(
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+): OrbitCameraController {
+	return readOrbitCameraControllerFromBytes(
+		componentBytesOrThrow(
+			world,
+			camera,
+			component,
+			"readOrbitCameraControllerComponent",
+		),
+	);
+}
+
+function readOrbitCameraPoseFromBytes(bytes: Uint8Array): OrbitCameraPose {
+	return {
+		...readOrbitCameraControllerFromBytes(bytes),
+		distance: readF32(bytes, ORBIT_DISTANCE_OFFSET),
+		resetRequested: readF32(bytes, ORBIT_RESET_REQUESTED_OFFSET) !== 0,
+	};
+}
+
 function readOrbitCameraPoseComponent(
 	world: World,
 	camera: EntityId,
 	component: ComponentTypeId,
 ): OrbitCameraPose {
-	const bytes = componentBytesOrThrow(
-		world,
-		camera,
-		component,
-		"readOrbitCameraPoseComponent",
+	return readOrbitCameraPoseFromBytes(
+		componentBytesOrThrow(
+			world,
+			camera,
+			component,
+			"readOrbitCameraPoseComponent",
+		),
 	);
-	return {
-		...readOrbitCameraControllerComponent(world, camera, component),
-		distance: readF32(bytes, ORBIT_DISTANCE_OFFSET),
-		resetRequested: readF32(bytes, ORBIT_RESET_REQUESTED_OFFSET) !== 0,
-	};
 }
 
 export function updateOrbitCameraControllerComponentFromMouseFrame(
@@ -419,7 +429,7 @@ export function updateOrbitCameraControllerComponentFromMouseFrame(
 		component,
 		"updateOrbitCameraControllerComponentFromMouseFrame",
 	);
-	const controller = readOrbitCameraControllerComponent(world, camera, component);
+	const controller = readOrbitCameraControllerFromBytes(bytes);
 	if (!updateOrbitCameraControllerFromMouseFrame(controller, frame)) {
 		return false;
 	}
