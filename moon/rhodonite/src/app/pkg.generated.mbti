@@ -10,7 +10,7 @@ import {
 }
 
 // Values
-pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, MeshHandle, MaterialHandle) -> Bool
+pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
 
 pub fn default_fixed_step_phases() -> Array[@ecs.PhaseKey]
 
@@ -54,15 +54,23 @@ pub fn phase_update() -> @ecs.PhaseKey
 
 pub fn register_renderable_component(@ecs.World) -> RenderableComponent
 
-pub fn renderable_component_bytes(MeshHandle, MaterialHandle) -> FixedArray[Byte]
+pub fn renderable_component_bytes(RenderableDesc) -> FixedArray[Byte]
 
 pub fn renderable_component_stride() -> Int
+
+pub fn renderable_flags_default() -> RenderableFlags
+
+pub fn renderable_flags_from_view(ArrayView[Byte]) -> RenderableFlags
+
+pub fn renderable_flags_none() -> RenderableFlags
+
+pub fn renderable_flags_visible() -> RenderableFlags
 
 pub fn renderable_material_handle_from_view(ArrayView[Byte]) -> MaterialHandle
 
 pub fn renderable_mesh_handle_from_view(ArrayView[Byte]) -> MeshHandle
 
-pub fn set_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, MeshHandle, MaterialHandle) -> Bool
+pub fn set_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
 
 // Errors
 
@@ -184,6 +192,19 @@ pub(all) struct RenderableComponent {
 }
 pub fn RenderableComponent::id(Self) -> @ecs.ComponentTypeId
 
+pub(all) struct RenderableDesc {
+  mesh : MeshHandle
+  material : MaterialHandle
+  flags : RenderableFlags
+}
+pub fn RenderableDesc::new(MeshHandle, MaterialHandle, flags? : RenderableFlags) -> Self
+
+pub(all) struct RenderableFlags {
+  // private fields
+} derive(Eq)
+pub fn RenderableFlags::bits(Self) -> UInt
+pub fn RenderableFlags::contains(Self, Self) -> Bool
+
 pub struct Renderer {
   // private fields
 }
@@ -191,7 +212,7 @@ pub fn Renderer::device(Self) -> @webgpu.GPUDevice
 pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, String, Int, Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
 pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray[Byte], Int) -> MeshHandle
 pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> InstanceBufferHandle
-pub fn Renderer::register_unlit_material(Self, Double, Double, Double) -> MaterialHandle
+pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
 pub fn Renderer::render_scene(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::render_static_indexed_mesh_instances(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
@@ -253,6 +274,15 @@ pub fn TimeState::new(Float) -> Self
 pub fn TimeState::next_fixed_frame(Self) -> FrameState
 pub fn TimeState::next_render_frame(Self, Float) -> FrameState
 pub fn TimeState::push_fixed_elapsed(Self, Float) -> Unit
+
+pub(all) struct UnlitMaterialDesc {
+  base_color_r : Double
+  base_color_g : Double
+  base_color_b : Double
+  alpha : Double
+  flags : UInt
+}
+pub fn UnlitMaterialDesc::new(Double, Double, Double, alpha? : Double, flags? : UInt) -> Self
 
 // Type aliases
 pub using @ecs {type PhaseKey}

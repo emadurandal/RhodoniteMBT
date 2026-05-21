@@ -289,14 +289,39 @@ pub fn create_demo_state_for_scene(
   let cube_mesh = renderer.register_static_indexed_mesh(
     vertex_bytes, index_bytes, index_u16_count,
   )
-  let sun_material = renderer.register_unlit_material(1.0, 0.65, 0.15)
-  let earth_material = renderer.register_unlit_material(0.2, 0.55, 1.0)
-  let moon_material = renderer.register_unlit_material(1.0, 0.0, 1.0)
-  ignore(@app.add_renderable(world, sun, renderable, cube_mesh, sun_material))
-  ignore(
-    @app.add_renderable(world, earth, renderable, cube_mesh, earth_material),
+  let sun_material = renderer.register_unlit_material(
+    @app.UnlitMaterialDesc::new(1.0, 0.65, 0.15),
   )
-  ignore(@app.add_renderable(world, moon, renderable, cube_mesh, moon_material))
+  let earth_material = renderer.register_unlit_material(
+    @app.UnlitMaterialDesc::new(0.2, 0.55, 1.0),
+  )
+  let moon_material = renderer.register_unlit_material(
+    @app.UnlitMaterialDesc::new(1.0, 0.0, 1.0),
+  )
+  ignore(
+    @app.add_renderable(
+      world,
+      sun,
+      renderable,
+      @app.RenderableDesc::new(cube_mesh, sun_material),
+    ),
+  )
+  ignore(
+    @app.add_renderable(
+      world,
+      earth,
+      renderable,
+      @app.RenderableDesc::new(cube_mesh, earth_material),
+    ),
+  )
+  ignore(
+    @app.add_renderable(
+      world,
+      moon,
+      renderable,
+      @app.RenderableDesc::new(cube_mesh, moon_material),
+    ),
+  )
   push_local_transforms(world, bodies, 0.0)
   ignore(
     scene.run_systems_for_phase(

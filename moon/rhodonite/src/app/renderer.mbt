@@ -28,11 +28,31 @@ priv struct RendererMesh {
 }
 
 ///|
+/// Description for an unlit material registered with `Renderer`.
+pub(all) struct UnlitMaterialDesc {
+  base_color_r : Double
+  base_color_g : Double
+  base_color_b : Double
+  alpha : Double
+  flags : UInt
+}
+
+///|
+/// Builds an unlit material description.
+pub fn UnlitMaterialDesc::new(
+  base_color_r : Double,
+  base_color_g : Double,
+  base_color_b : Double,
+  alpha? : Double = 1.0,
+  flags? : UInt = 0U,
+) -> UnlitMaterialDesc {
+  { base_color_r, base_color_g, base_color_b, alpha, flags }
+}
+
+///|
 /// Unlit material resource owned by `Renderer`.
 priv struct RendererMaterial {
-  r : Double
-  g : Double
-  b : Double
+  desc : UnlitMaterialDesc
 }
 
 ///|
@@ -249,15 +269,13 @@ pub fn Renderer::register_static_indexed_mesh(
 }
 
 ///|
-/// Registers an unlit RGB material.
+/// Registers an unlit material.
 pub fn Renderer::register_unlit_material(
   self : Renderer,
-  r : Double,
-  g : Double,
-  b : Double,
+  desc : UnlitMaterialDesc,
 ) -> MaterialHandle {
   let index = self.materials.length()
-  self.materials.push({ r, g, b })
+  self.materials.push({ desc, })
   { index, }
 }
 
@@ -430,9 +448,14 @@ fn Renderer::extract_draw_items(
         mesh_index = renderable_mesh_handle_from_view(bytes).index
         material_index = renderable_material_handle_from_view(bytes).index
       })
-      if self.has_mesh(mesh_index) && self.has_material(material_index) {
-        items.push({ entity: row.entity(), mesh_index, material_index })
-      }
+      row.read(renderable.id, bytes => {
+        let flags = renderable_flags_from_view(bytes)
+        if flags.contains(renderable_flags_visible()) &&
+          self.has_mesh(mesh_index) &&
+          self.has_material(material_index) {
+          items.push({ entity: row.entity(), mesh_index, material_index })
+        }
+      })
     },
   )
   items
@@ -488,7 +511,11 @@ fn Renderer::build_instance_bytes(
   let colors : Array[RendererInstanceColor] = []
   for i = 0; i < items.length(); i = i + 1 {
     let material = self.materials[items[i].material_index]
-    colors.push({ r: material.r, g: material.g, b: material.b })
+    colors.push({
+      r: material.desc.base_color_r,
+      g: material.desc.base_color_g,
+      b: material.desc.base_color_b,
+    })
   }
   build_renderer_instance_bytes(world, entities, colors)
 }
