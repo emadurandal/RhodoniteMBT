@@ -424,7 +424,7 @@ function localMatrixFromTrs(
 	]);
 }
 
-function mat4Inverse(m: Float32Array): Float32Array | null {
+export function mat4Inverse(m: Float32Array): Float32Array | null {
 	const a00 = m[0] ?? 0;
 	const a01 = m[1] ?? 0;
 	const a02 = m[2] ?? 0;
