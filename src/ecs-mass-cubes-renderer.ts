@@ -1,17 +1,7 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-	cameraHelpersDefault,
-	cameraWordsBindGroup,
-	cameraWordsBindingDefault,
-	globalTransformHelpersDefault,
-	globalTransformRefInstanceVertexBufferLayout,
-	globalTransformWordsBindGroup,
-	globalTransformWordsBindingDefault,
-	createOrbitCameraController,
-	type OrbitCameraController,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import { type OrbitCameraController } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import { updateOrbitCameraControllerFromInput } from "../moon/rhodonite/src/app/ts/index.ts";
 
 export { updateOrbitCameraControllerFromInput };
@@ -30,18 +20,6 @@ export const MASS_CUBES_CUBE_SCALE = 0.055;
 export const MASS_CUBES_MIN_INTERACTIVE_GRID_PITCH_PX = 0.56;
 
 type Mat4 = Float32Array;
-
-export type MassCubesRenderResources = {
-	readonly pipeline: GPURenderPipeline;
-	readonly depthTexture: GPUTexture;
-	readonly depthView: GPUTextureView;
-	readonly vertexBuffer: GPUBuffer;
-	readonly instanceBuffer: GPUBuffer;
-	readonly indexBuffer: GPUBuffer;
-	readonly cameraBuffer: GPUBuffer;
-	readonly bindTransforms: GPUBindGroup;
-	readonly bindCamera: GPUBindGroup;
-};
 
 export function gridSideLen(count: number): number {
 	return Math.ceil(Math.sqrt(count));
@@ -71,18 +49,6 @@ export function writeU32(bytes: Uint8Array, offset: number, value: number): void
 	);
 }
 
-export function createMassCubesOrbitCameraController(): OrbitCameraController {
-	return createOrbitCameraController(MASS_CUBES_CAMERA_ELEVATION_RAD);
-}
-
-export function writeMassCubesCameraUniform(
-	queue: GPUQueue,
-	cameraBuffer: GPUBuffer,
-	orbit: OrbitCameraController,
-): void {
-	queue.writeBuffer(cameraBuffer, 0, cameraUniformBytes(orbit));
-}
-
 export function createMassCubesInstanceBytesFromRefs(
 	transformRefs: Uint32Array,
 ): Uint8Array {
@@ -98,199 +64,6 @@ export function createMassCubesInstanceBytesFromRefs(
 		writeF32(bytes, base + 16, b);
 	}
 	return bytes;
-}
-
-type MassCubesRenderResourceOptions = {
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly targetFormat: GPUTextureFormat;
-	readonly transformStorage: GPUBuffer;
-	readonly instanceData: Uint8Array;
-} & (
-	| {
-			readonly orbitController: OrbitCameraController;
-			readonly cameraStorage?: undefined;
-	  }
-	| {
-			readonly orbitController?: undefined;
-			readonly cameraStorage: GPUBuffer;
-	  }
-);
-
-export function createMassCubesRenderResources(options: {
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly targetFormat: GPUTextureFormat;
-	readonly transformStorage: GPUBuffer;
-	readonly instanceData: Uint8Array;
-	readonly orbitController: OrbitCameraController;
-}): MassCubesRenderResources {
-	return createMassCubesRenderResourcesInternal(options);
-}
-
-export function createMassCubesRenderResourcesFromCameraStorage(options: {
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly targetFormat: GPUTextureFormat;
-	readonly transformStorage: GPUBuffer;
-	readonly cameraStorage: GPUBuffer;
-	readonly instanceData: Uint8Array;
-}): MassCubesRenderResources {
-	return createMassCubesRenderResourcesInternal(options);
-}
-
-function createMassCubesRenderResourcesInternal(
-	options: MassCubesRenderResourceOptions,
-): MassCubesRenderResources {
-	const { device, queue, targetFormat, transformStorage, instanceData } = options;
-	const usesCameraStorage = options.cameraStorage !== undefined;
-	const shader = device.createShaderModule({
-		code: shaderWgsl(usesCameraStorage ? "storage" : "uniform"),
-	});
-	const pipeline = device.createRenderPipeline({
-		layout: "auto",
-		vertex: {
-			module: shader,
-			entryPoint: "vertexMain",
-			buffers: [
-				{
-					arrayStride: MASS_CUBES_VERTEX_STRIDE_LOCAL,
-					stepMode: "vertex",
-					attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-				},
-				globalTransformRefInstanceVertexBufferLayout(MASS_CUBES_INSTANCE_STRIDE, {
-					extraAttributes: [
-						{ shaderLocation: 2, offset: 8, format: "float32x3" },
-					],
-				}),
-			],
-		},
-		fragment: {
-			module: shader,
-			entryPoint: "fragmentMain",
-			targets: [{ format: targetFormat }],
-		},
-		primitive: { topology: "triangle-list" },
-		depthStencil: {
-			format: "depth24plus",
-			depthWriteEnabled: true,
-			depthCompare: "less",
-		},
-	});
-	const cameraBuffer =
-		options.cameraStorage ??
-		device.createBuffer({
-			size: 256,
-			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-		});
-	if (!usesCameraStorage) {
-		writeMassCubesCameraUniform(queue, cameraBuffer, options.orbitController);
-	}
-	const bindTransforms = globalTransformWordsBindGroup(
-		device,
-		pipeline,
-		transformStorage,
-	);
-	const bindCamera = usesCameraStorage
-		? cameraWordsBindGroup(device, pipeline, cameraBuffer)
-		: device.createBindGroup({
-				layout: pipeline.getBindGroupLayout(1),
-				entries: [{ binding: 0, resource: { buffer: cameraBuffer } }],
-			});
-	const vertexBuffer = device.createBuffer({
-		size: MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
-		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-	});
-	queue.writeBuffer(vertexBuffer, 0, massCubesVertexPositionBytes(0.42));
-	const instanceBuffer = device.createBuffer({
-		size: instanceData.byteLength,
-		usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-	});
-	queue.writeBuffer(instanceBuffer, 0, instanceData);
-	const indexData = massCubesIndexU16Bytes();
-	const indexBuffer = device.createBuffer({
-		size: indexData.byteLength,
-		usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-	});
-	queue.writeBuffer(indexBuffer, 0, indexData);
-	const depthTexture = device.createTexture({
-		size: [MASS_CUBES_CANVAS_WIDTH, MASS_CUBES_CANVAS_HEIGHT],
-		format: "depth24plus",
-		usage: GPUTextureUsage.RENDER_ATTACHMENT,
-	});
-	return {
-		pipeline,
-		depthTexture,
-		depthView: depthTexture.createView(),
-		vertexBuffer,
-		instanceBuffer,
-		indexBuffer,
-		cameraBuffer,
-		bindTransforms,
-		bindCamera,
-	};
-}
-
-export function renderMassCubesScene(options: {
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly render: MassCubesRenderResources;
-	readonly colorView: GPUTextureView;
-	readonly depthView?: GPUTextureView;
-}): void {
-	const { device, queue, render, colorView } = options;
-	const depthView = options.depthView ?? render.depthView;
-	const encoder = device.createCommandEncoder();
-	const pass = encoder.beginRenderPass({
-		colorAttachments: [
-			{
-				view: colorView,
-				clearValue: { r: 0.03, g: 0.04, b: 0.09, a: 1 },
-				loadOp: "clear",
-				storeOp: "store",
-			},
-		],
-		depthStencilAttachment: {
-			view: depthView,
-			depthClearValue: 1,
-			depthLoadOp: "clear",
-			depthStoreOp: "store",
-		},
-	});
-	pass.setPipeline(render.pipeline);
-	pass.setBindGroup(0, render.bindTransforms);
-	pass.setBindGroup(1, render.bindCamera);
-	pass.setIndexBuffer(
-		render.indexBuffer,
-		"uint16",
-		0,
-		MASS_CUBES_INDEX_U16_COUNT * 2,
-	);
-	pass.setVertexBuffer(
-		0,
-		render.vertexBuffer,
-		0,
-		MASS_CUBES_VERTS_PER_CUBE * MASS_CUBES_VERTEX_STRIDE_LOCAL,
-	);
-	pass.setVertexBuffer(
-		1,
-		render.instanceBuffer,
-		0,
-		MASS_CUBES_ENTITY_COUNT * MASS_CUBES_INSTANCE_STRIDE,
-	);
-	pass.drawIndexed(MASS_CUBES_INDEX_U16_COUNT, MASS_CUBES_ENTITY_COUNT);
-	pass.end();
-	queue.submit([encoder.finish()]);
-}
-
-export function releaseMassCubesRenderResources(
-	render: MassCubesRenderResources,
-): void {
-	render.depthTexture.destroy();
-	render.vertexBuffer.destroy();
-	render.instanceBuffer.destroy();
-	render.indexBuffer.destroy();
-	render.cameraBuffer.destroy();
 }
 
 export function instanceColorRgb(index: number): [number, number, number] {
@@ -489,14 +262,6 @@ export function massCubesCameraMatrices(
 	};
 }
 
-function cameraUniformBytes(orbit: OrbitCameraController): Uint8Array {
-	const { view, proj } = massCubesCameraMatrices(orbit);
-	const vp = mat4Mul(proj, view);
-	const bytes = new Uint8Array(256);
-	new Float32Array(bytes.buffer, 0, 16).set(vp);
-	return bytes;
-}
-
 function cubeLocalCorners(): [number, number, number][] {
 	return [
 		[-1, -1, -1],
@@ -531,87 +296,4 @@ export function massCubesIndexU16Bytes(): Uint8Array {
 	const bytes = new Uint8Array(indices.length * 2);
 	indices.forEach((index, i) => writeU16(bytes, i * 2, index));
 	return bytes;
-}
-
-function shaderWgsl(cameraBinding: "uniform" | "storage"): string {
-	if (cameraBinding === "storage") {
-		const prefix =
-			globalTransformWordsBindingDefault() + cameraWordsBindingDefault();
-		const suffix = `
-struct VertexOut {
-  @builtin(position) position: vec4<f32>,
-  @location(0) color: vec3<f32>,
-};
-
-@vertex
-fn vertexMain(
-  @location(0) local_pos: vec3<f32>,
-  @location(1) transform_ref: vec2<u32>,
-  @location(2) color: vec3<f32>,
-) -> VertexOut {
-  let world_pos = rn_transform_point(
-    rn_load_global_transform(transform_ref),
-    local_pos,
-  );
-  let camera = rn_load_camera(0u);
-  let clip = camera.view_proj * world_pos;
-  var o: VertexOut;
-  o.position = clip;
-  o.color = color;
-  return o;
-}
-
-@fragment
-fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-  return vec4<f32>(color, 1.0);
-}
-`;
-		return (
-			prefix +
-			globalTransformHelpersDefault() +
-			cameraHelpersDefault() +
-			suffix
-		);
-	}
-	const prefix =
-		`
-struct CameraUniform {
-  view_proj: mat4x4<f32>,
-}
-
-` +
-		globalTransformWordsBindingDefault() +
-		`
-@group(1) @binding(0) var<uniform> camera: CameraUniform;
-`;
-
-	const suffix = `
-struct VertexOut {
-  @builtin(position) position: vec4<f32>,
-  @location(0) color: vec3<f32>,
-};
-
-@vertex
-fn vertexMain(
-  @location(0) local_pos: vec3<f32>,
-  @location(1) transform_ref: vec2<u32>,
-  @location(2) color: vec3<f32>,
-) -> VertexOut {
-  let world_pos = rn_transform_point(
-    rn_load_global_transform(transform_ref),
-    local_pos,
-  );
-  let clip = camera.view_proj * world_pos;
-  var o: VertexOut;
-  o.position = clip;
-  o.color = color;
-  return o;
-}
-
-@fragment
-fn fragmentMain(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-  return vec4<f32>(color, 1.0);
-}
-`;
-	return prefix + globalTransformHelpersDefault() + suffix;
 }

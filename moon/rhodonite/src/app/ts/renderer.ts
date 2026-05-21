@@ -420,6 +420,28 @@ export class Renderer {
 		}
 	}
 
+	ensureStorageBuffers(options: {
+		readonly transformWords: number;
+		readonly cameraWords: number;
+	}): void {
+		this.ensureStorageBufferCapacities(
+			options.transformWords,
+			options.cameraWords,
+		);
+	}
+
+	uploadGlobalTransformBytes(bytes: Uint8Array, byteOffset = 0): void {
+		if (this.transformStorage !== null) {
+			this.queue.writeBuffer(this.transformStorage, byteOffset, bytes);
+		}
+	}
+
+	uploadCameraBytes(bytes: Uint8Array, byteOffset = 0): void {
+		if (this.cameraStorage !== null) {
+			this.queue.writeBuffer(this.cameraStorage, byteOffset, bytes);
+		}
+	}
+
 	renderSceneRenderables(
 		scene: Scene<World, EntityId>,
 		renderable: RenderableComponent,
@@ -511,6 +533,98 @@ export class Renderer {
 		if (this.cameraStorage !== null) {
 			drainAndUploadCameraWrites(this.queue, this.cameraStorage, world);
 		}
+		this.drawInstancedMesh(meshEntry, instanceEntry, instanceCount, colorView);
+	}
+
+	renderPreparedInstancedMesh(
+		mesh: MeshHandle,
+		instances: InstanceBufferHandle,
+		instanceCount: number,
+		colorView: GPUTextureView,
+	): void {
+		const meshEntry = this.meshes[mesh.index()];
+		const instanceEntry = this.instanceBuffers[instances.index()];
+		const instanceByteLength = instanceCount * RENDERER_INSTANCE_STRIDE;
+		if (
+			this.depthView === null ||
+			instanceCount <= 0 ||
+			meshEntry === undefined ||
+			instanceEntry === undefined ||
+			instanceByteLength > instanceEntry.byteCapacity
+		) {
+			return;
+		}
+		this.drawInstancedMesh(meshEntry, instanceEntry, instanceCount, colorView);
+	}
+
+	release(): void {
+		for (const mesh of this.meshes) {
+			mesh.vertexBuffer.destroy();
+			mesh.indexBuffer.destroy();
+		}
+		for (const entry of this.instanceBuffers) {
+			entry.buffer.destroy();
+		}
+		this.transformStorage?.destroy();
+		this.cameraStorage?.destroy();
+		this.renderableInstanceBuffer?.destroy();
+		this.depthTexture?.destroy();
+		this.transformStorage = null;
+		this.cameraStorage = null;
+		this.renderableInstanceBuffer = null;
+		this.depthTexture = null;
+		this.depthView = null;
+	}
+
+	private ensureSceneBuffers(world: World): void {
+		this.ensureStorageBufferCapacities(
+			world.globalTransformBlobWordCapacity(),
+			world.cameraBlobWordCapacity(),
+		);
+	}
+
+	private ensureStorageBufferCapacities(
+		transformCapacity: number,
+		cameraCapacity: number,
+	): void {
+		if (
+			this.transformStorage === null ||
+			transformCapacity > this.transformWordCapacity
+		) {
+			this.transformStorage?.destroy();
+			this.transformStorage = createGlobalTransformWordsBuffer(
+				this.device,
+				transformCapacity,
+			);
+			this.transformWordCapacity = transformCapacity;
+			this.bindTransforms = globalTransformWordsBindGroup(
+				this.device,
+				this.pipeline,
+				this.transformStorage,
+			);
+		}
+		if (this.cameraStorage === null || cameraCapacity > this.cameraWordCapacity) {
+			this.cameraStorage?.destroy();
+			this.cameraStorage = createCameraWordsBuffer(this.device, cameraCapacity);
+			this.cameraWordCapacity = cameraCapacity;
+			this.bindCamera = cameraWordsBindGroup(
+				this.device,
+				this.pipeline,
+				this.cameraStorage,
+			);
+		}
+	}
+
+	private drawInstancedMesh(
+		meshEntry: RendererMesh,
+		instanceEntry: RendererInstanceBuffer,
+		instanceCount: number,
+		colorView: GPUTextureView,
+	): void {
+		if (this.depthView === null) {
+			return;
+		}
+		const instanceByteLength = instanceCount * RENDERER_INSTANCE_STRIDE;
 		const encoder = this.device.createCommandEncoder();
 		const pass = encoder.beginRenderPass({
 			colorAttachments: [
@@ -541,56 +655,6 @@ export class Renderer {
 		pass.drawIndexed(meshEntry.indexCount, instanceCount);
 		pass.end();
 		this.queue.submit([encoder.finish()]);
-	}
-
-	release(): void {
-		for (const mesh of this.meshes) {
-			mesh.vertexBuffer.destroy();
-			mesh.indexBuffer.destroy();
-		}
-		for (const entry of this.instanceBuffers) {
-			entry.buffer.destroy();
-		}
-		this.transformStorage?.destroy();
-		this.cameraStorage?.destroy();
-		this.renderableInstanceBuffer?.destroy();
-		this.depthTexture?.destroy();
-		this.transformStorage = null;
-		this.cameraStorage = null;
-		this.renderableInstanceBuffer = null;
-		this.depthTexture = null;
-		this.depthView = null;
-	}
-
-	private ensureSceneBuffers(world: World): void {
-		const transformCapacity = world.globalTransformBlobWordCapacity();
-		if (
-			this.transformStorage === null ||
-			transformCapacity > this.transformWordCapacity
-		) {
-			this.transformStorage?.destroy();
-			this.transformStorage = createGlobalTransformWordsBuffer(
-				this.device,
-				world,
-			);
-			this.transformWordCapacity = transformCapacity;
-			this.bindTransforms = globalTransformWordsBindGroup(
-				this.device,
-				this.pipeline,
-				this.transformStorage,
-			);
-		}
-		const cameraCapacity = world.cameraBlobWordCapacity();
-		if (this.cameraStorage === null || cameraCapacity > this.cameraWordCapacity) {
-			this.cameraStorage?.destroy();
-			this.cameraStorage = createCameraWordsBuffer(this.device, world);
-			this.cameraWordCapacity = cameraCapacity;
-			this.bindCamera = cameraWordsBindGroup(
-				this.device,
-				this.pipeline,
-				this.cameraStorage,
-			);
-		}
 	}
 
 	private extractDrawItems(

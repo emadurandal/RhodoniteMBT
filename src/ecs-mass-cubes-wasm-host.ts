@@ -3,16 +3,18 @@
 
 import "./style.css";
 import {
-	createCameraWordsBuffer,
-	createGlobalTransformWordsBuffer,
-	uploadGlobalTransformBytes,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
-import {
 	createRgba8ReadbackTarget,
 	destroyReadbackTarget,
 	readRgba8Texture,
 } from "./visual-regression/webgpu-readback";
-import { InputState, MouseButton, installBrowserInputState } from "../moon/rhodonite/src/app/ts/index.ts";
+import {
+	InputState,
+	MouseButton,
+	Renderer,
+	installBrowserInputState,
+	type InstanceBufferHandle,
+	type MeshHandle,
+} from "../moon/rhodonite/src/app/ts/index.ts";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,
@@ -20,10 +22,10 @@ import {
 	MASS_CUBES_ENTITY_COUNT,
 	MASS_CUBES_GRID_SPACING,
 	createMassCubesInstanceBytesFromRefs,
-	createMassCubesRenderResourcesFromCameraStorage,
 	gridSideLen,
-	renderMassCubesScene,
-	type MassCubesRenderResources,
+	massCubesIndexU16Bytes,
+	massCubesVertexPositionBytes,
+	MASS_CUBES_INDEX_U16_COUNT,
 } from "./ecs-mass-cubes-renderer";
 import {
 	createMassCubesHalfArray,
@@ -55,8 +57,9 @@ type DemoState = {
 	readonly context: GPUCanvasContext;
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
-	readonly render: MassCubesRenderResources;
-	readonly transformStorage: GPUBuffer;
+	readonly renderer: Renderer;
+	readonly cubeMesh: MeshHandle;
+	readonly instanceBuffer: InstanceBufferHandle;
 	readonly input: InputState;
 	readonly transformRefs: Uint32Array;
 	readonly transformBytes: Uint8Array;
@@ -70,7 +73,6 @@ type DemoState = {
 	perSide: number;
 	transformStride: number;
 	snapshotColorView?: GPUTextureView;
-	snapshotDepthView?: GPUTextureView;
 	wasmTransformUploadBuffer?: ArrayBufferLike;
 	wasmTransformUploadPtr?: number;
 	wasmTransformUploadByteLength?: number;
@@ -270,8 +272,7 @@ function writeMassCubesYTransformData(demoState: DemoState, waveTime: number): v
 }
 
 function writeWasmBytesToBuffer(
-	queue: GPUQueue,
-	gpuBuffer: GPUBuffer,
+	renderer: Renderer,
 	memory: WebAssembly.Memory | undefined,
 	ptr: number,
 	byteLength: number,
@@ -306,7 +307,7 @@ function writeWasmBytesToBuffer(
 		view = new Uint8Array(buffer, ptr, byteLength);
 		setCached(buffer, ptr, byteLength, view);
 	}
-	uploadGlobalTransformBytes(queue, gpuBuffer, view);
+	renderer.uploadGlobalTransformBytes(view);
 }
 
 function writeTransformBytesFromWasmMemory(
@@ -316,8 +317,7 @@ function writeTransformBytesFromWasmMemory(
 	byteLength: number,
 ): void {
 	writeWasmBytesToBuffer(
-		demoState.queue,
-		demoState.transformStorage,
+		demoState.renderer,
 		memory,
 		ptr,
 		byteLength,
@@ -355,19 +355,29 @@ async function createDemoState(
 	const targetFormat = renderFormat ?? format;
 
 	const transformLayout = createTransformLayout();
-	const transformStorage = createGlobalTransformWordsBuffer(
-		device,
-		transformLayout.wordCapacity,
-	);
-	const cameraStorage = createCameraWordsBuffer(device, CAMERA_WORD_COUNT);
-	const render = createMassCubesRenderResourcesFromCameraStorage({
+	const renderer = new Renderer(
 		device,
 		queue,
 		targetFormat,
-		transformStorage,
-		cameraStorage,
-		instanceData: createMassCubesInstanceBytesFromRefs(transformLayout.refs),
+		MASS_CUBES_CANVAS_WIDTH,
+		MASS_CUBES_CANVAS_HEIGHT,
+		{
+			arrayStride: 12,
+			attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+		},
+	);
+	renderer.ensureStorageBuffers({
+		transformWords: transformLayout.wordCapacity,
+		cameraWords: CAMERA_WORD_COUNT,
 	});
+	const cubeMesh = renderer.registerStaticIndexedMesh(
+		massCubesVertexPositionBytes(0.42),
+		massCubesIndexU16Bytes(),
+		MASS_CUBES_INDEX_U16_COUNT,
+	);
+	const instanceBuffer = renderer.registerStaticInstanceBuffer(
+		createMassCubesInstanceBytesFromRefs(transformLayout.refs),
+	);
 
 	const transformBytes = new Uint8Array(transformLayout.uploadWordCount * 4);
 	const transformWords = new Uint32Array(
@@ -391,8 +401,9 @@ async function createDemoState(
 		context,
 		device,
 		queue,
-		render,
-		transformStorage,
+		renderer,
+		cubeMesh,
+		instanceBuffer,
 		input: new InputState(),
 		transformRefs: transformLayout.refs,
 		transformBytes,
@@ -406,7 +417,6 @@ async function createDemoState(
 		perSide: gridSideLen(MASS_CUBES_ENTITY_COUNT),
 		transformStride: 0,
 		snapshotColorView: undefined,
-		snapshotDepthView: undefined,
 	};
 }
 
@@ -432,18 +442,14 @@ function createHostImports(
 			},
 			write_initial_global_transforms: (perSide: number, waveTime: number) => {
 				writeMassCubesFullTransformData(demoState, perSide, waveTime);
-				uploadGlobalTransformBytes(
-					demoState.queue,
-					demoState.transformStorage,
+				demoState.renderer.uploadGlobalTransformBytes(
 					demoState.transformBytes,
 					demoState.transformWordUploadFirst * 4,
 				);
 			},
 			write_global_transform_y: (waveTime: number) => {
 				writeMassCubesYTransformData(demoState, waveTime);
-				uploadGlobalTransformBytes(
-					demoState.queue,
-					demoState.transformStorage,
+				demoState.renderer.uploadGlobalTransformBytes(
 					demoState.transformBytes,
 					demoState.transformWordUploadFirst * 4,
 				);
@@ -471,23 +477,18 @@ function createHostImports(
 				demoState.cameraWords[wordIndex] = word >>> 0;
 			},
 			upload_camera_words: () => {
-				demoState.queue.writeBuffer(
-					demoState.render.cameraBuffer,
-					0,
-					demoState.cameraBytes,
-				);
+				demoState.renderer.uploadCameraBytes(demoState.cameraBytes);
 			},
 			render_demo_frame: (fps: number, cpuMs: number) => {
 				const colorView =
 					demoState.snapshotColorView ??
 					demoState.context.getCurrentTexture().createView();
-				renderMassCubesScene({
-					device: demoState.device,
-					queue: demoState.queue,
-					render: demoState.render,
+				demoState.renderer.renderPreparedInstancedMesh(
+					demoState.cubeMesh,
+					demoState.instanceBuffer,
+					MASS_CUBES_ENTITY_COUNT,
 					colorView,
-					depthView: demoState.snapshotDepthView,
-				});
+				);
 				updatePerfOverlay(label, fps, cpuMs);
 			},
 		},
@@ -570,10 +571,8 @@ export async function renderEcsMassCubesWasmSnapshot(
 		wasm._start?.();
 		wasm.create_wasm_demo_state();
 		demoState.snapshotColorView = target.view;
-		demoState.snapshotDepthView = target.depthView;
 		runWasmRenderFrame(wasm);
 		demoState.snapshotColorView = undefined;
-		demoState.snapshotDepthView = undefined;
 		return await readRgba8Texture(
 			demoState.device,
 			demoState.queue,
@@ -583,7 +582,7 @@ export async function renderEcsMassCubesWasmSnapshot(
 		);
 	} finally {
 		demoState.snapshotColorView = undefined;
-		demoState.snapshotDepthView = undefined;
+		demoState.renderer.release();
 		destroyReadbackTarget(target);
 	}
 }
