@@ -193,10 +193,11 @@ pub(all) struct RenderableComponent {
 pub fn RenderableComponent::id(Self) -> @ecs.ComponentTypeId
 
 pub(all) struct RenderableDesc {
-  mesh : MeshHandle
-  material : MaterialHandle
-  flags : RenderableFlags
+  // private fields
 }
+pub fn RenderableDesc::flags(Self) -> RenderableFlags
+pub fn RenderableDesc::material(Self) -> MaterialHandle
+pub fn RenderableDesc::mesh(Self) -> MeshHandle
 pub fn RenderableDesc::new(MeshHandle, MaterialHandle, flags? : RenderableFlags) -> Self
 
 pub(all) struct RenderableFlags {
@@ -276,12 +277,13 @@ pub fn TimeState::next_render_frame(Self, Float) -> FrameState
 pub fn TimeState::push_fixed_elapsed(Self, Float) -> Unit
 
 pub(all) struct UnlitMaterialDesc {
-  base_color_r : Double
-  base_color_g : Double
-  base_color_b : Double
-  alpha : Double
-  flags : UInt
+  // private fields
 }
+pub fn UnlitMaterialDesc::alpha(Self) -> Double
+pub fn UnlitMaterialDesc::base_color_b(Self) -> Double
+pub fn UnlitMaterialDesc::base_color_g(Self) -> Double
+pub fn UnlitMaterialDesc::base_color_r(Self) -> Double
+pub fn UnlitMaterialDesc::flags(Self) -> UInt
 pub fn UnlitMaterialDesc::new(Double, Double, Double, alpha? : Double, flags? : UInt) -> Self
 
 // Type aliases

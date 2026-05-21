@@ -30,11 +30,11 @@ priv struct RendererMesh {
 ///|
 /// Description for an unlit material registered with `Renderer`.
 pub(all) struct UnlitMaterialDesc {
-  base_color_r : Double
-  base_color_g : Double
-  base_color_b : Double
-  alpha : Double
-  flags : UInt
+  priv base_color_r : Double
+  priv base_color_g : Double
+  priv base_color_b : Double
+  priv alpha : Double
+  priv flags : UInt
 }
 
 ///|
@@ -47,6 +47,36 @@ pub fn UnlitMaterialDesc::new(
   flags? : UInt = 0U,
 ) -> UnlitMaterialDesc {
   { base_color_r, base_color_g, base_color_b, alpha, flags }
+}
+
+///|
+/// Returns the red channel of the unlit base color.
+pub fn UnlitMaterialDesc::base_color_r(self : UnlitMaterialDesc) -> Double {
+  self.base_color_r
+}
+
+///|
+/// Returns the green channel of the unlit base color.
+pub fn UnlitMaterialDesc::base_color_g(self : UnlitMaterialDesc) -> Double {
+  self.base_color_g
+}
+
+///|
+/// Returns the blue channel of the unlit base color.
+pub fn UnlitMaterialDesc::base_color_b(self : UnlitMaterialDesc) -> Double {
+  self.base_color_b
+}
+
+///|
+/// Returns the alpha channel reserved for future blending support.
+pub fn UnlitMaterialDesc::alpha(self : UnlitMaterialDesc) -> Double {
+  self.alpha
+}
+
+///|
+/// Returns the raw material option flags.
+pub fn UnlitMaterialDesc::flags(self : UnlitMaterialDesc) -> UInt {
+  self.flags
 }
 
 ///|

@@ -67,9 +67,9 @@ pub fn renderable_flags_default() -> RenderableFlags {
 ///|
 /// CPU-side renderable description stored in the Renderable ECS component.
 pub(all) struct RenderableDesc {
-  mesh : MeshHandle
-  material : MaterialHandle
-  flags : RenderableFlags
+  priv mesh : MeshHandle
+  priv material : MaterialHandle
+  priv flags : RenderableFlags
 }
 
 ///|
@@ -80,6 +80,24 @@ pub fn RenderableDesc::new(
   flags? : RenderableFlags = renderable_flags_default(),
 ) -> RenderableDesc {
   { mesh, material, flags }
+}
+
+///|
+/// Returns the mesh handle referenced by this renderable.
+pub fn RenderableDesc::mesh(self : RenderableDesc) -> MeshHandle {
+  self.mesh
+}
+
+///|
+/// Returns the material handle referenced by this renderable.
+pub fn RenderableDesc::material(self : RenderableDesc) -> MaterialHandle {
+  self.material
+}
+
+///|
+/// Returns the extraction flags for this renderable.
+pub fn RenderableDesc::flags(self : RenderableDesc) -> RenderableFlags {
+  self.flags
 }
 
 ///|

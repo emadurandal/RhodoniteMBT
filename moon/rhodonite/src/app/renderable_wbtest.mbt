@@ -23,6 +23,17 @@ test "renderable flags report visible participation" {
 }
 
 ///|
+test "renderable description exposes constructor accessors" {
+  let mesh = MeshHandle::{ index: 2 }
+  let material = MaterialHandle::{ index: 5 }
+  let flags = renderable_flags_none()
+  let desc = RenderableDesc::new(mesh, material, flags~)
+  assert_true(desc.mesh() == mesh)
+  assert_true(desc.material() == material)
+  assert_true(desc.flags() == flags)
+}
+
+///|
 test "set_renderable adds and updates the component payload" {
   let world = @ecs.World::new()
   let renderable = register_renderable_component(world)

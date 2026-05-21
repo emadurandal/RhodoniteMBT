@@ -2,6 +2,16 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+test "unlit material description exposes constructor accessors" {
+  let desc = UnlitMaterialDesc::new(0.2, 0.4, 0.6, alpha=0.8, flags=3U)
+  assert_true(desc.base_color_r() == 0.2)
+  assert_true(desc.base_color_g() == 0.4)
+  assert_true(desc.base_color_b() == 0.6)
+  assert_true(desc.alpha() == 0.8)
+  assert_true(desc.flags() == 3U)
+}
+
+///|
 test "renderer instance bytes store transform refs and colors" {
   let world = @ecs.World::new()
   let entities = world.spawn_transform_global_batch(2, fn(
