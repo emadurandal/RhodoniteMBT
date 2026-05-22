@@ -44,3 +44,16 @@ test "phase handler registration key deduplicates exact phase slot key matches" 
     ),
   )
 }
+
+///|
+test "push unique declared common runtime scene skips duplicates" {
+  let main = Scene::new("main")
+  let surface_only = Scene::new("surface")
+  let result : Array[Scene] = []
+  push_unique_declared_common_runtime_scene(result, main)
+  push_unique_declared_common_runtime_scene(result, surface_only)
+  push_unique_declared_common_runtime_scene(result, main)
+  assert_eq(result.length(), 2)
+  assert_true(result[0].same(main))
+  assert_true(result[1].same(surface_only))
+}

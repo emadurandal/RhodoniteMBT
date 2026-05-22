@@ -370,10 +370,41 @@ fn Engine::add_common_runtime_orbit_camera_input_handler(
 }
 
 ///|
+/// Appends a scene once when it is not already present in the collection.
+fn push_unique_declared_common_runtime_scene(
+  scenes : Array[Scene],
+  scene : Scene,
+) -> Unit {
+  for i = 0; i < scenes.length(); i = i + 1 {
+    if scene.same(scenes[i]) {
+      return
+    }
+  }
+  scenes.push(scene)
+}
+
+///|
+/// Collects scenes that may declare common runtime from engine scenes and surfaces.
+fn declared_common_runtime_scenes(engine : Engine) -> Array[Scene] {
+  let result : Array[Scene] = []
+  for i = 0; i < engine.scenes.length(); i = i + 1 {
+    push_unique_declared_common_runtime_scene(result, engine.scenes[i])
+  }
+  for i = 0; i < engine.surfaces.length(); i = i + 1 {
+    push_unique_declared_common_runtime_scene(
+      result,
+      engine.surfaces[i].scene(),
+    )
+  }
+  result
+}
+
+///|
 /// Installs common runtime handlers declared by scenes.
 fn Engine::install_declared_common_runtimes(self : Engine) -> Unit {
-  for i = 0; i < self.scenes.length(); i = i + 1 {
-    let scene = self.scenes[i]
+  let scenes = declared_common_runtime_scenes(self)
+  for i = 0; i < scenes.length(); i = i + 1 {
+    let scene = scenes[i]
     match scene.apply_common_runtime() {
       Some(config) =>
         match config.orbit_component {
