@@ -1904,13 +1904,3 @@ pub async fn run_multi_window_platform(
   engine.shutdown()
   release_sdl_multi_window_platform(session)
 }
-
-///|
-/// Runs the single-window SDL3 platform entry point from configuration.
-pub async fn run_single_window_platform(
-  config : PlatformConfig,
-  app : PlatformApp,
-  options : PlatformOptions,
-) -> Unit raise Sdl3AppError {
-  run_platform(config, app, options)
-}
