@@ -406,7 +406,6 @@ fn finish_sdl_webgpu_native_session(
   surface_width : Int,
   surface_height : Int,
 ) -> SdlMetalWebGpuNativeSession raise Sdl3AppError {
-  println("native: requesting adapter and device")
   let adapter = request_native_webgpu_adapter(instance, webgpu_canvas_context) catch {
     _ => {
       webgpu_canvas_context.release()
@@ -435,7 +434,6 @@ fn finish_sdl_webgpu_native_session(
   let format = instance.get_preferred_canvas_format_for_surface(
     adapter, webgpu_canvas_context,
   )
-  println("native: configuring surface")
   webgpu_canvas_context.configure(device, format)
   let queue = device.get_queue()
   let render_format = webgpu_canvas_context.get_format()
@@ -545,7 +543,6 @@ pub fn init_sdl_metal_webgpu_native(
   let ctx = @sdl3_pkg.Context::new() catch {
     _ => raise Sdl3AppError::CreateContextFailed
   }
-  println("native: creating SDL Metal window")
   let sdl_win = @lib.sdl_CreateWindow(
     window_title,
     width,
@@ -568,14 +565,12 @@ pub fn init_sdl_metal_webgpu_native(
       raise error
     }
   }
-  println("native: creating SDL Metal view")
   let metal_view = sdl_metal_create_view(sdl_win)
   if @wgpu_objects.opaque_ptr_is_null(metal_view) {
     @lib.sdl_DestroyWindow(sdl_win)
     ctx.quit()
     raise Sdl3AppError::CreateMetalViewFailed(@lib.sdl_GetError())
   }
-  println("native: retrieving CAMetalLayer")
   let cametal_ptr = sdl_metal_get_layer_ptr(metal_view)
   if @wgpu_objects.opaque_ptr_is_null(cametal_ptr) {
     sdl_metal_destroy_view(metal_view)
@@ -584,7 +579,6 @@ pub fn init_sdl_metal_webgpu_native(
     raise Sdl3AppError::GetMetalLayerFailed(@lib.sdl_GetError())
   }
   let cametal = sdl_metal_get_layer(metal_view)
-  println("native: creating WebGPU instance and surface")
   let instance = @wgpu.create_native_webgpu_instance() catch {
     _ => {
       sdl_metal_destroy_view(metal_view)
