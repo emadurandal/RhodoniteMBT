@@ -1,8 +1,8 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { type OrbitCameraController } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
-import { updateOrbitCameraControllerFromInput } from "../moon/rhodonite/src/app/ts/index.ts";
+import { type OrbitCameraController } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
+import { updateOrbitCameraControllerFromInput } from "../../moon/rhodonite/src/app/ts/index.ts";
 
 export { updateOrbitCameraControllerFromInput };
 export type { OrbitCameraController };

@@ -22,7 +22,8 @@
     "noUncheckedSideEffectImports": true
   },
   "include": [
-    "src",
+    "visual-regression",
+    "samples/ts",
     "moon/rhodonite/src/app/ts",
     "moon/rhodonite_core/src/ecs/ts/ecs-bridge.d.ts"
   ]

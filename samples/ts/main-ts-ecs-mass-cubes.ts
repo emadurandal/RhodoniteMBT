@@ -20,10 +20,10 @@ import {
 	type GlobalTransformBlobWriter,
 	type GlobalTransformDenseLayout,
 	type OrbitCameraController,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+} from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "./visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
 	Engine,
@@ -41,7 +41,7 @@ import {
 	runPlatform,
 	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
-} from "../moon/rhodonite/src/app/ts/index.ts";
+} from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,

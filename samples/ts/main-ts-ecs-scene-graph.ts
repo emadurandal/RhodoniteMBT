@@ -13,7 +13,7 @@ import {
 	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+} from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	CubeMeshDesc,
 	Engine,
@@ -36,10 +36,10 @@ import {
 	runPlatform,
 	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
-} from "../moon/rhodonite/src/app/ts/index.ts";
+} from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "./visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;

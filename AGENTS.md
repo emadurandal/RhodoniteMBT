@@ -22,7 +22,7 @@ Keep **source code and everything under [`docs/`](docs/) in sync at all times**.
 
 ## Publish (mooncakes)
 
-After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, `emadurandal/rhodonite`, and `emadurandal/rhodonite_app_sdl3` ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing dependencies so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep, the facade’s core/webgpu path deps, and app_sdl3’s core/webgpu/facade path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry, use `PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon`; if only the SDL3 app module must be retried, use `PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon`.
+After `moon login`, from the repository root: `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, `emadurandal/rhodonite`, and `emadurandal/rhodonite_app_sdl3` ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing dependencies so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep, the facade’s core/webgpu path deps, and app_sdl3’s core/webgpu/facade path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry, use `PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon`; if only the SDL3 app module must be retried, use `PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon`.
 
 ## Workspace development
 
@@ -35,12 +35,10 @@ moon fmt
 moon info
 ```
 
-[`justfile`](justfile) `just check-ws` runs `moon check --target all`.
-
 ## Node / pnpm notes
 
 - Do **not** add `"type": "module"` to the root [`package.json`](package.json). Doing so can break mooncake prebuilds (e.g. `Milky2018/wgpu_mbt`) that rely on CommonJS `require`.
-- Workspace JS build artifacts may land under the **repository root `_build`**, not necessarily next to each module (Vitest aliases and `src/main-*.ts` imports assume this).
+- Workspace JS build artifacts may land under the **repository root `_build`**, not necessarily next to each module (Vitest aliases and `samples/ts/main-*.ts` imports assume this).
 
 ## Build, run, and test (pnpm)
 
@@ -77,11 +75,11 @@ After changing source code that can affect sample rendering, always run the visu
 - For any source file you create or edit in this repo, add the following copyright header at the top:
   - MoonBit: `/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `/// SPDX-License-Identifier: Apache-2.0`
   - Other source files (TypeScript/JavaScript/C): `// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `// SPDX-License-Identifier: Apache-2.0`
-- follow the [Karpathy behavioral guidelines](karpathy-guidelines.md)
+- follow the [project guidelines](guidelines.md)
 
 ## JS bridge and TypeScript wrappers
 
-When MoonBit code has a corresponding **`js_bridge`** and/or **TypeScript wrapper** (facades, `src/main-*.ts`, Vitest glue, etc.), keep **their contracts in sync** with the MoonBit side (exports, calling conventions, data layout, and error paths). Land coordinated updates in the same change when possible. Before finishing, **confirm the workspace still builds and tests cleanly** for the affected targets—for example `moon check --target all` plus the relevant `pnpm` scripts (JS demos, `pnpm run test:core:js`, etc.).
+When MoonBit code has a corresponding **`js_bridge`** and/or **TypeScript wrapper** (facades, `samples/ts/main-*.ts`, Vitest glue, etc.), keep **their contracts in sync** with the MoonBit side (exports, calling conventions, data layout, and error paths). Land coordinated updates in the same change when possible. Before finishing, **confirm the workspace still builds and tests cleanly** for the affected targets—for example `moon check --target all` plus the relevant `pnpm` scripts (JS demos, `pnpm run test:core:js`, etc.).
 
 When changing library source that is exposed through the npm package, always check whether [`scripts/build-npm-package.mjs`](scripts/build-npm-package.mjs) also needs updates. This is required when TypeScript wrapper locations, public npm entrypoints, MoonBit JS bridge package paths, generated bridge filenames, copied source filters, import rewriting rules, or bundled type declarations change. For npm-facing changes, run `pnpm run build:npm` and preferably `pnpm run pack:npm` before finishing.
 

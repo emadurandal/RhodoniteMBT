@@ -4,7 +4,7 @@
 import "./style.css";
 import {
 	readPresentedCanvasRgba8,
-} from "./visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
 	InputState,
@@ -14,7 +14,7 @@ import {
 	installBrowserInputState,
 	type InstanceBufferHandle,
 	type MeshHandle,
-} from "../moon/rhodonite/src/app/ts/index.ts";
+} from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	MASS_CUBES_CANVAS_HEIGHT,
 	MASS_CUBES_CANVAS_WIDTH,
@@ -29,7 +29,7 @@ import {
 	writeHalf,
 	writeMassCubesDenseYTransformWaveToArrays,
 } from "./ecs-mass-cubes-transform-writer";
-import { requestLargeStorageBufferDevice } from "../moon/rhodonite/src/app/ts/index.ts";
+import { requestLargeStorageBufferDevice } from "../../moon/rhodonite/src/app/ts/index.ts";
 
 type GlobalTransformPrecisionMode =
 	| "all-f32"

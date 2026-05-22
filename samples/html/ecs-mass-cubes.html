@@ -4,14 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MoonBit WASM-GC WebGPU — ecs-mass-cubes</title>
+    <title>MoonBit WebGPU — ecs-mass-cubes</title>
   </head>
   <body>
     <div id="app">
-      <h1>MoonBit WASM-GC WebGPU ecs-mass-cubes</h1>
+      <h1>MoonBit WebGPU ecs-mass-cubes</h1>
       <p>
-        MoonBit/WASM-GC が ECS の dense <code>GlobalTransform</code> 更新を実行し、
-        TypeScript host bridge 経由でブラウザ WebGPU に描画を委譲するサンプル。
+        大量ルートエンティティの <code>Transform3D</code> を <code>Query</code> で更新し、
+        <code>update_global_transforms_from_transforms</code> とインスタンス描画で負荷を確認するサンプル（エンティティ数は
+        <code>demo_state.mbt</code> の <code>entity_count</code>）。
       </p>
       <pre
         id="ecs-mass-cubes-perf"
@@ -27,10 +28,10 @@
           text-align: center;
         "
       >
-        FPS ...
+        FPS …
       </pre>
       <canvas id="webgpu-canvas" width="800" height="600"></canvas>
     </div>
-    <script type="module" src="/src/main-wasm-gc-ecs-mass-cubes.ts"></script>
+    <script type="module" src="/samples/ts/main-ecs-mass-cubes.ts"></script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ByteView } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+import type { ByteView } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 
 type Float16ArrayLike = {
 	readonly length: number;

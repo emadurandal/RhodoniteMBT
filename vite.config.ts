@@ -19,16 +19,16 @@ export default defineConfig({
 	build: {
 		rollupOptions: {
 			input: {
-				basicTriangle: "demos/basic-triangle.html",
-				ecsMassCubes: "demos/ecs-mass-cubes.html",
-				ecsSceneGraph: "demos/ecs-scene-graph.html",
-				ondemandTriangle: "demos/ondemand-triangle.html",
-				tsEcsMassCubes: "demos/ts-ecs-mass-cubes.html",
+				basicTriangle: "samples/html/basic-triangle.html",
+				ecsMassCubes: "samples/html/ecs-mass-cubes.html",
+				ecsSceneGraph: "samples/html/ecs-scene-graph.html",
+				ondemandTriangle: "samples/html/ondemand-triangle.html",
+				tsEcsMassCubes: "samples/html/ts-ecs-mass-cubes.html",
 				tsMultiSurfaceIndependentInput:
-					"demos/ts-multi-surface-independent-input.html",
-				tsOndemandTriangle: "demos/ts-ondemand-triangle.html",
-				wasmEcsMassCubes: "demos/wasm-ecs-mass-cubes.html",
-				wasmGcEcsMassCubes: "demos/wasm-gc-ecs-mass-cubes.html",
+					"samples/html/ts-multi-surface-independent-input.html",
+				tsOndemandTriangle: "samples/html/ts-ondemand-triangle.html",
+				wasmEcsMassCubes: "samples/html/wasm-ecs-mass-cubes.html",
+				wasmGcEcsMassCubes: "samples/html/wasm-gc-ecs-mass-cubes.html",
 			},
 		},
 	},

@@ -11,10 +11,10 @@ import {
 	PlatformOptions,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
-} from "../moon/rhodonite/src/app/ts/index.ts";
+} from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "./visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 
 type DemoState = {
 	readonly engine: Engine;
