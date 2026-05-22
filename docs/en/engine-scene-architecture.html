@@ -75,7 +75,7 @@ flowchart TD
             <li><code>phase_startup()</code> and <code>phase_shutdown()</code> are one-shot phases, not group members.</li>
             <li>Custom phase group/order edits are performed during <code>Engine::initialize()</code> startup handlers.</li>
             <li><code>Engine::add_phase_handler</code> can take a registration key; handlers with the same phase, slot, and key are deduplicated.</li>
-            <li>Samples declare standard transform/camera runtime integration with <code>Scene::use_common_runtime</code>. <code>Engine::initialize()</code> reflects that declaration into common scene systems and orbit-camera input handlers.</li>
+            <li>MoonBit samples declare standard transform/camera runtime integration with <code>Scene::use_common_runtime</code>; TypeScript samples use the matching <code>Scene.useCommonRuntime</code>. <code>Engine::initialize()</code> reflects that declaration into common scene systems and orbit-camera input handlers.</li>
             <li>Scene-only or offscreen rendering code can call <code>Scene::prepare_render_state</code> to run <code>update</code>, <code>post_update</code>, and <code>render_extract</code> once without spelling out each phase.</li>
             <li>When a surface is suspended, update phases still run and render extraction/prepare/render/present are skipped.</li>
             <li>In on-demand mode, no frame runs while the engine is clean; visible state changes must call <code>request_render</code>.</li>

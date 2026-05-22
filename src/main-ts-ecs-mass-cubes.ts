@@ -364,13 +364,16 @@ function createDemoStateForEngine(
 	) {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
-	scene.addCommonSystems({
-		orbitControllerComponent,
-		homeComponent: cameraHomeComponent,
-		updateOrbitCameraControllerFromInput:
-			updateOrbitCameraControllerComponentFromInput,
-		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-	});
+	scene.useCommonRuntime(
+		{
+			orbitControllerComponent,
+			homeComponent: cameraHomeComponent,
+			updateOrbitCameraControllerFromInput:
+				updateOrbitCameraControllerComponentFromInput,
+			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+		},
+		{ transformPropagation: false },
+	);
 	scene.setMainCamera(camera);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
 	const renderer = new Renderer(
@@ -412,7 +415,6 @@ function createDemoStateForEngine(
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.addCommonHandlers(demoState.scene, { transformPropagation: false });
 	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);

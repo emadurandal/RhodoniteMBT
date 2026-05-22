@@ -63,7 +63,7 @@ flowchart LR
           </ul>
 
           <h2>Camera Controllers</h2>
-          <p>MoonBit samples use <code>OrbitCameraController</code> and declare standard camera runtime integration with <code>Scene::use_common_runtime</code>. <code>Engine::initialize()</code> installs the builtin orbit-camera input handler through keyed phase handler registration, so repeated common runtime reflection does not register the same handler again. TypeScript samples use matching byte layouts in <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> and input folding in <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code>.</p>
+          <p>MoonBit samples use <code>OrbitCameraController</code> and declare standard camera runtime integration with <code>Scene::use_common_runtime</code>; TypeScript samples use <code>Scene.useCommonRuntime</code>. <code>Engine::initialize()</code> installs the builtin orbit-camera input handler through keyed phase handler registration, so repeated common runtime reflection does not register the same handler again. TypeScript samples use matching byte layouts in <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> and input folding in <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code>.</p>
         </article>
       </main>
     </div>

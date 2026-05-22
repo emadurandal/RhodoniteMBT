@@ -197,14 +197,16 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.addCommonSystems({
-		orbitControllerComponent,
-		homeComponent: cameraHomeComponent,
-		updateOrbitCameraControllerFromInput:
-			updateOrbitCameraControllerComponentFromInput,
-		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-	});
-	scene.installCommonSystems({ transformPropagation: false });
+	scene.useCommonRuntime(
+		{
+			orbitControllerComponent,
+			homeComponent: cameraHomeComponent,
+			updateOrbitCameraControllerFromInput:
+				updateOrbitCameraControllerComponentFromInput,
+			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+		},
+		{ transformPropagation: false },
+	);
 	scene.setSchedule(
 		(systemWorld) => {
 			syncOrbitCameraBlobComponent(
@@ -263,15 +265,6 @@ function ensureSurfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState 
 	}
 	addSurfaceState(demo, id, demo.engine.surfaceInput(id));
 	return demo.surfaces[demo.surfaces.length - 1]!;
-}
-
-function handleInput(surface: SurfaceRenderState): void {
-	updateOrbitCameraControllerComponentFromInput(
-		surface.world,
-		surface.camera,
-		surface.orbitControllerComponent,
-		surface.input,
-	);
 }
 
 function writeScene(surface: SurfaceRenderState, frame: FrameState): void {
@@ -360,11 +353,6 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	engine.addPhaseHandler(Phase.Surface, (_engine, frame) => {
 		if (frame.surfaceId !== undefined) {
 			ensureSurfaceState(demo, frame.surfaceId);
-		}
-	});
-	engine.addPhaseHandler(Phase.Input, (_engine, frame) => {
-		if (frame.surfaceId !== undefined) {
-			handleInput(ensureSurfaceState(demo, frame.surfaceId));
 		}
 	});
 	engine.addPhaseHandler(

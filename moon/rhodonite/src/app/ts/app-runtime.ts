@@ -128,6 +128,11 @@ export type CommonHandlersOptions = {
 	readonly transformPropagation?: boolean;
 };
 
+type CommonRuntimeConfig<TWorld, TMainCamera, TComponent> = {
+	readonly systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>;
+	readonly options: CommonHandlersOptions;
+};
+
 export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
@@ -386,6 +391,9 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	private commonOrbitCameraValue:
 		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
 		| undefined;
+	private commonRuntimeValue:
+		| CommonRuntimeConfig<TWorld, TMainCamera, unknown>
+		| undefined;
 	private commonTransformPropagationValue: ((world: TWorld) => void) | undefined;
 	private commonOrbitCameraTransformScheduled = false;
 	private commonTransformPropagationScheduled = false;
@@ -460,6 +468,28 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 			updateOrbitCameraControllerFromInput,
 			syncOrbitCameraTransform,
 		} as CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>;
+	}
+
+	useCommonRuntime<TComponent>(
+		systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>,
+		options: CommonHandlersOptions = {},
+	): void {
+		this.commonRuntimeValue = {
+			systems: systems as CommonSceneSystems<TWorld, TMainCamera, unknown>,
+			options,
+		};
+		this.applyCommonRuntime();
+	}
+
+	applyCommonRuntime():
+		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
+		| undefined {
+		const runtime = this.commonRuntimeValue;
+		if (runtime === undefined) {
+			return undefined;
+		}
+		this.addCommonSystems(runtime.systems);
+		return this.installCommonSystems(runtime.options);
 	}
 
 	installCommonSystems(
@@ -1595,6 +1625,15 @@ export class Engine {
 				"Engine.addPhaseHandler cannot register phase handlers after engine initialization.",
 			);
 		}
+		this.addPhaseHandlerUnchecked(phase, callback, slot, key);
+	}
+
+	private addPhaseHandlerUnchecked(
+		phase: PhaseKey,
+		callback: EngineCallback,
+		slot: PhaseSlot = PhaseSlot.BeforeSystems,
+		key?: string,
+	): void {
 		if (
 			key !== undefined &&
 			this.phaseHandlers.some(
@@ -1609,15 +1648,15 @@ export class Engine {
 		this.phaseHandlers.push({ phase, slot, key, callback });
 	}
 
-	addCommonHandlers<TWorld, TMainCamera>(
+	private addCommonRuntimeOrbitCameraInputHandler<TWorld, TMainCamera>(
 		scene: Scene<TWorld, TMainCamera>,
-		options: CommonHandlersOptions = {},
+		orbit: CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>,
+		unchecked = false,
 	): void {
-		const orbit = scene.installCommonSystems(options);
-		if (orbit === undefined) {
-			return;
-		}
-		this.addPhaseHandler(
+		const register = unchecked
+			? this.addPhaseHandlerUnchecked.bind(this)
+			: this.addPhaseHandler.bind(this);
+		register(
 			Phase.Input,
 			(engine, frame) => {
 				if (!engine.frameTargetsScene(frame, scene)) {
@@ -1625,7 +1664,7 @@ export class Engine {
 				}
 				const camera = scene.mainCamera();
 				if (camera === null) {
-					throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
+					throw new Error("Engine common runtime requires Scene.mainCamera.");
 				}
 				const input = frame.input ?? engine.input;
 				orbit.updateOrbitCameraControllerFromInput(
@@ -1640,6 +1679,45 @@ export class Engine {
 		);
 	}
 
+	addCommonHandlers<TWorld, TMainCamera>(
+		scene: Scene<TWorld, TMainCamera>,
+		options: CommonHandlersOptions = {},
+	): void {
+		const orbit = scene.installCommonSystems(options);
+		if (orbit === undefined) {
+			return;
+		}
+		this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit);
+	}
+
+	private declaredCommonRuntimeScenes(): Scene<unknown, unknown>[] {
+		const result: Scene<unknown, unknown>[] = [];
+		const seen = new Set<RuntimeScene>();
+		const add = (scene: RuntimeScene): void => {
+			if (!(scene instanceof Scene) || seen.has(scene)) {
+				return;
+			}
+			seen.add(scene);
+			result.push(scene);
+		};
+		for (const scene of this.scenes) {
+			add(scene);
+		}
+		for (const surface of this.surfaces) {
+			add(surface.scene);
+		}
+		return result;
+	}
+
+	private installDeclaredCommonRuntimes(): void {
+		for (const scene of this.declaredCommonRuntimeScenes()) {
+			const orbit = scene.applyCommonRuntime();
+			if (orbit !== undefined) {
+				this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
+			}
+		}
+	}
+
 	initialize(): void {
 		if (this.initializing || this.initialized) {
 			throw new Error("Engine is already initialized.");
@@ -1648,6 +1726,7 @@ export class Engine {
 		this.initializing = true;
 		this.runPhaseUnchecked(Phase.Startup, new FrameState(0, 0, 0));
 		this.initializing = false;
+		this.installDeclaredCommonRuntimes();
 		this.validatePhaseHandlers();
 		this.initialized = true;
 	}
