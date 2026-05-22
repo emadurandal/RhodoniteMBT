@@ -14,7 +14,7 @@ import {
 	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
-} from "../moon/rhodonite_core/src/ecs/ts/index.ts";
+} from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	CubeMeshDesc,
 	Engine,
@@ -38,7 +38,7 @@ import {
 	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 	type SurfaceId,
-} from "../moon/rhodonite/src/app/ts/index.ts";
+} from "../../moon/rhodonite/src/app/ts/index.ts";
 
 type DemoObjects = {
 	readonly sun: EntityId;

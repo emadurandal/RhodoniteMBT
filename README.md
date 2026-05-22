@@ -34,7 +34,7 @@ native entry packages still override it with the real browser or wgpu backend.
 ### Node, pnpm, and workspace output
 
 - The root [`package.json`](package.json) does **not** set `"type": "module"`. Setting it can break mooncake prebuilds (e.g. `Milky2018/wgpu_mbt`) that use CommonJS `require`, because Node then treats the package as ESM.
-- JS artifacts built under [`moon.work`](moon.work) may be grouped under the **repository root `_build`**, not always next to each module (Vitest aliases and `src/main-*.ts` imports are written with that in mind).
+- JS artifacts built under [`moon.work`](moon.work) may be grouped under the **repository root `_build`**, not always next to each module (Vitest aliases and `samples/ts/main-*.ts` imports are written with that in mind).
 
 ### npm package
 

@@ -246,9 +246,9 @@ async function createSampleRenderRegistry(
 		wasmModule,
 		wasmGcModule,
 	] = await Promise.all([
-		import("../main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
-		import("../main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
-		import("../ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
+		import("../../samples/ts/main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
+		import("../../samples/ts/main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
+		import("../../samples/ts/ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
 		import(
 			"../../_build/wasm/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
 		) as Promise<{ default: string }>,
@@ -257,7 +257,7 @@ async function createSampleRenderRegistry(
 		) as Promise<{ default: string }>,
 	]);
 	const tsOndemandTriangleModule = await import(
-		"../main-ondemand-triangle"
+		"../../samples/ts/main-ondemand-triangle"
 	) as TsOndemandTriangleModule;
 	return new Map<string, () => Promise<Uint8Array>>([
 		[

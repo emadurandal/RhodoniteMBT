@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "./style.css";
-import { create_webgpu_demo_state } from "../_build/js/debug/build/emadurandal/rhodonite_examples/multi-surface-independent-input/js/main/main.js";
+import { create_webgpu_demo_state } from "../../_build/js/debug/build/emadurandal/rhodonite_examples/multi-surface-independent-input/js/main/main.js";
 
 function requireCanvas(id: string): HTMLCanvasElement {
 	const element = document.getElementById(id);
