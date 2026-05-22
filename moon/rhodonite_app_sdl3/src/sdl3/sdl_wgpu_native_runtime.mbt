@@ -1849,9 +1849,9 @@ pub fn run_single_frame_platform_capture_rgba8(
     config,
     app,
     PlatformOptions::single_frame(),
-    Some(fn() { @wgpu.begin_next_native_canvas_present_capture() }),
+    Some(fn() { @wgpu_objects.native_canvas_present_capture_begin() }),
   )
-  let bytes = @wgpu.take_native_canvas_present_capture()
+  let bytes = @wgpu_objects.native_canvas_present_capture_take()
   if bytes.length() == 0 {
     None
   } else {

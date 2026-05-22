@@ -93,20 +93,6 @@ pub fn webgpu_device_poll(device : GPUDevice, wait? : Bool = false) -> Bool {
 }
 
 ///|
-/// Requests an RGBA8 capture of the next native canvas present.
-#cfg(target="native")
-pub fn begin_next_native_canvas_present_capture() -> Unit {
-  @raw.native_canvas_present_capture_begin()
-}
-
-///|
-/// Takes the most recent native canvas present capture as tightly packed RGBA8 bytes.
-#cfg(target="native")
-pub fn take_native_canvas_present_capture() -> Bytes {
-  @raw.native_canvas_present_capture_take()
-}
-
-///|
 /// Implements `webgpu_device_release`.
 pub fn webgpu_device_release(device : GPUDevice) -> Unit {
   @raw.webgpu_device_release(device.raw)
