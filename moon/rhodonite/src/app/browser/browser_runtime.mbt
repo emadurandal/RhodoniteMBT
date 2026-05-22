@@ -794,16 +794,6 @@ pub async fn run_platform(
 }
 
 ///|
-/// Runs the simplified single-canvas browser platform entry point.
-pub async fn run_single_canvas_platform(
-  canvas : @wgpu.HTMLCanvasElement,
-  app : PlatformApp,
-  options : PlatformOptions,
-) -> Platform? {
-  run_platform(PlatformConfig::new(canvas), app, options)
-}
-
-///|
 /// Stops the active browser platform associated with a canvas.
 pub fn stop_platform(canvas : @wgpu.HTMLCanvasElement) -> Unit {
   stop_platform_for_canvas(canvas, fn(platform) { platform.dispose() })
