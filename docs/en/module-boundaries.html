@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Module Boundaries - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/module-boundaries.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Module Boundaries</h1>
+          <p class="lead">RhodoniteMBT is a MoonBit workspace joined by the root <a href="../../moon.work"><code>moon.work</code></a>. Library modules keep clear ownership boundaries; examples are repository-only and are not published as release units.</p>
+
+          <h2>Workspace Modules</h2>
+          <table>
+            <thead><tr><th>Module</th><th>Directory</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>emadurandal/sdl3</code></td><td><a href="../../moon/sdl3/">moon/sdl3</a></td><td>SDL3 MoonBit binding fork used by native runtime packages.</td></tr>
+              <tr><td><code>emadurandal/rhodonite_core</code></td><td><a href="../../moon/rhodonite_core/">moon/rhodonite_core</a></td><td>Math, binary writes, JS bridge, CPU-only ECS, platform-independent input, and ECS benchmarks.</td></tr>
+              <tr><td><code>emadurandal/rhodonite_webgpu</code></td><td><a href="../../moon/rhodonite_webgpu/">moon/rhodonite_webgpu</a></td><td>WebGPU abstraction with browser and native object backends selected through a virtual package.</td></tr>
+              <tr><td><code>emadurandal/rhodonite</code></td><td><a href="../../moon/rhodonite/">moon/rhodonite</a></td><td>Public facade: Engine, Scene, Renderer, browser platform helpers, and TypeScript app wrapper.</td></tr>
+              <tr><td><code>emadurandal/rhodonite_app_sdl3</code></td><td><a href="../../moon/rhodonite_app_sdl3/">moon/rhodonite_app_sdl3</a></td><td>SDL3 native app runtime helpers for windows, events, resize, suspended surfaces, and WebGPU bootstrap.</td></tr>
+              <tr><td><code>emadurandal/rhodonite_examples</code></td><td><a href="../../moon/rhodonite_examples/">moon/rhodonite_examples</a></td><td>Runnable samples, visual regression harnesses, and sample-only shared helpers.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Dependency Direction</h2>
+          <div class="mermaid">
+flowchart LR
+  sdl3["sdl3"]
+  core["rhodonite_core"]
+  webgpu["rhodonite_webgpu"]
+  facade["rhodonite facade"]
+  app_sdl3["rhodonite_app_sdl3"]
+  examples["rhodonite_examples"]
+  webgpu --> core
+  facade --> core
+  facade --> webgpu
+  app_sdl3 --> facade
+  app_sdl3 --> core
+  app_sdl3 --> webgpu
+  app_sdl3 --> sdl3
+  examples --> facade
+  examples --> app_sdl3
+  examples --> core
+  examples --> webgpu
+          </div>
+          <ul>
+            <li><code>rhodonite_core</code> does not know GPU devices, DOM, SDL3, or platform loops.</li>
+            <li><code>rhodonite_webgpu/webgpu_objects</code> is virtual. The default stub keeps workspace-wide checks buildable; runnable packages override it with <code>js</code> or <code>native</code>.</li>
+            <li>The runtime facade lives in <code>emadurandal/rhodonite/app</code>. Browser platform code lives in <code>emadurandal/rhodonite/app/browser</code>; SDL3 platform code lives in <code>emadurandal/rhodonite_app_sdl3/sdl3</code>.</li>
+            <li>Examples may import both the facade and lower modules, but library modules must not depend on examples.</li>
+          </ul>
+
+          <h2>Release Units</h2>
+          <p>Mooncakes publishing runs in dependency order. The root script temporarily rewrites workspace path dependencies to registry versions, publishes, then restores the workspace files.</p>
+          <ol>
+            <li><code>emadurandal/sdl3</code></li>
+            <li><code>emadurandal/rhodonite_core</code></li>
+            <li><code>emadurandal/rhodonite_webgpu</code></li>
+            <li><code>emadurandal/rhodonite</code></li>
+            <li><code>emadurandal/rhodonite_app_sdl3</code></li>
+          </ol>
+          <pre><code class="language-bash">just publish-mooncakes
+pnpm run publish:moon
+PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon
+PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon</code></pre>
+
+          <h2>npm Package</h2>
+          <p><a href="../../packages/rhodonite-mbt/"><code>packages/rhodonite-mbt</code></a> is an ESM-only npm package. It exports root, <code>./math</code>, <code>./ecs</code>, and <code>./app</code>. It bundles TypeScript wrappers plus the MoonBit JS bridge, not examples or SDL3 native runtime code.</p>
+          <pre><code class="language-bash">pnpm run build:npm
+pnpm run pack:npm
+pnpm run publish:npm</code></pre>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

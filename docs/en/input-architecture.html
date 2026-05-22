@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Input Architecture - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/input-architecture.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Input Architecture</h1>
+          <p class="lead">Input is split into platform-independent <a href="../../moon/rhodonite_core/src/input/"><code>emadurandal/rhodonite_core/input</code></a> state and thin browser / SDL3 adapters. Gameplay code should not depend on DOM or SDL3 event types.</p>
+
+          <h2>Event Flow</h2>
+          <div class="mermaid">
+flowchart LR
+  DOM[Browser DOM events] --> BA[Browser adapter]
+  SDL[SDL3 poll events] --> SA[SDL3 adapter]
+  BA --> Q[InputState event queue]
+  SA --> Q
+  Q --> BF[input.begin_frame]
+  BF --> P["rhodonite/input phase"]
+  P --> U["update / fixed_update / render_extract"]
+          </div>
+          <p><code>Engine::run_frame</code> calls <code>input.begin_frame()</code> at frame start. Multi-surface engines keep one <code>InputState</code> per surface.</p>
+
+          <h2>Core Model</h2>
+          <table>
+            <thead><tr><th>Type</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>KeyCode</code></td><td>Open string identifier using browser-style physical key names.</td></tr>
+              <tr><td><code>MouseButton</code></td><td><code>Left</code>, <code>Middle</code>, <code>Right</code>, <code>Back</code>, <code>Forward</code>, or <code>Other(Int)</code>.</td></tr>
+              <tr><td><code>Modifiers</code></td><td>shift / ctrl / alt / meta snapshot.</td></tr>
+              <tr><td><code>InputEvent</code></td><td>Normalized events enqueued by platform adapters.</td></tr>
+              <tr><td><code>InputState</code></td><td>Tracks down/pressed/released, pointer delta, wheel delta, and frame events.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Adapters And Rules</h2>
+          <ul>
+            <li>Browser MoonBit adapter: <code>emadurandal/rhodonite/app/browser</code>.</li>
+            <li>Browser TypeScript adapter: <code>rhodonite-mbt/app</code> through <code>installBrowserInputCallbacks</code> / <code>installBrowserInput</code>.</li>
+            <li>SDL3 adapter: <code>emadurandal/rhodonite_app_sdl3/sdl3</code>.</li>
+            <li>Browser uses <code>KeyboardEvent.code</code>; SDL3 maps scancodes to the same browser-style names when possible.</li>
+            <li>Pointer coordinates are surface-local. Browser converts CSS pixels to backing size; native uses window-relative coordinates.</li>
+            <li>Pointer and wheel deltas reset every frame and accumulate events applied during that frame.</li>
+          </ul>
+
+          <h2>Camera Controllers</h2>
+          <p>MoonBit samples use <code>OrbitCameraController</code> and <code>Engine::add_common_handlers(scene)</code>. TypeScript samples use matching byte layouts in <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> and input folding in <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code>.</p>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

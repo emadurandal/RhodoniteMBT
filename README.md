@@ -13,7 +13,7 @@ A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser
 | `emadurandal/rhodonite_webgpu` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | Samples |
 
-See [docs/module_boundaries.md](docs/module_boundaries.md) for boundaries and publishing notes.
+See [docs/en/module-boundaries.html](docs/en/module-boundaries.html) for boundaries and publishing notes.
 
 ## Development (workspace)
 
@@ -153,11 +153,11 @@ pnpm run test:examples:visual:update
 
 The visual regression setup renders existing examples through native WebGPU and
 browser WebGPU, reads back offscreen RGBA8 textures, and compares PNG golden
-files with exact or perceptual comparison. See [docs/image_regression_tests.md](docs/image_regression_tests.md).
+files with exact or perceptual comparison. See [docs/en/visual-regression-tests.html](docs/en/visual-regression-tests.html).
 
 ## Publish order (outline)
 
-When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/module_boundaries.md](docs/module_boundaries.md) — Release units.
+When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/en/module-boundaries.html](docs/en/module-boundaries.html) — Release units.
 
 For npm, run `pnpm run publish:npm`; it rebuilds the release JS bridge and emits
 the `packages/rhodonite-mbt/dist` package before invoking `npm publish`.

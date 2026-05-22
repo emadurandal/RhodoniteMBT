@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ECS - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/ecs.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>ECS</h1>
+          <p class="lead"><a href="../../moon/rhodonite_core/src/ecs/"><code>emadurandal/rhodonite_core/ecs</code></a> is an archetype-based ECS. Arbitrary component storage is CPU-only SoA; renderer upload bytes are handled by builtin packed blob stores.</p>
+
+          <h2>Storage Model</h2>
+          <div class="mermaid">
+flowchart LR
+  W[World] --> R[ComponentRegistry]
+  W --> A[Archetypes]
+  A --> S[sorted component signature]
+  A --> E[dense entity rows]
+  A --> C[CPU SoA component columns]
+  W --> GT[GlobalTransform blob]
+  W --> CB[Camera blob]
+  GT --> GQ[resize/write queues]
+  CB --> CQ[resize/write queues]
+          </div>
+          <ul>
+            <li>User components are registered as <code>RegisteredComponent { id, name, cpu_stride }</code> and packed into per-archetype <code>ComponentColumn</code> buffers.</li>
+            <li><code>GlobalTransform</code> and <code>Camera</code> store small CPU refs in rows; their matrix bytes live in dedicated blob stores.</li>
+            <li>CPU columns grow by replacing fixed backing buffers instead of appending bytes one at a time, which avoids large JS <code>Array.push</code> hot paths.</li>
+            <li><code>reserve_batch_capacity</code> and <code>spawn_batch</code> control archetype capacity for large spawn batches.</li>
+          </ul>
+
+          <h2>Core Types</h2>
+          <table>
+            <thead><tr><th>Type</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>EntityId</code></td><td>Stable index plus generation; stale handles are rejected after destroy/reuse.</td></tr>
+              <tr><td><code>World</code></td><td>Owns entities, archetypes, the registry, and builtin blob stores.</td></tr>
+              <tr><td><code>Query</code> / <code>RawQuery</code></td><td>Row iteration and archetype-column iteration.</td></tr>
+              <tr><td><code>PreparedQuery</code></td><td>A reusable plan cache, not a snapshot. It rebuilds when archetype versions change.</td></tr>
+              <tr><td><code>SystemRunner</code></td><td>Phase-filtered system set with access guards and command buffer boundaries.</td></tr>
+              <tr><td><code>GpuWriteView</code></td><td>Borrowed upload slice from builtin blob backing storage.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Builtins</h2>
+          <table>
+            <thead><tr><th>Index</th><th>Component</th><th>Storage</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>0</td><td><code>Transform3D</code></td><td>CPU SoA</td><td>Local TRS.</td></tr>
+              <tr><td>1</td><td><code>GlobalTransform</code></td><td>CPU ref + packed blob</td><td>CPU row stores format and word offset.</td></tr>
+              <tr><td>2</td><td><code>ChildOf</code></td><td>CPU SoA</td><td>Parent <code>EntityId</code> index/generation.</td></tr>
+              <tr><td>3</td><td><code>Camera</code></td><td>CPU ref + packed blob</td><td>View/projection bytes live in the Camera blob.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Queries And Mutation</h2>
+          <p><code>QueryRow::read</code> and <code>write</code> lend row bytes only inside the closure. <code>RawQuery::for_each_archetype</code> returns contiguous column views for hot loops. Direct structural mutation and payload setters are guarded while query callbacks are active; queue structural changes through <code>CommandBuffer</code>.</p>
+          <table>
+            <thead><tr><th>Operation</th><th>Required declaration</th></tr></thead>
+            <tbody>
+              <tr><td>reads, query prepare/iteration</td><td><code>reads</code> or <code>writes</code></td></tr>
+              <tr><td>payload writes and row/column writes</td><td><code>writes</code></td></tr>
+              <tr><td>entity/component structural changes, reserve, spawn batch</td><td><code>structural_write</code> plus relevant component <code>writes</code></td></tr>
+              <tr><td>builtin blob resize event drains</td><td><code>structural_write</code></td></tr>
+            </tbody>
+          </table>
+
+          <h2>Camera Control</h2>
+          <p>Camera control is split into input source, controller component, transform, lens, and Camera blob sync. The main components are <code>OrbitCameraController</code>, <code>CameraHomeTransform</code>, and <code>CameraLens</code>. The transform systems update <code>Transform3D</code> / <code>GlobalTransform</code>; blob sync systems write the builtin Camera blob from <code>GlobalTransform + CameraLens</code>.</p>
+
+          <h2>TypeScript Wrapper</h2>
+          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, query APIs, spawn batch, camera-control byte layouts, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

@@ -14,11 +14,11 @@ Community MoonBit skills are listed at <https://github.com/moonbitlang/skills>.
 | `emadurandal/rhodonite_webgpu` | `moon/rhodonite_webgpu/` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | `moon/rhodonite_examples/` | Samples and demos |
 
-See [`docs/module_boundaries.md`](docs/module_boundaries.md) for dependency boundaries and publish order.
+See [`docs/en/module-boundaries.html`](docs/en/module-boundaries.html) for dependency boundaries and publish order.
 
 ## Documentation (`docs/`)
 
-Keep **source code and everything under [`docs/`](docs/) in sync at all times**. When behavior, APIs, module layout, build or publish steps, or project conventions change in the repo, update the relevant `docs/*.md` in the same change; when documentation is revised to reflect the current system, ensure the code and scripts match. Do not leave `docs/` describing outdated paths, commands, or architecture.
+Keep **source code and everything under [`docs/`](docs/) in sync at all times**. When behavior, APIs, module layout, build or publish steps, or project conventions change in the repo, update the relevant `docs/**/*.html` in the same change; when documentation is revised to reflect the current system, ensure the code and scripts match. Do not leave `docs/` describing outdated paths, commands, or architecture.
 
 ## Publish (mooncakes)
 

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Engine / Scene Architecture - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/engine-scene-architecture.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Engine / Scene Architecture</h1>
+          <p class="lead">The current runtime lives in the public facade package <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a>. The older prototype and phase-plan text is obsolete; examples now use the facade runtime directly.</p>
+
+          <h2>Runtime Ownership</h2>
+          <div class="mermaid">
+flowchart TB
+  E[Engine] --> GC[GPUContext]
+  E --> T[TimeState]
+  E --> PH[Phase handlers and groups]
+  E --> SF[Surface list]
+  E --> S[Scene list]
+  SF --> SI[surface-local InputState]
+  SF --> SS[SurfaceState]
+  S --> W[World]
+  S --> SR[SystemRunner]
+  R[Renderer] --> GPU[GPU resources]
+  R --> S
+  W --> ECS[ECS data and builtin blobs]
+          </div>
+          <table>
+            <thead><tr><th>Type</th><th>Responsibility</th></tr></thead>
+            <tbody>
+              <tr><td><code>Engine</code></td><td>Owns GPU context, scenes, surfaces, time, input, phase groups, and on-demand render state.</td></tr>
+              <tr><td><code>Scene</code></td><td>Runtime scene with one <code>World</code>, one <code>SystemRunner</code>, a main camera, and enabled/visible flags.</td></tr>
+              <tr><td><code>World</code></td><td>ECS storage only; it does not own engine lifecycle or GPU resources.</td></tr>
+              <tr><td><code>Renderer</code></td><td>Owns GPU resources, mesh/material/instance tables, scene renderable extraction, and draw calls.</td></tr>
+              <tr><td><code>FrameState</code></td><td>Passes delta, frame index, elapsed time, surface snapshot, and optional surface input to phases and systems.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Phase Groups</h2>
+          <div class="mermaid">
+flowchart TD
+  A["rhodonite/frame_begin"] --> A1["rhodonite/surface"]
+  A1 --> A2["rhodonite/input"]
+  A2 --> B["rhodonite/fixed_step 0..max_fixed_steps_per_frame"]
+  B --> B1["rhodonite/fixed_update"]
+  B1 --> B2["rhodonite/fixed_post_update"]
+  B2 --> C["rhodonite/render_frame"]
+  C --> C1["rhodonite/update"]
+  C1 --> C2["rhodonite/post_update"]
+  C2 --> C3["rhodonite/render_extract"]
+  C3 --> C4["rhodonite/render_prepare"]
+  C4 --> C5["rhodonite/render"]
+  C5 --> C6["rhodonite/present"]
+          </div>
+          <p><code>Engine::run_frame(delta_seconds)</code> runs frame-begin, fixed-step, and render-frame groups in the standard order. Each phase runs before-system handlers, scene systems, and after-system handlers.</p>
+          <ul>
+            <li><code>phase_startup()</code> and <code>phase_shutdown()</code> are one-shot phases, not group members.</li>
+            <li>Custom phase group/order edits are performed during <code>Engine::initialize()</code> startup handlers.</li>
+            <li>When a surface is suspended, update phases still run and render extraction/prepare/render/present are skipped.</li>
+            <li>In on-demand mode, no frame runs while the engine is clean; visible state changes must call <code>request_render</code>.</li>
+          </ul>
+
+          <h2>Surfaces And Renderer</h2>
+          <p>Single-surface code updates the current snapshot through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input.</p>
+          <p><code>Renderer</code> v1 is intentionally narrow: it renders visible <code>Renderable + GlobalTransform</code> entities with the scene main camera using unlit static indexed meshes, plus a dedicated instanced mesh path for MassCubes. Textures, skinning, transparent sorting, shadows, and LOD are outside v1.</p>
+
+          <h2>Platform Runners</h2>
+          <table>
+            <thead><tr><th>Platform</th><th>Package</th><th>Entrypoints</th></tr></thead>
+            <tbody>
+              <tr><td>Browser MoonBit JS</td><td><code>emadurandal/rhodonite/app/browser</code></td><td><code>run_platform</code>, <code>run_multi_surface_platform</code>, <code>start_platform</code>, <code>stop_platform</code></td></tr>
+              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>, <code>runSingleCanvasPlatform</code>, <code>runMultiSurfacePlatform</code>, <code>stopPlatform</code></td></tr>
+              <tr><td>Native SDL3</td><td><code>emadurandal/rhodonite_app_sdl3/sdl3</code></td><td><code>run_platform</code>, <code>run_multi_window_platform</code></td></tr>
+            </tbody>
+          </table>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

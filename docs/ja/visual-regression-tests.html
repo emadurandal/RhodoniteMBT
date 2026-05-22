@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Visual Regression Tests - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/visual-regression-tests.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Visual Regression Tests</h1>
+          <p class="lead">Visual regression は real sample <code>DemoState</code> を WebGPU backend で offscreen render し、readback した RGBA8 pixels を PNG golden files と比較します。CPU canvas reference ではありません。</p>
+
+          <h2>Flow</h2>
+          <div class="mermaid">
+flowchart LR
+  M[visual_samples.tsv] --> H[Native or browser harness]
+  H --> D[Sample DemoState]
+  D --> T[Offscreen rgba8unorm texture 800x600]
+  T --> B[Readback buffer]
+  B --> U[Unpack padded rows]
+  U --> P[PNG compare or update]
+  P --> G[__image_snapshots__]
+          </div>
+
+          <h2>Commands</h2>
+          <pre><code class="language-bash">pnpm run test:examples:visual
+pnpm run test:examples:visual:native
+pnpm run test:examples:visual:browser
+pnpm run test:examples:visual:update
+pnpm run test:examples:visual:update:native
+pnpm run test:examples:visual:update:browser
+
+pnpm run test:examples:visual -- --verbose</code></pre>
+          <p><code>just test-visual</code>、<code>just test-visual-native</code>、<code>just test-visual-browser</code>、<code>just update-visual-snapshots</code> も使えます。</p>
+
+          <h2>Manifest And Golden Files</h2>
+          <p>test matrix は <a href="../../moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"><code>visual_samples.tsv</code></a> にあります。各 row は target、id、display name、PNG filename、<code>max_mismatch_rate</code>、<code>perceptual_threshold</code> を持ちます。</p>
+          <p>golden PNG は <a href="../../moon/rhodonite_examples/src/visual_regression/__image_snapshots__/"><code>moon/rhodonite_examples/src/visual_regression/__image_snapshots__</code></a> に置きます。browser harness は MoonBit JS、WASM、WASM-GC、TypeScript host variants を含みます。</p>
+
+          <h2>Comparison</h2>
+          <ul>
+            <li>native helper は <code>mizchi/image</code> で PNG を decode し、<code>mizchi/pixelmatch</code> で perceptual comparison を行います。</li>
+            <li>browser harness は browser 内で <code>createImageBitmap</code> と <code>OffscreenCanvas</code> を使って PNG decode/encode し、Node runner へ result を POST します。</li>
+            <li><code>max_mismatch_rate=0.0005</code> は小さな backend / driver variance を許容しつつ、目に見える regression を検出する値です。</li>
+            <li>snapshot update は <code>RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1</code> で現在の readback output を golden PNG に書き戻します。rendered result を確認してから使います。</li>
+          </ul>
+
+          <h2>Implementation Notes</h2>
+          <ul>
+            <li>native visual package は <code>supported_targets = "native"</code>、browser visual package は <code>supported_targets = "js"</code>。</li>
+            <li>native は <code>webgpu_objects/native</code>、browser は <code>webgpu_objects/js</code> を override します。</li>
+            <li><code>scripts/run-visual-regression.mjs</code> は native/browser をまとめ、MoonBit warnings を通常非表示にします。</li>
+            <li><code>scripts/run-browser-visual-regression.mjs</code> は Vite と local result server を起動し、headless Chrome/Chromium から result を受け取ります。</li>
+            <li>WebGPU adapter creation や Chrome startup に失敗する環境では skip message を出して pass します。golden 更新は WebGPU-capable machine で行います。</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

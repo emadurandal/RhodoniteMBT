@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Engine / Scene Architecture - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/engine-scene-architecture.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Engine / Scene Architecture</h1>
+          <p class="lead">現在の runtime は <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a> の public facade にあります。古い prototype / phase 計画は完了済みで、examples は facade runtime を直接使います。</p>
+
+          <h2>Runtime Ownership</h2>
+          <div class="mermaid">
+flowchart TB
+  E[Engine] --> GC[GPUContext]
+  E --> T[TimeState]
+  E --> PH[Phase handlers and groups]
+  E --> SF[Surface list]
+  E --> S[Scene list]
+  SF --> SI[surface-local InputState]
+  SF --> SS[SurfaceState]
+  S --> W[World]
+  S --> SR[SystemRunner]
+  R[Renderer] --> GPU[GPU resources]
+  R --> S
+  W --> ECS[ECS data and builtin blobs]
+          </div>
+          <table>
+            <thead><tr><th>Type</th><th>Responsibility</th></tr></thead>
+            <tbody>
+              <tr><td><code>Engine</code></td><td>GPUContext、scenes、surfaces、time、input、phase groups、on-demand render state を所有する。</td></tr>
+              <tr><td><code>Scene</code></td><td>1つの <code>World</code> と <code>SystemRunner</code>、main camera、enabled/visible state を持つ runtime scene。</td></tr>
+              <tr><td><code>World</code></td><td>ECS storage。engine lifecycle や GPU resource ownership は持たない。</td></tr>
+              <tr><td><code>Renderer</code></td><td>GPU resources、mesh/material/instance buffer table、scene renderable extraction と draw を扱う。</td></tr>
+              <tr><td><code>FrameState</code></td><td>delta、frame index、elapsed、surface snapshot、surface-local input を phase/system へ渡す。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Phase Groups</h2>
+          <div class="mermaid">
+flowchart TD
+  A["rhodonite/frame_begin"] --> A1["rhodonite/surface"]
+  A1 --> A2["rhodonite/input"]
+  A2 --> B["rhodonite/fixed_step 0..max_fixed_steps_per_frame"]
+  B --> B1["rhodonite/fixed_update"]
+  B1 --> B2["rhodonite/fixed_post_update"]
+  B2 --> C["rhodonite/render_frame"]
+  C --> C1["rhodonite/update"]
+  C1 --> C2["rhodonite/post_update"]
+  C2 --> C3["rhodonite/render_extract"]
+  C3 --> C4["rhodonite/render_prepare"]
+  C4 --> C5["rhodonite/render"]
+  C5 --> C6["rhodonite/present"]
+          </div>
+          <p><code>Engine::run_frame(delta_seconds)</code> は frame-begin、fixed-step、render-frame group を標準順序で実行します。各 phase は <code>PhaseSlot::BeforeSystems</code> handlers、enabled/visible scene systems、<code>AfterSystems</code> handlers の順に処理されます。</p>
+          <ul>
+            <li><code>phase_startup()</code> と <code>phase_shutdown()</code> は one-shot phase。group には追加しません。</li>
+            <li>custom phase group / phase order の編集は <code>Engine::initialize()</code> 中の startup handler で行います。</li>
+            <li>surface suspended 中は update までは進み、render extraction 以降は skip されます。</li>
+            <li>on-demand mode では dirty でない間 frame 自体を走らせません。見た目が変わる state mutation 後は利用側が <code>request_render</code> を呼びます。</li>
+          </ul>
+
+          <h2>Surface Model</h2>
+          <p>single-surface では <code>Engine::set_surface_active</code> / <code>set_surface_suspended</code> が legacy-compatible な surface snapshot を更新します。multi-surface では <code>Engine::add_surface</code>、<code>add_surface_for_scene</code>、<code>set_surface_scene</code>、<code>surface_input</code>、<code>run_multi_surface_frame</code> を使います。</p>
+          <div class="mermaid">
+flowchart LR
+  P[Platform event loop] --> E[Engine]
+  E --> S1[Surface A: canvas/window/input]
+  E --> S2[Surface B: canvas/window/input]
+  S1 --> Scene1[Scene A systems and render]
+  S2 --> Scene2[Scene B systems and render]
+          </div>
+          <p>各 surface は surface-local <code>InputState</code> を持ちます。canvas/window A の pointer event は B の camera/controller に影響しません。</p>
+
+          <h2>Renderer v1</h2>
+          <p><code>Renderer</code> は現在 intentionally narrow な engine-owned renderer です。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して unlit static indexed mesh を描画します。</p>
+          <ul>
+            <li>handles: <code>MeshHandle</code>、<code>MaterialHandle</code>、<code>InstanceBufferHandle</code></li>
+            <li>components: <code>RenderableDesc</code>、<code>RenderableFlags</code>、<code>register_renderable_component</code></li>
+            <li>resources: <code>register_static_indexed_mesh_desc</code>、<code>register_cube_mesh</code>、<code>register_unlit_material</code>、<code>register_static_instance_buffer</code></li>
+            <li>draw paths: <code>render_scene_renderables</code> と MassCubes 用の <code>render_instanced_mesh</code></li>
+          </ul>
+          <p>Texture、skinning、transparent sorting、shadow、LOD はまだ v1 renderer の責務ではありません。</p>
+
+          <h2>Platform Runners</h2>
+          <table>
+            <thead><tr><th>Platform</th><th>Package</th><th>Entrypoints</th></tr></thead>
+            <tbody>
+              <tr><td>Browser MoonBit JS</td><td><code>emadurandal/rhodonite/app/browser</code></td><td><code>run_platform</code>、<code>run_multi_surface_platform</code>、<code>start_platform</code>、<code>stop_platform</code></td></tr>
+              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>、<code>runSingleCanvasPlatform</code>、<code>runMultiSurfacePlatform</code>、<code>stopPlatform</code></td></tr>
+              <tr><td>Native SDL3</td><td><code>emadurandal/rhodonite_app_sdl3/sdl3</code></td><td><code>run_platform</code>、<code>run_multi_window_platform</code></td></tr>
+            </tbody>
+          </table>
+          <p><code>PlatformOptions</code> は <code>interactive</code>、<code>render_loop</code>、<code>interactive_on_demand</code>、<code>render_on_demand</code>、<code>single_frame</code> を持ちます。</p>
+
+          <h2>Sample Layout</h2>
+          <p>samples は <code>DemoState</code> という名前で sample-local GPU/pipeline/state をまとめ、<code>create_demo_state_for_engine(engine)</code> と <code>register_engine_handlers(engine, demo_state)</code> を公開する方向に揃えています。ECS samples は <code>Scene</code> を render source とし、basic triangle のような low-level sample は main scene を実行境界としてだけ使います。</p>
+
+          <h2>Validation</h2>
+          <pre><code class="language-bash">moon check --target all
+pnpm run test:app:ts
+pnpm run test:examples:visual</code></pre>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
