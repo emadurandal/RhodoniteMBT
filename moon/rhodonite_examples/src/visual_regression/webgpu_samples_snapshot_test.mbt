@@ -88,7 +88,7 @@ test "visual WebGPU native ECS mass cubes PNG golden" {
 
 ///|
 /// Returns the platform app hooks for a native visual sample.
-fn native_visual_platform_app(id : String) -> @sdl_app.PlatformApp {
+fn native_visual_platform_app(id : String) -> @sdl_app.PlatformApp raise {
   match id {
     "basic-triangle" =>
       @sdl_app.PlatformApp::default_engine(@basic_triangle.setup_engine)
@@ -100,13 +100,13 @@ fn native_visual_platform_app(id : String) -> @sdl_app.PlatformApp {
       @sdl_app.PlatformApp::new(
         @ecs_mass_cubes.create_engine, @ecs_mass_cubes.setup_engine,
       )
-    _ => @sdl_app.PlatformApp::default_engine(@basic_triangle.setup_engine)
+    _ => @test.fail("unknown native visual regression sample id: \{id}")
   }
 }
 
 ///|
 /// Implements `render_native_visual_sample`.
-fn render_native_visual_sample(id : String) -> RgbaImage? {
+fn render_native_visual_sample(id : String) -> RgbaImage? raise {
   let app = native_visual_platform_app(id)
   let bytes = @sdl_app.run_single_frame_platform_capture_rgba8(
     @sdl_app.PlatformConfig::new(
