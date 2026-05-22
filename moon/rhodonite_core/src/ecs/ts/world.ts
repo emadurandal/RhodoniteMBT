@@ -37,6 +37,7 @@ import {
 	world_register_cpu_component,
 	world_remove_component,
 	world_set_camera_matrices_col_major,
+	world_set_child_of,
 	world_set_component_bytes,
 	world_set_global_transform_col_major,
 	world_set_global_transform_format,
@@ -287,6 +288,10 @@ export class World {
 				sz,
 			),
 		);
+	}
+
+	setChildOf(entity: EntityId, parent: EntityId): boolean {
+		return moonBool(world_set_child_of(this.inner, entity.inner, parent.inner));
 	}
 
 	setGlobalTransform(entity: EntityId, matrixColMajor: ArrayLike<number>): boolean {

@@ -87,7 +87,7 @@ flowchart LR
           <p>Camera control is split into input source, controller component, transform, lens, and Camera blob sync. The main components are <code>OrbitCameraController</code>, <code>CameraHomeTransform</code>, and <code>CameraLens</code>. The transform systems update <code>Transform3D</code> / <code>GlobalTransform</code>; blob sync systems write the builtin Camera blob from <code>GlobalTransform + CameraLens</code>.</p>
 
           <h2>TypeScript Wrapper</h2>
-          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, query APIs, spawn batch, camera-control byte layouts, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
+          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, <code>ChildOf</code> parent links, query APIs, spawn batch, camera-control byte layouts, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
         </article>
       </main>
     </div>

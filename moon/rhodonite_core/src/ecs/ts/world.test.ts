@@ -153,6 +153,23 @@ describe("ECS TypeScript wrapper", () => {
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);
 	});
 
+	it("sets builtin ChildOf parent links", () => {
+		const world = World.new();
+		const parent = world.createEntity();
+		const child = world.createEntity();
+
+		expect(world.setChildOf(child, parent)).toBe(true);
+		const bytes = world.componentBytesCopy(child, world.childOfComponent());
+		expect(bytes).not.toBeNull();
+		const view = new DataView(
+			bytes?.buffer ?? new ArrayBuffer(0),
+			bytes?.byteOffset ?? 0,
+			bytes?.byteLength ?? 0,
+		);
+		expect(view.getUint32(0, true)).toBe(parent.index());
+		expect(view.getUint32(4, true)).toBe(parent.generation());
+	});
+
 	it("keeps transform archetype columns appendable after JS global-transform fast path", () => {
 		const world = World.new();
 		const first = world.spawnTransformGlobalBatchIdentity(1);

@@ -60,6 +60,10 @@ type TsMassCubesModule = {
 	renderTsEcsMassCubesBrowserSnapshot: () => Promise<unknown>;
 };
 
+type TsEcsSceneGraphModule = {
+	renderTsEcsSceneGraphBrowserSnapshot: () => Promise<unknown>;
+};
+
 type TsOndemandTriangleModule = {
 	renderTsOndemandTriangleBrowserSnapshot: () => Promise<unknown>;
 };
@@ -235,8 +239,15 @@ function createSamples(
 async function createSampleRenderRegistry(
 	snapshotModule: SnapshotModule,
 ): Promise<Map<string, () => Promise<Uint8Array>>> {
-	const [tsModule, wasmHost, wasmModule, wasmGcModule] = await Promise.all([
+	const [
+		tsMassCubesModule,
+		tsSceneGraphModule,
+		wasmHost,
+		wasmModule,
+		wasmGcModule,
+	] = await Promise.all([
 		import("../main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
+		import("../main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
 		import("../ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
 		import(
 			"../../_build/wasm/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
@@ -276,7 +287,14 @@ async function createSampleRenderRegistry(
 		[
 			"ts-ecs-mass-cubes",
 			async () =>
-				toUint8Array(await tsModule.renderTsEcsMassCubesBrowserSnapshot()),
+				toUint8Array(await tsMassCubesModule.renderTsEcsMassCubesBrowserSnapshot()),
+		],
+		[
+			"ts-ecs-scene-graph",
+			async () =>
+				toUint8Array(
+					await tsSceneGraphModule.renderTsEcsSceneGraphBrowserSnapshot(),
+				),
 		],
 		[
 			"ts-ondemand-triangle",

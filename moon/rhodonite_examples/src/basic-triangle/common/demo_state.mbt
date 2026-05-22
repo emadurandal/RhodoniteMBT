@@ -148,12 +148,6 @@ pub fn DemoState::release(self : DemoState) -> Unit {
 }
 
 ///|
-/// Implements `demo_state_release`.
-pub fn demo_state_release(demo_state : DemoState) -> Unit {
-  demo_state.release()
-}
-
-///|
 let triangle_shader_code : String =
   #|struct VertexOutput {
   #|  @builtin(position) position: vec4<f32>,
