@@ -7,6 +7,7 @@ browser	basic-triangle	basic-triangle browser	basic_triangle_browser_sample.png	
 browser	ondemand-triangle	ondemand-triangle browser	ondemand_triangle_browser_sample.png	0.0005	0.1
 browser	ecs-scene-graph	ecs-scene-graph browser	ecs_scene_graph_browser_sample.png	0.0005	0.1
 browser	ecs-mass-cubes	ecs-mass-cubes browser	ecs_mass_cubes_browser_sample.png	0.0005	0.1
+browser	ts-ecs-scene-graph	ts-ecs-scene-graph browser	ts_ecs_scene_graph_browser_sample.png	0.0005	0.1
 browser	ts-ecs-mass-cubes	ts-ecs-mass-cubes browser	ts_ecs_mass_cubes_browser_sample.png	0.0005	0.1
 browser	ts-ondemand-triangle	ts-ondemand-triangle browser	ts_ondemand_triangle_browser_sample.png	0.0005	0.1
 browser	wasm-ecs-mass-cubes	wasm-ecs-mass-cubes browser	wasm_ecs_mass_cubes_browser_sample.png	0.0005	0.1

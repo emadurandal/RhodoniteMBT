@@ -226,6 +226,16 @@ pub fn world_set_transform_trs(
 }
 
 ///|
+/// Implements `world_set_child_of`.
+pub fn world_set_child_of(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  parent : @ecs.EntityId,
+) -> Bool {
+  world.set_child_of(entity, parent)
+}
+
+///|
 /// Builds a Matrix44F from 16 column-major floats passed through the JS bridge.
 fn matrix44f_from_col_major_array(data : FixedArray[Float]) -> @m44.Matrix44F {
   if data.length() != 16 {

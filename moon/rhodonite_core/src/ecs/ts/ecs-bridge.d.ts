@@ -123,6 +123,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		sy: number,
 		sz: number,
 	): MoonBool;
+	export function world_set_child_of(
+		world: MoonWorld,
+		entity: MoonEntityId,
+		parent: MoonEntityId,
+	): MoonBool;
 	export function world_set_global_transform_col_major(
 		world: MoonWorld,
 		entity: MoonEntityId,

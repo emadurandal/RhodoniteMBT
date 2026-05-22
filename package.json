@@ -15,6 +15,7 @@
     "dev:js:ecs-mass-cubes": "pnpm run build:moon && vite --open /demos/ecs-mass-cubes.html",
     "dev:wasm:ecs-mass-cubes": "pnpm run build:moon:wasm && vite --open /demos/wasm-ecs-mass-cubes.html",
     "dev:wasm-gc:ecs-mass-cubes": "pnpm run build:moon:wasm-gc && vite --open /demos/wasm-gc-ecs-mass-cubes.html",
+    "dev:js:ts-ecs-scene-graph": "pnpm run build:core:js && vite --open /demos/ts-ecs-scene-graph.html",
     "dev:js:ts-ecs-mass-cubes": "pnpm run build:core:js && vite --open /demos/ts-ecs-mass-cubes.html",
     "dev:js:ts-multi-surface-independent-input": "pnpm run build:core:js && vite --open /demos/ts-multi-surface-independent-input.html",
     "dev:js:ts-ondemand-triangle": "vite --open /demos/ts-ondemand-triangle.html",

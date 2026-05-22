@@ -71,9 +71,10 @@ pnpm run dev:js:ondemand-triangle
 ```
 
 The browser demos also include a TypeScript-only WebGPU DemoState using the ECS
-TypeScript wrapper and a TypeScript-only on-demand triangle:
+TypeScript wrapper and TypeScript-only on-demand triangle paths:
 
 ```bash
+pnpm run dev:js:ts-ecs-scene-graph
 pnpm run dev:js:ts-ecs-mass-cubes
 pnpm run dev:js:ts-ondemand-triangle
 ```
