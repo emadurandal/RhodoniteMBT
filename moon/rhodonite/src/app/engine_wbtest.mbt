@@ -46,6 +46,28 @@ test "phase handler registration key deduplicates exact phase slot key matches" 
 }
 
 ///|
+test "common runtime orbit input key matches common handlers key" {
+  let scene = Scene::new("dedupe")
+  let key = common_orbit_camera_input_handler_key(scene)
+  let handlers : Array[PhaseHandler] = [
+    {
+      phase: phase_input(),
+      slot: BeforeSystems,
+      key: Some(key),
+      run: fn(_engine, _frame) {  },
+    },
+  ]
+  assert_true(
+    has_phase_handler_registration(
+      handlers,
+      phase_input(),
+      BeforeSystems,
+      common_orbit_camera_input_handler_key(scene),
+    ),
+  )
+}
+
+///|
 test "push unique declared common runtime scene skips duplicates" {
   let main = Scene::new("main")
   let surface_only = Scene::new("surface")
