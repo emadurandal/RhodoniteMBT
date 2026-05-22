@@ -715,6 +715,7 @@ pub fn create_demo_state_for_scene(
     perf_excluded_wait_ms: @ref.new(0.0),
   }
   demo_state.add_mass_cubes_camera_sync_system()
+  ignore(scene.prepare_render_state())
   demo_state
 }
 
