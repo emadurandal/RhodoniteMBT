@@ -99,6 +99,8 @@ pub(all) struct CommonHandlersOptions {
 pub fn CommonHandlersOptions::default() -> Self
 pub fn CommonHandlersOptions::new(transform_propagation? : Bool) -> Self
 
+type CommonRuntimeConfig
+
 pub(all) struct CubeMeshDesc {
   // private fields
 }
@@ -271,6 +273,7 @@ pub fn Scene::same(Self, Self) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
+pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
 

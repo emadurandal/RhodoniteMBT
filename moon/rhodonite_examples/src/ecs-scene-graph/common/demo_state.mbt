@@ -117,7 +117,7 @@ pub fn create_demo_state_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  scene.add_common_systems(
+  scene.use_common_runtime(
     transform_propagation=true,
     orbit_component=Some(orbit_controller),
     home_component=Some(camera_home),
@@ -187,7 +187,6 @@ pub fn create_demo_state_for_scene(
     ),
   )
   push_local_transforms(world, bodies, 0.0)
-  ignore(scene.prepare_render_state())
   {
     context,
     renderer,
@@ -308,10 +307,8 @@ pub fn DemoState::update_scene(
 ///|
 /// Advances the demo clock, runs one frame of ECS phases, then draws into `color_view`.
 ///
-/// Kept `pub` for browser and native visual regression (`visual_regression_browser`,
-/// `emadurandal/rhodonite_examples/visual_regression`), which render into an offscreen
-/// view without a swapchain. The interactive sample uses `render_current_frame` in
-/// `register_engine_handlers` instead.
+/// Kept `pub` for callers that render into an offscreen view without a swapchain.
+/// The visual regression harness uses platform single-frame rendering.
 pub fn render_frame_to_view(
   demo_state : DemoState,
   color_view : @wgpu.GPUTextureView,
@@ -348,6 +345,18 @@ pub fn DemoState::render_scene(
 }
 
 ///|
+/// Creates DemoState and registers the sample engine handlers.
+pub fn setup_engine(engine : @app.Engine) -> Bool {
+  match create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Registers engine phase handlers that drive this DemoState.
 pub fn register_engine_handlers(
   engine : @app.Engine,
@@ -356,7 +365,6 @@ pub fn register_engine_handlers(
   engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
     demo_state.handle_surface_frame(frame)
   })
-  engine.add_common_handlers(demo_state.scene)
   engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.update_scene(frame)
   })

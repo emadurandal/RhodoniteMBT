@@ -8,67 +8,76 @@ let sample_width : UInt = 800U
 let sample_height : UInt = 600U
 
 ///|
-async fn create_browser_webgpu_fixture() -> (
-  @wgpu.GPUInstance,
-  @wgpu.GPUDevice,
-  @wgpu.GPUQueue,
-) raise Error {
-  let instance = @wgpu.create_webgpu_instance(@wgpu.navigatorGPU())
-  let adapter = instance.request_adapter()
-  let device = adapter.request_device()
-  let queue = device.get_queue()
-  (instance, device, queue)
+/// Creates an off-document canvas for browser visual regression.
+extern "js" fn create_visual_regression_canvas(
+  width : Int,
+  height : Int,
+) -> @wgpu.HTMLCanvasElement =
+  #| (width, height) => {
+  #|   const canvas = document.createElement("canvas");
+  #|   canvas.width = width;
+  #|   canvas.height = height;
+  #|   return canvas;
+  #| }
+
+///|
+/// Reads the presented WebGPU canvas pixels as top-left RGBA bytes.
+extern "js" fn read_visual_regression_canvas_rgba8_async(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> @js_async.Promise[Bytes] =
+  #| async (canvas) => {
+  #|   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  #|   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  #|   const bitmap = await createImageBitmap(canvas);
+  #|   try {
+  #|     const readback = document.createElement("canvas");
+  #|     readback.width = canvas.width;
+  #|     readback.height = canvas.height;
+  #|     const ctx = readback.getContext("2d", { willReadFrequently: true });
+  #|     ctx.drawImage(bitmap, 0, 0);
+  #|     const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  #|     return new Uint8Array(image.data.buffer.slice(0));
+  #|   } finally {
+  #|     bitmap.close();
+  #|   }
+  #| }
+
+///|
+/// Implements `read_visual_regression_canvas_rgba8`.
+async fn read_visual_regression_canvas_rgba8(
+  canvas : @wgpu.HTMLCanvasElement,
+) -> Bytes raise Error {
+  @js_async.Promise::wait(read_visual_regression_canvas_rgba8_async(canvas))
 }
 
 ///|
-async fn render_browser_webgpu_sample(
-  render : (@wgpu.GPUDevice, @wgpu.GPUQueue, String, @wgpu.GPUTextureView) -> Unit raise,
+/// Runs a browser platform in single-frame mode and reads the canvas result.
+async fn render_browser_platform_sample(
+  app : @app_browser.PlatformApp,
 ) -> Bytes raise Error {
-  let (instance, device, queue) = create_browser_webgpu_fixture()
-  let texture = device.create_rgba8_render_texture(sample_width, sample_height)
-  let view = texture.create_view()
-  let readback = device.create_buffer(
-    @wgpu.rgba8_copy_padded_byte_length(sample_width, sample_height),
-    @wgpu.GPU_BUFFER_USAGE_MAP_READ | @wgpu.GPU_BUFFER_USAGE_COPY_DST,
+  let canvas = create_visual_regression_canvas(
+    sample_width.reinterpret_as_int(),
+    sample_height.reinterpret_as_int(),
   )
-  render(device, queue, "rgba8unorm", view)
-  let encoder = device.create_command_encoder()
-  encoder.copy_texture_to_buffer_rgba8(
-    texture, readback, sample_width, sample_height,
+  let platform = @app_browser.run_platform(
+    @app_browser.PlatformConfig::new(canvas),
+    app,
+    @app_browser.PlatformOptions::single_frame(),
   )
-  queue.submit(encoder.finish())
-  let width = sample_width.reinterpret_as_int()
-  let height = sample_height.reinterpret_as_int()
-  let padded_row = @wgpu.rgba8_copy_bytes_per_row(sample_width).to_int()
-  let raw = readback.readback_async(
-    0UL,
-    @wgpu.rgba8_copy_padded_byte_length(sample_width, sample_height),
-  )
-  let data = Bytes::makei(width * height * 4, fn(i) {
-    let pixel = i / 4
-    let x = pixel % width
-    let y = pixel / width
-    let channel = i % 4
-    raw[y * padded_row + x * 4 + channel]
-  })
-  readback.release()
-  @wgpu.textureView_release(view)
-  texture.release()
-  queue.release()
-  device.release()
-  instance.release()
+  let platform = match platform {
+    Some(platform) => platform
+    None => abort("browser visual regression failed to initialize platform")
+  }
+  let data = read_visual_regression_canvas_rgba8(canvas)
+  platform.dispose()
   data
 }
 
 ///|
 async fn render_basic_triangle_browser_snapshot_async() -> Bytes raise Error {
-  render_browser_webgpu_sample(fn(device, queue, format, view) {
-    let demo_state = @basic_triangle.create_demo_state_for_device(
-      device, queue, format,
-    )
-    @basic_triangle.render_frame_to_view(demo_state, view)
-    demo_state.release()
-  })
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::default_engine(@basic_triangle.setup_engine),
+  )
 }
 
 ///|
@@ -81,13 +90,9 @@ pub fn render_basic_triangle_browser_snapshot() -> @js_async.Promise[Bytes] {
 
 ///|
 async fn render_ondemand_triangle_browser_snapshot_async() -> Bytes raise Error {
-  render_browser_webgpu_sample(fn(device, queue, format, view) {
-    let demo_state = @ondemand_triangle.create_demo_state_for_device(
-      device, queue, format,
-    )
-    @ondemand_triangle.render_frame_to_view(demo_state, view)
-    demo_state.release()
-  })
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::default_engine(@ondemand_triangle.setup_engine),
+  )
 }
 
 ///|
@@ -100,13 +105,9 @@ pub fn render_ondemand_triangle_browser_snapshot() -> @js_async.Promise[Bytes] {
 
 ///|
 async fn render_ecs_scene_graph_browser_snapshot_async() -> Bytes raise Error {
-  render_browser_webgpu_sample(fn(device, queue, format, view) {
-    let demo_state = @ecs_scene_graph.create_demo_state_for_device(
-      device, queue, format,
-    )
-    @ecs_scene_graph.render_frame_to_view(demo_state, view)
-    demo_state.release()
-  })
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::default_engine(@ecs_scene_graph.setup_engine),
+  )
 }
 
 ///|
@@ -119,13 +120,11 @@ pub fn render_ecs_scene_graph_browser_snapshot() -> @js_async.Promise[Bytes] {
 
 ///|
 async fn render_ecs_mass_cubes_browser_snapshot_async() -> Bytes raise Error {
-  render_browser_webgpu_sample(fn(device, queue, format, view) {
-    let demo_state = @ecs_mass_cubes.create_demo_state_for_device(
-      device, queue, format,
-    )
-    @ecs_mass_cubes.render_frame_to_view(demo_state, view, record_perf=false)
-    demo_state.release()
-  })
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::new(
+      @ecs_mass_cubes.create_engine, @ecs_mass_cubes.setup_engine,
+    ),
+  )
 }
 
 ///|

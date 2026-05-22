@@ -19,6 +19,25 @@ test "scene infers common orbit camera component ids from registered systems" {
 }
 
 ///|
+test "scene common runtime records and installs standard systems" {
+  let scene = Scene::new("common-runtime")
+  let world = scene.world()
+  let orbit = world.register_cpu_component("RuntimeOrbit", 4)
+  let home = world.register_cpu_component("RuntimeHome", 4)
+  let lens = world.register_cpu_component("RuntimeLens", 4)
+  scene.use_common_runtime(
+    transform_propagation=true,
+    orbit_component=Some(orbit),
+    home_component=Some(home),
+    lens_component=Some(lens),
+  )
+  assert_true(scene.apply_common_runtime() is Some(_))
+  assert_true(scene.inferred_common_orbit_component() == Some(orbit))
+  assert_true(scene.inferred_common_home_component(Some(orbit)) == Some(home))
+  assert_true(scene.inferred_common_lens_component(Some(orbit)) == Some(lens))
+}
+
+///|
 test "scene render state preparation runs update post update and render extract" {
   let scene = Scene::new("prepare")
   let calls : Array[Int] = []

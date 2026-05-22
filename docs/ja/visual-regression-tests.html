@@ -25,17 +25,16 @@
       <main class="content">
         <article class="doc">
           <h1>Visual Regression Tests</h1>
-          <p class="lead">Visual regression は real sample <code>DemoState</code> を WebGPU backend で offscreen render し、readback した RGBA8 pixels を PNG golden files と比較します。CPU canvas reference ではありません。</p>
+          <p class="lead">Visual regression は real sample path を WebGPU backend で render し、readback した RGBA8 pixels を PNG golden files と比較します。browser sample は browser Platform single-frame path を通り、native sample は現時点では native offscreen WebGPU readback path を使います。</p>
 
           <h2>Flow</h2>
           <div class="mermaid">
 flowchart LR
   M[visual_samples.tsv] --> H[Native or browser harness]
-  H --> D[Sample DemoState]
-  D --> T[Offscreen rgba8unorm texture 800x600]
-  T --> B[Readback buffer]
-  B --> U[Unpack padded rows]
-  U --> P[PNG compare or update]
+  H --> E[Sample setup_engine]
+  E --> R[Platform single-frame or native offscreen render]
+  R --> B[RGBA8 readback]
+  B --> P[PNG compare or update]
   P --> G[__image_snapshots__]
           </div>
 

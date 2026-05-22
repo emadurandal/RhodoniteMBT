@@ -25,17 +25,16 @@
       <main class="content">
         <article class="doc">
           <h1>Visual Regression Tests</h1>
-          <p class="lead">Visual regression tests render real sample <code>DemoState</code> paths through WebGPU into offscreen textures, read back RGBA8 pixels, and compare them with PNG golden files. They are not CPU-side canvas references.</p>
+          <p class="lead">Visual regression tests render real sample paths through WebGPU, read back RGBA8 pixels, and compare them with PNG golden files. Browser samples run through the browser Platform single-frame path; native samples still use the native offscreen WebGPU readback path.</p>
 
           <h2>Flow</h2>
           <div class="mermaid">
 flowchart LR
   M[visual_samples.tsv] --> H[Native or browser harness]
-  H --> D[Sample DemoState]
-  D --> T[Offscreen rgba8unorm texture 800x600]
-  T --> B[Readback buffer]
-  B --> U[Unpack padded rows]
-  U --> P[PNG compare or update]
+  H --> E[Sample setup_engine]
+  E --> R[Platform single-frame or native offscreen render]
+  R --> B[RGBA8 readback]
+  B --> P[PNG compare or update]
   P --> G[__image_snapshots__]
           </div>
 
