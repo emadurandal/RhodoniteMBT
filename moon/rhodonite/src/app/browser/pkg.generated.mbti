@@ -27,8 +27,6 @@ pub async fn run_multi_surface_platform(Array[PlatformConfig], PlatformApp, Plat
 
 pub async fn run_platform(PlatformConfig, PlatformApp, PlatformOptions) -> Platform?
 
-pub async fn run_single_canvas_platform(@webgpu_objects.HTMLCanvasElement, PlatformApp, PlatformOptions) -> Platform?
-
 pub fn start_browser_engine_canvas_loop(@app.Engine, @webgpu_objects.HTMLCanvasElement) -> BrowserFrameLoop
 
 pub fn start_browser_engine_loop(@app.Engine) -> BrowserFrameLoop
