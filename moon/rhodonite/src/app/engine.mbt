@@ -277,6 +277,74 @@ fn Engine::frame_targets_scene(
 }
 
 ///|
+/// Builds the standard orbit camera input phase handler for one scene.
+fn orbit_camera_controller_input_phase_handler(
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  caller : String,
+) -> (Engine, FrameState) -> Unit {
+  fn(engine, frame) {
+    if !engine.frame_targets_scene(frame, scene) {
+      return
+    }
+    let camera = scene_main_camera_or_abort(scene, caller)
+    let input = match frame.input() {
+      Some(input) => input
+      None => engine.input()
+    }
+    ignore(
+      @ecs.update_orbit_camera_controller_from_mouse_frame(
+        scene.world(),
+        camera,
+        orbit_component,
+        input.mouse_down(Left),
+        input.mouse_pressed(Left),
+        input.mouse_down(Middle),
+        input.mouse_pressed(Middle),
+        input.pointer_delta_x(),
+        input.pointer_delta_y(),
+        input.wheel_delta_y(),
+      ),
+    )
+  }
+}
+
+///|
+/// Registers the standard orbit camera input handler, optionally bypassing the
+/// public registration window used after phase handler registration is locked.
+fn Engine::register_orbit_camera_controller_input_handler(
+  self : Engine,
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  phase : PhaseKey,
+  slot : PhaseSlot,
+  key : String?,
+  unchecked : Bool,
+  caller : String,
+) -> Unit {
+  let handler = orbit_camera_controller_input_phase_handler(
+    scene, orbit_component, caller,
+  )
+  if unchecked {
+    match key {
+      Some(value) =>
+        if has_phase_handler_registration(
+            self.phase_handlers,
+            phase,
+            slot,
+            value,
+          ) {
+          return
+        }
+      None => ()
+    }
+    self.add_phase_handler_unchecked(phase, handler, slot, key)
+  } else {
+    self.add_phase_handler(phase, handler, slot~, key~)
+  }
+}
+
+///|
 /// Adds the standard input handler for a scene main camera's orbit controller.
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
@@ -286,36 +354,8 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
   slot? : PhaseSlot = BeforeSystems,
   key? : String? = None,
 ) -> Unit {
-  self.add_phase_handler(
-    phase,
-    fn(engine, frame) {
-      if !engine.frame_targets_scene(frame, scene) {
-        return
-      }
-      let camera = scene_main_camera_or_abort(
-        scene, "Engine::add_orbit_camera_controller_input_handler",
-      )
-      let input = match frame.input() {
-        Some(input) => input
-        None => engine.input()
-      }
-      ignore(
-        @ecs.update_orbit_camera_controller_from_mouse_frame(
-          scene.world(),
-          camera,
-          orbit_component,
-          input.mouse_down(Left),
-          input.mouse_pressed(Left),
-          input.mouse_down(Middle),
-          input.mouse_pressed(Middle),
-          input.pointer_delta_x(),
-          input.pointer_delta_y(),
-          input.wheel_delta_y(),
-        ),
-      )
-    },
-    slot~,
-    key~,
+  self.register_orbit_camera_controller_input_handler(
+    scene, orbit_component, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
   )
 }
 
@@ -328,44 +368,14 @@ fn Engine::add_common_runtime_orbit_camera_input_handler(
 ) -> Unit {
   let key = "rhodonite/common_runtime/orbit_camera_input/" +
     scene.instance_id.to_string()
-  if has_phase_handler_registration(
-      self.phase_handlers,
-      phase_input(),
-      BeforeSystems,
-      key,
-    ) {
-    return
-  }
-  self.add_phase_handler_unchecked(
+  self.register_orbit_camera_controller_input_handler(
+    scene,
+    orbit_component,
     phase_input(),
-    fn(engine, frame) {
-      if !engine.frame_targets_scene(frame, scene) {
-        return
-      }
-      let camera = scene_main_camera_or_abort(
-        scene, "Engine::add_common_runtime_orbit_camera_input_handler",
-      )
-      let input = match frame.input() {
-        Some(input) => input
-        None => engine.input()
-      }
-      ignore(
-        @ecs.update_orbit_camera_controller_from_mouse_frame(
-          scene.world(),
-          camera,
-          orbit_component,
-          input.mouse_down(Left),
-          input.mouse_pressed(Left),
-          input.mouse_down(Middle),
-          input.mouse_pressed(Middle),
-          input.pointer_delta_x(),
-          input.pointer_delta_y(),
-          input.wheel_delta_y(),
-        ),
-      )
-    },
     BeforeSystems,
     Some(key),
+    true,
+    "Engine::add_common_runtime_orbit_camera_input_handler",
   )
 }
 
