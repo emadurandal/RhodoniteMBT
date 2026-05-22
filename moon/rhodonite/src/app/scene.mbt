@@ -13,6 +13,15 @@ fn alloc_scene_instance_id() -> Int {
 }
 
 ///|
+/// Declarative standard scene runtime setup consumed by the owning engine.
+struct CommonRuntimeConfig {
+  transform_propagation : Bool
+  orbit_component : @ecs.ComponentTypeId?
+  home_component : @ecs.ComponentTypeId?
+  lens_component : @ecs.ComponentTypeId?
+}
+
+///|
 /// Runtime scene instance that binds one ECS world to one system runner.
 pub struct Scene {
   priv instance_id : Int
@@ -32,6 +41,7 @@ pub struct Scene {
   priv orbit_camera_blob_sync_registrations : Array[
     OrbitCameraBlobSyncRegistration,
   ]
+  priv mut common_runtime : CommonRuntimeConfig?
 }
 
 ///|
@@ -55,6 +65,7 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     camera_blob_sync_registrations: [],
     orbit_camera_transform_registrations: [],
     orbit_camera_blob_sync_registrations: [],
+    common_runtime: None,
   }
 }
 
@@ -441,6 +452,46 @@ pub fn Scene::add_common_systems(
 }
 
 ///|
+/// Installs and records the standard runtime systems expected by engine-driven samples.
+pub fn Scene::use_common_runtime(
+  self : Scene,
+  transform_propagation? : Bool = true,
+  orbit_component? : @ecs.ComponentTypeId? = None,
+  home_component? : @ecs.ComponentTypeId? = None,
+  lens_component? : @ecs.ComponentTypeId? = None,
+) -> Unit {
+  self.common_runtime = Some({
+    transform_propagation,
+    orbit_component,
+    home_component,
+    lens_component,
+  })
+  self.add_common_systems(
+    transform_propagation~,
+    orbit_component~,
+    home_component~,
+    lens_component~,
+  )
+}
+
+///|
+/// Re-applies recorded common runtime systems and returns the stored config.
+fn Scene::apply_common_runtime(self : Scene) -> CommonRuntimeConfig? {
+  match self.common_runtime {
+    Some(config) => {
+      self.add_common_systems(
+        transform_propagation=config.transform_propagation,
+        orbit_component=config.orbit_component,
+        home_component=config.home_component,
+        lens_component=config.lens_component,
+      )
+      Some(config)
+    }
+    None => None
+  }
+}
+
+///|
 /// Implements `Scene::set_main_camera`.
 pub fn Scene::set_main_camera(self : Scene, camera : @ecs.EntityId?) -> Unit {
   self.main_camera = camera
@@ -484,6 +535,31 @@ pub fn Scene::run_systems_for_phase(
   frame : FrameState,
 ) -> Bool {
   self.system_runner.run_phase(self.world, frame.system_context(), phase)
+}
+
+///|
+/// Runs this scene's systems for several engine phases in the supplied order.
+pub fn Scene::run_systems_for_phases(
+  self : Scene,
+  phases : Array[PhaseKey],
+  frame : FrameState,
+) -> Bool {
+  let mut ok = true
+  for i = 0; i < phases.length(); i = i + 1 {
+    if !self.run_systems_for_phase(phases[i], frame) {
+      ok = false
+    }
+  }
+  ok
+}
+
+///|
+/// Runs the standard scene phases needed to make current ECS state renderable.
+pub fn Scene::prepare_render_state(
+  self : Scene,
+  frame? : FrameState = FrameState::zero(),
+) -> Bool {
+  self.run_systems_for_phases(default_render_state_preparation_phases(), frame)
 }
 
 ///|

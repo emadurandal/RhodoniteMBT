@@ -461,7 +461,7 @@ fn finish_sdl_webgpu_native_session(
 
 ///|
 /// Initializes SDL3, creates a Linux Vulkan surface, and returns a native session.
-pub async fn init_sdl_linux_webgpu_native(
+pub fn init_sdl_linux_webgpu_native(
   window_title : String,
   width : Int,
   height : Int,
@@ -517,7 +517,7 @@ pub async fn init_sdl_linux_webgpu_native(
 
 ///|
 /// Initializes SDL3 and a native WebGPU surface for the current host OS.
-pub async fn init_sdl_webgpu_native(
+pub fn init_sdl_webgpu_native(
   window_title : String,
   width : Int,
   height : Int,
@@ -534,7 +534,7 @@ pub async fn init_sdl_webgpu_native(
 
 ///|
 /// Initializes SDL3, creates a Metal-backed WebGPU surface, and returns a native session.
-pub async fn init_sdl_metal_webgpu_native(
+pub fn init_sdl_metal_webgpu_native(
   window_title : String,
   width : Int,
   height : Int,
@@ -1730,11 +1730,12 @@ pub fn PlatformOptions::single_frame() -> PlatformOptions {
 }
 
 ///|
-/// Runs the SDL3 platform lifecycle with application hooks.
-pub async fn run_platform(
+/// Runs the SDL3 platform lifecycle after invoking an optional pre-loop hook.
+fn run_platform_lifecycle(
   config : PlatformConfig,
   app : PlatformApp,
   options : PlatformOptions,
+  before_frame_mode : (() -> Unit)?,
 ) -> Unit raise Sdl3AppError {
   let session = init_sdl_webgpu_native(
     config.window_title,
@@ -1757,6 +1758,10 @@ pub async fn run_platform(
     engine.set_surface_suspended()
   }
   engine.initialize()
+  match before_frame_mode {
+    Some(callback) => callback()
+    None => ()
+  }
   let session = match options.frame_mode {
     Loop => {
       let session = run_sdl_metal_webgpu_input_render_loop(
@@ -1822,6 +1827,36 @@ pub async fn run_platform(
   }
   engine.shutdown()
   release_sdl_metal_webgpu_native(session)
+}
+
+///|
+/// Runs the SDL3 platform lifecycle with application hooks.
+pub async fn run_platform(
+  config : PlatformConfig,
+  app : PlatformApp,
+  options : PlatformOptions,
+) -> Unit raise Sdl3AppError {
+  run_platform_lifecycle(config, app, options, None)
+}
+
+///|
+/// Runs one SDL3 platform frame and returns the presented canvas as packed RGBA8 bytes.
+pub fn run_single_frame_platform_capture_rgba8(
+  config : PlatformConfig,
+  app : PlatformApp,
+) -> Bytes? raise Sdl3AppError {
+  run_platform_lifecycle(
+    config,
+    app,
+    PlatformOptions::single_frame(),
+    Some(fn() { @wgpu_objects.native_canvas_present_capture_begin() }),
+  )
+  let bytes = @wgpu_objects.native_canvas_present_capture_take()
+  if bytes.length() == 0 {
+    None
+  } else {
+    Some(bytes)
+  }
 }
 
 ///|

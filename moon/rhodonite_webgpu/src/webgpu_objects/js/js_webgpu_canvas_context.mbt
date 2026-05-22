@@ -58,3 +58,15 @@ pub fn webgpu_canvas_context_get_current_texture(
 pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
   ignore(context)
 }
+
+///|
+/// JS backend does not use native canvas present capture.
+pub fn native_canvas_present_capture_begin() -> Unit {
+  ()
+}
+
+///|
+/// JS backend does not use native canvas present capture.
+pub fn native_canvas_present_capture_take() -> Bytes {
+  []
+}

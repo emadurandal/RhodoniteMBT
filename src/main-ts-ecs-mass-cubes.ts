@@ -22,9 +22,7 @@ import {
 	type OrbitCameraController,
 } from "../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
-	createRgba8ReadbackTarget,
-	destroyReadbackTarget,
-	readRgba8Texture,
+	readPresentedCanvasRgba8,
 } from "./visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
@@ -81,7 +79,6 @@ type DemoState = {
 	readonly transformWordUploadCount: number;
 	readonly denseTransformLayout: GlobalTransformDenseLayout | null;
 	readonly perSide: number;
-	snapshotColorView?: GPUTextureView;
 	frame: number;
 	lastFrameStartMs: number;
 	cpuFrameStartMs: number;
@@ -367,21 +364,15 @@ function createDemoStateForEngine(
 	) {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
-	scene.addCommonSystems({
-		orbitControllerComponent,
-		homeComponent: cameraHomeComponent,
-		updateOrbitCameraControllerFromInput:
-			updateOrbitCameraControllerComponentFromInput,
-		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-	});
-	pushCameraMatrices(
-		world,
-		camera,
-		readOrbitCameraControllerComponent(
-			world,
-			camera,
+	scene.useCommonRuntime(
+		{
 			orbitControllerComponent,
-		),
+			homeComponent: cameraHomeComponent,
+			updateOrbitCameraControllerFromInput:
+				updateOrbitCameraControllerComponentFromInput,
+			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+		},
+		{ transformPropagation: false },
 	);
 	scene.setMainCamera(camera);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
@@ -413,18 +404,17 @@ function createDemoStateForEngine(
 		transformWordUploadCount: transformUploadRange.wordCount,
 		denseTransformLayout,
 		perSide,
-		snapshotColorView: undefined,
 		frame: 0,
 		lastFrameStartMs: -1,
 		cpuFrameStartMs: -1,
 	};
 	addMassCubesCameraSyncSystem(demoState);
+	demoState.scene.prepareRenderState();
 	uploadInitialGlobalTransforms(demoState);
 	return demoState;
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.addCommonHandlers(demoState.scene, { transformPropagation: false });
 	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
@@ -468,8 +458,7 @@ function renderCurrentFrame(demoState: DemoState): void {
 			: 0;
 	demoState.lastFrameStartMs = frameStart;
 
-	const colorView =
-		demoState.snapshotColorView ?? demoState.context.getCurrentTexture().createView();
+	const colorView = demoState.context.getCurrentTexture().createView();
 	renderScene(demoState, demoState.scene, colorView);
 	updatePerfOverlay(fps, performance.now() - frameStart);
 	demoState.cpuFrameStartMs = -1;
@@ -497,28 +486,27 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	const canvas = document.createElement("canvas");
 	canvas.width = MASS_CUBES_CANVAS_WIDTH;
 	canvas.height = MASS_CUBES_CANVAS_HEIGHT;
-	const engine = await Engine.create(canvas, {
-		mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
-	});
-	const demoState = createDemoStateForEngine(engine, "rgba8unorm");
-	registerEngineHandlers(engine, demoState);
-	engine.initialize();
-	const target = createRgba8ReadbackTarget(demoState.device, MASS_CUBES_CANVAS_WIDTH, MASS_CUBES_CANVAS_HEIGHT);
+	const platform = await runSingleCanvasPlatform(
+		canvas,
+		new PlatformApp({
+			createEngine: (config) =>
+				Engine.create(config.canvas, {
+					mainScene: new Scene<World, EntityId>("ts-ecs-mass-cubes"),
+				}),
+			setupEngine: (engine) => {
+				const demoState = createDemoStateForEngine(engine);
+				registerEngineHandlers(engine, demoState);
+			},
+		}),
+		PlatformOptions.singleFrame(),
+	);
+	if (platform === undefined) {
+		throw new Error("TypeScript ECS mass cubes platform failed to initialize.");
+	}
 	try {
-		demoState.snapshotColorView = target.view;
-		engine.runFrame(0);
-		demoState.snapshotColorView = undefined;
-		return await readRgba8Texture(
-			demoState.device,
-			demoState.queue,
-			target.texture,
-			MASS_CUBES_CANVAS_WIDTH,
-			MASS_CUBES_CANVAS_HEIGHT,
-		);
+		return await readPresentedCanvasRgba8(canvas, platform.engine.queue);
 	} finally {
-		demoState.snapshotColorView = undefined;
-		engine.shutdown();
-		destroyReadbackTarget(target);
+		platform.dispose();
 	}
 }
 

@@ -12,13 +12,7 @@ fn create_engine(gpu_context : @wgpu.GPUContext) -> @app.Engine {
 ///|
 /// Creates DemoState and registers engine handlers.
 fn setup_engine(engine : @app.Engine) -> Bool {
-  match @demo_state.create_demo_state_for_engine(engine) {
-    Some(demo_state) => {
-      @demo_state.register_engine_handlers(engine, demo_state)
-      true
-    }
-    None => false
-  }
+  @demo_state.setup_engine(engine)
 }
 
 ///|

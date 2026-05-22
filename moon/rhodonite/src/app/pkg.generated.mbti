@@ -30,6 +30,8 @@ pub fn default_frame_begin_phases() -> Array[@ecs.PhaseKey]
 
 pub fn default_render_frame_phases() -> Array[@ecs.PhaseKey]
 
+pub fn default_render_state_preparation_phases() -> Array[@ecs.PhaseKey]
+
 pub fn phase(String) -> @ecs.PhaseKey
 
 pub fn phase_fixed_post_update() -> @ecs.PhaseKey
@@ -97,6 +99,8 @@ pub(all) struct CommonHandlersOptions {
 pub fn CommonHandlersOptions::default() -> Self
 pub fn CommonHandlersOptions::new(transform_propagation? : Bool) -> Self
 
+type CommonRuntimeConfig
+
 pub(all) struct CubeMeshDesc {
   // private fields
 }
@@ -107,9 +111,9 @@ pub struct Engine {
   // private fields
 }
 pub fn Engine::add_common_handlers(Self, Scene, options? : CommonHandlersOptions) -> Unit
-pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
-pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_surface(Self, @webgpu.GPUSurface) -> SurfaceId
 pub fn Engine::add_surface_for_scene(Self, @webgpu.GPUSurface, Scene) -> SurfaceId
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit
@@ -183,6 +187,7 @@ pub fn FrameState::surface_height(Self) -> Int
 pub fn FrameState::surface_id(Self) -> SurfaceId?
 pub fn FrameState::surface_width(Self) -> Int
 pub fn FrameState::system_context(Self) -> @ecs.SystemContext
+pub fn FrameState::zero() -> Self
 
 pub(all) struct InstanceBufferHandle {
   // private fields
@@ -261,11 +266,14 @@ pub fn Scene::main_camera(Self) -> @ecs.EntityId?
 pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
+pub fn Scene::prepare_render_state(Self, frame? : FrameState) -> Bool
 pub fn Scene::run_systems_for_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
+pub fn Scene::run_systems_for_phases(Self, Array[@ecs.PhaseKey], FrameState) -> Bool
 pub fn Scene::same(Self, Self) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
+pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
 

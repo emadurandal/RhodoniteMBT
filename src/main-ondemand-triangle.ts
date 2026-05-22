@@ -13,9 +13,7 @@ import {
 	runPlatform,
 } from "../moon/rhodonite/src/app/ts/index.ts";
 import {
-	createRgba8ReadbackTarget,
-	destroyReadbackTarget,
-	readRgba8Texture,
+	readPresentedCanvasRgba8,
 } from "./visual-regression/webgpu-readback";
 
 type DemoState = {
@@ -24,7 +22,6 @@ type DemoState = {
 	readonly uniformBuffer: GPUBuffer;
 	readonly bindGroup: GPUBindGroup;
 	angle: number;
-	snapshotColorView?: GPUTextureView;
 };
 
 const CANVAS_WIDTH = 800;
@@ -147,9 +144,7 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 }
 
 function renderCurrentFrame(demoState: DemoState): void {
-	const colorView =
-		demoState.snapshotColorView ??
-		demoState.engine.context.getCurrentTexture().createView();
+	const colorView = demoState.engine.context.getCurrentTexture().createView();
 	renderToView(demoState, colorView);
 }
 
@@ -180,26 +175,21 @@ export async function renderTsOndemandTriangleBrowserSnapshot(): Promise<Uint8Ar
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
 	canvas.height = CANVAS_HEIGHT;
-	const engine = await Engine.create(canvas);
-	const demoState = createDemoStateForEngine(engine);
-	registerEngineHandlers(engine, demoState);
-	engine.initialize();
-	const target = createRgba8ReadbackTarget(engine.device, CANVAS_WIDTH, CANVAS_HEIGHT);
+	const platform = await runPlatform(
+		new PlatformConfig(canvas),
+		PlatformApp.defaultEngine((engine) => {
+			const demoState = createDemoStateForEngine(engine);
+			registerEngineHandlers(engine, demoState);
+		}),
+		PlatformOptions.singleFrame(),
+	);
+	if (platform === undefined) {
+		throw new Error("TypeScript on-demand triangle platform failed to initialize.");
+	}
 	try {
-		demoState.snapshotColorView = target.view;
-		engine.runFrame(0);
-		demoState.snapshotColorView = undefined;
-		return await readRgba8Texture(
-			engine.device,
-			engine.queue,
-			target.texture,
-			CANVAS_WIDTH,
-			CANVAS_HEIGHT,
-		);
+		return await readPresentedCanvasRgba8(canvas, platform.engine.queue);
 	} finally {
-		demoState.snapshotColorView = undefined;
-		engine.shutdown();
-		destroyReadbackTarget(target);
+		platform.dispose();
 	}
 }
 

@@ -168,6 +168,18 @@ pub fn render_frame_to_view(
 }
 
 ///|
+/// Creates DemoState and registers the sample engine handlers.
+pub fn setup_engine(engine : @app.Engine) -> Bool {
+  match create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Registers input, render, and shutdown handlers for an on-demand engine.
 pub fn register_engine_handlers(
   engine : @app.Engine,

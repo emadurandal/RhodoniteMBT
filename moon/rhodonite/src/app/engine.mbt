@@ -208,15 +208,59 @@ fn Engine::ensure_phase_handler_registration_open(
 }
 
 ///|
-/// Appends a function to run in an engine phase slot.
+/// Reports whether a keyed phase handler is already registered for a phase slot.
+fn has_phase_handler_registration(
+  handlers : Array[PhaseHandler],
+  phase : PhaseKey,
+  slot : PhaseSlot,
+  key : String,
+) -> Bool {
+  for i = 0; i < handlers.length(); i = i + 1 {
+    let handler = handlers[i]
+    if handler.phase == phase && handler.slot == slot {
+      match handler.key {
+        Some(existing) => if existing == key { return true }
+        None => ()
+      }
+    }
+  }
+  false
+}
+
+///|
+/// Appends a phase handler without checking the public registration window.
+fn Engine::add_phase_handler_unchecked(
+  self : Engine,
+  phase : PhaseKey,
+  handler : (Engine, FrameState) -> Unit,
+  slot : PhaseSlot,
+  key : String?,
+) -> Unit {
+  self.phase_handlers.push({ phase, slot, key, run: handler })
+}
+
+///|
+/// Adds a function to run in an engine phase slot.
+///
+/// When `key` is provided, repeated registrations with the same phase, slot,
+/// and key are ignored. Unkeyed handlers are always appended because function
+/// values cannot be compared for identity.
 pub fn Engine::add_phase_handler(
   self : Engine,
   phase : PhaseKey,
   handler : (Engine, FrameState) -> Unit,
   slot? : PhaseSlot = BeforeSystems,
+  key? : String? = None,
 ) -> Unit {
   self.ensure_phase_handler_registration_open("Engine::add_phase_handler")
-  self.phase_handlers.push({ phase, slot, run: handler })
+  match key {
+    Some(value) =>
+      if has_phase_handler_registration(self.phase_handlers, phase, slot, value) {
+        return
+      }
+    None => ()
+  }
+  self.add_phase_handler_unchecked(phase, handler, slot, key)
 }
 
 ///|
@@ -233,44 +277,167 @@ fn Engine::frame_targets_scene(
 }
 
 ///|
-/// Appends the standard input handler for a scene main camera's orbit controller.
+/// Builds the standard orbit camera input phase handler for one scene.
+fn orbit_camera_controller_input_phase_handler(
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  caller : String,
+) -> (Engine, FrameState) -> Unit {
+  fn(engine, frame) {
+    if !engine.frame_targets_scene(frame, scene) {
+      return
+    }
+    let camera = scene_main_camera_or_abort(scene, caller)
+    let input = match frame.input() {
+      Some(input) => input
+      None => engine.input()
+    }
+    ignore(
+      @ecs.update_orbit_camera_controller_from_mouse_frame(
+        scene.world(),
+        camera,
+        orbit_component,
+        input.mouse_down(Left),
+        input.mouse_pressed(Left),
+        input.mouse_down(Middle),
+        input.mouse_pressed(Middle),
+        input.pointer_delta_x(),
+        input.pointer_delta_y(),
+        input.wheel_delta_y(),
+      ),
+    )
+  }
+}
+
+///|
+/// Returns the deduplication key for a scene's standard orbit camera input handler.
+fn common_orbit_camera_input_handler_key(scene : Scene) -> String {
+  "rhodonite/orbit_camera_input/" + scene.instance_id.to_string()
+}
+
+///|
+/// Registers the standard orbit camera input handler, optionally bypassing the
+/// public registration window used after phase handler registration is locked.
+fn Engine::register_orbit_camera_controller_input_handler(
+  self : Engine,
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+  phase : PhaseKey,
+  slot : PhaseSlot,
+  key : String?,
+  unchecked : Bool,
+  caller : String,
+) -> Unit {
+  let handler = orbit_camera_controller_input_phase_handler(
+    scene, orbit_component, caller,
+  )
+  if unchecked {
+    match key {
+      Some(value) =>
+        if has_phase_handler_registration(
+            self.phase_handlers,
+            phase,
+            slot,
+            value,
+          ) {
+          return
+        }
+      None => ()
+    }
+    self.add_phase_handler_unchecked(phase, handler, slot, key)
+  } else {
+    self.add_phase_handler(phase, handler, slot~, key~)
+  }
+}
+
+///|
+/// Adds the standard input handler for a scene main camera's orbit controller.
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
   orbit_component : @ecs.ComponentTypeId,
   phase? : PhaseKey = phase_input(),
   slot? : PhaseSlot = BeforeSystems,
+  key? : String? = None,
 ) -> Unit {
-  self.add_phase_handler(
-    phase,
-    fn(engine, frame) {
-      if !engine.frame_targets_scene(frame, scene) {
-        return
-      }
-      let camera = scene_main_camera_or_abort(
-        scene, "Engine::add_orbit_camera_controller_input_handler",
-      )
-      let input = match frame.input() {
-        Some(input) => input
-        None => engine.input()
-      }
-      ignore(
-        @ecs.update_orbit_camera_controller_from_mouse_frame(
-          scene.world(),
-          camera,
-          orbit_component,
-          input.mouse_down(Left),
-          input.mouse_pressed(Left),
-          input.mouse_down(Middle),
-          input.mouse_pressed(Middle),
-          input.pointer_delta_x(),
-          input.pointer_delta_y(),
-          input.wheel_delta_y(),
-        ),
-      )
-    },
-    slot~,
+  self.register_orbit_camera_controller_input_handler(
+    scene, orbit_component, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
   )
+}
+
+///|
+/// Adds the standard orbit camera input handler while engine initialization is active.
+fn Engine::add_common_runtime_orbit_camera_input_handler(
+  self : Engine,
+  scene : Scene,
+  orbit_component : @ecs.ComponentTypeId,
+) -> Unit {
+  let key = common_orbit_camera_input_handler_key(scene)
+  self.register_orbit_camera_controller_input_handler(
+    scene,
+    orbit_component,
+    phase_input(),
+    BeforeSystems,
+    Some(key),
+    true,
+    "Engine::add_common_runtime_orbit_camera_input_handler",
+  )
+}
+
+///|
+/// Appends a scene once when it is not already present in the collection.
+fn push_unique_declared_common_runtime_scene(
+  scenes : Array[Scene],
+  scene : Scene,
+) -> Unit {
+  for i = 0; i < scenes.length(); i = i + 1 {
+    if scene.same(scenes[i]) {
+      return
+    }
+  }
+  scenes.push(scene)
+}
+
+///|
+/// Collects scenes that may declare common runtime from engine scenes and surfaces.
+fn declared_common_runtime_scenes(engine : Engine) -> Array[Scene] {
+  let result : Array[Scene] = []
+  for i = 0; i < engine.scenes.length(); i = i + 1 {
+    push_unique_declared_common_runtime_scene(result, engine.scenes[i])
+  }
+  for i = 0; i < engine.surfaces.length(); i = i + 1 {
+    push_unique_declared_common_runtime_scene(
+      result,
+      engine.surfaces[i].scene(),
+    )
+  }
+  result
+}
+
+///|
+/// Installs common runtime handlers declared by one scene when it is bound to a surface.
+fn Engine::try_install_declared_common_runtime(
+  self : Engine,
+  scene : Scene,
+) -> Unit {
+  match scene.apply_common_runtime() {
+    Some(config) =>
+      match config.orbit_component {
+        Some(orbit) =>
+          self.add_common_runtime_orbit_camera_input_handler(scene, orbit)
+        None => ()
+      }
+    None => ()
+  }
+}
+
+///|
+/// Installs common runtime handlers declared by scenes.
+fn Engine::install_declared_common_runtimes(self : Engine) -> Unit {
+  let scenes = declared_common_runtime_scenes(self)
+  for i = 0; i < scenes.length(); i = i + 1 {
+    self.try_install_declared_common_runtime(scenes[i])
+  }
 }
 
 ///|
@@ -310,7 +477,12 @@ pub fn Engine::add_common_handlers(
     lens_component~,
   )
   match orbit_component {
-    Some(orbit) => self.add_orbit_camera_controller_input_handler(scene, orbit)
+    Some(orbit) =>
+      self.add_orbit_camera_controller_input_handler(
+        scene,
+        orbit,
+        key=Some(common_orbit_camera_input_handler_key(scene)),
+      )
     None => ()
   }
 }
@@ -631,6 +803,7 @@ pub fn Engine::initialize(self : Engine) -> Unit {
   self.initializing = true
   self.run_phase_unchecked(phase_startup(), zero_frame_state())
   self.initializing = false
+  self.install_declared_common_runtimes()
   self.validate_phase_handlers()
   self.initialized = true
 }

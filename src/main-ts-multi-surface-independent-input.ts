@@ -197,26 +197,29 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.addCommonSystems({
-		orbitControllerComponent,
-		homeComponent: cameraHomeComponent,
-		updateOrbitCameraControllerFromInput:
-			updateOrbitCameraControllerComponentFromInput,
-		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-	});
-	scene.installCommonSystems({ transformPropagation: false });
-	syncOrbitCameraTransformComponent(
-		world,
-		camera,
-		orbitControllerComponent,
-		cameraHomeComponent,
+	scene.useCommonRuntime(
+		{
+			orbitControllerComponent,
+			homeComponent: cameraHomeComponent,
+			updateOrbitCameraControllerFromInput:
+				updateOrbitCameraControllerComponentFromInput,
+			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+		},
+		{ transformPropagation: false },
 	);
-	syncOrbitCameraBlobComponent(
-		world,
-		camera,
-		orbitControllerComponent,
-		cameraLensComponent,
+	demo.engine.setSurfaceScene(id, scene);
+	scene.setSchedule(
+		(systemWorld) => {
+			syncOrbitCameraBlobComponent(
+				systemWorld,
+				camera,
+				orbitControllerComponent,
+				cameraLensComponent,
+			);
+		},
+		Phase.RenderExtract,
 	);
+	scene.prepareRenderState();
 	const objects = {
 		sun: createRenderableObject(
 			demo,
@@ -249,7 +252,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		renderableComponent,
 		objects,
 	});
-	demo.engine.setSurfaceScene(id, scene);
 }
 
 function surfaceStateIndex(demo: DemoState, id: SurfaceId): number {
@@ -263,15 +265,6 @@ function ensureSurfaceState(demo: DemoState, id: SurfaceId): SurfaceRenderState 
 	}
 	addSurfaceState(demo, id, demo.engine.surfaceInput(id));
 	return demo.surfaces[demo.surfaces.length - 1]!;
-}
-
-function handleInput(surface: SurfaceRenderState): void {
-	updateOrbitCameraControllerComponentFromInput(
-		surface.world,
-		surface.camera,
-		surface.orbitControllerComponent,
-		surface.input,
-	);
 }
 
 function writeScene(surface: SurfaceRenderState, frame: FrameState): void {
@@ -360,11 +353,6 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	engine.addPhaseHandler(Phase.Surface, (_engine, frame) => {
 		if (frame.surfaceId !== undefined) {
 			ensureSurfaceState(demo, frame.surfaceId);
-		}
-	});
-	engine.addPhaseHandler(Phase.Input, (_engine, frame) => {
-		if (frame.surfaceId !== undefined) {
-			handleInput(ensureSurfaceState(demo, frame.surfaceId));
 		}
 	});
 	engine.addPhaseHandler(

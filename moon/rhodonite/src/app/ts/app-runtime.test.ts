@@ -5,15 +5,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	Engine,
 	type EngineCallback,
+	FrameState,
 	GpuSurface,
 	Phase,
 	PhaseGroup,
+	PhaseSlot,
 	Scene,
 	TimeState,
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
 	defaultMaxFixedStepsPerFrame,
+	defaultRenderStatePreparationPhases,
 	installBrowserInputCallbacks,
 	runMultiSurfacePlatform,
 	runPlatform,
@@ -160,6 +163,56 @@ describe("GpuSurface.syncFromCanvas", () => {
 	});
 });
 
+describe("app-runtime Scene", () => {
+	it("prepares render state with update post-update and render-extract schedules", () => {
+		const scene = new Scene<Record<string, never>>("prepare", {});
+		const calls: string[] = [];
+
+		scene.setSchedule((_world, frame) => {
+			calls.push(`update:${frame.frameIndex}`);
+		}, Phase.Update);
+		scene.setSchedule((_world, frame) => {
+			calls.push(`post-update:${frame.frameIndex}`);
+		}, Phase.PostUpdate);
+		scene.setSchedule((_world, frame) => {
+			calls.push(`render-extract:${frame.frameIndex}`);
+		}, Phase.RenderExtract);
+
+		expect(scene.prepareRenderState()).toBe(true);
+		expect(calls).toEqual([
+			"update:0",
+			"post-update:0",
+			"render-extract:0",
+		]);
+	});
+
+	it("runs an explicit ordered phase list with one frame state", () => {
+		const scene = new Scene<Record<string, never>>("phase-list", {});
+		const calls: string[] = [];
+		const frame = new FrameState(0.016, 7, 0.112);
+
+		scene.setSchedule((_world, runFrame) => {
+			calls.push(`update:${runFrame.frameIndex}`);
+		}, Phase.Update);
+		scene.setSchedule((_world, runFrame) => {
+			calls.push(`post-update:${runFrame.frameIndex}`);
+		}, Phase.PostUpdate);
+
+		expect(
+			scene.runSchedulePhases([Phase.PostUpdate, Phase.Update], frame),
+		).toBe(true);
+		expect(calls).toEqual(["post-update:7", "update:7"]);
+	});
+
+	it("exposes the render state preparation phase list", () => {
+		expect(defaultRenderStatePreparationPhases()).toEqual([
+			Phase.Update,
+			Phase.PostUpdate,
+			Phase.RenderExtract,
+		]);
+	});
+});
+
 describe("app-runtime Engine", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
@@ -267,6 +320,43 @@ describe("app-runtime Engine", () => {
 		expect(renderSurfaceChanged).toEqual([true]);
 	});
 
+	it("deduplicates keyed addPhaseHandler registrations", async () => {
+		const engine = await createTestEngine();
+		let inputCount = 0;
+		let afterInputCount = 0;
+
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				inputCount += 1;
+			},
+			PhaseSlot.BeforeSystems,
+			"test/input",
+		);
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				inputCount += 1;
+			},
+			PhaseSlot.BeforeSystems,
+			"test/input",
+		);
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				afterInputCount += 1;
+			},
+			PhaseSlot.AfterSystems,
+			"test/input",
+		);
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(inputCount).toBe(1);
+		expect(afterInputCount).toBe(1);
+	});
+
 	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
 		const engine = await createTestEngine();
 		const sceneA = new Scene("surface-a", {});
@@ -284,6 +374,91 @@ describe("app-runtime Engine", () => {
 		engine.initialize();
 		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneA });
 		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
+	it("deduplicates repeated addCommonHandlers orbit input registrations", async () => {
+		const engine = await createTestEngine();
+		const scene = new Scene("dedupe", {});
+		scene.setMainCamera("camera");
+
+		let orbitUpdateCount = 0;
+		scene.addCommonSystems({
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.addCommonHandlers(scene);
+		engine.addCommonHandlers(scene);
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
+	it("installs declared common runtime orbit input during initialize", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene<Record<string, never>, string>();
+		scene.setWorld({});
+		scene.setMainCamera("camera");
+
+		let orbitUpdateCount = 0;
+		scene.useCommonRuntime({
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
+	it("installs declared common runtime for surface scenes created during startup", async () => {
+		const engine = await createTestEngine();
+		const surfaceId = engine.addSurface(createTestGpuSurface(fakeCanvas()));
+		let orbitUpdateCount = 0;
+
+		engine.addPhaseHandler(Phase.Startup, () => {
+			const scene = new Scene("startup-surface", {});
+			scene.setMainCamera("camera");
+			scene.useCommonRuntime({
+				orbitControllerComponent: "orbit",
+				updateOrbitCameraControllerFromInput: () => {
+					orbitUpdateCount += 1;
+				},
+			});
+			engine.setSurfaceScene(surfaceId, scene);
+		});
+		engine.initialize();
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
+	it("installs declared common runtime when a surface scene is bound after initialize", async () => {
+		const engine = await createTestEngine();
+		const surfaceId = engine.addSurface(createTestGpuSurface(fakeCanvas()));
+		let orbitUpdateCount = 0;
+
+		engine.initialize();
+		const scene = new Scene("surface-after-init", {});
+		scene.setMainCamera("camera");
+		scene.useCommonRuntime({
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.setSurfaceScene(surfaceId, scene);
 
 		engine.runMultiSurfaceFrame(1 / 60);
 

@@ -53,6 +53,10 @@ export function defaultRenderFramePhases(): PhaseKey[] {
 	];
 }
 
+export function defaultRenderStatePreparationPhases(): PhaseKey[] {
+	return [Phase.Update, Phase.PostUpdate, Phase.RenderExtract];
+}
+
 export function defaultFrameBeginPhases(): PhaseKey[] {
 	return [Phase.Surface, Phase.Input];
 }
@@ -88,6 +92,7 @@ export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
 type PhaseHandler = {
 	phase: PhaseKey;
 	slot: PhaseSlot;
+	key: string | undefined;
 	callback: EngineCallback;
 };
 
@@ -123,6 +128,11 @@ export type CommonHandlersOptions = {
 	readonly transformPropagation?: boolean;
 };
 
+type CommonRuntimeConfig<TWorld, TMainCamera, TComponent> = {
+	readonly systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>;
+	readonly options: CommonHandlersOptions;
+};
+
 export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
@@ -148,6 +158,10 @@ export class FrameState {
 		this.surface = surface;
 		this.surfaceChanged = surfaceChanged;
 		this.input = input;
+	}
+
+	static zero(): FrameState {
+		return new FrameState(0, 0, 0);
 	}
 
 	withSurface(surface: SurfaceState, surfaceChanged: boolean): FrameState {
@@ -377,6 +391,9 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	private commonOrbitCameraValue:
 		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
 		| undefined;
+	private commonRuntimeValue:
+		| CommonRuntimeConfig<TWorld, TMainCamera, unknown>
+		| undefined;
 	private commonTransformPropagationValue: ((world: TWorld) => void) | undefined;
 	private commonOrbitCameraTransformScheduled = false;
 	private commonTransformPropagationScheduled = false;
@@ -453,6 +470,28 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		} as CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>;
 	}
 
+	useCommonRuntime<TComponent>(
+		systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>,
+		options: CommonHandlersOptions = {},
+	): void {
+		this.commonRuntimeValue = {
+			systems: systems as CommonSceneSystems<TWorld, TMainCamera, unknown>,
+			options,
+		};
+		this.applyCommonRuntime();
+	}
+
+	applyCommonRuntime():
+		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
+		| undefined {
+		const runtime = this.commonRuntimeValue;
+		if (runtime === undefined) {
+			return undefined;
+		}
+		this.addCommonSystems(runtime.systems);
+		return this.installCommonSystems(runtime.options);
+	}
+
 	installCommonSystems(
 		options: CommonHandlersOptions = {},
 	): CommonOrbitCameraSystems<TWorld, TMainCamera, unknown> | undefined {
@@ -519,6 +558,20 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		}
 		return true;
 	}
+
+	runSchedulePhases(phases: PhaseKey[], frame: FrameState): boolean {
+		let ok = true;
+		for (const phase of phases) {
+			if (!this.runSchedulePhase(phase, frame)) {
+				ok = false;
+			}
+		}
+		return ok;
+	}
+
+	prepareRenderState(frame: FrameState = FrameState.zero()): boolean {
+		return this.runSchedulePhases(defaultRenderStatePreparationPhases(), frame);
+	}
 }
 
 export type RuntimeScene = {
@@ -526,6 +579,20 @@ export type RuntimeScene = {
 	visible: () => boolean;
 	runSchedulePhase: (phase: PhaseKey, frame: FrameState) => boolean;
 };
+
+const runtimeSceneIds = new WeakMap<RuntimeScene, number>();
+let nextRuntimeSceneId = 1;
+
+function runtimeSceneIdentity(scene: RuntimeScene): number {
+	const existing = runtimeSceneIds.get(scene);
+	if (existing !== undefined) {
+		return existing;
+	}
+	const id = nextRuntimeSceneId;
+	nextRuntimeSceneId += 1;
+	runtimeSceneIds.set(scene, id);
+	return id;
+}
 
 export type KeyCode = string;
 
@@ -1463,6 +1530,9 @@ export class Engine {
 
 	setSurfaceScene(surfaceId: SurfaceId, scene: RuntimeScene): void {
 		this.requireSurface(surfaceId).scene = scene;
+		if (scene instanceof Scene) {
+			this.tryInstallDeclaredCommonRuntime(scene);
+		}
 		this.requestRender("surface-scene");
 	}
 
@@ -1551,13 +1621,65 @@ export class Engine {
 		phase: PhaseKey,
 		callback: EngineCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSystems,
+		key?: string,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
 				"Engine.addPhaseHandler cannot register phase handlers after engine initialization.",
 			);
 		}
-		this.phaseHandlers.push({ phase, slot, callback });
+		this.addPhaseHandlerUnchecked(phase, callback, slot, key);
+	}
+
+	private addPhaseHandlerUnchecked(
+		phase: PhaseKey,
+		callback: EngineCallback,
+		slot: PhaseSlot = PhaseSlot.BeforeSystems,
+		key?: string,
+	): void {
+		if (
+			key !== undefined &&
+			this.phaseHandlers.some(
+				(handler) =>
+					handler.phase === phase &&
+					handler.slot === slot &&
+					handler.key === key,
+			)
+		) {
+			return;
+		}
+		this.phaseHandlers.push({ phase, slot, key, callback });
+	}
+
+	private addCommonRuntimeOrbitCameraInputHandler<TWorld, TMainCamera>(
+		scene: Scene<TWorld, TMainCamera>,
+		orbit: CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>,
+		unchecked = false,
+	): void {
+		const register = unchecked
+			? this.addPhaseHandlerUnchecked.bind(this)
+			: this.addPhaseHandler.bind(this);
+		register(
+			Phase.Input,
+			(engine, frame) => {
+				if (!engine.frameTargetsScene(frame, scene)) {
+					return;
+				}
+				const camera = scene.mainCamera();
+				if (camera === null) {
+					throw new Error("Engine common runtime requires Scene.mainCamera.");
+				}
+				const input = frame.input ?? engine.input;
+				orbit.updateOrbitCameraControllerFromInput(
+					scene.world(),
+					camera,
+					orbit.orbitControllerComponent,
+					input,
+				);
+			},
+			PhaseSlot.BeforeSystems,
+			`rhodonite/orbit-camera-input/${runtimeSceneIdentity(scene)}`,
+		);
 	}
 
 	addCommonHandlers<TWorld, TMainCamera>(
@@ -1568,22 +1690,41 @@ export class Engine {
 		if (orbit === undefined) {
 			return;
 		}
-		this.addPhaseHandler(Phase.Input, (engine, frame) => {
-			if (!engine.frameTargetsScene(frame, scene)) {
+		this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit);
+	}
+
+	private declaredCommonRuntimeScenes(): Scene<unknown, unknown>[] {
+		const result: Scene<unknown, unknown>[] = [];
+		const seen = new Set<RuntimeScene>();
+		const add = (scene: RuntimeScene): void => {
+			if (!(scene instanceof Scene) || seen.has(scene)) {
 				return;
 			}
-			const camera = scene.mainCamera();
-			if (camera === null) {
-				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
-			}
-			const input = frame.input ?? engine.input;
-			orbit.updateOrbitCameraControllerFromInput(
-				scene.world(),
-				camera,
-				orbit.orbitControllerComponent,
-				input,
-			);
-		});
+			seen.add(scene);
+			result.push(scene);
+		};
+		for (const scene of this.scenes) {
+			add(scene);
+		}
+		for (const surface of this.surfaces) {
+			add(surface.scene);
+		}
+		return result;
+	}
+
+	private tryInstallDeclaredCommonRuntime(
+		scene: Scene<unknown, unknown>,
+	): void {
+		const orbit = scene.applyCommonRuntime();
+		if (orbit !== undefined) {
+			this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
+		}
+	}
+
+	private installDeclaredCommonRuntimes(): void {
+		for (const scene of this.declaredCommonRuntimeScenes()) {
+			this.tryInstallDeclaredCommonRuntime(scene);
+		}
 	}
 
 	initialize(): void {
@@ -1594,6 +1735,7 @@ export class Engine {
 		this.initializing = true;
 		this.runPhaseUnchecked(Phase.Startup, new FrameState(0, 0, 0));
 		this.initializing = false;
+		this.installDeclaredCommonRuntimes();
 		this.validatePhaseHandlers();
 		this.initialized = true;
 	}

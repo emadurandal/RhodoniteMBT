@@ -37,6 +37,7 @@ pub struct GPUCanvasContext {
   /// Color format reported to the engine.
   format : Ref[String]
   currentTexture : Ref[@wgpu.Texture?]
+  configuredDevice : Ref[GPUDevice?]
 }
 
 ///|

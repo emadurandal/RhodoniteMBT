@@ -6,5 +6,6 @@
 priv struct PhaseHandler {
   phase : PhaseKey
   slot : PhaseSlot
+  key : String?
   run : (Engine, FrameState) -> Unit
 }

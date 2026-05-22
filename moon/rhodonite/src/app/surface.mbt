@@ -162,6 +162,7 @@ pub fn Engine::set_surface_scene(
   scene : Scene,
 ) -> Unit {
   self.surface(id).set_scene(scene)
+  self.try_install_declared_common_runtime(scene)
   self.request_render("surface-scene")
 }
 

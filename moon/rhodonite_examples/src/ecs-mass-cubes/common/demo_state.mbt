@@ -593,7 +593,8 @@ pub fn create_demo_state_for_scene(
   let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
   let camera_home = @ecs.register_camera_home_transform_component(world)
   let camera_lens = @ecs.register_camera_lens_component(world)
-  scene.add_common_systems(
+  scene.use_common_runtime(
+    transform_propagation=false,
     orbit_component=Some(orbit_controller),
     home_component=Some(camera_home),
   )
@@ -714,18 +715,7 @@ pub fn create_demo_state_for_scene(
     perf_excluded_wait_ms: @ref.new(0.0),
   }
   demo_state.add_mass_cubes_camera_sync_system()
-  ignore(
-    scene.run_systems_for_phase(
-      @app.phase_post_update(),
-      @app.FrameState::new((0.0 : Float), 0, 0.0),
-    ),
-  )
-  ignore(
-    scene.run_systems_for_phase(
-      @app.phase_render_extract(),
-      @app.FrameState::new((0.0 : Float), 0, 0.0),
-    ),
-  )
+  ignore(scene.prepare_render_state())
   demo_state
 }
 
@@ -955,6 +945,18 @@ pub fn DemoState::render_scene(
 }
 
 ///|
+/// Creates DemoState and registers the sample engine handlers.
+pub fn setup_engine(engine : @app.Engine) -> Bool {
+  match create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Registers engine phase handlers that drive this DemoState.
 pub fn register_engine_handlers(
   engine : @app.Engine,
@@ -962,9 +964,6 @@ pub fn register_engine_handlers(
 ) -> Unit {
   engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
     demo_state.handle_surface_frame(frame)
-  })
-  engine.add_common_handlers(demo_state.scene, options=@app.CommonHandlersOptions::{
-    transform_propagation: false,
   })
   engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()

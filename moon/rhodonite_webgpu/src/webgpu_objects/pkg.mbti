@@ -30,6 +30,8 @@ pub fn webgpu_canvas_context_configure(WebGPUCanvasContext, GPUDevice, String) -
 pub fn webgpu_canvas_context_resize(WebGPUCanvasContext, GPUDevice, String, Int, Int) -> Unit
 pub fn webgpu_canvas_context_get_format(WebGPUCanvasContext) -> String
 pub fn webgpu_canvas_context_release(WebGPUCanvasContext) -> Unit
+pub fn native_canvas_present_capture_begin() -> Unit
+pub fn native_canvas_present_capture_take() -> Bytes
 pub fn webgpu_queue_release(WebGPUQueue) -> Unit
 pub fn webgpu_adapter_release(WebGPUAdapter) -> Unit
 pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit

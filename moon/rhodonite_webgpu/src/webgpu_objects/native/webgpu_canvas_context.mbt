@@ -8,6 +8,14 @@ pub struct WebGPUCanvasContext {
 }
 
 ///|
+/// Pending native canvas capture request used by visual regression platform runs.
+let native_canvas_capture_requested : Ref[Bool] = @ref.new(false)
+
+///|
+/// Last captured native canvas pixel bytes, stored as tightly packed RGBA8.
+let native_canvas_capture_bytes : Ref[Bytes?] = @ref.new(None)
+
+///|
 /// Implements `WebGPUCanvasContext::new`.
 pub fn WebGPUCanvasContext::new(
   context : GPUCanvasContext,
@@ -44,6 +52,7 @@ pub fn create_metal_canvas_context(
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
     currentTexture: @ref.new(None),
+    configuredDevice: @ref.new(None),
   })
 }
 
@@ -74,6 +83,7 @@ pub fn create_wayland_canvas_context(
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
     currentTexture: @ref.new(None),
+    configuredDevice: @ref.new(None),
   })
 }
 
@@ -96,6 +106,7 @@ pub fn create_xlib_canvas_context(
     height: height.reinterpret_as_uint(),
     format: @ref.new(webgpu_instance_get_preferred_canvas_format(instance)),
     currentTexture: @ref.new(None),
+    configuredDevice: @ref.new(None),
   })
 }
 
@@ -106,6 +117,7 @@ pub fn webgpu_canvas_context_configure(
   device : GPUDevice,
   format : String,
 ) -> Unit {
+  context.context.configuredDevice.val = Some(device)
   let usage = @wgpu.TextureUsage::from_u64(
     @wgpu.TEXTURE_USAGE_RENDER_ATTACHMENT | @wgpu.TEXTURE_USAGE_COPY_SRC,
   )
@@ -269,8 +281,117 @@ pub fn webgpu_canvas_context_get_current_texture(
 }
 
 ///|
+/// Computes WebGPU's 256-byte-aligned RGBA8 copy row pitch.
+fn native_rgba8_copy_bytes_per_row(width : UInt) -> UInt64 {
+  let unpadded = width.to_uint64() * 4UL
+  let align = 256UL
+  let rem = unpadded % align
+  if rem == 0UL {
+    unpadded
+  } else {
+    unpadded + (align - rem)
+  }
+}
+
+///|
+/// Copies a padded RGBA8 readback buffer into tightly packed RGBA rows.
+fn native_pack_rgba8_readback(
+  raw : Bytes,
+  width : Int,
+  height : Int,
+  padded_row : Int,
+  source_is_bgra : Bool,
+) -> Bytes {
+  Bytes::makei(width * height * 4, fn(i) {
+    let pixel = i / 4
+    let x = pixel % width
+    let y = pixel / width
+    let channel = i % 4
+    let src_channel = if source_is_bgra {
+      match channel {
+        0 => 2
+        2 => 0
+        _ => channel
+      }
+    } else {
+      channel
+    }
+    raw[y * padded_row + x * 4 + src_channel]
+  })
+}
+
+///|
+/// Captures the current native canvas texture before presentation when requested.
+fn webgpu_canvas_context_capture_current_texture(
+  context : WebGPUCanvasContext,
+  texture : @wgpu.Texture,
+) -> Unit {
+  if !native_canvas_capture_requested.val {
+    return
+  }
+  native_canvas_capture_requested.val = false
+  native_canvas_capture_bytes.val = None
+  let device = match context.context.configuredDevice.val {
+    Some(device) => device
+    None => return
+  }
+  let width = context.context.width
+  let height = context.context.height
+  if width == 0U || height == 0U {
+    return
+  }
+  let padded_row = native_rgba8_copy_bytes_per_row(width)
+  let byte_length = padded_row * height.to_uint64()
+  let readback = device.raw.create_buffer(
+    size=byte_length,
+    usage=@wgpu.BufferUsage::from_u64(
+      @wgpu.BUFFER_USAGE_MAP_READ | @wgpu.BUFFER_USAGE_COPY_DST,
+    ),
+  )
+  let encoder = device.raw.create_command_encoder()
+  encoder.copy_texture_to_buffer_rgba8(texture, readback, width, height)
+  device.raw.queue().submit_one(encoder.finish())
+  encoder.release()
+  ignore(device.raw.poll(wait=true))
+  let raw = readback.readback(device.instance, 0UL, byte_length)
+  let packed = native_pack_rgba8_readback(
+    raw,
+    width.reinterpret_as_int(),
+    height.reinterpret_as_int(),
+    padded_row.to_int(),
+    context.context.format.val == "bgra8unorm" ||
+    context.context.format.val == "bgra8unorm-srgb",
+  )
+  readback.release()
+  native_canvas_capture_bytes.val = Some(packed)
+}
+
+///|
+/// Requests a tightly packed RGBA8 capture on the next native canvas present.
+pub fn native_canvas_present_capture_begin() -> Unit {
+  native_canvas_capture_requested.val = true
+  native_canvas_capture_bytes.val = None
+}
+
+///|
+/// Takes the most recent native canvas present capture, or empty bytes if none.
+pub fn native_canvas_present_capture_take() -> Bytes {
+  let bytes = match native_canvas_capture_bytes.val {
+    Some(bytes) => bytes
+    None => []
+  }
+  native_canvas_capture_bytes.val = None
+  bytes
+}
+
+///|
 /// Implements `webgpu_canvas_context_present`.
 pub fn webgpu_canvas_context_present(context : WebGPUCanvasContext) -> Unit {
+  match context.context.currentTexture.val {
+    Some(texture) =>
+      webgpu_canvas_context_capture_current_texture(context, texture)
+    None => ()
+  }
   context.context.surface.present_or_raise() catch {
     _ => println("native: WebGPU surface present failed")
   }

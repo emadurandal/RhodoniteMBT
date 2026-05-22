@@ -74,6 +74,9 @@ flowchart TD
           <ul>
             <li><code>phase_startup()</code> と <code>phase_shutdown()</code> は one-shot phase。group には追加しません。</li>
             <li>custom phase group / phase order の編集は <code>Engine::initialize()</code> 中の startup handler で行います。</li>
+            <li><code>Engine::add_phase_handler</code> は registration key を受け取れます。同じ phase、slot、key の handler は重複登録されません。</li>
+            <li>MoonBit sample は標準 transform/camera runtime integration を <code>Scene::use_common_runtime</code> で宣言し、TypeScript sample は対応する <code>Scene.useCommonRuntime</code> を使います。<code>Engine::initialize()</code> がこの宣言を common scene systems と orbit-camera input handler に反映します。<code>Engine::set_surface_scene</code> / <code>Engine.setSurfaceScene</code> で scene を surface に bind したときも、宣言済み orbit-camera input handler がその scene 向けに追加されます。</li>
+            <li>Scene 単体や offscreen rendering では、<code>Scene::prepare_render_state</code> で <code>update</code>、<code>post_update</code>、<code>render_extract</code> を一度に実行でき、各 phase をユーザーコードに並べる必要はありません。</li>
             <li>surface suspended 中は update までは進み、render extraction 以降は skip されます。</li>
             <li>on-demand mode では dirty でない間 frame 自体を走らせません。見た目が変わる state mutation 後は利用側が <code>request_render</code> を呼びます。</li>
           </ul>

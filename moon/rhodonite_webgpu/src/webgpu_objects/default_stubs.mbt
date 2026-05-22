@@ -348,6 +348,18 @@ pub fn webgpu_canvas_context_release(_context : WebGPUCanvasContext) -> Unit {
 }
 
 ///|
+/// Requests a native canvas present capture in real native builds.
+pub fn native_canvas_present_capture_begin() -> Unit {
+  unavailable()
+}
+
+///|
+/// Takes a native canvas present capture in real native builds.
+pub fn native_canvas_present_capture_take() -> Bytes {
+  unavailable()
+}
+
+///|
 /// Releases a queue in real native builds.
 pub fn webgpu_queue_release(_queue : WebGPUQueue) -> Unit {
   unavailable()

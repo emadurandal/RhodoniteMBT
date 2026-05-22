@@ -117,6 +117,12 @@ pub fn FrameState::new(
 }
 
 ///|
+/// Builds a frame state for phases that do not advance app time.
+pub fn FrameState::zero() -> FrameState {
+  FrameState::new((0.0 : Float), 0, 0.0)
+}
+
+///|
 /// Implements `FrameState::delta_seconds`.
 pub fn FrameState::delta_seconds(self : FrameState) -> Float {
   self.delta_seconds
@@ -235,5 +241,5 @@ pub fn FrameState::system_context(self : FrameState) -> @ecs.SystemContext {
 ///|
 /// Builds a frame state for one-shot phases that do not advance time.
 fn zero_frame_state() -> FrameState {
-  FrameState::new((0.0 : Float), 0, 0.0)
+  FrameState::zero()
 }

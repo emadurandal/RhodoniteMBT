@@ -116,6 +116,12 @@ pub fn default_render_frame_phases() -> Array[PhaseKey] {
 }
 
 ///|
+/// Returns the standard scene phases needed to make current ECS state renderable.
+pub fn default_render_state_preparation_phases() -> Array[PhaseKey] {
+  [phase_update(), phase_post_update(), phase_render_extract()]
+}
+
+///|
 /// Reports whether a phase is part of the standard rendering path.
 fn phase_is_render_path(phase_key : PhaseKey) -> Bool {
   phase_key == phase_render_extract() ||
