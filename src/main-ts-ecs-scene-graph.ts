@@ -195,6 +195,8 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 			updateOrbitCameraControllerFromInput:
 				updateOrbitCameraControllerComponentFromInput,
 			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
+			propagateTransforms: (systemWorld) =>
+				systemWorld.updateGlobalTransformsFromTransforms(),
 		},
 		{ transformPropagation: true },
 	);
