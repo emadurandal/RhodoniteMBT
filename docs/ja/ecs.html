@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ECS - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/ecs.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>ECS</h1>
+          <p class="lead"><a href="../../moon/rhodonite_core/src/ecs/"><code>emadurandal/rhodonite_core/ecs</code></a> は archetype-based ECS です。任意 component の storage は CPU-only SoA に統一し、renderer upload bytes は builtin packed blob が扱います。</p>
+
+          <h2>Storage Model</h2>
+          <div class="mermaid">
+flowchart LR
+  W[World] --> R[ComponentRegistry]
+  W --> A[Archetypes]
+  A --> S[sorted component signature]
+  A --> E[dense entity rows]
+  A --> C[CPU SoA component columns]
+  W --> GT[GlobalTransform blob]
+  W --> CB[Camera blob]
+  GT --> GQ[resize/write queues]
+  CB --> CQ[resize/write queues]
+          </div>
+          <ul>
+            <li>User-registered component は <code>RegisteredComponent { id, name, cpu_stride }</code> として登録され、payload は archetype ごとの <code>ComponentColumn</code> に <code>row * stride</code> で packed されます。</li>
+            <li><code>GlobalTransform</code> と <code>Camera</code> は CPU row に小さな ref を置き、matrix bytes は専用 blob store に置きます。</li>
+            <li>CPU column は固定長 buffer を backing storage とし、capacity 拡張時は buffer を差し替えます。JS backend で byte 単位の <code>Array.push</code> hot path を避けます。</li>
+            <li><code>reserve_batch_capacity</code> と <code>spawn_batch</code> は大量 spawn 時の archetype capacity 拡張を制御する API です。</li>
+          </ul>
+
+          <h2>Core Types</h2>
+          <table>
+            <thead><tr><th>Type</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>EntityId</code></td><td>stable index + generation。destroy/reuse 後の stale handle を拒否する。</td></tr>
+              <tr><td><code>ComponentTypeId</code></td><td>registry id。archetype signature と query descriptor に使う。</td></tr>
+              <tr><td><code>World</code></td><td>entities、archetypes、component registry、builtin blob stores を所有する。</td></tr>
+              <tr><td><code>Query</code> / <code>RawQuery</code></td><td>row iteration と archetype column iteration。</td></tr>
+              <tr><td><code>PreparedQuery</code> / <code>RawPreparedQuery</code></td><td>matched archetype plan を cache する optimization handle。snapshot ではない。</td></tr>
+              <tr><td><code>SystemRunner</code></td><td>phase で filter される system set。access declaration と command buffer flush の境界。</td></tr>
+              <tr><td><code>GpuWriteView</code></td><td>builtin blob backing bytes を借用する upload slice。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Builtins</h2>
+          <table>
+            <thead><tr><th>Index</th><th>Component</th><th>Storage</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>0</td><td><code>Transform3D</code></td><td>CPU SoA</td><td>local TRS。<code>set_transform</code> / <code>get_transform</code>。</td></tr>
+              <tr><td>1</td><td><code>GlobalTransform</code></td><td>CPU ref + packed blob</td><td>CPU row は format と word offset。GPU matrix bytes は blob。</td></tr>
+              <tr><td>2</td><td><code>ChildOf</code></td><td>CPU SoA</td><td>parent <code>EntityId</code> の index/generation。</td></tr>
+              <tr><td>3</td><td><code>Camera</code></td><td>CPU ref + packed blob</td><td>view/projection bytes は Camera blob。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Query And Mutation</h2>
+          <div class="mermaid">
+sequenceDiagram
+  participant S as System
+  participant W as World
+  participant Q as Query
+  participant C as CommandBuffer
+  S->>W: declare reads/writes/structural_write
+  S->>Q: prepare or iterate
+  Q->>W: borrow row/column views inside callback
+  S->>C: queue structural changes
+  C->>W: apply after callback/system boundary
+          </div>
+          <p><code>QueryRow::read</code> / <code>write</code> は closure の中だけ row bytes を貸し出します。<code>RawQuery::for_each_archetype</code> は hot loop 向けに contiguous column view を返します。query callback 中の直接構造変更や payload setter は guard されるため、構造変更は <code>CommandBuffer</code> に積みます。</p>
+
+          <h2>System Access Rules</h2>
+          <table>
+            <thead><tr><th>Operation</th><th>Required declaration</th></tr></thead>
+            <tbody>
+              <tr><td><code>has_component</code>、<code>component_bytes</code>、query prepare/iteration</td><td><code>reads</code> または <code>writes</code></td></tr>
+              <tr><td><code>set_component_bytes</code>、query row writes、column writes</td><td><code>writes</code></td></tr>
+              <tr><td><code>create_entity</code>、<code>destroy_entity</code>、<code>add_component*</code>、<code>remove_component</code>、<code>reserve_batch_capacity</code>、<code>spawn_batch</code></td><td><code>structural_write</code> と対象 component の <code>writes</code></td></tr>
+              <tr><td>builtin blob resize event drain</td><td><code>structural_write</code></td></tr>
+            </tbody>
+          </table>
+
+          <h2>Camera Control</h2>
+          <p>camera control は input source、controller component、transform、lens、Camera blob sync に分かれます。</p>
+          <ul>
+            <li><code>OrbitCameraController</code> は yaw/pitch、pan、dolly、distance、sensitivity、clamp、reset request を持つ user component。</li>
+            <li><code>CameraHomeTransform</code> は reset target の local <code>Transform3D</code> snapshot。</li>
+            <li><code>CameraLens</code> は projection kind、near/far、aspect、FOV または orthographic half-height。</li>
+            <li><code>orbit_camera_transform_system</code> は controller から <code>Transform3D</code> と parentless <code>GlobalTransform</code> を更新する。</li>
+            <li><code>camera_blob_sync_system</code> と <code>orbit_camera_blob_sync_system</code> は <code>GlobalTransform + CameraLens</code> から builtin Camera blob を更新する。</li>
+          </ul>
+
+          <h2>TypeScript Wrapper</h2>
+          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、query、spawn batch、camera-control bytes、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
+
+          <h2>Validation</h2>
+          <pre><code class="language-bash">moon check --target all
+pnpm run test:core:mbt
+pnpm run test:core:js
+pnpm run test:app:ts</code></pre>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

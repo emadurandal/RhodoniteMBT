@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>入力アーキテクチャ - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/input-architecture.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>入力アーキテクチャ</h1>
+          <p class="lead">入力は platform-independent な <a href="../../moon/rhodonite_core/src/input/"><code>emadurandal/rhodonite_core/input</code></a> と、browser / SDL3 adapters に分けます。gameplay code は DOM や SDL3 型を直接見ません。</p>
+
+          <h2>Event Flow</h2>
+          <div class="mermaid">
+flowchart LR
+  DOM[Browser DOM events] --> BA[Browser adapter]
+  SDL[SDL3 poll events] --> SA[SDL3 adapter]
+  BA --> Q[InputState event queue]
+  SA --> Q
+  Q --> BF[input.begin_frame]
+  BF --> P["rhodonite/input phase"]
+  P --> U["update / fixed_update / render_extract"]
+          </div>
+          <p><code>Engine::run_frame</code> は frame 冒頭で <code>input.begin_frame()</code> を呼び、前フレームから enqueue された event を現在フレームの state に確定します。multi-surface では surface ごとに <code>InputState</code> を持ちます。</p>
+
+          <h2>Core Model</h2>
+          <table>
+            <thead><tr><th>Type</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td><code>KeyCode</code></td><td>open string identifier。browser の <code>KeyboardEvent.code</code> 風の物理キー名を使う。</td></tr>
+              <tr><td><code>MouseButton</code></td><td><code>Left</code>、<code>Middle</code>、<code>Right</code>、<code>Back</code>、<code>Forward</code>、<code>Other(Int)</code>。</td></tr>
+              <tr><td><code>Modifiers</code></td><td>shift / ctrl / alt / meta snapshot。</td></tr>
+              <tr><td><code>InputEvent</code></td><td>platform adapter が enqueue する normalized event。</td></tr>
+              <tr><td><code>InputState</code></td><td>down/pressed/released、pointer delta、wheel delta、frame event list を管理する。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Phase Order</h2>
+          <p>入力を読む gameplay system は通常 <code>rhodonite/update</code> に置きます。controller component を同一フレームで後続 update/render に反映したい場合は <code>rhodonite/input</code> に置けます。</p>
+          <pre><code>rhodonite/frame_begin:
+  rhodonite/surface
+  rhodonite/input
+rhodonite/fixed_step:
+  rhodonite/fixed_update
+  rhodonite/fixed_post_update
+rhodonite/render_frame:
+  rhodonite/update
+  rhodonite/post_update
+  rhodonite/render_extract
+  rhodonite/render_prepare
+  rhodonite/render
+  rhodonite/present</code></pre>
+
+          <h2>Adapters</h2>
+          <ul>
+            <li>Browser MoonBit adapter は <code>emadurandal/rhodonite/app/browser</code> にあります。<code>install_browser_input</code>、<code>install_browser_surface_input</code>、platform runner が DOM events を <code>InputState</code> へ enqueue します。</li>
+            <li>Browser TypeScript adapter は <code>rhodonite-mbt/app</code> の <code>installBrowserInputCallbacks</code> / <code>installBrowserInput</code> を使います。</li>
+            <li>SDL3 adapter は <code>emadurandal/rhodonite_app_sdl3/sdl3</code> にあります。SDL events と render 直前の mouse snapshot を組み合わせて state を補完します。</li>
+          </ul>
+
+          <h2>Key And Mouse Rules</h2>
+          <ul>
+            <li><code>KeyCode</code> は enum ではなく open identifier です。unknown key を保持でき、adapter の mapping を段階的に改善できます。</li>
+            <li>browser は <code>KeyboardEvent.code</code> を使い、SDL3 は scancode を <code>KeyW</code>、<code>ArrowLeft</code>、<code>Space</code> などの browser-style name へ正規化します。</li>
+            <li>pointer coordinates は canvas/window surface 座標です。browser は CSS pixel から backing size へ変換します。</li>
+            <li><code>pointer_delta_x/y</code> と <code>wheel_delta_x/y</code> は frame ごとに 0 に戻り、その frame の event 合計になります。</li>
+            <li>SDL3 wheel は DOM wheel に近い符号と大きさへ寄せ、上方向 scroll が dolly-in になるよう正規化します。</li>
+          </ul>
+
+          <h2>Surface-local Input</h2>
+          <p>multi-surface では <code>Platform</code> が device/event loop を共有し、<code>Surface</code> が canvas/window/swapchain/input を所有します。render path の camera/controller は <code>Engine::surface_input(surface_id)</code> または <code>FrameState::input()</code> を読みます。</p>
+
+          <h2>Camera Controllers</h2>
+          <p>MoonBit samples は <code>OrbitCameraController</code> component と <code>Engine::add_common_handlers(scene)</code> を使います。TypeScript samples は <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> と <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code> で同じ byte layout と phase order を使います。</p>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

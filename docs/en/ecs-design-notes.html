@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ECS Design Notes - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/ecs-design-notes.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>ECS Design Notes</h1>
+          <p class="lead">The current ECS is CPU-only archetype SoA plus builtin packed GPU blobs. Generic GPU component storage has been removed.</p>
+
+          <h2>Query View Lifetime</h2>
+          <p><code>QueryRow::read</code> / <code>write</code> and <code>RawQueryRow::read_view</code> / <code>write_view</code> return closure-scoped views. This keeps borrowed row or column views from escaping the callback boundary.</p>
+          <p><code>RawQueryArchetype::write_column</code> is an expert API that lends a mutable view of a whole archetype column. It relies on duplicate required-component rejection to avoid overlapping mutable views for the same component.</p>
+
+          <h2>SystemRunner Access Declarations</h2>
+          <ul>
+            <li>Execution is currently single-threaded, but systems declare <code>reads</code>, <code>writes</code>, and <code>structural_write</code>.</li>
+            <li><code>writes</code> also permits reads of the same component.</li>
+            <li>Entity/archetype structural mutation requires <code>structural_write</code>.</li>
+            <li><code>CommandBuffer</code> validates component writes and structural writes at queue time.</li>
+            <li>Component registration is locked while the system runner is executing.</li>
+          </ul>
+
+          <h2>Builtin Packed Blobs</h2>
+          <div class="mermaid">
+flowchart LR
+  Row[CPU ref component row] --> Off[format and word offset]
+  Off --> Blob[Packed GPU blob bytes]
+  Blob --> Resize[resize events]
+  Blob --> Writes[GpuWriteView write drains]
+  Writes --> Renderer[Renderer upload]
+          </div>
+          <p><code>GlobalTransform</code> and <code>Camera</code> use two layers: a CPU ref component row plus packed GPU blob bytes. <code>GpuWriteView</code> borrows blob backing storage, so upload it before mutating or resizing the same blob again.</p>
+
+          <h2>Removed Responsibilities</h2>
+          <ul>
+            <li>Generic component GPU upload queues.</li>
+            <li>Entity-index-fixed component payload storage.</li>
+            <li>Component kind branching.</li>
+            <li>Per-component active index sets.</li>
+          </ul>
+          <p>New GPU-facing data should use a dedicated store like builtin blobs, or be explicitly packed during renderer extraction from CPU SoA data.</p>
+
+          <h2>Test Focus</h2>
+          <ul>
+            <li>CPU column copying during archetype moves.</li>
+            <li>Query/raw query row and column views.</li>
+            <li>SystemRunner access guards and <code>CommandBuffer</code>.</li>
+            <li><code>GlobalTransform</code> / <code>Camera</code> allocation, resize events, and write drains.</li>
+            <li>TypeScript wrapper ByteView and builtin blob upload helpers.</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

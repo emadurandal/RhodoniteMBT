@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ECS Design Notes - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/ecs-design-notes.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>ECS Design Notes</h1>
+          <p class="lead">このページは現行 ECS の設計上の注意点をまとめます。汎用 GPU component storage は削除済みで、現在は CPU-only archetype SoA と builtin packed GPU blob に統一されています。</p>
+
+          <h2>Query View Lifetime</h2>
+          <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。view を外へ逃がさない API 形状にしているため、system 実行順や将来の並列化に向けた最低限の境界を保ちます。</p>
+          <p><code>RawQueryArchetype::write_column</code> は archetype column 全体の mutable view を貸し出す expert API です。同一 component の重複 mutable view を避けるため、query required set の duplicate check に依存します。</p>
+
+          <h2>SystemRunner Access Declaration</h2>
+          <ul>
+            <li>現行実装は single-thread 実行ですが、<code>System</code> は <code>reads</code> / <code>writes</code> / <code>structural_write</code> を宣言します。</li>
+            <li><code>writes</code> は同じ component の read も許可します。</li>
+            <li>entity/archetype 構造を変える API は <code>structural_write</code> を要求します。</li>
+            <li><code>CommandBuffer</code> は queue 時点で component write と structural write を検証します。</li>
+            <li>component 登録は system runner 実行中に lock されます。</li>
+          </ul>
+
+          <h2>Builtin Packed Blobs</h2>
+          <div class="mermaid">
+flowchart LR
+  Row[CPU ref component row] --> Off[format and word offset]
+  Off --> Blob[Packed GPU blob bytes]
+  Blob --> Resize[resize events]
+  Blob --> Writes[GpuWriteView write drains]
+  Writes --> Renderer[Renderer upload]
+          </div>
+          <p><code>GlobalTransform</code> と <code>Camera</code> は CPU ref component と packed GPU blob の二層構造です。<code>GpuWriteView</code> は blob backing storage の借用 view なので、同じ blob を次に mutate / resize する前に upload まで終える必要があります。</p>
+
+          <h2>Removed Responsibilities</h2>
+          <p>以下の責務は現在の ECS には残していません。</p>
+          <ul>
+            <li>arbitrary component の GPU upload queue</li>
+            <li>entity index 固定の component payload storage</li>
+            <li>component kind 分岐</li>
+            <li>component ごとの active index set</li>
+          </ul>
+          <p>GPU 向けデータを追加する場合は、まず builtin blob と同じ dedicated store にするか、CPU SoA から renderer extraction で明示的に pack します。</p>
+
+          <h2>Test Focus</h2>
+          <ul>
+            <li>archetype move 時の CPU column copy</li>
+            <li>query / raw query の row and column view</li>
+            <li>system runner access guard と <code>CommandBuffer</code></li>
+            <li><code>GlobalTransform</code> / <code>Camera</code> blob allocation、resize event、write drain</li>
+            <li>TypeScript wrapper の ByteView と builtin blob upload helper</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
