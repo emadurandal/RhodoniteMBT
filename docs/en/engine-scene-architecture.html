@@ -78,9 +78,19 @@ flowchart TD
             <li>In on-demand mode, no frame runs while the engine is clean; visible state changes must call <code>request_render</code>.</li>
           </ul>
 
-          <h2>Surfaces And Renderer</h2>
+          <h2>Surface Model</h2>
           <p>Single-surface code updates the current snapshot through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input.</p>
-          <p><code>Renderer</code> v1 is intentionally narrow: it renders visible <code>Renderable + GlobalTransform</code> entities with the scene main camera using unlit static indexed meshes, plus a dedicated instanced mesh path for MassCubes. Textures, skinning, transparent sorting, shadows, and LOD are outside v1.</p>
+
+          <h2>Renderer v1</h2>
+          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes.</p>
+          <ul>
+            <li>handles: <code>MeshHandle</code>, <code>MaterialHandle</code>, <code>InstanceBufferHandle</code></li>
+            <li>components: <code>RenderableDesc</code>, <code>RenderableFlags</code>, <code>register_renderable_component</code></li>
+            <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>, <code>CubeMeshDesc</code>, <code>cube_mesh_desc</code></li>
+            <li>resources: <code>register_static_indexed_mesh_desc</code>, <code>register_cube_mesh</code>, <code>register_unlit_material</code>, <code>register_static_instance_buffer</code></li>
+            <li>draw paths: <code>render_scene_renderables</code> and <code>render_instanced_mesh</code> for MassCubes</li>
+          </ul>
+          <p>Textures, skinning, transparent sorting, shadows, and LOD are not v1 renderer responsibilities yet.</p>
 
           <h2>Platform Runners</h2>
           <table>

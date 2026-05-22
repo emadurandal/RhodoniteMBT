@@ -103,6 +103,33 @@ If you only need input normalization or frame-loop helpers, import them from
 `rhodonite-mbt/app` directly, for example `installBrowserInputState`,
 `startBrowserFrameLoop`, or `startBrowserOnDemandFrameLoop`.
 
+## Renderer helpers
+
+The app entrypoint also exports the v1 unlit renderer helpers, including the
+position-only cube primitive descriptor used by the examples.
+
+```ts
+import {
+  CubeMeshDesc,
+  Renderer,
+  UnlitMaterialDesc,
+  cubePosition3VertexLayout,
+} from "rhodonite-mbt/app";
+
+const renderer = Renderer.new(
+  device,
+  queue,
+  format,
+  width,
+  height,
+  cubePosition3VertexLayout(),
+);
+const cube = renderer.registerCubeMesh(CubeMeshDesc.new(0.5));
+const material = renderer.registerUnlitMaterial(
+  UnlitMaterialDesc.new(0.9, 0.25, 0.18),
+);
+```
+
 ## Local package testing
 
 From the RhodoniteMBT repository root, build and pack the npm package with:
