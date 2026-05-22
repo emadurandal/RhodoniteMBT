@@ -1530,6 +1530,9 @@ export class Engine {
 
 	setSurfaceScene(surfaceId: SurfaceId, scene: RuntimeScene): void {
 		this.requireSurface(surfaceId).scene = scene;
+		if (scene instanceof Scene) {
+			this.tryInstallDeclaredCommonRuntime(scene);
+		}
 		this.requestRender("surface-scene");
 	}
 
@@ -1709,12 +1712,18 @@ export class Engine {
 		return result;
 	}
 
+	private tryInstallDeclaredCommonRuntime(
+		scene: Scene<unknown, unknown>,
+	): void {
+		const orbit = scene.applyCommonRuntime();
+		if (orbit !== undefined) {
+			this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
+		}
+	}
+
 	private installDeclaredCommonRuntimes(): void {
 		for (const scene of this.declaredCommonRuntimeScenes()) {
-			const orbit = scene.applyCommonRuntime();
-			if (orbit !== undefined) {
-				this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
-			}
+			this.tryInstallDeclaredCommonRuntime(scene);
 		}
 	}
 

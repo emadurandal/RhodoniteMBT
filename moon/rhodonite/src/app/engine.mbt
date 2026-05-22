@@ -400,20 +400,28 @@ fn declared_common_runtime_scenes(engine : Engine) -> Array[Scene] {
 }
 
 ///|
+/// Installs common runtime handlers declared by one scene when it is bound to a surface.
+fn Engine::try_install_declared_common_runtime(
+  self : Engine,
+  scene : Scene,
+) -> Unit {
+  match scene.apply_common_runtime() {
+    Some(config) =>
+      match config.orbit_component {
+        Some(orbit) =>
+          self.add_common_runtime_orbit_camera_input_handler(scene, orbit)
+        None => ()
+      }
+    None => ()
+  }
+}
+
+///|
 /// Installs common runtime handlers declared by scenes.
 fn Engine::install_declared_common_runtimes(self : Engine) -> Unit {
   let scenes = declared_common_runtime_scenes(self)
   for i = 0; i < scenes.length(); i = i + 1 {
-    let scene = scenes[i]
-    match scene.apply_common_runtime() {
-      Some(config) =>
-        match config.orbit_component {
-          Some(orbit) =>
-            self.add_common_runtime_orbit_camera_input_handler(scene, orbit)
-          None => ()
-        }
-      None => ()
-    }
+    self.try_install_declared_common_runtime(scenes[i])
   }
 }
 

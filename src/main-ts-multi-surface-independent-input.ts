@@ -207,6 +207,7 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		},
 		{ transformPropagation: false },
 	);
+	demo.engine.setSurfaceScene(id, scene);
 	scene.setSchedule(
 		(systemWorld) => {
 			syncOrbitCameraBlobComponent(
@@ -251,7 +252,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		renderableComponent,
 		objects,
 	});
-	demo.engine.setSurfaceScene(id, scene);
 }
 
 function surfaceStateIndex(demo: DemoState, id: SurfaceId): number {

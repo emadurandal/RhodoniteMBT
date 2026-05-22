@@ -444,6 +444,27 @@ describe("app-runtime Engine", () => {
 		expect(orbitUpdateCount).toBe(1);
 	});
 
+	it("installs declared common runtime when a surface scene is bound after initialize", async () => {
+		const engine = await createTestEngine();
+		const surfaceId = engine.addSurface(createTestGpuSurface(fakeCanvas()));
+		let orbitUpdateCount = 0;
+
+		engine.initialize();
+		const scene = new Scene("surface-after-init", {});
+		scene.setMainCamera("camera");
+		scene.useCommonRuntime({
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.setSurfaceScene(surfaceId, scene);
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
 	it("exposes frame-begin, fixed-step, and render-frame groups separately", async () => {
 		const engine = await createTestEngine();
 		engine.initialize();
