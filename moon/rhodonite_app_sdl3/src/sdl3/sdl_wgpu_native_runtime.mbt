@@ -1906,18 +1906,11 @@ pub async fn run_multi_window_platform(
 }
 
 ///|
-/// Runs the simplified single-window SDL3 platform entry point.
+/// Runs the single-window SDL3 platform entry point from configuration.
 pub async fn run_single_window_platform(
-  window_title : String,
-  width : Int,
-  height : Int,
+  config : PlatformConfig,
   app : PlatformApp,
   options : PlatformOptions,
-  init_log? : String = "",
 ) -> Unit raise Sdl3AppError {
-  run_platform(
-    PlatformConfig::new(window_title, width, height, init_log),
-    app,
-    options,
-  )
+  run_platform(config, app, options)
 }
