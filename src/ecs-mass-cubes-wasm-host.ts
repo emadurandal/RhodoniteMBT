@@ -3,9 +3,7 @@
 
 import "./style.css";
 import {
-	createRgba8ReadbackTarget,
-	destroyReadbackTarget,
-	readRgba8Texture,
+	readPresentedCanvasRgba8,
 } from "./visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
@@ -71,7 +69,6 @@ type DemoState = {
 	readonly transformWordUploadCount: number;
 	perSide: number;
 	transformStride: number;
-	snapshotColorView?: GPUTextureView;
 	wasmTransformUploadBuffer?: ArrayBufferLike;
 	wasmTransformUploadPtr?: number;
 	wasmTransformUploadByteLength?: number;
@@ -408,7 +405,6 @@ async function createDemoState(
 		transformWordUploadCount: transformLayout.uploadWordCount,
 		perSide: gridSideLen(MASS_CUBES_ENTITY_COUNT),
 		transformStride: 0,
-		snapshotColorView: undefined,
 	};
 }
 
@@ -472,9 +468,7 @@ function createHostImports(
 				demoState.renderer.uploadCameraBytes(demoState.cameraBytes);
 			},
 			render_demo_frame: (fps: number, cpuMs: number) => {
-				const colorView =
-					demoState.snapshotColorView ??
-					demoState.context.getCurrentTexture().createView();
+				const colorView = demoState.context.getCurrentTexture().createView();
 				demoState.renderer.renderPreparedInstancedMesh(
 					demoState.cubeMesh,
 					demoState.instanceBuffer,
@@ -556,25 +550,14 @@ export async function renderEcsMassCubesWasmSnapshot(
 	const canvas = document.createElement("canvas");
 	canvas.width = MASS_CUBES_CANVAS_WIDTH;
 	canvas.height = MASS_CUBES_CANVAS_HEIGHT;
-	const demoState = await createDemoState(canvas, "rgba8unorm");
-	const target = createRgba8ReadbackTarget(demoState.device, MASS_CUBES_CANVAS_WIDTH, MASS_CUBES_CANVAS_HEIGHT);
+	const demoState = await createDemoState(canvas);
 	try {
 		const wasm = await instantiateWasm(demoState, wasmUrl, label);
 		wasm._start?.();
 		wasm.create_wasm_demo_state();
-		demoState.snapshotColorView = target.view;
 		runWasmRenderFrame(wasm);
-		demoState.snapshotColorView = undefined;
-		return await readRgba8Texture(
-			demoState.device,
-			demoState.queue,
-			target.texture,
-			MASS_CUBES_CANVAS_WIDTH,
-			MASS_CUBES_CANVAS_HEIGHT,
-		);
+		return await readPresentedCanvasRgba8(canvas, demoState.queue);
 	} finally {
-		demoState.snapshotColorView = undefined;
 		demoState.renderer.release();
-		destroyReadbackTarget(target);
 	}
 }

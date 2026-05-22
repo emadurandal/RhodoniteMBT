@@ -25,14 +25,14 @@
       <main class="content">
         <article class="doc">
           <h1>Visual Regression Tests</h1>
-          <p class="lead">Visual regression tests render real sample paths through WebGPU, read back RGBA8 pixels, and compare them with PNG golden files. Browser and native samples both run through their Platform single-frame paths so Engine setup, common runtime handlers, surface configuration, and presentation are covered.</p>
+          <p class="lead">Visual regression tests render real sample paths through WebGPU, read back RGBA8 pixels, and compare them with PNG golden files. MoonBit browser, TypeScript browser, and native samples run through their Platform single-frame paths so Engine setup, common runtime handlers, surface configuration, and presentation are covered. WASM host variants render to their browser canvas and read back the presented canvas pixels.</p>
 
           <h2>Flow</h2>
           <div class="mermaid">
 flowchart LR
   M[visual_samples.tsv] --> H[Native or browser harness]
   H --> E[Sample setup_engine]
-  E --> R[Platform single-frame render]
+  E --> R[Platform single-frame or browser canvas render]
   R --> B[RGBA8 readback]
   B --> P[PNG compare or update]
   P --> G[__image_snapshots__]
@@ -51,14 +51,14 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <h2>Comparison</h2>
           <ul>
             <li>Native tests capture the SDL3 Platform single-frame presentation, decode PNGs with <code>mizchi/image</code>, and compare with <code>mizchi/pixelmatch</code>.</li>
-            <li>Browser tests decode/encode PNGs in Chrome/Chromium using <code>createImageBitmap</code> and <code>OffscreenCanvas</code>, then POST results to the Node runner.</li>
+            <li>Browser tests read presented canvas pixels in Chrome/Chromium using <code>createImageBitmap</code>, decode/encode PNGs with <code>OffscreenCanvas</code>, then POST results to the Node runner.</li>
             <li>The current manifest generally uses <code>max_mismatch_rate=0.0005</code> and a perceptual threshold around <code>0.1</code>.</li>
             <li>Snapshot updates write current WebGPU readback output back to PNGs. Inspect the rendered change before updating.</li>
           </ul>
 
           <h2>Implementation Notes</h2>
           <ul>
-            <li>Native overrides <code>webgpu_objects/native</code> and captures the next canvas presentation before presenting; browser overrides <code>webgpu_objects/js</code>.</li>
+            <li>Native overrides <code>webgpu_objects/native</code> and captures the next canvas presentation before presenting; browser overrides <code>webgpu_objects/js</code> and reads presented canvas pixels for MoonBit, TypeScript, and WASM variants.</li>
             <li><code>scripts/run-visual-regression.mjs</code> routes native/browser runs and hides MoonBit warnings unless verbose mode is enabled.</li>
             <li><code>scripts/run-browser-visual-regression.mjs</code> starts Vite, a result server, and a headless Chrome/Chromium page.</li>
             <li>On machines without WebGPU adapter support or Chrome/Chromium, tests print a skip message and pass without comparing pixels.</li>

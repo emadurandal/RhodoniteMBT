@@ -25,14 +25,14 @@
       <main class="content">
         <article class="doc">
           <h1>Visual Regression Tests</h1>
-          <p class="lead">Visual regression は real sample path を WebGPU backend で render し、readback した RGBA8 pixels を PNG golden files と比較します。browser sample と native sample はどちらも Platform single-frame path を通るため、Engine setup、common runtime handlers、surface configuration、presentation も対象になります。</p>
+          <p class="lead">Visual regression は real sample path を WebGPU backend で render し、readback した RGBA8 pixels を PNG golden files と比較します。MoonBit browser、TypeScript browser、native sample は Platform single-frame path を通るため、Engine setup、common runtime handlers、surface configuration、presentation も対象になります。WASM host variants は browser canvas へ render し、presented canvas pixels を readback します。</p>
 
           <h2>Flow</h2>
           <div class="mermaid">
 flowchart LR
   M[visual_samples.tsv] --> H[Native or browser harness]
   H --> E[Sample setup_engine]
-  E --> R[Platform single-frame render]
+  E --> R[Platform single-frame or browser canvas render]
   R --> B[RGBA8 readback]
   B --> P[PNG compare or update]
   P --> G[__image_snapshots__]
@@ -56,7 +56,7 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <h2>Comparison</h2>
           <ul>
             <li>native helper は SDL3 Platform single-frame presentation を capture し、<code>mizchi/image</code> で PNG を decode して <code>mizchi/pixelmatch</code> で perceptual comparison を行います。</li>
-            <li>browser harness は browser 内で <code>createImageBitmap</code> と <code>OffscreenCanvas</code> を使って PNG decode/encode し、Node runner へ result を POST します。</li>
+            <li>browser harness は browser 内で <code>createImageBitmap</code> により presented canvas pixels を読み、<code>OffscreenCanvas</code> で PNG decode/encode して Node runner へ result を POST します。</li>
             <li><code>max_mismatch_rate=0.0005</code> は小さな backend / driver variance を許容しつつ、目に見える regression を検出する値です。</li>
             <li>snapshot update は <code>RHODONITE_UPDATE_VISUAL_SNAPSHOTS=1</code> で現在の readback output を golden PNG に書き戻します。rendered result を確認してから使います。</li>
           </ul>
@@ -64,7 +64,7 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <h2>Implementation Notes</h2>
           <ul>
             <li>native visual package は <code>supported_targets = "native"</code>、browser visual package は <code>supported_targets = "js"</code>。</li>
-            <li>native は <code>webgpu_objects/native</code> を override し、次の canvas presentation を present 前に capture します。browser は <code>webgpu_objects/js</code> を override します。</li>
+            <li>native は <code>webgpu_objects/native</code> を override し、次の canvas presentation を present 前に capture します。browser は <code>webgpu_objects/js</code> を override し、MoonBit、TypeScript、WASM variants の presented canvas pixels を readback します。</li>
             <li><code>scripts/run-visual-regression.mjs</code> は native/browser をまとめ、MoonBit warnings を通常非表示にします。</li>
             <li><code>scripts/run-browser-visual-regression.mjs</code> は Vite と local result server を起動し、headless Chrome/Chromium から result を受け取ります。</li>
             <li>WebGPU adapter creation や Chrome startup に失敗する環境では skip message を出して pass します。golden 更新は WebGPU-capable machine で行います。</li>
