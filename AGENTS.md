@@ -22,7 +22,7 @@ Keep **source code and everything under [`docs/`](docs/) in sync at all times**.
 
 ## Publish (mooncakes)
 
-After `moon login`, from the repository root: `just publish-mooncakes` or `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, `emadurandal/rhodonite`, and `emadurandal/rhodonite_app_sdl3` ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing dependencies so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep, the facade’s core/webgpu path deps, and app_sdl3’s core/webgpu/facade path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry, use `PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon`; if only the SDL3 app module must be retried, use `PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon`.
+After `moon login`, from the repository root: `pnpm run publish:moon`. This publishes `emadurandal/rhodonite_core`, `emadurandal/rhodonite_webgpu`, `emadurandal/rhodonite`, and `emadurandal/rhodonite_app_sdl3` ([`scripts/publish-rhodonite-mooncakes.sh`](scripts/publish-rhodonite-mooncakes.sh)); `rhodonite_examples` is excluded. The script runs `moon update` and a short wait (8s, overridable with `MOON_PUBLISH_INDEX_WAIT_SECONDS`) after publishing dependencies so each dependent publish-time `moon check` can resolve freshly published deps. It temporarily rewrites webgpu’s core path dep, the facade’s core/webgpu path deps, and app_sdl3’s core/webgpu/facade path deps to registry versions, then restores the workspace files. If core/webgpu are already on the registry, use `PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon`; if only the SDL3 app module must be retried, use `PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon`.
 
 ## Workspace development
 
@@ -34,8 +34,6 @@ moon check --target all
 moon fmt
 moon info
 ```
-
-[`justfile`](justfile) `just check-ws` runs `moon check --target all`.
 
 ## Node / pnpm notes
 

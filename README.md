@@ -27,7 +27,6 @@ moon fmt
 moon info
 ```
 
-From [`justfile`](justfile), `just check-ws` runs `moon check --target all`.
 The WebGPU object package is a virtual package with a default fallback stub so
 workspace-wide checks/tests can build library packages directly; runnable JS and
 native entry packages still override it with the real browser or wgpu backend.
