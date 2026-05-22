@@ -46,7 +46,7 @@ and exposes existing wrapper surfaces:
 ```ts
 import { Vector3F } from "rhodonite-mbt/math";
 import { World } from "rhodonite-mbt/ecs";
-import { CubeMeshDesc, runSingleCanvasPlatform } from "rhodonite-mbt/app";
+import { CubeMeshDesc, PlatformConfig, runPlatform } from "rhodonite-mbt/app";
 ```
 
 The app entrypoint includes the v1 unlit renderer surface as well, including

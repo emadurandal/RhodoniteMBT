@@ -63,15 +63,16 @@ The app runtime helpers are browser-only and expect WebGPU support.
 import {
   Engine,
   PlatformApp,
+  PlatformConfig,
   PlatformOptions,
-  runSingleCanvasPlatform,
+  runPlatform,
 } from "rhodonite-mbt/app";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#canvas");
 
 if (canvas) {
-  await runSingleCanvasPlatform(
-    canvas,
+  await runPlatform(
+    new PlatformConfig(canvas),
     PlatformApp.defaultEngine((engine: Engine) => {
       engine.addPhaseHandler("rhodonite/render", (_engine, frame) => {
         if (!frame.surface.active) {

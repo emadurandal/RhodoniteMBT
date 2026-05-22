@@ -33,11 +33,12 @@ import {
 	PhaseSlot,
 	Renderer,
 	Scene,
+	PlatformConfig,
 	PlatformApp,
 	PlatformOptions,
 	cubePosition3VertexLayout,
 	runBrowserWebGpuCanvasDemo,
-	runSingleCanvasPlatform,
+	runPlatform,
 	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 } from "../moon/rhodonite/src/app/ts/index.ts";
@@ -486,8 +487,8 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 	const canvas = document.createElement("canvas");
 	canvas.width = MASS_CUBES_CANVAS_WIDTH;
 	canvas.height = MASS_CUBES_CANVAS_HEIGHT;
-	const platform = await runSingleCanvasPlatform(
-		canvas,
+	const platform = await runPlatform(
+		new PlatformConfig(canvas),
 		new PlatformApp({
 			createEngine: (config) =>
 				Engine.create(config.canvas, {
@@ -512,8 +513,8 @@ export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array>
 
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
-		await runSingleCanvasPlatform(
-			canvas,
+		await runPlatform(
+			new PlatformConfig(canvas),
 			PlatformApp.defaultEngine((engine) => {
 				const demoState = createDemoStateForEngine(engine);
 				registerEngineHandlers(engine, demoState);

@@ -1308,14 +1308,6 @@ export async function runPlatform(
 	return platform;
 }
 
-export async function runSingleCanvasPlatform(
-	canvas: HTMLCanvasElement,
-	app: PlatformApp,
-	options: PlatformOptions = PlatformOptions.interactive(),
-): Promise<Platform | undefined> {
-	return runPlatform(new PlatformConfig(canvas), app, options);
-}
-
 export async function runMultiSurfacePlatform(
 	configs: readonly PlatformConfig[],
 	app: PlatformApp,
