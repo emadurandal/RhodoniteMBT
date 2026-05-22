@@ -208,15 +208,47 @@ fn Engine::ensure_phase_handler_registration_open(
 }
 
 ///|
-/// Appends a function to run in an engine phase slot.
+/// Reports whether a keyed phase handler is already registered for a phase slot.
+fn has_phase_handler_registration(
+  handlers : Array[PhaseHandler],
+  phase : PhaseKey,
+  slot : PhaseSlot,
+  key : String,
+) -> Bool {
+  for i = 0; i < handlers.length(); i = i + 1 {
+    let handler = handlers[i]
+    if handler.phase == phase && handler.slot == slot {
+      match handler.key {
+        Some(existing) => if existing == key { return true }
+        None => ()
+      }
+    }
+  }
+  false
+}
+
+///|
+/// Adds a function to run in an engine phase slot.
+///
+/// When `key` is provided, repeated registrations with the same phase, slot,
+/// and key are ignored. Unkeyed handlers are always appended because function
+/// values cannot be compared for identity.
 pub fn Engine::add_phase_handler(
   self : Engine,
   phase : PhaseKey,
   handler : (Engine, FrameState) -> Unit,
   slot? : PhaseSlot = BeforeSystems,
+  key? : String? = None,
 ) -> Unit {
   self.ensure_phase_handler_registration_open("Engine::add_phase_handler")
-  self.phase_handlers.push({ phase, slot, run: handler })
+  match key {
+    Some(value) =>
+      if has_phase_handler_registration(self.phase_handlers, phase, slot, value) {
+        return
+      }
+    None => ()
+  }
+  self.phase_handlers.push({ phase, slot, key, run: handler })
 }
 
 ///|
@@ -233,13 +265,14 @@ fn Engine::frame_targets_scene(
 }
 
 ///|
-/// Appends the standard input handler for a scene main camera's orbit controller.
+/// Adds the standard input handler for a scene main camera's orbit controller.
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
   orbit_component : @ecs.ComponentTypeId,
   phase? : PhaseKey = phase_input(),
   slot? : PhaseSlot = BeforeSystems,
+  key? : String? = None,
 ) -> Unit {
   self.add_phase_handler(
     phase,
@@ -270,6 +303,7 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
       )
     },
     slot~,
+    key~,
   )
 }
 
@@ -310,7 +344,15 @@ pub fn Engine::add_common_handlers(
     lens_component~,
   )
   match orbit_component {
-    Some(orbit) => self.add_orbit_camera_controller_input_handler(scene, orbit)
+    Some(orbit) =>
+      self.add_orbit_camera_controller_input_handler(
+        scene,
+        orbit,
+        key=Some(
+          "rhodonite/add_common_handlers/orbit_camera_input/" +
+          scene.instance_id.to_string(),
+        ),
+      )
     None => ()
   }
 }

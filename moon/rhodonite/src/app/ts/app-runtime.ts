@@ -88,6 +88,7 @@ export type PhaseSlot = (typeof PhaseSlot)[keyof typeof PhaseSlot];
 type PhaseHandler = {
 	phase: PhaseKey;
 	slot: PhaseSlot;
+	key: string | undefined;
 	callback: EngineCallback;
 };
 
@@ -526,6 +527,20 @@ export type RuntimeScene = {
 	visible: () => boolean;
 	runSchedulePhase: (phase: PhaseKey, frame: FrameState) => boolean;
 };
+
+const runtimeSceneIds = new WeakMap<RuntimeScene, number>();
+let nextRuntimeSceneId = 1;
+
+function runtimeSceneIdentity(scene: RuntimeScene): number {
+	const existing = runtimeSceneIds.get(scene);
+	if (existing !== undefined) {
+		return existing;
+	}
+	const id = nextRuntimeSceneId;
+	nextRuntimeSceneId += 1;
+	runtimeSceneIds.set(scene, id);
+	return id;
+}
 
 export type KeyCode = string;
 
@@ -1551,13 +1566,25 @@ export class Engine {
 		phase: PhaseKey,
 		callback: EngineCallback,
 		slot: PhaseSlot = PhaseSlot.BeforeSystems,
+		key?: string,
 	): void {
 		if (this.phaseRegistrationLocked) {
 			throw new Error(
 				"Engine.addPhaseHandler cannot register phase handlers after engine initialization.",
 			);
 		}
-		this.phaseHandlers.push({ phase, slot, callback });
+		if (
+			key !== undefined &&
+			this.phaseHandlers.some(
+				(handler) =>
+					handler.phase === phase &&
+					handler.slot === slot &&
+					handler.key === key,
+			)
+		) {
+			return;
+		}
+		this.phaseHandlers.push({ phase, slot, key, callback });
 	}
 
 	addCommonHandlers<TWorld, TMainCamera>(
@@ -1568,22 +1595,27 @@ export class Engine {
 		if (orbit === undefined) {
 			return;
 		}
-		this.addPhaseHandler(Phase.Input, (engine, frame) => {
-			if (!engine.frameTargetsScene(frame, scene)) {
-				return;
-			}
-			const camera = scene.mainCamera();
-			if (camera === null) {
-				throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
-			}
-			const input = frame.input ?? engine.input;
-			orbit.updateOrbitCameraControllerFromInput(
-				scene.world(),
-				camera,
-				orbit.orbitControllerComponent,
-				input,
-			);
-		});
+		this.addPhaseHandler(
+			Phase.Input,
+			(engine, frame) => {
+				if (!engine.frameTargetsScene(frame, scene)) {
+					return;
+				}
+				const camera = scene.mainCamera();
+				if (camera === null) {
+					throw new Error("Engine.addCommonHandlers requires Scene.mainCamera.");
+				}
+				const input = frame.input ?? engine.input;
+				orbit.updateOrbitCameraControllerFromInput(
+					scene.world(),
+					camera,
+					orbit.orbitControllerComponent,
+					input,
+				);
+			},
+			PhaseSlot.BeforeSystems,
+			`rhodonite/orbit-camera-input/${runtimeSceneIdentity(scene)}`,
+		);
 	}
 
 	initialize(): void {

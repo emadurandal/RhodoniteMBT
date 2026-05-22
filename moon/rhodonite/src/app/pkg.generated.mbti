@@ -107,9 +107,9 @@ pub struct Engine {
   // private fields
 }
 pub fn Engine::add_common_handlers(Self, Scene, options? : CommonHandlersOptions) -> Unit
-pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
-pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot) -> Unit
+pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_surface(Self, @webgpu.GPUSurface) -> SurfaceId
 pub fn Engine::add_surface_for_scene(Self, @webgpu.GPUSurface, Scene) -> SurfaceId
 pub fn Engine::append_phase_to_group(Self, PhaseGroupKey, @ecs.PhaseKey) -> Unit

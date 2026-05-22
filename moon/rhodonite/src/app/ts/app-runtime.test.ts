@@ -8,6 +8,7 @@ import {
 	GpuSurface,
 	Phase,
 	PhaseGroup,
+	PhaseSlot,
 	Scene,
 	TimeState,
 	PlatformApp,
@@ -267,6 +268,43 @@ describe("app-runtime Engine", () => {
 		expect(renderSurfaceChanged).toEqual([true]);
 	});
 
+	it("deduplicates keyed addPhaseHandler registrations", async () => {
+		const engine = await createTestEngine();
+		let inputCount = 0;
+		let afterInputCount = 0;
+
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				inputCount += 1;
+			},
+			PhaseSlot.BeforeSystems,
+			"test/input",
+		);
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				inputCount += 1;
+			},
+			PhaseSlot.BeforeSystems,
+			"test/input",
+		);
+		engine.addPhaseHandler(
+			Phase.Input,
+			() => {
+				afterInputCount += 1;
+			},
+			PhaseSlot.AfterSystems,
+			"test/input",
+		);
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(inputCount).toBe(1);
+		expect(afterInputCount).toBe(1);
+	});
+
 	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
 		const engine = await createTestEngine();
 		const sceneA = new Scene("surface-a", {});
@@ -286,6 +324,27 @@ describe("app-runtime Engine", () => {
 		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
 
 		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+	});
+
+	it("deduplicates repeated addCommonHandlers orbit input registrations", async () => {
+		const engine = await createTestEngine();
+		const scene = new Scene("dedupe", {});
+		scene.setMainCamera("camera");
+
+		let orbitUpdateCount = 0;
+		scene.addCommonSystems({
+			orbitControllerComponent: "orbit",
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+		});
+		engine.addCommonHandlers(scene);
+		engine.addCommonHandlers(scene);
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
 
 		expect(orbitUpdateCount).toBe(1);
 	});

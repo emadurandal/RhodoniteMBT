@@ -74,6 +74,7 @@ flowchart TD
           <ul>
             <li><code>phase_startup()</code> and <code>phase_shutdown()</code> are one-shot phases, not group members.</li>
             <li>Custom phase group/order edits are performed during <code>Engine::initialize()</code> startup handlers.</li>
+            <li><code>Engine::add_phase_handler</code> can take a registration key; handlers with the same phase, slot, and key are deduplicated.</li>
             <li>When a surface is suspended, update phases still run and render extraction/prepare/render/present are skipped.</li>
             <li>In on-demand mode, no frame runs while the engine is clean; visible state changes must call <code>request_render</code>.</li>
           </ul>
