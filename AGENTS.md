@@ -75,7 +75,7 @@ After changing source code that can affect sample rendering, always run the visu
 - For any source file you create or edit in this repo, add the following copyright header at the top:
   - MoonBit: `/// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `/// SPDX-License-Identifier: Apache-2.0`
   - Other source files (TypeScript/JavaScript/C): `// Copyright (c) 2026 emadurandal (Act and Wit, Inc.)` / `// SPDX-License-Identifier: Apache-2.0`
-- follow the [Karpathy behavioral guidelines](karpathy-guidelines.md)
+- follow the [project guidelines](guidelines.md)
 
 ## JS bridge and TypeScript wrappers
 
