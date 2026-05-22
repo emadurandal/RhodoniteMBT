@@ -19,4 +19,8 @@ test "default phase groups split frame begin fixed step and render frame" {
       phase_present(),
     ],
   )
+  assert_true(
+    default_render_state_preparation_phases() ==
+    [phase_update(), phase_post_update(), phase_render_extract()],
+  )
 }

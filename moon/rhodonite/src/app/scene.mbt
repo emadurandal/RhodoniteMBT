@@ -487,6 +487,31 @@ pub fn Scene::run_systems_for_phase(
 }
 
 ///|
+/// Runs this scene's systems for several engine phases in the supplied order.
+pub fn Scene::run_systems_for_phases(
+  self : Scene,
+  phases : Array[PhaseKey],
+  frame : FrameState,
+) -> Bool {
+  let mut ok = true
+  for i = 0; i < phases.length(); i = i + 1 {
+    if !self.run_systems_for_phase(phases[i], frame) {
+      ok = false
+    }
+  }
+  ok
+}
+
+///|
+/// Runs the standard scene phases needed to make current ECS state renderable.
+pub fn Scene::prepare_render_state(
+  self : Scene,
+  frame? : FrameState = FrameState::zero(),
+) -> Bool {
+  self.run_systems_for_phases(default_render_state_preparation_phases(), frame)
+}
+
+///|
 /// Returns the scene main camera or aborts because a camera-bound engine handler requires one.
 fn scene_main_camera_or_abort(scene : Scene, caller : String) -> @ecs.EntityId {
   match scene.main_camera() {

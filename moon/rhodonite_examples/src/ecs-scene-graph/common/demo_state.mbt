@@ -187,24 +187,7 @@ pub fn create_demo_state_for_scene(
     ),
   )
   push_local_transforms(world, bodies, 0.0)
-  ignore(
-    scene.run_systems_for_phase(
-      @app.phase_update(),
-      @app.FrameState::new((0.0 : Float), 0, 0.0),
-    ),
-  )
-  ignore(
-    scene.run_systems_for_phase(
-      @app.phase_post_update(),
-      @app.FrameState::new((0.0 : Float), 0, 0.0),
-    ),
-  )
-  ignore(
-    scene.run_systems_for_phase(
-      @app.phase_render_extract(),
-      @app.FrameState::new((0.0 : Float), 0, 0.0),
-    ),
-  )
+  ignore(scene.prepare_render_state())
   {
     context,
     renderer,
@@ -340,13 +323,7 @@ pub fn render_frame_to_view(
     demo_state.frame.val.to_double() * 0.022,
   )
   demo_state.update_scene(frame)
-  ignore(demo_state.scene.run_systems_for_phase(@app.phase_update(), frame))
-  ignore(
-    demo_state.scene.run_systems_for_phase(@app.phase_post_update(), frame),
-  )
-  ignore(
-    demo_state.scene.run_systems_for_phase(@app.phase_render_extract(), frame),
-  )
+  ignore(demo_state.scene.prepare_render_state(frame~))
   render_current_frame_to_view(demo_state, color_view)
 }
 

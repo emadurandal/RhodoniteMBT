@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	Engine,
 	type EngineCallback,
+	FrameState,
 	GpuSurface,
 	Phase,
 	PhaseGroup,
@@ -15,6 +16,7 @@ import {
 	PlatformConfig,
 	PlatformOptions,
 	defaultMaxFixedStepsPerFrame,
+	defaultRenderStatePreparationPhases,
 	installBrowserInputCallbacks,
 	runMultiSurfacePlatform,
 	runPlatform,
@@ -158,6 +160,56 @@ describe("GpuSurface.syncFromCanvas", () => {
 		canvas.height = 768;
 		expect(surface.syncFromCanvas()).toBe(true);
 		expect(surface.state().generation).toBe(1);
+	});
+});
+
+describe("app-runtime Scene", () => {
+	it("prepares render state with update post-update and render-extract schedules", () => {
+		const scene = new Scene<Record<string, never>>("prepare", {});
+		const calls: string[] = [];
+
+		scene.setSchedule((_world, frame) => {
+			calls.push(`update:${frame.frameIndex}`);
+		}, Phase.Update);
+		scene.setSchedule((_world, frame) => {
+			calls.push(`post-update:${frame.frameIndex}`);
+		}, Phase.PostUpdate);
+		scene.setSchedule((_world, frame) => {
+			calls.push(`render-extract:${frame.frameIndex}`);
+		}, Phase.RenderExtract);
+
+		expect(scene.prepareRenderState()).toBe(true);
+		expect(calls).toEqual([
+			"update:0",
+			"post-update:0",
+			"render-extract:0",
+		]);
+	});
+
+	it("runs an explicit ordered phase list with one frame state", () => {
+		const scene = new Scene<Record<string, never>>("phase-list", {});
+		const calls: string[] = [];
+		const frame = new FrameState(0.016, 7, 0.112);
+
+		scene.setSchedule((_world, runFrame) => {
+			calls.push(`update:${runFrame.frameIndex}`);
+		}, Phase.Update);
+		scene.setSchedule((_world, runFrame) => {
+			calls.push(`post-update:${runFrame.frameIndex}`);
+		}, Phase.PostUpdate);
+
+		expect(
+			scene.runSchedulePhases([Phase.PostUpdate, Phase.Update], frame),
+		).toBe(true);
+		expect(calls).toEqual(["post-update:7", "update:7"]);
+	});
+
+	it("exposes the render state preparation phase list", () => {
+		expect(defaultRenderStatePreparationPhases()).toEqual([
+			Phase.Update,
+			Phase.PostUpdate,
+			Phase.RenderExtract,
+		]);
 	});
 });
 

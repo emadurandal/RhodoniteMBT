@@ -53,6 +53,10 @@ export function defaultRenderFramePhases(): PhaseKey[] {
 	];
 }
 
+export function defaultRenderStatePreparationPhases(): PhaseKey[] {
+	return [Phase.Update, Phase.PostUpdate, Phase.RenderExtract];
+}
+
 export function defaultFrameBeginPhases(): PhaseKey[] {
 	return [Phase.Surface, Phase.Input];
 }
@@ -149,6 +153,10 @@ export class FrameState {
 		this.surface = surface;
 		this.surfaceChanged = surfaceChanged;
 		this.input = input;
+	}
+
+	static zero(): FrameState {
+		return new FrameState(0, 0, 0);
 	}
 
 	withSurface(surface: SurfaceState, surfaceChanged: boolean): FrameState {
@@ -519,6 +527,20 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 			}
 		}
 		return true;
+	}
+
+	runSchedulePhases(phases: PhaseKey[], frame: FrameState): boolean {
+		let ok = true;
+		for (const phase of phases) {
+			if (!this.runSchedulePhase(phase, frame)) {
+				ok = false;
+			}
+		}
+		return ok;
+	}
+
+	prepareRenderState(frame: FrameState = FrameState.zero()): boolean {
+		return this.runSchedulePhases(defaultRenderStatePreparationPhases(), frame);
 	}
 }
 
