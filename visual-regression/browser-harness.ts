@@ -119,7 +119,7 @@ async function main(): Promise<void> {
 		await postStatus("importing MoonBit visual snapshot module");
 		snapshotModule = await withTimeout(
 			import(
-				"../../_build/js/debug/build/emadurandal/rhodonite_examples/visual_regression_browser/js/main/main.js"
+				"../_build/js/debug/build/emadurandal/rhodonite_examples/visual_regression_browser/js/main/main.js"
 			) as Promise<SnapshotModule>,
 			10000,
 			"MoonBit browser visual snapshot module import timed out",
@@ -246,18 +246,18 @@ async function createSampleRenderRegistry(
 		wasmModule,
 		wasmGcModule,
 	] = await Promise.all([
-		import("../../samples/ts/main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
-		import("../../samples/ts/main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
-		import("../../samples/ts/ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
+		import("../samples/ts/main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
+		import("../samples/ts/main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
+		import("../samples/ts/ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
 		import(
-			"../../_build/wasm/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
+			"../_build/wasm/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
 		) as Promise<{ default: string }>,
 		import(
-			"../../_build/wasm-gc/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
+			"../_build/wasm-gc/release/build/emadurandal/rhodonite_examples/ecs-mass-cubes/wasm/main/main.wasm?url"
 		) as Promise<{ default: string }>,
 	]);
 	const tsOndemandTriangleModule = await import(
-		"../../samples/ts/main-ondemand-triangle"
+		"../samples/ts/main-ondemand-triangle"
 	) as TsOndemandTriangleModule;
 	return new Map<string, () => Promise<Uint8Array>>([
 		[

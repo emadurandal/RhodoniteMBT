@@ -96,7 +96,7 @@ try {
 	await vite.listen();
 	const address = vite.httpServer.address();
 	const port = typeof address === "object" && address ? address.port : 5173;
-	const url = `http://127.0.0.1:${port}/src/visual-regression/browser-harness.html?update=${update ? "1" : "0"}&result=${encodeURIComponent(resultEndpoint)}`;
+	const url = `http://127.0.0.1:${port}/visual-regression/browser-harness.html?update=${update ? "1" : "0"}&result=${encodeURIComponent(resultEndpoint)}`;
 	if (verbose) {
 		console.log(`visual_regression(browser): launching ${browser}`);
 		console.log(`visual_regression(browser): opening ${url}`);

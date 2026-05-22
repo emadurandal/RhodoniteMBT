@@ -14,7 +14,7 @@ import {
 } from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "../../src/visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 
 type DemoState = {
 	readonly engine: Engine;

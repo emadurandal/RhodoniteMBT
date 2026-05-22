@@ -39,7 +39,7 @@ import {
 } from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "../../src/visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;

@@ -4,7 +4,7 @@
 import "./style.css";
 import {
 	readPresentedCanvasRgba8,
-} from "../../src/visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
 	InputState,

@@ -23,7 +23,7 @@ import {
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
 	readPresentedCanvasRgba8,
-} from "../../src/visual-regression/webgpu-readback";
+} from "../../visual-regression/webgpu-readback";
 import {
 	CubeMeshDesc,
 	Engine,
