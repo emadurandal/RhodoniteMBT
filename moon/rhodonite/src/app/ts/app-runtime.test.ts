@@ -421,6 +421,26 @@ describe("app-runtime Engine", () => {
 		expect(orbitUpdateCount).toBe(1);
 	});
 
+	it("uses builtin transform propagation when a common runtime world supports it", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene<
+			{ updateGlobalTransformsFromTransforms: () => void },
+			string
+		>();
+		let propagationCount = 0;
+		scene.setWorld({
+			updateGlobalTransformsFromTransforms: () => {
+				propagationCount += 1;
+			},
+		});
+		scene.useCommonRuntime({});
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(propagationCount).toBe(1);
+	});
+
 	it("installs declared common runtime for surface scenes created during startup", async () => {
 		const engine = await createTestEngine();
 		const surfaceId = engine.addSurface(createTestGpuSurface(fakeCanvas()));

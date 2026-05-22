@@ -133,6 +133,17 @@ type CommonRuntimeConfig<TWorld, TMainCamera, TComponent> = {
 	readonly options: CommonHandlersOptions;
 };
 
+type BuiltinTransformPropagationWorld = {
+	updateGlobalTransformsFromTransforms: () => void;
+};
+
+function defaultTransformPropagation(world: unknown): void {
+	const candidate = world as Partial<BuiltinTransformPropagationWorld>;
+	if (typeof candidate.updateGlobalTransformsFromTransforms === "function") {
+		candidate.updateGlobalTransformsFromTransforms();
+	}
+}
+
 export class FrameState {
 	readonly deltaSeconds: number;
 	readonly frameIndex: number;
@@ -498,10 +509,10 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		const { transformPropagation = true } = options;
 		if (
 			transformPropagation &&
-			this.commonTransformPropagationValue !== undefined &&
 			!this.commonTransformPropagationScheduled
 		) {
-			const propagateTransforms = this.commonTransformPropagationValue;
+			const propagateTransforms =
+				this.commonTransformPropagationValue ?? defaultTransformPropagation;
 			this.setSchedule((world) => {
 				propagateTransforms(world);
 			}, Phase.Update);
