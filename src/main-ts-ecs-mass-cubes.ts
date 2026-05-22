@@ -374,15 +374,6 @@ function createDemoStateForEngine(
 			updateOrbitCameraControllerComponentFromInput,
 		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
 	});
-	pushCameraMatrices(
-		world,
-		camera,
-		readOrbitCameraControllerComponent(
-			world,
-			camera,
-			orbitControllerComponent,
-		),
-	);
 	scene.setMainCamera(camera);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
 	const renderer = new Renderer(
@@ -419,6 +410,7 @@ function createDemoStateForEngine(
 		cpuFrameStartMs: -1,
 	};
 	addMassCubesCameraSyncSystem(demoState);
+	demoState.scene.prepareRenderState();
 	uploadInitialGlobalTransforms(demoState);
 	return demoState;
 }

@@ -205,18 +205,18 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
 	});
 	scene.installCommonSystems({ transformPropagation: false });
-	syncOrbitCameraTransformComponent(
-		world,
-		camera,
-		orbitControllerComponent,
-		cameraHomeComponent,
+	scene.setSchedule(
+		(systemWorld) => {
+			syncOrbitCameraBlobComponent(
+				systemWorld,
+				camera,
+				orbitControllerComponent,
+				cameraLensComponent,
+			);
+		},
+		Phase.RenderExtract,
 	);
-	syncOrbitCameraBlobComponent(
-		world,
-		camera,
-		orbitControllerComponent,
-		cameraLensComponent,
-	);
+	scene.prepareRenderState();
 	const objects = {
 		sun: createRenderableObject(
 			demo,
