@@ -78,10 +78,7 @@ pub fn DemoState::update_camera_from_input(
 ///|
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  let (device, canvas_context, format, queue) = engine.gpu_context().get()
-  ignore(device)
-  ignore(queue)
-  ignore(format)
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
   Some(
     create_demo_state_with_renderer(
       engine.main_scene(),

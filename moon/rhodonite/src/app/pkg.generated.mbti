@@ -142,14 +142,8 @@ pub fn Engine::surface_id_at(Self, Int) -> SurfaceId
 pub fn Engine::surface_input(Self, SurfaceId) -> @input.InputState
 pub fn Engine::surface_state(Self) -> SurfaceState
 
-pub(all) struct EngineSurface {
-  id : SurfaceId
-  gpu_surface : @webgpu.GPUSurface
-  mut scene : Scene
-  input_state : @input.InputState
-  render_target_resources : RenderTargetResources
-  mut state : SurfaceState
-  mut changed : Bool
+pub struct EngineSurface {
+  // private fields
 }
 pub fn EngineSurface::gpu_surface(Self) -> @webgpu.GPUSurface
 pub fn EngineSurface::id(Self) -> SurfaceId

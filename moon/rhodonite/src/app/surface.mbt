@@ -3,14 +3,14 @@
 
 ///|
 /// Surface-specific rendering view owned by an engine.
-pub(all) struct EngineSurface {
-  id : SurfaceId
-  gpu_surface : @wgpu.GPUSurface
-  mut scene : Scene
-  input_state : @input.InputState
-  render_target_resources : RenderTargetResources
-  mut state : SurfaceState
-  mut changed : Bool
+pub struct EngineSurface {
+  priv id : SurfaceId
+  priv gpu_surface : @wgpu.GPUSurface
+  priv mut scene : Scene
+  priv input_state : @input.InputState
+  priv render_target_resources : RenderTargetResources
+  priv mut state : SurfaceState
+  priv mut changed : Bool
 }
 
 ///|
