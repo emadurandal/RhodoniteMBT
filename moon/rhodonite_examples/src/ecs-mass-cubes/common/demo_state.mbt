@@ -453,21 +453,6 @@ pub(all) struct DemoState {
 }
 
 ///|
-/// Applies surface changes to sample-owned render resources.
-fn DemoState::handle_surface_frame(
-  self : DemoState,
-  frame : @app.FrameState,
-) -> Unit {
-  if self.owns_target && frame.surface_changed() && frame.surface_active() {
-    self.target.resize(
-      frame.surface_width(),
-      frame.surface_height(),
-      frame.surface_format(),
-    )
-  }
-}
-
-///|
 #cfg(target="js")
 extern "js" fn ecs_mass_cubes_perf_overlay_js(
   fps : Double,
@@ -993,9 +978,6 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.add_phase_handler(@app.phase_surface(), fn(_engine, frame) {
-    demo_state.handle_surface_frame(frame)
-  })
   engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
@@ -1009,9 +991,6 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSystems,
   )
-  engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
-    demo_state.release()
-  })
 }
 
 ///|
