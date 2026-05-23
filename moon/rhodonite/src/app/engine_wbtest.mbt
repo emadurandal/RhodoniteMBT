@@ -46,7 +46,7 @@ test "phase handler registration key deduplicates exact phase slot key matches" 
 }
 
 ///|
-test "common runtime orbit input key matches common handlers key" {
+test "common runtime orbit input key matches keyed registration" {
   let scene = Scene::new("dedupe")
   let key = common_orbit_camera_input_handler_key(scene)
   let handlers : Array[PhaseHandler] = [
@@ -78,20 +78,4 @@ test "push unique declared common runtime scene skips duplicates" {
   assert_eq(result.length(), 2)
   assert_true(result[0].same(main))
   assert_true(result[1].same(surface_only))
-}
-
-///|
-test "common handlers honor explicit common runtime flags" {
-  let scene = Scene::new("explicit-common-runtime")
-  scene.use_common_runtime(
-    transform_propagation=false,
-    orbit_camera_blob_sync=false,
-  )
-  let config = common_handlers_runtime_config(
-    scene,
-    CommonHandlersOptions::default(),
-  )
-  assert_true(!config.transform_propagation)
-  assert_true(config.orbit_camera_transform)
-  assert_true(!config.orbit_camera_blob_sync)
 }

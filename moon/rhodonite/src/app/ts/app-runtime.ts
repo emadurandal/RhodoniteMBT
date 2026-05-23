@@ -133,7 +133,7 @@ export type CommonSceneSystems<TWorld, TMainCamera> =
 	readonly propagateTransforms?: (world: TWorld) => void;
 };
 
-export type CommonHandlersOptions<TWorld = unknown> = {
+export type CommonRuntimeOptions<TWorld = unknown> = {
 	readonly transformPropagation?: boolean;
 	readonly orbitCameraTransform?: boolean;
 	readonly orbitCameraBlobSync?: boolean;
@@ -142,7 +142,7 @@ export type CommonHandlersOptions<TWorld = unknown> = {
 
 type CommonRuntimeConfig<TWorld, TMainCamera> = {
 	readonly systems: CommonSceneSystems<TWorld, TMainCamera>;
-	readonly options: CommonHandlersOptions<TWorld>;
+	readonly options: CommonRuntimeOptions<TWorld>;
 	readonly implicit: boolean;
 };
 
@@ -539,7 +539,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 
 	addCommonSystems(
-		options: CommonHandlersOptions<TWorld> = {},
+		options: CommonRuntimeOptions<TWorld> = {},
 		systems: CommonSceneSystems<TWorld, TMainCamera> = {},
 	): void {
 		this.commonOrbitCameraValue = systems;
@@ -547,7 +547,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 
 	useCommonRuntime(
-		options: CommonHandlersOptions<TWorld> = {},
+		options: CommonRuntimeOptions<TWorld> = {},
 		systems: CommonSceneSystems<TWorld, TMainCamera> = {},
 	): void {
 		this.commonRuntimeValue = {
@@ -576,35 +576,8 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		return this.commonRuntimeValue?.implicit !== true;
 	}
 
-	installCommonHandlersRuntime(
-		options: CommonHandlersOptions<TWorld> = {},
-	):
-		| {
-				readonly orbit: CommonOrbitCameraSystems<TWorld, TMainCamera>;
-				readonly requireMainCamera: boolean;
-		  }
-		| undefined {
-		const explicit = this.commonRuntimeValue?.implicit === false
-			? this.commonRuntimeValue
-			: undefined;
-		const runtime: CommonRuntimeConfig<TWorld, TMainCamera> = explicit ?? {
-			systems: this.commonOrbitCameraValue ?? {},
-			options,
-			implicit: false,
-		};
-		this.commonOrbitCameraValue = runtime.systems;
-		const orbit = this.installCommonSystems(runtime.options);
-		if (orbit === undefined) {
-			return undefined;
-		}
-		return {
-			orbit,
-			requireMainCamera: runtime.implicit !== true,
-		};
-	}
-
 	installCommonSystems(
-		options: CommonHandlersOptions<TWorld> = {},
+		options: CommonRuntimeOptions<TWorld> = {},
 	): CommonOrbitCameraSystems<TWorld, TMainCamera> | undefined {
 		const {
 			transformPropagation = true,
@@ -1815,22 +1788,6 @@ export class Engine {
 			},
 			PhaseSlot.BeforeSystems,
 			`rhodonite/orbit-camera-input/${runtimeSceneIdentity(scene)}`,
-		);
-	}
-
-	addCommonHandlers<TWorld, TMainCamera>(
-		scene: Scene<TWorld, TMainCamera>,
-		options: CommonHandlersOptions<TWorld> = {},
-	): void {
-		const runtime = scene.installCommonHandlersRuntime(options);
-		if (runtime === undefined) {
-			return;
-		}
-		this.addCommonRuntimeOrbitCameraInputHandler(
-			scene,
-			runtime.orbit,
-			false,
-			runtime.requireMainCamera,
 		);
 	}
 
