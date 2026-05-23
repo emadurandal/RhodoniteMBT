@@ -117,12 +117,7 @@ pub fn create_demo_state_for_scene(
   let sun = world.create_entity()
   let earth = world.create_entity()
   let moon = world.create_entity()
-  scene.use_common_runtime(
-    transform_propagation=true,
-    orbit_component=Some(orbit_controller),
-    home_component=Some(camera_home),
-    lens_component=Some(camera_lens),
-  )
+  scene.use_common_runtime(transform_propagation=true)
   let bodies : Array[@ecs.EntityId] = [sun, earth, moon]
   let gt = world.global_transform_component()
   let id_m = @m44.Matrix44F::identity()

@@ -461,6 +461,27 @@ pub fn Scene::add_common_systems(
 }
 
 ///|
+/// Resolves omitted standard camera-control component ids to builtin world ids.
+fn Scene::common_runtime_config(
+  self : Scene,
+  transform_propagation : Bool,
+  orbit_component : @ecs.ComponentTypeId?,
+  home_component : @ecs.ComponentTypeId?,
+  lens_component : @ecs.ComponentTypeId?,
+) -> CommonRuntimeConfig {
+  if orbit_component is None && home_component is None && lens_component is None {
+    {
+      transform_propagation,
+      orbit_component: Some(self.world.orbit_camera_controller_component()),
+      home_component: Some(self.world.camera_home_transform_component()),
+      lens_component: Some(self.world.camera_lens_component()),
+    }
+  } else {
+    { transform_propagation, orbit_component, home_component, lens_component }
+  }
+}
+
+///|
 /// Installs and records the standard runtime systems expected by engine-driven samples.
 pub fn Scene::use_common_runtime(
   self : Scene,
@@ -469,17 +490,15 @@ pub fn Scene::use_common_runtime(
   home_component? : @ecs.ComponentTypeId? = None,
   lens_component? : @ecs.ComponentTypeId? = None,
 ) -> Unit {
-  self.common_runtime = Some({
-    transform_propagation,
-    orbit_component,
-    home_component,
-    lens_component,
-  })
+  let config = self.common_runtime_config(
+    transform_propagation, orbit_component, home_component, lens_component,
+  )
+  self.common_runtime = Some(config)
   self.add_common_systems(
-    transform_propagation~,
-    orbit_component~,
-    home_component~,
-    lens_component~,
+    transform_propagation=config.transform_propagation,
+    orbit_component=config.orbit_component,
+    home_component=config.home_component,
+    lens_component=config.lens_component,
   )
 }
 

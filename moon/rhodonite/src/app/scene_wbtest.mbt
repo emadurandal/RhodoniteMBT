@@ -48,6 +48,29 @@ test "scene common runtime records and installs standard systems" {
 }
 
 ///|
+test "scene common runtime uses builtin camera components by default" {
+  let scene = Scene::new("common-runtime-builtin")
+  let world = scene.world()
+  scene.use_common_runtime(transform_propagation=false)
+  assert_true(
+    scene.inferred_common_orbit_component() ==
+    Some(world.orbit_camera_controller_component()),
+  )
+  assert_true(
+    scene.inferred_common_home_component(
+      Some(world.orbit_camera_controller_component()),
+    ) ==
+    Some(world.camera_home_transform_component()),
+  )
+  assert_true(
+    scene.inferred_common_lens_component(
+      Some(world.orbit_camera_controller_component()),
+    ) ==
+    Some(world.camera_lens_component()),
+  )
+}
+
+///|
 test "scene render state preparation runs update post update and render extract" {
   let scene = Scene::new("prepare")
   let calls : Array[Int] = []
