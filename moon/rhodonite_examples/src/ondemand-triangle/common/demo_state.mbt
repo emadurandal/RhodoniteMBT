@@ -191,11 +191,7 @@ pub fn register_engine_handlers(
     fn(engine, _frame) { update_from_input(demo_state, engine.input()) },
     slot=@app.PhaseSlot::AfterSystems,
   )
-  engine.add_phase_handler(
-    @app.phase_render(),
-    fn(_engine, _frame) { render_current_frame(demo_state) },
-    slot=@app.PhaseSlot::AfterSystems,
-  )
+  engine.on_frame_render(fn(_frame) { render_current_frame(demo_state) })
   engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })

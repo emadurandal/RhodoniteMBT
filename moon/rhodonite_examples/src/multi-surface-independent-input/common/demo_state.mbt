@@ -142,12 +142,10 @@ pub fn register_engine_handlers(
   engine.add_phase_handler(@app.phase_input(), fn(engine, frame) {
     demo_state.handle_input_frame(engine, frame)
   })
-  engine.add_phase_handler(@app.phase_update(), fn(engine, frame) {
+  engine.on_frame_update(fn(frame) {
     demo_state.update_surface_frame(engine, frame)
   })
-  engine.add_phase_handler(
-    @app.phase_render(),
-    fn(engine, frame) { demo_state.render_surface_frame(engine, frame) },
-    slot=@app.PhaseSlot::AfterSystems,
-  )
+  engine.on_frame_render(fn(frame) {
+    demo_state.render_surface_frame(engine, frame)
+  })
 }
