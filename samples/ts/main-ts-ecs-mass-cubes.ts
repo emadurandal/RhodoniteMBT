@@ -27,13 +27,10 @@ import {
 	type MeshHandle,
 	Phase,
 	PhaseSlot,
-	Renderer,
-	RenderTargetResources,
 	Scene,
 	PlatformConfig,
 	PlatformApp,
 	PlatformOptions,
-	cubePosition3VertexLayout,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
 	type FrameState,
@@ -60,12 +57,9 @@ type GlobalTransformPrecisionMode =
 const GLOBAL_TRANSFORM_PRECISION_MODE: GlobalTransformPrecisionMode = "all-f16";
 
 type DemoState = {
-	readonly canvas: HTMLCanvasElement;
 	readonly context: GPUCanvasContext;
-	readonly device: GPUDevice;
-	readonly queue: GPUQueue;
-	readonly renderer: Renderer;
-	readonly target: RenderTargetResources;
+	readonly renderer: Engine["renderer"];
+	readonly target: Engine["renderTargetResources"];
 	readonly cubeMesh: MeshHandle;
 	readonly instanceBuffer: InstanceBufferHandle;
 	readonly scene: Scene<World, EntityId>;
@@ -305,13 +299,9 @@ function addMassCubesCameraSyncSystem(demoState: DemoState): void {
 	}, Phase.RenderExtract);
 }
 
-function createDemoStateForEngine(
-	engine: Engine,
-	renderFormat?: GPUTextureFormat,
-): DemoState {
-	const { canvas, context, device, queue, format } = engine;
+function createDemoStateForEngine(engine: Engine): DemoState {
+	const { context } = engine;
 	const scene = engine.mainScene<World, EntityId>();
-	const targetFormat = renderFormat ?? format;
 
 	const world = globalTransformDefaultIsF16()
 		? World.newWithGlobalTransformF16()
@@ -365,25 +355,13 @@ function createDemoStateForEngine(
 	});
 	scene.setMainCamera(camera);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
-	const renderer = new Renderer(
-		device,
-		queue,
-		cubePosition3VertexLayout(),
-	);
-	const target = new RenderTargetResources(
-		device,
-		MASS_CUBES_CANVAS_WIDTH,
-		MASS_CUBES_CANVAS_HEIGHT,
-		targetFormat,
-	);
+	const renderer = engine.renderer;
+	const target = engine.renderTargetResources;
 	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const instanceBuffer = renderer.registerStaticInstanceBuffer(instanceData);
 
 	const demoState: DemoState = {
-		canvas,
 		context,
-		device,
-		queue,
 		renderer,
 		target,
 		cubeMesh,
@@ -421,7 +399,6 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 		},
 		PhaseSlot.AfterSystems,
 	);
-	engine.addPhaseHandler(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
@@ -470,11 +447,6 @@ function renderScene(
 		demoState.target,
 		colorView,
 	);
-}
-
-function releaseDemoState(demoState: DemoState): void {
-	demoState.target.release();
-	demoState.renderer.release();
 }
 
 export async function renderTsEcsMassCubesBrowserSnapshot(): Promise<Uint8Array> {
