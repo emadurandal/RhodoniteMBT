@@ -17,16 +17,6 @@ pub(all) struct DemoState {
 }
 
 ///|
-/// Recreates surface-sized render resources for callers that render into an external surface.
-pub fn DemoState::resize_surface_resources(
-  self : DemoState,
-  width : Int,
-  height : Int,
-) -> Unit {
-  self.target.resize(width, height, self.target.format())
-}
-
-///|
 /// Applies surface-local input to the scene camera orbit controller.
 pub fn DemoState::update_camera_from_input(
   self : DemoState,

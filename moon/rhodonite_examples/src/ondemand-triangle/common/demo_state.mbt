@@ -207,12 +207,6 @@ pub fn DemoState::release(self : DemoState) -> Unit {
 }
 
 ///|
-/// Releases GPU resources through a free function for JS bridge symmetry.
-pub fn demo_state_release(demo_state : DemoState) -> Unit {
-  demo_state.release()
-}
-
-///|
 let triangle_shader_code : String =
   #|struct DemoUniform {
   #|  angle: f32,

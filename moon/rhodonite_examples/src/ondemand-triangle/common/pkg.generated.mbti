@@ -15,8 +15,6 @@ pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String,
 
 pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
 
-pub fn demo_state_release(DemoState) -> Unit
-
 pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState) -> Unit
@@ -43,4 +41,3 @@ pub fn DemoState::release(Self) -> Unit
 // Type aliases
 
 // Traits
-

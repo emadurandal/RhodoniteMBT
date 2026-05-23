@@ -38,7 +38,6 @@ pub(all) struct DemoState {
   frame : @ref.Ref[Int]
 }
 pub fn DemoState::render_scene(Self, @app.Scene, @webgpu_objects.GPUTextureView) -> Unit
-pub fn DemoState::resize_surface_resources(Self, Int, Int) -> Unit
 pub fn DemoState::update_camera_from_input(Self, @input.InputState) -> Unit
 pub fn DemoState::update_scene(Self, @app.FrameState) -> Unit
 
