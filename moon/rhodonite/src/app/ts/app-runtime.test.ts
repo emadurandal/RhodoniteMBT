@@ -24,6 +24,7 @@ import {
 	startBrowserFrameLoop,
 	stopPlatform,
 } from "./index.ts";
+import { FakeDevice } from "../test-utils/fake-webgpu.ts";
 
 type FakeEventTarget = {
 	addEventListener: ReturnType<typeof vi.fn>;
@@ -96,11 +97,12 @@ function stubAnimationFrame(): {
 }
 
 function stubWebGpu(): void {
+	const device = new FakeDevice();
 	vi.stubGlobal("navigator", {
 		gpu: {
 			requestAdapter: vi.fn(async () => ({
 				limits: {},
-				requestDevice: vi.fn(async () => ({ queue: {} })),
+				requestDevice: vi.fn(async () => device),
 			})),
 			getPreferredCanvasFormat: vi.fn(() => "rgba8unorm"),
 		},

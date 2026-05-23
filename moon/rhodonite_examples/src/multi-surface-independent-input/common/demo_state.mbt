@@ -11,9 +11,6 @@ pub(all) struct SurfaceDemoState {
 ///|
 /// Coordinates one shared platform demo across multiple presentation surfaces.
 pub(all) struct MultiSurfaceDemoState {
-  device : @wgpu.GPUDevice
-  queue : @wgpu.GPUQueue
-  format : String
   surfaces : Array[SurfaceDemoState]
 }
 
@@ -22,8 +19,8 @@ pub(all) struct MultiSurfaceDemoState {
 pub fn create_demo_state_for_engine(
   engine : @app.Engine,
 ) -> MultiSurfaceDemoState {
-  let (device, _canvas_context, format, queue) = engine.gpu_context().get()
-  { device, queue, format, surfaces: [] }
+  ignore(engine)
+  { surfaces: [] }
 }
 
 ///|
@@ -51,15 +48,16 @@ fn MultiSurfaceDemoState::ensure_surface(
     Some(index) => self.surfaces[index]
     None => {
       let scene = @app.Scene::new("multi-surface-independent-input")
-      let demo = @scene_graph.create_demo_state_for_scene(
+      engine.set_surface_scene(id, scene)
+      let demo = @scene_graph.create_demo_state_with_renderer(
         scene,
-        self.device,
-        self.queue,
-        self.format,
+        engine.renderer(),
+        engine.surface(id).render_target_resources(),
+        owns_renderer=false,
+        owns_target=false,
       )
       let surface_demo = { id, demo }
       self.surfaces.push(surface_demo)
-      engine.set_surface_scene(id, scene)
       surface_demo
     }
   }
@@ -75,12 +73,7 @@ fn MultiSurfaceDemoState::handle_surface_frame(
   match frame.surface_id() {
     Some(id) => {
       let surface_demo = self.ensure_surface(engine, id)
-      if frame.surface_changed() && frame.surface_active() {
-        surface_demo.demo.resize_surface_resources(
-          frame.surface_width(),
-          frame.surface_height(),
-        )
-      }
+      ignore(surface_demo)
     }
     None => ()
   }

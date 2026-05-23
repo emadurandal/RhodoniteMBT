@@ -38,6 +38,7 @@ fn create_pipeline(
 ) -> @wgpu.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
   let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
+    layout: None,
     vertex: shader,
     fragment: shader,
     topology: @wgpu.GPUPrimitiveTopology::TriangleList,

@@ -74,6 +74,7 @@ fn vertex_format_to_u32(f : @webgpu_enums.GPUVertexFormat) -> UInt {
 /// Separate WGSL modules need an extension in wgpu_mbt or descriptor setup from C.
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
+  layout : GPUPipelineLayout?,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
@@ -93,7 +94,11 @@ pub fn webgpu_device_create_render_pipeline(
   }
   let topology_u = topology_to_primitive_u32(topology)
   try {
-    let builder = @wgpu.RenderPipelineDescBuilder::new(vertex.raw)
+    let builder = match layout {
+      Some(layout) =>
+        @wgpu.RenderPipelineDescBuilder::new(vertex.raw, layout=layout.raw)
+      None => @wgpu.RenderPipelineDescBuilder::new(vertex.raw)
+    }
     let pipeline = try {
       let _ = builder.set_entry_points("vertexMain", "fragmentMain")
       let _ = builder.set_color_target_format(format)
@@ -136,6 +141,47 @@ pub fn webgpu_device_create_render_pipeline(
     pipeline
   } catch {
     _ => abort("native WebGPU: render pipeline builder allocation failed")
+  }
+}
+
+///|
+/// Implements `webgpu_device_create_bind_group_layout`.
+pub fn webgpu_device_create_bind_group_layout(
+  device : WebGPUDevice,
+  bindings : Array[UInt],
+  visibilities : Array[UInt64],
+  buffer_types : Array[UInt],
+  has_dynamic_offsets : Array[Bool],
+  min_binding_sizes : Array[UInt64],
+) -> GPUBindGroupLayout {
+  let builder = @wgpu.BindGroupLayoutBuilder::new(
+    max_entries=bindings.length().to_uint64(),
+  )
+  for i = 0; i < bindings.length(); i = i + 1 {
+    let ok = builder.add_buffer(
+      bindings[i],
+      @wgpu.ShaderStage::from_u64(visibilities[i]),
+      buffer_types[i],
+      has_dynamic_offset=has_dynamic_offsets[i],
+      min_binding_size=min_binding_sizes[i],
+    )
+    if !ok {
+      builder.free()
+      abort("native WebGPU: bind group layout builder failed")
+    }
+  }
+  GPUBindGroupLayout::{ raw: builder.finish(device.device.raw) }
+}
+
+///|
+/// Implements `webgpu_device_create_pipeline_layout`.
+pub fn webgpu_device_create_pipeline_layout(
+  device : WebGPUDevice,
+  bind_group_layouts : Array[GPUBindGroupLayout],
+) -> GPUPipelineLayout {
+  let layouts = bind_group_layouts.map(fn(layout) { layout.raw })
+  GPUPipelineLayout::{
+    raw: device.device.raw.create_pipeline_layout_many(layouts),
   }
 }
 

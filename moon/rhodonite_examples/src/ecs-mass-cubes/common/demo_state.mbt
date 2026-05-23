@@ -431,6 +431,9 @@ fn update_and_drain_global_transforms(
 pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   renderer : @app.Renderer
+  target : @app.RenderTargetResources
+  owns_renderer : Bool
+  owns_target : Bool
   scene : @app.Scene
   mesh : @app.MeshHandle
   instances : @app.InstanceBufferHandle
@@ -455,10 +458,11 @@ fn DemoState::handle_surface_frame(
   self : DemoState,
   frame : @app.FrameState,
 ) -> Unit {
-  if frame.surface_changed() && frame.surface_active() {
-    self.renderer.resize_surface_resources(
+  if self.owns_target && frame.surface_changed() && frame.surface_active() {
+    self.target.resize(
       frame.surface_width(),
       frame.surface_height(),
+      frame.surface_format(),
     )
   }
 }
@@ -559,12 +563,16 @@ pub fn create_engine(context : @wgpu.GPUContext) -> @app.Engine {
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
   let (device, canvas_context, format, queue) = engine.gpu_context().get()
+  ignore(device)
+  ignore(queue)
+  ignore(format)
   Some(
-    create_demo_state_for_scene(
+    create_demo_state_with_renderer(
       engine.main_scene(),
-      device,
-      queue,
-      format,
+      engine.renderer(),
+      engine.render_target_resources(),
+      owns_renderer=false,
+      owns_target=false,
       context=Some(canvas_context),
     ),
   )
@@ -582,11 +590,34 @@ pub fn create_demo_state_for_scene(
   let renderer = @app.Renderer::new(
     device,
     queue,
-    format,
-    canvas_width.reinterpret_as_int(),
-    canvas_height.reinterpret_as_int(),
     @app.cube_position3_vertex_layout(),
   )
+  let target = @app.RenderTargetResources::new(
+    device,
+    canvas_width.reinterpret_as_int(),
+    canvas_height.reinterpret_as_int(),
+    format,
+  )
+  create_demo_state_with_renderer(
+    scene,
+    renderer,
+    target,
+    owns_renderer=true,
+    owns_target=true,
+    context~,
+  )
+}
+
+///|
+/// Creates DemoState backed by caller-provided renderer and target resources.
+pub fn create_demo_state_with_renderer(
+  scene : @app.Scene,
+  renderer : @app.Renderer,
+  target : @app.RenderTargetResources,
+  owns_renderer? : Bool = false,
+  owns_target? : Bool = false,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> DemoState {
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
@@ -693,6 +724,9 @@ pub fn create_demo_state_for_scene(
   let demo_state : DemoState = {
     context,
     renderer,
+    target,
+    owns_renderer,
+    owns_target,
     scene,
     mesh,
     instances,
@@ -935,6 +969,7 @@ pub fn DemoState::render_scene(
     self.mesh,
     self.instances,
     entity_count,
+    self.target,
     color_view,
   )
   @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
@@ -982,7 +1017,12 @@ pub fn register_engine_handlers(
 ///|
 /// Implements `DemoState::release`.
 pub fn DemoState::release(self : DemoState) -> Unit {
-  self.renderer.release()
+  if self.owns_target {
+    self.target.release()
+  }
+  if self.owns_renderer {
+    self.renderer.release()
+  }
 }
 
 ///|

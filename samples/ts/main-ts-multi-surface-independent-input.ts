@@ -27,7 +27,6 @@ import {
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
-	cubePosition3VertexLayout,
 	runMultiSurfacePlatform,
 	type FrameState,
 	type SurfaceId,
@@ -58,8 +57,6 @@ type DemoState = {
 	readonly earthMaterial: MaterialHandle;
 	readonly moonMaterial: MaterialHandle;
 	readonly surfaces: SurfaceRenderState[];
-	rendererWidth: number;
-	rendererHeight: number;
 };
 
 function requireCanvas(id: string): HTMLCanvasElement {
@@ -103,15 +100,7 @@ function setYRotationTrs(
 }
 
 function createDemoStateForEngine(engine: Engine): DemoState {
-	const surface = engine.surfaceState();
-	const renderer = new Renderer(
-		engine.device,
-		engine.queue,
-		engine.format,
-		surface.width,
-		surface.height,
-		cubePosition3VertexLayout(),
-	);
+	const renderer = engine.renderer;
 	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const sunMaterial = renderer.registerUnlitMaterial(
 		UnlitMaterialDesc.new(1.0, 0.65, 0.15),
@@ -130,8 +119,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		earthMaterial,
 		moonMaterial,
 		surfaces: [],
-		rendererWidth: surface.width,
-		rendererHeight: surface.height,
 	};
 }
 
@@ -294,26 +281,18 @@ function writeScene(surface: SurfaceRenderState, frame: FrameState): void {
 	surface.world.updateGlobalTransformsFromTransforms();
 }
 
-function resizeRendererIfNeeded(demo: DemoState, frame: FrameState): void {
-	const width = Math.max(frame.surface.width, 1);
-	const height = Math.max(frame.surface.height, 1);
-	if (demo.rendererWidth === width && demo.rendererHeight === height) {
-		return;
-	}
-	demo.renderer.resizeSurfaceResources(width, height);
-	demo.rendererWidth = width;
-	demo.rendererHeight = height;
-}
-
 function renderSurface(demo: DemoState, frame: FrameState): void {
 	if (frame.surfaceId === undefined || !frame.surface.active) {
 		return;
 	}
 	const surface = ensureSurfaceState(demo, frame.surfaceId);
 	writeScene(surface, frame);
-	resizeRendererIfNeeded(demo, frame);
 	const colorView = demo.engine.surfaceGpuSurface(frame.surfaceId).acquireView();
-	demo.renderer.renderSceneRenderables(surface.scene, colorView);
+	demo.renderer.renderSceneRenderables(
+		surface.scene,
+		demo.engine.surfaceRenderTargetResources(frame.surfaceId),
+		colorView,
+	);
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {
@@ -332,9 +311,6 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 		(_engine, frame) => renderSurface(demo, frame),
 		PhaseSlot.AfterSystems,
 	);
-	engine.addPhaseHandler(Phase.Shutdown, () => {
-		demo.renderer.release();
-	});
 }
 
 async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): Promise<void> {

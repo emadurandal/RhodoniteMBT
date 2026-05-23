@@ -51,6 +51,80 @@ type RendererDrawItem = {
 	readonly materialIndex: number;
 };
 
+type RendererPipelineEntry = {
+	readonly format: GPUTextureFormat;
+	readonly pipeline: GPURenderPipeline;
+};
+
+export class RenderTargetResources {
+	private readonly device: GPUDevice;
+	private formatValue: GPUTextureFormat;
+	private width = 0;
+	private height = 0;
+	private depthTexture: GPUTexture | null = null;
+	private depthViewValue: GPUTextureView | null = null;
+
+	constructor(
+		device: GPUDevice,
+		width: number,
+		height: number,
+		format: GPUTextureFormat,
+	) {
+		this.device = device;
+		this.formatValue = format;
+		this.resize(width, height, format);
+	}
+
+	static new(
+		device: GPUDevice,
+		width: number,
+		height: number,
+		format: GPUTextureFormat,
+	): RenderTargetResources {
+		return new RenderTargetResources(device, width, height, format);
+	}
+
+	active(): boolean {
+		return this.width > 0 && this.height > 0 && this.depthViewValue !== null;
+	}
+
+	format(): GPUTextureFormat {
+		return this.formatValue;
+	}
+
+	depthView(): GPUTextureView | null {
+		return this.depthViewValue;
+	}
+
+	resize(width: number, height: number, format: GPUTextureFormat): void {
+		this.releaseDepthResources();
+		this.formatValue = format;
+		this.width = width;
+		this.height = height;
+		if (width <= 0 || height <= 0) {
+			this.width = 0;
+			this.height = 0;
+			return;
+		}
+		this.depthTexture = this.device.createTexture({
+			size: [Math.max(width, 1), Math.max(height, 1)],
+			format: "depth24plus",
+			usage: globalThis.GPUTextureUsage?.RENDER_ATTACHMENT ?? 1,
+		});
+		this.depthViewValue = this.depthTexture.createView();
+	}
+
+	release(): void {
+		this.releaseDepthResources();
+	}
+
+	private releaseDepthResources(): void {
+		this.depthTexture?.destroy();
+		this.depthTexture = null;
+		this.depthViewValue = null;
+	}
+}
+
 export class MeshHandle {
 	private readonly indexValue: number;
 
@@ -403,9 +477,11 @@ export function setRenderable(
 export class Renderer {
 	private readonly device: GPUDevice;
 	private readonly queue: GPUQueue;
-	private readonly pipeline: GPURenderPipeline;
-	private depthTexture: GPUTexture | null = null;
-	private depthView: GPUTextureView | null = null;
+	private readonly transformLayout: GPUBindGroupLayout;
+	private readonly cameraLayout: GPUBindGroupLayout;
+	private readonly pipelineLayout: GPUPipelineLayout;
+	private readonly vertexLayout: GPUVertexBufferLayout;
+	private readonly pipelineEntries: RendererPipelineEntry[] = [];
 	private readonly meshes: RendererMesh[] = [];
 	private readonly materials: RendererMaterial[] = [];
 	private readonly instanceBuffers: RendererInstanceBuffer[] = [];
@@ -421,45 +497,24 @@ export class Renderer {
 	constructor(
 		device: GPUDevice,
 		queue: GPUQueue,
-		format: GPUTextureFormat,
-		width: number,
-		height: number,
 		vertexLayout: GPUVertexBufferLayout,
 	) {
 		this.device = device;
 		this.queue = queue;
-		this.pipeline = createRenderableUnlitPipeline(
-			device,
-			format,
-			vertexLayout,
-		);
-		this.resizeSurfaceResources(width, height);
+		this.vertexLayout = vertexLayout;
+		this.transformLayout = createRendererStorageBindGroupLayout(device);
+		this.cameraLayout = createRendererStorageBindGroupLayout(device);
+		this.pipelineLayout = device.createPipelineLayout({
+			bindGroupLayouts: [this.transformLayout, this.cameraLayout],
+		});
 	}
 
 	static new(
 		device: GPUDevice,
 		queue: GPUQueue,
-		format: GPUTextureFormat,
-		width: number,
-		height: number,
 		vertexLayout: GPUVertexBufferLayout,
 	): Renderer {
-		return new Renderer(device, queue, format, width, height, vertexLayout);
-	}
-
-	resizeSurfaceResources(width: number, height: number): void {
-		this.depthTexture?.destroy();
-		this.depthTexture = null;
-		this.depthView = null;
-		if (width <= 0 || height <= 0) {
-			return;
-		}
-		this.depthTexture = this.device.createTexture({
-			size: [Math.max(width, 1), Math.max(height, 1)],
-			format: "depth24plus",
-			usage: GPUTextureUsage.RENDER_ATTACHMENT,
-		});
-		this.depthView = this.depthTexture.createView();
+		return new Renderer(device, queue, vertexLayout);
 	}
 
 	registerStaticIndexedMesh(
@@ -574,11 +629,14 @@ export class Renderer {
 
 	renderSceneRenderables(
 		scene: Scene<World, EntityId>,
+		target: RenderTargetResources,
 		colorView: GPUTextureView,
 	): void {
-		if (this.depthView === null) {
+		const depthView = target.depthView();
+		if (depthView === null) {
 			return;
 		}
+		const pipeline = this.pipelineForFormat(target.format());
 		const world = scene.world();
 		this.ensureSceneBuffers(world);
 		const items = this.extractDrawItems(world, sceneRenderableComponent(scene));
@@ -605,13 +663,13 @@ export class Renderer {
 				},
 			],
 			depthStencilAttachment: {
-				view: this.depthView,
+				view: depthView,
 				depthClearValue: 1,
 				depthLoadOp: "clear",
 				depthStoreOp: "store",
 			},
 		});
-		pass.setPipeline(this.pipeline);
+		pass.setPipeline(pipeline);
 		if (this.bindTransforms !== null) {
 			pass.setBindGroup(0, this.bindTransforms);
 		}
@@ -636,13 +694,15 @@ export class Renderer {
 		mesh: MeshHandle,
 		instances: InstanceBufferHandle,
 		instanceCount: number,
+		target: RenderTargetResources,
 		colorView: GPUTextureView,
 	): void {
 		const meshEntry = this.meshes[mesh.index()];
 		const instanceEntry = this.instanceBuffers[instances.index()];
 		const instanceByteLength = instanceCount * RENDERER_INSTANCE_STRIDE;
+		const depthView = target.depthView();
 		if (
-			this.depthView === null ||
+			depthView === null ||
 			instanceCount <= 0 ||
 			meshEntry === undefined ||
 			instanceEntry === undefined ||
@@ -662,20 +722,28 @@ export class Renderer {
 		if (this.cameraStorage !== null) {
 			drainAndUploadCameraWrites(this.queue, this.cameraStorage, world);
 		}
-		this.drawInstancedMesh(meshEntry, instanceEntry, instanceCount, colorView);
+		this.drawInstancedMesh(
+			meshEntry,
+			instanceEntry,
+			instanceCount,
+			target,
+			colorView,
+		);
 	}
 
 	renderPreparedInstancedMesh(
 		mesh: MeshHandle,
 		instances: InstanceBufferHandle,
 		instanceCount: number,
+		target: RenderTargetResources,
 		colorView: GPUTextureView,
 	): void {
 		const meshEntry = this.meshes[mesh.index()];
 		const instanceEntry = this.instanceBuffers[instances.index()];
 		const instanceByteLength = instanceCount * RENDERER_INSTANCE_STRIDE;
+		const depthView = target.depthView();
 		if (
-			this.depthView === null ||
+			depthView === null ||
 			instanceCount <= 0 ||
 			meshEntry === undefined ||
 			instanceEntry === undefined ||
@@ -683,7 +751,13 @@ export class Renderer {
 		) {
 			return;
 		}
-		this.drawInstancedMesh(meshEntry, instanceEntry, instanceCount, colorView);
+		this.drawInstancedMesh(
+			meshEntry,
+			instanceEntry,
+			instanceCount,
+			target,
+			colorView,
+		);
 	}
 
 	release(): void {
@@ -697,12 +771,9 @@ export class Renderer {
 		this.transformStorage?.destroy();
 		this.cameraStorage?.destroy();
 		this.renderableInstanceBuffer?.destroy();
-		this.depthTexture?.destroy();
 		this.transformStorage = null;
 		this.cameraStorage = null;
 		this.renderableInstanceBuffer = null;
-		this.depthTexture = null;
-		this.depthView = null;
 	}
 
 	private ensureSceneBuffers(world: World): void {
@@ -728,7 +799,7 @@ export class Renderer {
 			this.transformWordCapacity = transformCapacity;
 			this.bindTransforms = globalTransformWordsBindGroup(
 				this.device,
-				this.pipeline,
+				this.transformLayout,
 				this.transformStorage,
 			);
 		}
@@ -738,7 +809,7 @@ export class Renderer {
 			this.cameraWordCapacity = cameraCapacity;
 			this.bindCamera = cameraWordsBindGroup(
 				this.device,
-				this.pipeline,
+				this.cameraLayout,
 				this.cameraStorage,
 			);
 		}
@@ -748,11 +819,14 @@ export class Renderer {
 		meshEntry: RendererMesh,
 		instanceEntry: RendererInstanceBuffer,
 		instanceCount: number,
+		target: RenderTargetResources,
 		colorView: GPUTextureView,
 	): void {
-		if (this.depthView === null) {
+		const depthView = target.depthView();
+		if (depthView === null) {
 			return;
 		}
+		const pipeline = this.pipelineForFormat(target.format());
 		const instanceByteLength = instanceCount * RENDERER_INSTANCE_STRIDE;
 		const encoder = this.device.createCommandEncoder();
 		const pass = encoder.beginRenderPass({
@@ -765,13 +839,13 @@ export class Renderer {
 				},
 			],
 			depthStencilAttachment: {
-				view: this.depthView,
+				view: depthView,
 				depthClearValue: 1,
 				depthLoadOp: "clear",
 				depthStoreOp: "store",
 			},
 		});
-		pass.setPipeline(this.pipeline);
+		pass.setPipeline(pipeline);
 		if (this.bindTransforms !== null) {
 			pass.setBindGroup(0, this.bindTransforms);
 		}
@@ -856,6 +930,21 @@ export class Renderer {
 		}
 		return this.renderableInstanceBuffer;
 	}
+
+	private pipelineForFormat(format: GPUTextureFormat): GPURenderPipeline {
+		const existing = this.pipelineEntries.find((entry) => entry.format === format);
+		if (existing !== undefined) {
+			return existing.pipeline;
+		}
+		const pipeline = createRenderableUnlitPipeline(
+			this.device,
+			this.pipelineLayout,
+			format,
+			this.vertexLayout,
+		);
+		this.pipelineEntries.push({ format, pipeline });
+		return pipeline;
+	}
 }
 
 function cubeLocalCorners(): [number, number, number][] {
@@ -873,12 +962,13 @@ function cubeLocalCorners(): [number, number, number][] {
 
 function createRenderableUnlitPipeline(
 	device: GPUDevice,
+	pipelineLayout: GPUPipelineLayout,
 	format: GPUTextureFormat,
 	vertexLayout: GPUVertexBufferLayout,
 ): GPURenderPipeline {
 	const shader = device.createShaderModule({ code: renderableUnlitWgsl() });
 	return device.createRenderPipeline({
-		layout: "auto",
+		layout: pipelineLayout,
 		vertex: {
 			module: shader,
 			entryPoint: "vertexMain",
@@ -895,6 +985,20 @@ function createRenderableUnlitPipeline(
 			depthWriteEnabled: true,
 			depthCompare: "less",
 		},
+	});
+}
+
+function createRendererStorageBindGroupLayout(
+	device: GPUDevice,
+): GPUBindGroupLayout {
+	return device.createBindGroupLayout({
+		entries: [
+			{
+				binding: 0,
+				visibility: globalThis.GPUShaderStage?.VERTEX ?? 1,
+				buffer: { type: "read-only-storage" },
+			},
+		],
 	});
 }
 

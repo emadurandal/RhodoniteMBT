@@ -37,19 +37,23 @@ flowchart TB
   E --> S[Scene list]
   SF --> SI[surface-local InputState]
   SF --> SS[SurfaceState]
+  SF --> RT[RenderTargetResources]
   S --> W[World]
   S --> SR[SystemRunner]
-  R[Renderer] --> GPU[GPU resources]
+  E --> R[Renderer]
+  R[Renderer] --> GPU[device-wide GPU resources]
+  RT --> TG[surface-sized target resources]
   R --> S
   W --> ECS[ECS data and builtin blobs]
           </div>
           <table>
             <thead><tr><th>Type</th><th>Responsibility</th></tr></thead>
             <tbody>
-              <tr><td><code>Engine</code></td><td>Owns GPU context, scenes, surfaces, time, input, phase groups, and on-demand render state.</td></tr>
+              <tr><td><code>Engine</code></td><td>Owns GPU context, the standard renderer, render target resources, scenes, surfaces, time, input, phase groups, and on-demand render state.</td></tr>
               <tr><td><code>Scene</code></td><td>Runtime scene with one <code>World</code>, one <code>SystemRunner</code>, a main camera, and enabled/visible flags.</td></tr>
               <tr><td><code>World</code></td><td>ECS storage only; it does not own engine lifecycle or GPU resources.</td></tr>
-              <tr><td><code>Renderer</code></td><td>Owns GPU resources, mesh/material/instance tables, scene renderable extraction, and draw calls.</td></tr>
+              <tr><td><code>Renderer</code></td><td>Owns device-wide GPU resources, explicit pipeline layouts, format-keyed pipelines, mesh/material/instance tables, scene renderable extraction, and draw calls.</td></tr>
+              <tr><td><code>RenderTargetResources</code></td><td>Owns surface-local render target state such as color format, extent, and depth attachments.</td></tr>
               <tr><td><code>FrameState</code></td><td>Passes delta, frame index, elapsed time, surface snapshot, and optional surface input to phases and systems.</td></tr>
             </tbody>
           </table>
@@ -82,16 +86,16 @@ flowchart TD
           </ul>
 
           <h2>Surface Model</h2>
-          <p>Single-surface code updates the current snapshot through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input.</p>
+          <p>Single-surface code updates the current snapshot and render target resources through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input and render target resources.</p>
 
           <h2>Renderer v1</h2>
-          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes.</p>
+          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes into caller-supplied <code>RenderTargetResources</code>.</p>
           <ul>
             <li>handles: <code>MeshHandle</code>, <code>MaterialHandle</code>, <code>InstanceBufferHandle</code></li>
             <li>components: <code>RenderableDesc</code> and <code>RenderableFlags</code>; the Renderable component id is registered and owned internally by <code>Scene</code></li>
             <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>, <code>CubeMeshDesc</code>, <code>cube_mesh_desc</code></li>
             <li>resources: <code>register_static_indexed_mesh_desc</code>, <code>register_cube_mesh</code>, <code>register_unlit_material</code>, <code>register_static_instance_buffer</code></li>
-            <li>draw paths: <code>render_scene_renderables</code> and <code>render_instanced_mesh</code> for MassCubes</li>
+            <li>draw paths: <code>render_scene_renderables(scene, target, view)</code> and <code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code> for MassCubes</li>
           </ul>
           <p>Textures, skinning, transparent sorting, shadows, and LOD are not v1 renderer responsibilities yet.</p>
 

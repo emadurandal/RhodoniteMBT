@@ -84,7 +84,7 @@ pub(all) struct VertexBufferLayoutFFI {
 }
 
 ///|
-extern "js" fn device_createRenderPipeline(
+extern "js" fn device_createRenderPipelineAuto(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
@@ -93,7 +93,28 @@ extern "js" fn device_createRenderPipeline(
   vertexBuffers : Array[VertexBufferLayoutFFI],
   depthStencilFormat : String,
 ) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) => {
+  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
+  #|   __moonbit_rhodonite_create_render_pipeline(device, 'auto', vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+
+///|
+extern "js" fn device_createRenderPipelineWithLayout(
+  device : GPUDevice,
+  layout : GPUPipelineLayout,
+  vertex : GPUShaderModule,
+  fragment : GPUShaderModule,
+  topologyTag : Int,
+  formats : Array[String],
+  vertexBuffers : Array[VertexBufferLayoutFFI],
+  depthStencilFormat : String,
+) -> GPURenderPipeline =
+  #| (device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
+  #|   __moonbit_rhodonite_create_render_pipeline(device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+
+///|
+extern "js" fn installRenderPipelineHelper() -> Unit =
+  #| () => {
+  #| if (!globalThis.__moonbit_rhodonite_create_render_pipeline) {
+  #| globalThis.__moonbit_rhodonite_create_render_pipeline = (device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) => {
   #|   const TOPOLOGY_NAMES = [
   #|     'point-list', 'line-list', 'line-strip', 'triangle-list', 'triangle-strip',
   #|   ];
@@ -109,7 +130,7 @@ extern "js" fn device_createRenderPipeline(
   #|     })),
   #|   }));
   #|   const desc = {
-  #|     layout: 'auto',
+  #|     layout: layout ?? 'auto',
   #|     vertex: {
   #|       module: vertex,
   #|       entryPoint: 'vertexMain',
@@ -132,7 +153,41 @@ extern "js" fn device_createRenderPipeline(
   #|     };
   #|   }
   #|   return device.createRenderPipeline(desc);
+  #| };
   #| }
+  #| }
+
+///|
+extern "js" fn device_createBindGroupLayout(
+  device : GPUDevice,
+  bindings : Array[UInt],
+  visibilities : Array[UInt64],
+  bufferTypes : Array[UInt],
+  hasDynamicOffsets : Array[Bool],
+  minBindingSizes : Array[UInt64],
+) -> GPUBindGroupLayout =
+  #| (device, bindings, visibilities, bufferTypes, hasDynamicOffsets, minBindingSizes) => device.createBindGroupLayout({
+  #|   entries: bindings.map((binding, i) => ({
+  #|     binding,
+  #|     visibility: Number(visibilities[i]),
+  #|     buffer: {
+  #|       type: bufferTypes[i] === 4 ? 'read-only-storage'
+  #|         : bufferTypes[i] === 3 ? 'storage'
+  #|         : 'uniform',
+  #|       hasDynamicOffset: hasDynamicOffsets[i],
+  #|       minBindingSize: Number(minBindingSizes[i]),
+  #|     },
+  #|   })),
+  #| })
+
+///|
+extern "js" fn device_createPipelineLayout(
+  device : GPUDevice,
+  bindGroupLayouts : Array[GPUBindGroupLayout],
+) -> GPUPipelineLayout =
+  #| (device, bindGroupLayouts) => device.createPipelineLayout({
+  #|   bindGroupLayouts,
+  #| })
 
 ///|
 extern "js" fn device_createTexture(

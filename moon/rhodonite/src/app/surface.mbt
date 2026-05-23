@@ -8,6 +8,7 @@ pub(all) struct EngineSurface {
   gpu_surface : @wgpu.GPUSurface
   mut scene : Scene
   input_state : @input.InputState
+  render_target_resources : RenderTargetResources
   mut state : SurfaceState
   mut changed : Bool
 }
@@ -17,14 +18,27 @@ pub(all) struct EngineSurface {
 fn EngineSurface::new(
   id : SurfaceId,
   gpu_surface : @wgpu.GPUSurface,
+  device : @wgpu.GPUDevice,
   scene : Scene,
 ) -> EngineSurface {
+  let state = surface_state_from_gpu_surface(gpu_surface)
+  let render_target_resources = if state.active() {
+    RenderTargetResources::new(
+      device,
+      state.width(),
+      state.height(),
+      state.format(),
+    )
+  } else {
+    RenderTargetResources::new(device, 0, 0, "")
+  }
   {
     id,
     gpu_surface,
     scene,
     input_state: @input.InputState::new(),
-    state: surface_state_from_gpu_surface(gpu_surface),
+    render_target_resources,
+    state,
     changed: true,
   }
 }
@@ -54,6 +68,14 @@ pub fn EngineSurface::input(self : EngineSurface) -> @input.InputState {
 }
 
 ///|
+/// Returns surface-local render target resources.
+pub fn EngineSurface::render_target_resources(
+  self : EngineSurface,
+) -> RenderTargetResources {
+  self.render_target_resources
+}
+
+///|
 /// Returns the latest surface state snapshot.
 pub fn EngineSurface::state(self : EngineSurface) -> SurfaceState {
   self.state
@@ -71,6 +93,15 @@ fn EngineSurface::sync_from_gpu_surface(self : EngineSurface) -> Unit {
   let next = surface_state_from_gpu_surface(self.gpu_surface)
   if self.state != next {
     self.state = next
+    if next.active() {
+      self.render_target_resources.resize(
+        next.width(),
+        next.height(),
+        next.format(),
+      )
+    } else {
+      self.render_target_resources.resize(0, 0, "")
+    }
     self.changed = true
   }
 }
@@ -81,6 +112,12 @@ fn EngineSurface::consume_changed(self : EngineSurface) -> Bool {
   let changed = self.changed
   self.changed = false
   changed
+}
+
+///|
+/// Releases surface-local render target resources.
+fn EngineSurface::release(self : EngineSurface) -> Unit {
+  self.render_target_resources.release()
 }
 
 ///|
@@ -116,7 +153,8 @@ pub fn Engine::add_surface_for_scene(
 ) -> SurfaceId {
   let id = SurfaceId::new(self.next_surface_id)
   self.next_surface_id = self.next_surface_id + 1
-  self.surfaces.push(EngineSurface::new(id, surface, scene))
+  let (device, _canvas_context, _format, _queue) = self.gpu_context().get()
+  self.surfaces.push(EngineSurface::new(id, surface, device, scene))
   self.request_render("surface")
   id
 }
@@ -171,6 +209,7 @@ pub fn Engine::set_surface_scene(
 pub fn Engine::remove_surface(self : Engine, id : SurfaceId) -> Unit {
   match self.find_surface_index(id) {
     Some(index) => {
+      self.surfaces[index].release()
       ignore(self.surfaces.remove(index))
       self.request_render("surface")
     }

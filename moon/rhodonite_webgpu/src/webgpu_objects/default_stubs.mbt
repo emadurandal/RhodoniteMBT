@@ -70,6 +70,10 @@ pub type GPUBindGroupEntry
 pub type GPUBindGroupLayout
 
 ///|
+/// Default fallback type for browser GPU pipeline layouts.
+pub type GPUPipelineLayout
+
+///|
 /// Default fallback type for browser GPU bind groups.
 pub type GPUBindGroup
 
@@ -404,6 +408,7 @@ pub fn webgpu_device_create_shader_module(
 /// Creates a render pipeline in real JS/native builds.
 pub fn webgpu_device_create_render_pipeline(
   _device : WebGPUDevice,
+  _layout : GPUPipelineLayout?,
   _vertex : GPUShaderModule,
   _fragment : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
@@ -424,6 +429,28 @@ pub fn webgpu_render_pipeline_get_bind_group_layout(
   _pipeline : GPURenderPipeline,
   _index : UInt,
 ) -> GPUBindGroupLayout {
+  unavailable()
+}
+
+///|
+/// Creates a bind group layout in real JS/native builds.
+pub fn webgpu_device_create_bind_group_layout(
+  _device : WebGPUDevice,
+  _bindings : Array[UInt],
+  _visibilities : Array[UInt64],
+  _buffer_types : Array[UInt],
+  _has_dynamic_offsets : Array[Bool],
+  _min_binding_sizes : Array[UInt64],
+) -> GPUBindGroupLayout {
+  unavailable()
+}
+
+///|
+/// Creates a pipeline layout in real JS/native builds.
+pub fn webgpu_device_create_pipeline_layout(
+  _device : WebGPUDevice,
+  _bind_group_layouts : Array[GPUBindGroupLayout],
+) -> GPUPipelineLayout {
   unavailable()
 }
 
@@ -737,6 +764,12 @@ pub fn shaderModule_release(_shader : GPUShaderModule) -> Unit {
 ///|
 /// Releases a render pipeline in real native builds.
 pub fn renderPipeline_release(_pipeline : GPURenderPipeline) -> Unit {
+  unavailable()
+}
+
+///|
+/// Releases a pipeline layout in real native builds.
+pub fn pipelineLayout_release(_layout : GPUPipelineLayout) -> Unit {
   unavailable()
 }
 

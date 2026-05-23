@@ -95,6 +95,12 @@ pub struct GPUBindGroupLayout {
 }
 
 ///|
+/// Defines `GPUPipelineLayout`.
+pub struct GPUPipelineLayout {
+  raw : @wgpu.PipelineLayout
+}
+
+///|
 /// Defines `GPUBindGroup`.
 pub struct GPUBindGroup {
   raw : @wgpu.BindGroup

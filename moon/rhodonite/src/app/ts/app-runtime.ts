@@ -3,6 +3,11 @@
 
 import { requestLargeStorageBufferDevice } from "./webgpu-device-limits.ts";
 import {
+	Renderer,
+	RenderTargetResources,
+	cubePosition3VertexLayout,
+} from "./renderer.ts";
+import {
 	syncOrbitCameraBlobComponent,
 	syncOrbitCameraTransformComponent,
 	updateOrbitCameraControllerComponentFromMouseFrame,
@@ -1492,6 +1497,7 @@ type EngineSurface = {
 	readonly id: SurfaceId;
 	readonly gpuSurface: GpuSurface;
 	readonly input: InputState;
+	readonly renderTargetResources: RenderTargetResources;
 	scene: RuntimeScene;
 	changed: boolean;
 };
@@ -1504,6 +1510,8 @@ export class Engine {
 	readonly context: GPUCanvasContext;
 	readonly format: GPUTextureFormat;
 	readonly input: InputState;
+	readonly renderer: Renderer;
+	readonly renderTargetResources: RenderTargetResources;
 	private readonly scenes: RuntimeScene[];
 	private readonly surfaces: EngineSurface[] = [];
 	private readonly timeState: TimeState;
@@ -1535,6 +1543,7 @@ export class Engine {
 		this.context = context;
 		this.format = format;
 		this.input = new InputState();
+		this.renderer = new Renderer(device, this.queue, cubePosition3VertexLayout());
 		this.scenes = [mainScene];
 		this.timeState = new TimeState();
 		this.phaseGroupsValue = defaultPhaseGroups();
@@ -1543,6 +1552,12 @@ export class Engine {
 			Math.max(canvas.height, 1),
 			format,
 			0,
+		);
+		this.renderTargetResources = new RenderTargetResources(
+			device,
+			this.surfaceStateValue.width,
+			this.surfaceStateValue.height,
+			format,
 		);
 	}
 
@@ -1596,6 +1611,12 @@ export class Engine {
 			id,
 			gpuSurface,
 			input: new InputState(),
+			renderTargetResources: new RenderTargetResources(
+					this.device,
+					gpuSurface.state().width,
+					gpuSurface.state().height,
+					gpuSurface.state().format as GPUTextureFormat,
+				),
 			scene: options.scene ?? this.scenes[this.mainSceneIndex],
 			changed: true,
 		});
@@ -1608,6 +1629,7 @@ export class Engine {
 		if (index < 0) {
 			return;
 		}
+		this.surfaces[index]!.renderTargetResources.release();
 		this.surfaces.splice(index, 1);
 		this.requestRender("surface");
 	}
@@ -1618,6 +1640,10 @@ export class Engine {
 
 	surfaceGpuSurface(surfaceId: SurfaceId): GpuSurface {
 		return this.requireSurface(surfaceId).gpuSurface;
+	}
+
+	surfaceRenderTargetResources(surfaceId: SurfaceId): RenderTargetResources {
+		return this.requireSurface(surfaceId).renderTargetResources;
 	}
 
 	surfaceCount(): number {
@@ -1706,6 +1732,7 @@ export class Engine {
 			format,
 			this.surfaceStateValue.generation + 1,
 		);
+		this.renderTargetResources.resize(width, height, format as GPUTextureFormat);
 		this.surfaceChangedValue = true;
 		this.requestRender("surface");
 	}
@@ -1717,6 +1744,7 @@ export class Engine {
 		this.surfaceStateValue = SurfaceState.suspended(
 			this.surfaceStateValue.generation + 1,
 		);
+		this.renderTargetResources.resize(0, 0, this.format);
 		this.surfaceChangedValue = true;
 		this.requestRender("surface");
 	}
@@ -1846,6 +1874,11 @@ export class Engine {
 	shutdown(): void {
 		this.ensureInitialized("Engine.shutdown");
 		this.runPhase(Phase.Shutdown, new FrameState(0, 0, 0));
+		for (const surface of this.surfaces) {
+			surface.renderTargetResources.release();
+		}
+		this.renderTargetResources.release();
+		this.renderer.release();
 	}
 
 	phaseGroupOrder(group: PhaseGroupKey): PhaseKey[] {
@@ -1959,7 +1992,16 @@ export class Engine {
 		this.input.beginFrame();
 		const baseFrame = this.timeState.nextRenderFrame(elapsedSeconds);
 		for (const surface of this.surfaces) {
-			surface.changed = surface.gpuSurface.syncFromCanvas() || surface.changed;
+			const canvasChanged = surface.gpuSurface.syncFromCanvas();
+			if (canvasChanged) {
+				const state = surface.gpuSurface.state();
+				surface.renderTargetResources.resize(
+					state.width,
+					state.height,
+					state.format as GPUTextureFormat,
+				);
+			}
+			surface.changed = canvasChanged || surface.changed;
 			surface.input.beginFrame();
 			const changed = surface.changed;
 			const frame = baseFrame.withSurfaceView(

@@ -20,10 +20,10 @@ import {
 	PlatformOptions,
 	RenderableDesc,
 	Renderer,
+	RenderTargetResources,
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
-	cubePosition3VertexLayout,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
 	type FrameState,
@@ -45,11 +45,10 @@ type DemoObjects = {
 type DemoState = {
 	readonly engine: Engine;
 	readonly renderer: Renderer;
+	readonly target: RenderTargetResources;
 	readonly scene: Scene<World, EntityId>;
 	readonly world: World;
 	readonly objects: DemoObjects;
-	rendererWidth: number;
-	rendererHeight: number;
 };
 
 function identity(): Float32Array {
@@ -169,14 +168,7 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	}
 	scene.setMainCamera(camera);
 
-	const renderer = new Renderer(
-		engine.device,
-		engine.queue,
-		engine.format,
-		CANVAS_WIDTH,
-		CANVAS_HEIGHT,
-		cubePosition3VertexLayout(),
-	);
+	const renderer = engine.renderer;
 	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const sunMaterial = renderer.registerUnlitMaterial(
 		UnlitMaterialDesc.new(1.0, 0.65, 0.15),
@@ -205,11 +197,10 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	return {
 		engine,
 		renderer,
+		target: engine.renderTargetResources,
 		scene,
 		world,
 		objects,
-		rendererWidth: CANVAS_WIDTH,
-		rendererHeight: CANVAS_HEIGHT,
 	};
 }
 
@@ -217,28 +208,12 @@ function updateScene(demo: DemoState, frame: FrameState): void {
 	pushLocalTransforms(demo.world, demo.objects, frame.elapsedSeconds);
 }
 
-function resizeRendererIfNeeded(demo: DemoState, frame: FrameState): void {
-	const width = Math.max(frame.surface.width, 1);
-	const height = Math.max(frame.surface.height, 1);
-	if (demo.rendererWidth === width && demo.rendererHeight === height) {
-		return;
-	}
-	demo.renderer.resizeSurfaceResources(width, height);
-	demo.rendererWidth = width;
-	demo.rendererHeight = height;
-}
-
 function renderCurrentFrame(demo: DemoState): void {
 	const colorView = demo.engine.context.getCurrentTexture().createView();
-	demo.renderer.renderSceneRenderables(demo.scene, colorView);
+	demo.renderer.renderSceneRenderables(demo.scene, demo.target, colorView);
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {
-	engine.addPhaseHandler(Phase.Surface, (_engine, frame) => {
-		if (frame.surfaceChanged && frame.surface.active) {
-			resizeRendererIfNeeded(demo, frame);
-		}
-	});
 	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
 		updateScene(demo, frame);
 	});
@@ -251,7 +226,6 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 		},
 		PhaseSlot.AfterSystems,
 	);
-	engine.addPhaseHandler(Phase.Shutdown, () => demo.renderer.release());
 }
 
 export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array> {

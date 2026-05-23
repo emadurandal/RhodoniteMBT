@@ -42,6 +42,34 @@ pub(all) struct GPUBindGroupLayout {
 }
 
 ///|
+/// Defines `GPUPipelineLayout`.
+pub(all) struct GPUPipelineLayout {
+  raw : @raw.GPUPipelineLayout
+}
+
+///|
+/// Describes one buffer binding in a bind group layout.
+pub(all) struct GPUBufferBindGroupLayoutEntry {
+  binding : UInt
+  visibility : UInt64
+  buffer_type : UInt
+  has_dynamic_offset : Bool
+  min_binding_size : UInt64
+}
+
+///|
+/// WebGPU `GPUBindGroupLayoutDescriptor`.
+pub(all) struct GPUBindGroupLayoutDescriptor {
+  buffer_entries : Array[GPUBufferBindGroupLayoutEntry]
+}
+
+///|
+/// WebGPU `GPUPipelineLayoutDescriptor`.
+pub(all) struct GPUPipelineLayoutDescriptor {
+  bind_group_layouts : Array[GPUBindGroupLayout]
+}
+
+///|
 /// Defines `GPUBindGroup`.
 pub(all) struct GPUBindGroup {
   raw : @raw.GPUBindGroup
@@ -154,6 +182,7 @@ pub(all) struct GPUCanvasContext {
 ///|
 /// Defines `GPURenderPipelineDescriptor`.
 pub(all) struct GPURenderPipelineDescriptor {
+  layout : GPUPipelineLayout?
   vertex : GPUShaderModule
   fragment : GPUShaderModule
   topology : GPUPrimitiveTopology

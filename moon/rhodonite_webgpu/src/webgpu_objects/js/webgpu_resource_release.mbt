@@ -14,6 +14,12 @@ pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
 }
 
 ///|
+/// Implements `pipelineLayout_release`.
+pub fn pipelineLayout_release(layout : GPUPipelineLayout) -> Unit {
+  ignore(layout)
+}
+
+///|
 /// Implements `bindGroupLayout_release`.
 pub fn bindGroupLayout_release(layout : GPUBindGroupLayout) -> Unit {
   ignore(layout)

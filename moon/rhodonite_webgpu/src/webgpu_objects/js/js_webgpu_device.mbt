@@ -59,6 +59,7 @@ pub fn webgpu_device_create_shader_module(
 /// Implements `webgpu_device_create_render_pipeline`.
 pub fn webgpu_device_create_render_pipeline(
   device : WebGPUDevice,
+  layout : GPUPipelineLayout?,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
   topology~ : @webgpu_enums.GPUPrimitiveTopology,
@@ -67,15 +68,59 @@ pub fn webgpu_device_create_render_pipeline(
   depth_stencil_format~ : String,
 ) -> GPURenderPipeline {
   let vffi = vertex_buffers.map(fn(lb) { vertex_layout_to_ffi(lb) })
-  device_createRenderPipeline(
+  installRenderPipelineHelper()
+  match layout {
+    Some(layout) =>
+      device_createRenderPipelineWithLayout(
+        device.device,
+        layout,
+        vertex,
+        fragment,
+        topology.to_js_tag(),
+        formats,
+        vffi,
+        depth_stencil_format,
+      )
+    None =>
+      device_createRenderPipelineAuto(
+        device.device,
+        vertex,
+        fragment,
+        topology.to_js_tag(),
+        formats,
+        vffi,
+        depth_stencil_format,
+      )
+  }
+}
+
+///|
+/// Implements `webgpu_device_create_bind_group_layout`.
+pub fn webgpu_device_create_bind_group_layout(
+  device : WebGPUDevice,
+  bindings : Array[UInt],
+  visibilities : Array[UInt64],
+  buffer_types : Array[UInt],
+  has_dynamic_offsets : Array[Bool],
+  min_binding_sizes : Array[UInt64],
+) -> GPUBindGroupLayout {
+  device_createBindGroupLayout(
     device.device,
-    vertex,
-    fragment,
-    topology.to_js_tag(),
-    formats,
-    vffi,
-    depth_stencil_format,
+    bindings,
+    visibilities,
+    buffer_types,
+    has_dynamic_offsets,
+    min_binding_sizes,
   )
+}
+
+///|
+/// Implements `webgpu_device_create_pipeline_layout`.
+pub fn webgpu_device_create_pipeline_layout(
+  device : WebGPUDevice,
+  bind_group_layouts : Array[GPUBindGroupLayout],
+) -> GPUPipelineLayout {
+  device_createPipelineLayout(device.device, bind_group_layouts)
 }
 
 ///|

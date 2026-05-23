@@ -28,6 +28,7 @@ import {
 	Phase,
 	PhaseSlot,
 	Renderer,
+	RenderTargetResources,
 	Scene,
 	PlatformConfig,
 	PlatformApp,
@@ -64,6 +65,7 @@ type DemoState = {
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
 	readonly renderer: Renderer;
+	readonly target: RenderTargetResources;
 	readonly cubeMesh: MeshHandle;
 	readonly instanceBuffer: InstanceBufferHandle;
 	readonly scene: Scene<World, EntityId>;
@@ -366,10 +368,13 @@ function createDemoStateForEngine(
 	const renderer = new Renderer(
 		device,
 		queue,
-		targetFormat,
+		cubePosition3VertexLayout(),
+	);
+	const target = new RenderTargetResources(
+		device,
 		MASS_CUBES_CANVAS_WIDTH,
 		MASS_CUBES_CANVAS_HEIGHT,
-		cubePosition3VertexLayout(),
+		targetFormat,
 	);
 	const cubeMesh = renderer.registerCubeMesh(CubeMeshDesc.new(0.42));
 	const instanceBuffer = renderer.registerStaticInstanceBuffer(instanceData);
@@ -380,6 +385,7 @@ function createDemoStateForEngine(
 		device,
 		queue,
 		renderer,
+		target,
 		cubeMesh,
 		instanceBuffer,
 		scene,
@@ -461,11 +467,13 @@ function renderScene(
 		demoState.cubeMesh,
 		demoState.instanceBuffer,
 		MASS_CUBES_ENTITY_COUNT,
+		demoState.target,
 		colorView,
 	);
 }
 
 function releaseDemoState(demoState: DemoState): void {
+	demoState.target.release();
 	demoState.renderer.release();
 }
 
