@@ -5,12 +5,7 @@ import "./style.css";
 import {
 	World,
 	createOrbitOrthographicCameraDescFromYzPosition,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
 	setupOrbitOrthographicCamera,
-	syncOrbitCameraBlobComponent,
-	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -34,7 +29,6 @@ import {
 	registerRenderableComponent,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
-	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 } from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
@@ -161,9 +155,9 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	const world = World.new();
 	scene.setWorld(world);
 
-	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
-	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
-	const cameraLensComponent = registerCameraLensComponent(world);
+	const orbitControllerComponent = world.orbitCameraControllerComponent();
+	const cameraHomeComponent = world.cameraHomeTransformComponent();
+	const cameraLensComponent = world.cameraLensComponent();
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 
@@ -188,16 +182,7 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.useCommonRuntime(
-		{
-			orbitControllerComponent,
-			homeComponent: cameraHomeComponent,
-			updateOrbitCameraControllerFromInput:
-				updateOrbitCameraControllerComponentFromInput,
-			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-		},
-		{ transformPropagation: true },
-	);
+	scene.useCommonRuntime({ transformPropagation: true });
 
 	const renderer = new Renderer(
 		engine.device,
@@ -230,17 +215,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	}
 
 	pushLocalTransforms(world, objects, 0);
-	scene.setSchedule(
-		(systemWorld) => {
-			syncOrbitCameraBlobComponent(
-				systemWorld,
-				camera,
-				orbitControllerComponent,
-				cameraLensComponent,
-			);
-		},
-		Phase.RenderExtract,
-	);
 	scene.prepareRenderState();
 
 	return {

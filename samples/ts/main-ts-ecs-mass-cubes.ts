@@ -10,11 +10,7 @@ import {
 	writeGlobalTransformBlobRangeByRefs,
 	mat4Inverse,
 	readOrbitCameraControllerComponent,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
 	setupOrbitOrthographicCamera,
-	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
 	type GlobalTransformBlobWriter,
@@ -39,7 +35,6 @@ import {
 	cubePosition3VertexLayout,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
-	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 } from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
@@ -338,9 +333,9 @@ function createDemoStateForEngine(
 		MASS_CUBES_ENTITY_COUNT,
 		denseTransformLayout,
 	);
-	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
-	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
-	const cameraLensComponent = registerCameraLensComponent(world);
+	const orbitControllerComponent = world.orbitCameraControllerComponent();
+	const cameraHomeComponent = world.cameraHomeTransformComponent();
+	const cameraLensComponent = world.cameraLensComponent();
 	const camera = world.createEntity();
 	if (
 		!setupOrbitOrthographicCamera(
@@ -365,16 +360,10 @@ function createDemoStateForEngine(
 	) {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
-	scene.useCommonRuntime(
-		{
-			orbitControllerComponent,
-			homeComponent: cameraHomeComponent,
-			updateOrbitCameraControllerFromInput:
-				updateOrbitCameraControllerComponentFromInput,
-			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-		},
-		{ transformPropagation: false },
-	);
+	scene.useCommonRuntime({
+		transformPropagation: false,
+		orbitCameraBlobSync: false,
+	});
 	scene.setMainCamera(camera);
 	const instanceData = instanceBytes(entities, transformRefsBytes);
 	const renderer = new Renderer(

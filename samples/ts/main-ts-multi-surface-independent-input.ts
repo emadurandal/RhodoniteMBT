@@ -5,13 +5,9 @@ import "./style.css";
 import {
 	World,
 	createOrbitOrthographicCameraDescFromYzPosition,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
 	setCameraLensOrthographic,
 	setupOrbitOrthographicCamera,
 	syncOrbitCameraBlobComponent,
-	syncOrbitCameraTransformComponent,
 	type ComponentTypeId,
 	type EntityId,
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -35,7 +31,6 @@ import {
 	cubePosition3VertexLayout,
 	registerRenderableComponent,
 	runMultiSurfacePlatform,
-	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 	type SurfaceId,
 } from "../../moon/rhodonite/src/app/ts/index.ts";
@@ -171,9 +166,9 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const cameraElevation = 0.38;
 	const world = World.new();
 	const scene = new Scene<World, EntityId>(`ts-multi-surface-${id}`, world);
-	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
-	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
-	const cameraLensComponent = registerCameraLensComponent(world);
+	const orbitControllerComponent = world.orbitCameraControllerComponent();
+	const cameraHomeComponent = world.cameraHomeTransformComponent();
+	const cameraLensComponent = world.cameraLensComponent();
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 	if (
@@ -197,16 +192,10 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.useCommonRuntime(
-		{
-			orbitControllerComponent,
-			homeComponent: cameraHomeComponent,
-			updateOrbitCameraControllerFromInput:
-				updateOrbitCameraControllerComponentFromInput,
-			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-		},
-		{ transformPropagation: false },
-	);
+	scene.useCommonRuntime({
+		transformPropagation: false,
+		orbitCameraBlobSync: false,
+	});
 	demo.engine.setSurfaceScene(id, scene);
 	scene.setSchedule(
 		(systemWorld) => {
