@@ -91,17 +91,14 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 	it("sets up an orbit orthographic camera from a pitched Y/Z position", () => {
 		const world = World.new();
 		const camera = world.createEntity();
-		const orbit = registerOrbitCameraControllerComponent(world);
-		const home = registerCameraHomeTransformComponent(world);
-		const lens = registerCameraLensComponent(world);
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
 
 		expect(
 			setupOrbitOrthographicCamera(
 				world,
 				camera,
-				orbit,
-				home,
-				lens,
 				createOrbitOrthographicCameraDescFromYzPosition(
 					0.38,
 					2,

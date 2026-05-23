@@ -643,9 +643,6 @@ pub fn create_demo_state_for_scene(
     @ecs.setup_orbit_orthographic_camera(
       world,
       camera,
-      orbit_controller,
-      camera_home,
-      camera_lens,
       @ecs.OrbitOrthographicCameraDesc::new(
         0.0,
         camera_elevation_rad,

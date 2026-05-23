@@ -726,9 +726,6 @@ function orbitOrthographicCameraDescTrs(
 export function setupOrbitOrthographicCamera(
 	world: World,
 	camera: EntityId,
-	orbitComponent: ComponentTypeId,
-	homeComponent: ComponentTypeId,
-	lensComponent: ComponentTypeId,
 	desc: OrbitOrthographicCameraDesc,
 ): boolean {
 	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
@@ -743,7 +740,7 @@ export function setupOrbitOrthographicCamera(
 		addOrbitCameraControllerWithPose(
 			world,
 			camera,
-			orbitComponent,
+			world.orbitCameraControllerComponent(),
 			desc.yaw,
 			desc.pitch,
 			desc.panX,
@@ -751,11 +748,15 @@ export function setupOrbitOrthographicCamera(
 			desc.dolly,
 			desc.distance,
 		) &&
-		setCameraHomeFromCurrentTransform(world, camera, homeComponent) &&
+		setCameraHomeFromCurrentTransform(
+			world,
+			camera,
+			world.cameraHomeTransformComponent(),
+		) &&
 		addCameraLensOrthographic(
 			world,
 			camera,
-			lensComponent,
+			world.cameraLensComponent(),
 			desc.near,
 			desc.far,
 			desc.aspect,

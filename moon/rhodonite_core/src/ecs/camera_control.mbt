@@ -669,9 +669,6 @@ fn orbit_orthographic_camera_desc_projection(
 pub fn setup_orbit_orthographic_camera(
   world : World,
   camera : EntityId,
-  orbit_component : ComponentTypeId,
-  home_component : ComponentTypeId,
-  lens_component : ComponentTypeId,
   desc : OrbitOrthographicCameraDesc,
 ) -> Bool {
   let (px, py, pz, qx, qy, qz, qw) = orbit_camera_desc_trs(desc)
@@ -710,7 +707,7 @@ pub fn setup_orbit_orthographic_camera(
   add_orbit_camera_controller_with_pose(
     world,
     camera,
-    orbit_component,
+    world.orbit_camera_controller_component(),
     desc.yaw,
     desc.pitch,
     desc.pan_x,
@@ -718,11 +715,15 @@ pub fn setup_orbit_orthographic_camera(
     desc.dolly,
     desc.distance,
   ) &&
-  set_camera_home_from_current_transform(world, camera, home_component) &&
+  set_camera_home_from_current_transform(
+    world,
+    camera,
+    world.camera_home_transform_component(),
+  ) &&
   add_camera_lens_orthographic(
     world,
     camera,
-    lens_component,
+    world.camera_lens_component(),
     desc.near,
     desc.far,
     desc.aspect,

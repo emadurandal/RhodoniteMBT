@@ -341,9 +341,6 @@ function createDemoStateForEngine(
 		!setupOrbitOrthographicCamera(
 			world,
 			camera,
-			orbitControllerComponent,
-			cameraHomeComponent,
-			cameraLensComponent,
 			createOrbitOrthographicCameraDesc(
 				0,
 				MASS_CUBES_CAMERA_ELEVATION_RAD,

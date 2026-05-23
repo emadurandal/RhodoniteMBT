@@ -51,7 +51,7 @@ pub fn request_orbit_camera_reset(World, EntityId, ComponentTypeId) -> Bool
 
 pub fn set_camera_home_from_current_transform(World, EntityId, ComponentTypeId) -> Bool
 
-pub fn setup_orbit_orthographic_camera(World, EntityId, ComponentTypeId, ComponentTypeId, ComponentTypeId, OrbitOrthographicCameraDesc) -> Bool
+pub fn setup_orbit_orthographic_camera(World, EntityId, OrbitOrthographicCameraDesc) -> Bool
 
 pub fn transform_propagation_system(World, PhaseKey) -> System
 

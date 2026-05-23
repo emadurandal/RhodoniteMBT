@@ -156,7 +156,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	scene.setWorld(world);
 
 	const orbitControllerComponent = world.orbitCameraControllerComponent();
-	const cameraHomeComponent = world.cameraHomeTransformComponent();
 	const cameraLensComponent = world.cameraLensComponent();
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
@@ -165,9 +164,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		!setupOrbitOrthographicCamera(
 			world,
 			camera,
-			orbitControllerComponent,
-			cameraHomeComponent,
-			cameraLensComponent,
 			createOrbitOrthographicCameraDescFromYzPosition(
 				CAMERA_ELEVATION_RAD,
 				2,

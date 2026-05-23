@@ -268,9 +268,6 @@ test "setup orbit orthographic camera initializes transform components and camer
     setup_orbit_orthographic_camera(
       world,
       camera,
-      orbit,
-      home,
-      lens,
       OrbitOrthographicCameraDesc::new_yz_pitched(
         pitch,
         (2.0 : Float),

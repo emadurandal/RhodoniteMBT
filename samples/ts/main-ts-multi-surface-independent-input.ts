@@ -167,7 +167,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const world = World.new();
 	const scene = new Scene<World, EntityId>(`ts-multi-surface-${id}`, world);
 	const orbitControllerComponent = world.orbitCameraControllerComponent();
-	const cameraHomeComponent = world.cameraHomeTransformComponent();
 	const cameraLensComponent = world.cameraLensComponent();
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
@@ -175,9 +174,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		!setupOrbitOrthographicCamera(
 			world,
 			camera,
-			orbitControllerComponent,
-			cameraHomeComponent,
-			cameraLensComponent,
 			createOrbitOrthographicCameraDescFromYzPosition(
 				cameraElevation,
 				2,
