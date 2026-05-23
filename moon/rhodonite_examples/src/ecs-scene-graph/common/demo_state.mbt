@@ -26,12 +26,14 @@ fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
 }
 
 ///|
-/// Implements `push_local_transforms`.
-fn push_local_transforms(
-  world : @ecs.World,
-  bodies : Array[@ecs.EntityId],
-  t : Double,
+/// Updates sample animation inputs before the owning engine runs the scene system_runner.
+pub fn DemoState::update_scene(
+  self : DemoState,
+  frame : @app.FrameState,
 ) -> Unit {
+  let world = self.scene.world()
+  let bodies = self.bodies
+  let t = frame.elapsed_seconds()
   let sun_angle = t * 0.35
   let earth_orbit = t * 0.9
   let earth_spin = t * 2.2
@@ -118,19 +120,6 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
 }
 
 ///|
-/// Updates sample animation inputs before the owning engine runs the scene system_runner.
-pub fn DemoState::update_scene(
-  self : DemoState,
-  frame : @app.FrameState,
-) -> Unit {
-  push_local_transforms(
-    self.scene.world(),
-    self.bodies,
-    frame.elapsed_seconds(),
-  )
-}
-
-///|
 /// Creates demo state backed by caller-owned renderer and target resources.
 pub fn create_demo_state(
   scene : @app.Scene,
@@ -200,8 +189,17 @@ pub fn create_demo_state(
       @app.RenderableDesc::new(cube_mesh, moon_material),
     ),
   )
-  push_local_transforms(world, bodies, 0.0)
-  { context, renderer, target, scene, bodies, gt, frame: @ref.new(0) }
+  let demo_state = {
+    context,
+    renderer,
+    target,
+    scene,
+    bodies,
+    gt,
+    frame: @ref.new(0),
+  }
+  demo_state.update_scene(@app.FrameState::new((0.0 : Float), 0, 0.0))
+  demo_state
 }
 
 ///|
