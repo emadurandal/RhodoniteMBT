@@ -19,7 +19,6 @@ pub(all) struct DemoState {
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
-  renderable : @app.RenderableComponent
   frame : @ref.Ref[Int]
 }
 
@@ -105,7 +104,6 @@ pub fn create_demo_state_for_scene(
     @app.cube_position3_vertex_layout(),
   )
   let world = scene.world()
-  let renderable = scene.renderable_component()
   let camera = world.create_entity()
   let sun = world.create_entity()
   let earth = world.create_entity()
@@ -149,30 +147,27 @@ pub fn create_demo_state_for_scene(
   )
   ignore(
     @app.add_renderable(
-      world,
+      scene,
       sun,
-      renderable,
       @app.RenderableDesc::new(cube_mesh, sun_material),
     ),
   )
   ignore(
     @app.add_renderable(
-      world,
+      scene,
       earth,
-      renderable,
       @app.RenderableDesc::new(cube_mesh, earth_material),
     ),
   )
   ignore(
     @app.add_renderable(
-      world,
+      scene,
       moon,
-      renderable,
       @app.RenderableDesc::new(cube_mesh, moon_material),
     ),
   )
   push_local_transforms(world, bodies, 0.0)
-  { context, renderer, scene, bodies, gt, renderable, frame: @ref.new(0) }
+  { context, renderer, scene, bodies, gt, frame: @ref.new(0) }
 }
 
 ///|
@@ -314,7 +309,7 @@ pub fn DemoState::render_scene(
   scene : @app.Scene,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
-  self.renderer.render_scene_renderables(scene, self.renderable, color_view)
+  self.renderer.render_scene_renderables(scene, color_view)
   @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 

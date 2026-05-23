@@ -10,7 +10,7 @@ import {
 }
 
 // Values
-pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
+pub fn add_renderable(Scene, @ecs.EntityId, RenderableDesc) -> Bool
 
 pub fn cube_index_count() -> Int
 
@@ -70,8 +70,6 @@ pub fn primitive_position3_vertex_layout() -> @webgpu_enums.GPUVertexBufferLayou
 
 pub fn primitive_position3_vertex_stride() -> Int
 
-pub fn register_renderable_component(@ecs.World) -> RenderableComponent
-
 pub fn renderable_component_bytes(RenderableDesc) -> FixedArray[Byte]
 
 pub fn renderable_component_stride() -> Int
@@ -88,7 +86,7 @@ pub fn renderable_material_handle_from_view(ArrayView[Byte]) -> MaterialHandle
 
 pub fn renderable_mesh_handle_from_view(ArrayView[Byte]) -> MeshHandle
 
-pub fn set_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
+pub fn set_renderable(Scene, @ecs.EntityId, RenderableDesc) -> Bool
 
 // Errors
 
@@ -214,11 +212,6 @@ pub(all) enum PhaseSlot {
   AfterSystems
 } derive(Eq)
 
-pub(all) struct RenderableComponent {
-  // private fields
-}
-pub fn RenderableComponent::id(Self) -> @ecs.ComponentTypeId
-
 pub(all) struct RenderableDesc {
   // private fields
 }
@@ -245,7 +238,7 @@ pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> Inst
 pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
 pub fn Renderer::render_instanced_mesh(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
-pub fn Renderer::render_scene_renderables(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_scene_renderables(Self, Scene, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
 pub fn Renderer::update_static_instance_buffer(Self, InstanceBufferHandle, FixedArray[Byte]) -> Bool
 pub fn Renderer::upload_global_transform_writes(Self, @ecs.World, Array[@ecs.GpuWriteView]) -> Unit
@@ -267,7 +260,6 @@ pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
 pub fn Scene::prepare_render_state(Self, frame? : FrameState) -> Bool
-pub fn Scene::renderable_component(Self) -> RenderableComponent
 pub fn Scene::run_systems_for_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
 pub fn Scene::run_systems_for_phases(Self, Array[@ecs.PhaseKey], FrameState) -> Bool
 pub fn Scene::same(Self, Self) -> Bool

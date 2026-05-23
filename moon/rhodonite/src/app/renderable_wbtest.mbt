@@ -35,23 +35,23 @@ test "renderable description exposes constructor accessors" {
 
 ///|
 test "set_renderable adds and updates the component payload" {
-  let world = @ecs.World::new()
-  let renderable = register_renderable_component(world)
-  assert_true(world.component_cpu_stride(renderable.id()) == Some(16))
+  let scene = Scene::new("renderable")
+  let world = scene.world()
+  assert_true(
+    world.component_cpu_stride(scene.renderable_component_id) == Some(16),
+  )
   let entity = world.create_entity()
   assert_true(
     set_renderable(
-      world,
+      scene,
       entity,
-      renderable,
       RenderableDesc::new(MeshHandle::{ index: 1 }, MaterialHandle::{ index: 2 }),
     ),
   )
   assert_true(
     set_renderable(
-      world,
+      scene,
       entity,
-      renderable,
       RenderableDesc::new(
         MeshHandle::{ index: 3 },
         MaterialHandle::{ index: 4 },
@@ -59,7 +59,7 @@ test "set_renderable adds and updates the component payload" {
       ),
     ),
   )
-  match world.component_bytes(entity, renderable.id()) {
+  match world.component_bytes(entity, scene.renderable_component_id) {
     Some(bytes) => {
       assert_true(@writes.get_u32_le(bytes, 0).reinterpret_as_int() == 3)
       assert_true(@writes.get_u32_le(bytes, 4).reinterpret_as_int() == 4)

@@ -97,7 +97,7 @@ flowchart LR
           <p><code>Renderer</code> は現在 intentionally narrow な engine-owned renderer です。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して unlit static indexed mesh を描画します。</p>
           <ul>
             <li>handles: <code>MeshHandle</code>、<code>MaterialHandle</code>、<code>InstanceBufferHandle</code></li>
-            <li>components: <code>RenderableDesc</code>、<code>RenderableFlags</code>、scene-owned <code>Scene::renderable_component</code>。raw world 向けに <code>register_renderable_component</code> も残す。</li>
+            <li>components: <code>RenderableDesc</code>、<code>RenderableFlags</code>。Renderable component id は <code>Scene</code> が内部で登録・所有する。</li>
             <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>、<code>CubeMeshDesc</code>、<code>cube_mesh_desc</code></li>
             <li>resources: <code>register_static_indexed_mesh_desc</code>、<code>register_cube_mesh</code>、<code>register_unlit_material</code>、<code>register_static_instance_buffer</code></li>
             <li>draw paths: <code>render_scene_renderables</code> と MassCubes 用の <code>render_instanced_mesh</code></li>

@@ -88,7 +88,7 @@ flowchart TD
           <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes.</p>
           <ul>
             <li>handles: <code>MeshHandle</code>, <code>MaterialHandle</code>, <code>InstanceBufferHandle</code></li>
-            <li>components: <code>RenderableDesc</code>, <code>RenderableFlags</code>, scene-owned <code>Scene::renderable_component</code>; <code>register_renderable_component</code> remains available for raw worlds</li>
+            <li>components: <code>RenderableDesc</code> and <code>RenderableFlags</code>; the Renderable component id is registered and owned internally by <code>Scene</code></li>
             <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>, <code>CubeMeshDesc</code>, <code>cube_mesh_desc</code></li>
             <li>resources: <code>register_static_indexed_mesh_desc</code>, <code>register_cube_mesh</code>, <code>register_unlit_material</code>, <code>register_static_instance_buffer</code></li>
             <li>draw paths: <code>render_scene_renderables</code> and <code>render_instanced_mesh</code> for MassCubes</li>

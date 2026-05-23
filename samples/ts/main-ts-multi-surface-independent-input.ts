@@ -22,14 +22,12 @@ import {
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
-	RenderableComponent,
 	RenderableDesc,
 	Renderer,
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
 	cubePosition3VertexLayout,
-	registerRenderableComponent,
 	runMultiSurfacePlatform,
 	type FrameState,
 	type SurfaceId,
@@ -49,7 +47,6 @@ type SurfaceRenderState = {
 	readonly camera: EntityId;
 	readonly orbitControllerComponent: ComponentTypeId;
 	readonly cameraLensComponent: ComponentTypeId;
-	readonly renderableComponent: RenderableComponent;
 	readonly objects: DemoObjects;
 };
 
@@ -140,10 +137,10 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 
 function createRenderableObject(
 	demo: DemoState,
-	world: World,
-	renderableComponent: RenderableComponent,
+	scene: Scene<World, EntityId>,
 	material: MaterialHandle,
 ): EntityId {
+	const world = scene.world();
 	const entity = world.createEntity();
 	setYRotationTrs(world, entity, 0, 0, 0, 0, 1);
 	if (!world.setGlobalTransform(entity, identity())) {
@@ -151,9 +148,8 @@ function createRenderableObject(
 	}
 	if (
 		!addRenderable(
-			world,
+			scene,
 			entity,
-			renderableComponent,
 			RenderableDesc.new(demo.cubeMesh, material),
 		)
 	) {
@@ -168,7 +164,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const scene = new Scene<World, EntityId>(`ts-multi-surface-${id}`, world);
 	const orbitControllerComponent = world.orbitCameraControllerComponent();
 	const cameraLensComponent = world.cameraLensComponent();
-	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 	if (
 		!setupOrbitOrthographicCamera(
@@ -208,20 +203,17 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 	const objects = {
 		sun: createRenderableObject(
 			demo,
-			world,
-			renderableComponent,
+			scene,
 			demo.sunMaterial,
 		),
 		earth: createRenderableObject(
 			demo,
-			world,
-			renderableComponent,
+			scene,
 			demo.earthMaterial,
 		),
 		moon: createRenderableObject(
 			demo,
-			world,
-			renderableComponent,
+			scene,
 			demo.moonMaterial,
 		),
 	};
@@ -234,7 +226,6 @@ function addSurfaceState(demo: DemoState, id: SurfaceId, input: InputState): voi
 		camera,
 		orbitControllerComponent,
 		cameraLensComponent,
-		renderableComponent,
 		objects,
 	});
 }
@@ -322,11 +313,7 @@ function renderSurface(demo: DemoState, frame: FrameState): void {
 	writeScene(surface, frame);
 	resizeRendererIfNeeded(demo, frame);
 	const colorView = demo.engine.surfaceGpuSurface(frame.surfaceId).acquireView();
-	demo.renderer.renderSceneRenderables(
-		surface.scene,
-		surface.renderableComponent,
-		colorView,
-	);
+	demo.renderer.renderSceneRenderables(surface.scene, colorView);
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {

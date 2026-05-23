@@ -498,14 +498,15 @@ pub fn Renderer::upload_global_transform_writes(
 /// Extracts valid Renderable rows from a scene world.
 fn Renderer::extract_draw_items(
   self : Renderer,
-  world : @ecs.World,
-  renderable : RenderableComponent,
+  scene : Scene,
 ) -> Array[RendererDrawItem] {
+  let world = scene.world()
+  let renderable = scene.renderable_component_id
   let items : Array[RendererDrawItem] = []
-  @ecs.Query::new([renderable.id, world.global_transform_component()]).for_each(
+  @ecs.Query::new([renderable, world.global_transform_component()]).for_each(
     world,
     row => {
-      row.read(renderable.id, bytes => {
+      row.read(renderable, bytes => {
         let flags = renderable_flags_from_view(bytes)
         if flags.contains(renderable_flags_visible()) {
           let mesh_index = renderable_mesh_handle_from_view(bytes).index
@@ -584,7 +585,6 @@ fn Renderer::build_instance_bytes(
 pub fn Renderer::render_scene_renderables(
   self : Renderer,
   scene : Scene,
-  renderable : RenderableComponent,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   let depth_view = match self.depth_view {
@@ -593,7 +593,7 @@ pub fn Renderer::render_scene_renderables(
   }
   let world = scene.world()
   self.ensure_scene_buffers(world)
-  let items = self.extract_draw_items(world, renderable)
+  let items = self.extract_draw_items(scene)
   let instance_buffer = if items.length() > 0 {
     let instance_bytes = self.build_instance_bytes(world, items)
     let buffer = self.ensure_instance_buffer(instance_bytes.length())

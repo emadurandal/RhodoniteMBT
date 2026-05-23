@@ -4,8 +4,7 @@
 ///|
 test "scene owns the standard Renderable component" {
   let scene = Scene::new("renderable")
-  let renderable = scene.renderable_component()
-  match scene.world().component_cpu_stride(renderable.id()) {
+  match scene.world().component_cpu_stride(scene.renderable_component_id) {
     Some(stride) => assert_eq(stride, renderable_component_stride())
     None => abort("missing Renderable component")
   }
