@@ -18,6 +18,8 @@ import {
 	world_add_component_bytes,
 	world_camera_blob_word_capacity,
 	world_camera_component,
+	world_camera_home_transform_component,
+	world_camera_lens_component,
 	world_child_of_component,
 	world_component_bytes_copy,
 	world_component_cpu_stride,
@@ -34,6 +36,7 @@ import {
 	world_location,
 	world_new,
 	world_new_with_global_transform_f16,
+	world_orbit_camera_controller_component,
 	world_register_cpu_component,
 	world_remove_component,
 	world_set_camera_matrices_col_major,
@@ -157,6 +160,22 @@ export class World {
 
 	cameraComponent(): ComponentTypeId {
 		return new ComponentTypeId(world_camera_component(this.inner));
+	}
+
+	orbitCameraControllerComponent(): ComponentTypeId {
+		return new ComponentTypeId(
+			world_orbit_camera_controller_component(this.inner),
+		);
+	}
+
+	cameraHomeTransformComponent(): ComponentTypeId {
+		return new ComponentTypeId(
+			world_camera_home_transform_component(this.inner),
+		);
+	}
+
+	cameraLensComponent(): ComponentTypeId {
+		return new ComponentTypeId(world_camera_lens_component(this.inner));
 	}
 
 	location(entity: EntityId): EntityLocation | null {

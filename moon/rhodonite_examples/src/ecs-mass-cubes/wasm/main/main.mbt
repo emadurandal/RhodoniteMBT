@@ -186,7 +186,7 @@ pub fn create_wasm_demo_state() -> Unit {
   let stride = 24
   host_initialize_demo_state(per_side, stride)
   host_write_initial_global_transforms(per_side, 0.0)
-  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
+  let orbit_controller = world.orbit_camera_controller_component()
   let camera = world.create_entity()
   ignore(
     @ecs.add_orbit_camera_controller(

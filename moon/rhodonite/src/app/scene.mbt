@@ -27,6 +27,7 @@ pub struct Scene {
   priv instance_id : Int
   priv name : String
   priv world : @ecs.World
+  priv renderable_component : RenderableComponent
   priv system_runner : @ecs.SystemRunner
   priv mut main_camera : @ecs.EntityId?
   priv mut enabled : Bool
@@ -53,10 +54,12 @@ pub fn Scene::new(name : String) -> Scene {
 ///|
 /// Builds a scene around an already configured ECS world.
 pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
+  let renderable_component = register_renderable_component(world)
   {
     instance_id: alloc_scene_instance_id(),
     name,
     world,
+    renderable_component,
     system_runner: @ecs.SystemRunner::new(),
     main_camera: None,
     enabled: true,
@@ -85,6 +88,12 @@ pub fn Scene::name(self : Scene) -> String {
 /// Implements `Scene::world`.
 pub fn Scene::world(self : Scene) -> @ecs.World {
   self.world
+}
+
+///|
+/// Returns the scene-owned Renderable component id for renderer extraction.
+pub fn Scene::renderable_component(self : Scene) -> RenderableComponent {
+  self.renderable_component
 }
 
 ///|

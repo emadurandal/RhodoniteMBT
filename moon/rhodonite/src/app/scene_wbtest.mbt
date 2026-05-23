@@ -2,6 +2,16 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+test "scene owns the standard Renderable component" {
+  let scene = Scene::new("renderable")
+  let renderable = scene.renderable_component()
+  match scene.world().component_cpu_stride(renderable.id()) {
+    Some(stride) => assert_eq(stride, renderable_component_stride())
+    None => abort("missing Renderable component")
+  }
+}
+
+///|
 test "scene infers common orbit camera component ids from registered systems" {
   let scene = Scene::new("camera")
   let world = scene.world()

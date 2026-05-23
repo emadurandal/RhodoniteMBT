@@ -316,4 +316,7 @@ pub struct World {
   priv global_transform_default_format : @comp.GlobalTransformGpuFormat
   priv child_of_component_id : ComponentTypeId
   priv camera_component_id : ComponentTypeId
+  priv orbit_camera_controller_component_id : ComponentTypeId
+  priv camera_home_transform_component_id : ComponentTypeId
+  priv camera_lens_component_id : ComponentTypeId
 }

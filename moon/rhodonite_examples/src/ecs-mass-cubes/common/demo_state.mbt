@@ -590,9 +590,9 @@ pub fn create_demo_state_for_scene(
   let world = scene.world()
   let gt = world.global_transform_component()
   let tf = world.transform_component()
-  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
-  let camera_home = @ecs.register_camera_home_transform_component(world)
-  let camera_lens = @ecs.register_camera_lens_component(world)
+  let orbit_controller = world.orbit_camera_controller_component()
+  let camera_home = world.camera_home_transform_component()
+  let camera_lens = world.camera_lens_component()
   scene.use_common_runtime(
     transform_propagation=false,
     orbit_component=Some(orbit_controller),

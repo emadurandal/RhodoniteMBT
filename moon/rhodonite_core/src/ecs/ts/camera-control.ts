@@ -164,23 +164,17 @@ function orbitCameraControllerBytes(
 export function registerOrbitCameraControllerComponent(
 	world: World,
 ): ComponentTypeId {
-	return world.registerCpuComponent(
-		"OrbitCameraController",
-		ORBIT_CAMERA_CONTROLLER_STRIDE,
-	);
+	return world.orbitCameraControllerComponent();
 }
 
 export function registerCameraHomeTransformComponent(
 	world: World,
 ): ComponentTypeId {
-	return world.registerCpuComponent(
-		"CameraHomeTransform",
-		CAMERA_HOME_TRANSFORM_STRIDE,
-	);
+	return world.cameraHomeTransformComponent();
 }
 
 export function registerCameraLensComponent(world: World): ComponentTypeId {
-	return world.registerCpuComponent("CameraLens", CAMERA_LENS_STRIDE);
+	return world.cameraLensComponent();
 }
 
 export function addOrbitCameraController(

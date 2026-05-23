@@ -134,29 +134,25 @@ pub fn camera_projection_orthographic() -> Float {
 }
 
 ///|
-/// Registers the builtin-style orbit camera controller CPU component.
+/// Returns the world's builtin orbit camera controller CPU component.
 pub fn register_orbit_camera_controller_component(
   world : World,
 ) -> ComponentTypeId {
-  world.register_cpu_component(
-    "OrbitCameraController", orbit_camera_controller_stride,
-  )
+  world.orbit_camera_controller_component()
 }
 
 ///|
-/// Registers the camera home transform CPU component.
+/// Returns the world's builtin camera home transform CPU component.
 pub fn register_camera_home_transform_component(
   world : World,
 ) -> ComponentTypeId {
-  world.register_cpu_component(
-    "CameraHomeTransform", camera_home_transform_stride,
-  )
+  world.camera_home_transform_component()
 }
 
 ///|
-/// Registers the camera lens CPU component.
+/// Returns the world's builtin camera lens CPU component.
 pub fn register_camera_lens_component(world : World) -> ComponentTypeId {
-  world.register_cpu_component("CameraLens", camera_lens_stride)
+  world.camera_lens_component()
 }
 
 ///|

@@ -266,6 +266,8 @@ pub fn World::add_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[By
 pub fn World::camera_blob_word_capacity(Self) -> Int
 pub fn World::camera_component(Self) -> ComponentTypeId
 pub fn World::camera_gpu_row(Self, EntityId) -> FixedArray[Byte]?
+pub fn World::camera_home_transform_component(Self) -> ComponentTypeId
+pub fn World::camera_lens_component(Self) -> ComponentTypeId
 pub fn World::camera_ref(Self, EntityId) -> CameraRef?
 pub fn World::child_of_component(Self) -> ComponentTypeId
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
@@ -292,6 +294,7 @@ pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
+pub fn World::orbit_camera_controller_component(Self) -> ComponentTypeId
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::reserve_batch_capacity(Self, Array[ComponentTypeId], Int) -> Bool

@@ -201,4 +201,12 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(row ?? new Uint8Array(), 0)).toBeCloseTo(1);
 		expect(getF32(row ?? new Uint8Array(), 20)).toBeCloseTo(1);
 	});
+
+	it("exposes builtin orbit camera component ids", () => {
+		const world = World.new();
+
+		expect(world.orbitCameraControllerComponent().index()).toBe(4);
+		expect(world.cameraHomeTransformComponent().index()).toBe(5);
+		expect(world.cameraLensComponent().index()).toBe(6);
+	});
 });

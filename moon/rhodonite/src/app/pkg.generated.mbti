@@ -267,6 +267,7 @@ pub fn Scene::name(Self) -> String
 pub fn Scene::new(String) -> Self
 pub fn Scene::new_with_world(String, @ecs.World) -> Self
 pub fn Scene::prepare_render_state(Self, frame? : FrameState) -> Bool
+pub fn Scene::renderable_component(Self) -> RenderableComponent
 pub fn Scene::run_systems_for_phase(Self, @ecs.PhaseKey, FrameState) -> Bool
 pub fn Scene::run_systems_for_phases(Self, Array[@ecs.PhaseKey], FrameState) -> Bool
 pub fn Scene::same(Self, Self) -> Bool
