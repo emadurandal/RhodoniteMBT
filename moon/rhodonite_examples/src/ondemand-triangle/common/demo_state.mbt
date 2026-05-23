@@ -29,12 +29,6 @@ pub fn create_demo_state(context : @wgpu.GPUContext) -> DemoState? {
 }
 
 ///|
-/// Implements `create_demo_state_for_engine` for platform-managed engines.
-pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  create_demo_state(engine.gpu_context())
-}
-
-///|
 /// Creates the render pipeline used by the triangle sample.
 fn create_pipeline(
   device : @wgpu.GPUDevice,
@@ -171,7 +165,7 @@ pub fn render_frame_to_view(
 ///|
 /// Creates DemoState and registers the sample engine handlers.
 pub fn setup_engine(engine : @app.Engine) -> Bool {
-  match create_demo_state_for_engine(engine) {
+  match create_demo_state(engine.gpu_context()) {
     Some(demo_state) => {
       register_engine_handlers(engine, demo_state)
       true

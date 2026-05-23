@@ -10,9 +10,7 @@ import {
 }
 
 // Values
-pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
-
-pub fn create_demo_state_with_renderer(@app.Scene, @app.Renderer, @app.RenderTargetResources, context? : @webgpu.GPUCanvasContext?) -> DemoState
+pub fn create_demo_state(@app.Scene, @app.Renderer, @app.RenderTargetResources, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
 pub fn create_engine(@webgpu.GPUContext) -> @app.Engine
 

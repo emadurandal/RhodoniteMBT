@@ -13,8 +13,6 @@ pub fn create_demo_state(@webgpu.GPUContext) -> DemoState?
 
 pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
-pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
-
 pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState) -> Unit
