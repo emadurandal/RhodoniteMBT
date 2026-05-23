@@ -208,26 +208,6 @@ pub fn DemoState::update_scene(
 }
 
 ///|
-/// Advances the demo clock, runs one frame of ECS phases, then draws into `color_view`.
-///
-/// Kept `pub` for callers that render into an offscreen view without a swapchain.
-/// The visual regression harness uses platform single-frame rendering.
-pub fn render_frame_to_view(
-  demo_state : DemoState,
-  color_view : @wgpu.GPUTextureView,
-) -> Unit {
-  demo_state.frame.val = demo_state.frame.val + 1
-  let frame = @app.FrameState::new(
-    (0.022 : Float),
-    demo_state.frame.val,
-    demo_state.frame.val.to_double() * 0.022,
-  )
-  demo_state.update_scene(frame)
-  ignore(demo_state.scene.prepare_render_state(frame~))
-  render_current_frame_to_view(demo_state, color_view)
-}
-
-///|
 /// Renders the current scene state to a target view without advancing the scene.
 pub fn render_current_frame_to_view(
   demo_state : DemoState,
