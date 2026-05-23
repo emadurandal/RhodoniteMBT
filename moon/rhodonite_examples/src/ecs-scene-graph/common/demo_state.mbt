@@ -17,31 +17,6 @@ pub(all) struct DemoState {
 }
 
 ///|
-/// Applies surface-local input to the scene camera orbit controller.
-pub fn DemoState::update_camera_from_input(
-  self : DemoState,
-  input : @input.InputState,
-) -> Unit {
-  let camera = match self.scene.main_camera() {
-    Some(camera) => camera
-    None => abort("DemoState::update_camera_from_input requires a main camera")
-  }
-  ignore(
-    @ecs.update_orbit_camera_controller_from_mouse_frame(
-      self.scene.world(),
-      camera,
-      input.mouse_down(Left),
-      input.mouse_pressed(Left),
-      input.mouse_down(Middle),
-      input.mouse_pressed(Middle),
-      input.pointer_delta_x(),
-      input.pointer_delta_y(),
-      input.wheel_delta_y(),
-    ),
-  )
-}
-
-///|
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
   let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
