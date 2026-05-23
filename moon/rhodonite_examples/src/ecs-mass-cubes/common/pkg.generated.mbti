@@ -10,15 +10,11 @@ import {
 }
 
 // Values
-pub fn create_demo_state_for_device(@webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
-
 pub fn create_demo_state_for_engine(@app.Engine) -> DemoState?
 
-pub fn create_demo_state_for_scene(@app.Scene, @webgpu.GPUDevice, @webgpu.GPUQueue, String, context? : @webgpu.GPUCanvasContext?) -> DemoState
+pub fn create_demo_state_with_renderer(@app.Scene, @app.Renderer, @app.RenderTargetResources, context? : @webgpu.GPUCanvasContext?) -> DemoState
 
 pub fn create_engine(@webgpu.GPUContext) -> @app.Engine
-
-pub fn demo_state_release(DemoState) -> Unit
 
 pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
@@ -36,6 +32,7 @@ pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView, record_pe
 pub(all) struct DemoState {
   context : @webgpu.GPUCanvasContext?
   renderer : @app.Renderer
+  target : @app.RenderTargetResources
   scene : @app.Scene
   mesh : @app.MeshHandle
   instances : @app.InstanceBufferHandle
@@ -53,7 +50,6 @@ pub(all) struct DemoState {
   perf_frame_start_ms : @ref.Ref[Double]
   perf_excluded_wait_ms : @ref.Ref[Double]
 }
-pub fn DemoState::release(Self) -> Unit
 pub fn DemoState::render_scene(Self, @app.Scene, @webgpu_objects.GPUTextureView) -> Unit
 pub fn DemoState::update_scene(Self, @app.FrameState) -> Unit
 

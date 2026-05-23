@@ -10,6 +10,7 @@ import {
 	InputState,
 	MouseButton,
 	Renderer,
+	RenderTargetResources,
 	cubePosition3VertexLayout,
 	installBrowserInputState,
 	type InstanceBufferHandle,
@@ -55,6 +56,7 @@ type DemoState = {
 	readonly device: GPUDevice;
 	readonly queue: GPUQueue;
 	readonly renderer: Renderer;
+	readonly target: RenderTargetResources;
 	readonly cubeMesh: MeshHandle;
 	readonly instanceBuffer: InstanceBufferHandle;
 	readonly input: InputState;
@@ -354,10 +356,13 @@ async function createDemoState(
 	const renderer = new Renderer(
 		device,
 		queue,
-		targetFormat,
+		cubePosition3VertexLayout(),
+	);
+	const target = new RenderTargetResources(
+		device,
 		MASS_CUBES_CANVAS_WIDTH,
 		MASS_CUBES_CANVAS_HEIGHT,
-		cubePosition3VertexLayout(),
+		targetFormat,
 	);
 	renderer.ensureStorageBuffers({
 		transformWords: transformLayout.wordCapacity,
@@ -391,6 +396,7 @@ async function createDemoState(
 		device,
 		queue,
 		renderer,
+		target,
 		cubeMesh,
 		instanceBuffer,
 		input: new InputState(),
@@ -473,6 +479,7 @@ function createHostImports(
 					demoState.cubeMesh,
 					demoState.instanceBuffer,
 					MASS_CUBES_ENTITY_COUNT,
+					demoState.target,
 					colorView,
 				);
 				updatePerfOverlay(label, fps, cpuMs);
@@ -558,6 +565,7 @@ export async function renderEcsMassCubesWasmSnapshot(
 		runWasmRenderFrame(wasm);
 		return await readPresentedCanvasRgba8(canvas, demoState.queue);
 	} finally {
+		demoState.target.release();
 		demoState.renderer.release();
 	}
 }

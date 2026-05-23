@@ -19,6 +19,8 @@ pub struct Engine {
   priv mut surface_changed : Bool
   priv mut next_surface_id : Int
   priv surfaces : Array[EngineSurface]
+  priv renderer : Renderer
+  priv render_target_resources : RenderTargetResources
   priv mut render_requested : Bool
   priv mut continuous_render_requested : Bool
   priv mut render_wakeup : (() -> Unit)?
@@ -44,10 +46,14 @@ pub fn Engine::new_with_main_scene(
   gpu_context : @wgpu.GPUContext,
   main_scene : Scene,
 ) -> Engine {
-  let (_device, _canvas_context, format, _queue) = gpu_context.get()
+  let (device, _canvas_context, format, queue) = gpu_context.get()
   let scenes : Array[Scene] = []
   let surfaces : Array[EngineSurface] = []
   let phase_handlers : Array[PhaseHandler] = []
+  let renderer = Renderer::new(device, queue, cube_position3_vertex_layout())
+  let render_target_resources = RenderTargetResources::new(
+    device, 800, 600, format,
+  )
   scenes.push(main_scene)
   {
     gpu_context,
@@ -56,6 +62,8 @@ pub fn Engine::new_with_main_scene(
     surface_changed: true,
     next_surface_id: 1,
     surfaces,
+    renderer,
+    render_target_resources,
     render_requested: true,
     continuous_render_requested: false,
     render_wakeup: None,
@@ -171,6 +179,7 @@ pub fn Engine::set_surface_active(
   self.surface_state = SurfaceState::new_active(
     width, height, format, generation,
   )
+  self.render_target_resources.resize(width, height, format)
   self.surface_changed = true
   self.request_render("surface")
 }
@@ -183,6 +192,11 @@ pub fn Engine::set_surface_suspended(self : Engine) -> Unit {
   }
   let generation = self.surface_state.generation() + 1
   self.surface_state = SurfaceState::suspended(generation)
+  self.render_target_resources.resize(
+    0,
+    0,
+    self.render_target_resources.format(),
+  )
   self.surface_changed = true
   self.request_render("surface")
 }
@@ -191,6 +205,18 @@ pub fn Engine::set_surface_suspended(self : Engine) -> Unit {
 /// Implements `Engine::main_scene`.
 pub fn Engine::main_scene(self : Engine) -> Scene {
   self.scenes[self.main_scene_index]
+}
+
+///|
+/// Returns the engine-owned standard v1 renderer.
+pub fn Engine::renderer(self : Engine) -> Renderer {
+  self.renderer
+}
+
+///|
+/// Returns single-surface render target resources owned by the engine.
+pub fn Engine::render_target_resources(self : Engine) -> RenderTargetResources {
+  self.render_target_resources
 }
 
 ///|
@@ -261,6 +287,74 @@ pub fn Engine::add_phase_handler(
     None => ()
   }
   self.add_phase_handler_unchecked(phase, handler, slot, key)
+}
+
+///|
+/// Registers a frame-wide callback before standard update scene systems.
+pub fn Engine::on_frame_update(
+  self : Engine,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_update(),
+    fn(_engine, frame) { run(frame) },
+    key~,
+  )
+}
+
+///|
+/// Registers a frame-wide callback after standard render scene systems.
+pub fn Engine::on_frame_render(
+  self : Engine,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_render(),
+    fn(_engine, frame) { run(frame) },
+    slot=AfterSystems,
+    key~,
+  )
+}
+
+///|
+/// Registers a scene-scoped callback before update systems when the scene is enabled.
+pub fn Engine::on_scene_update(
+  self : Engine,
+  scene : Scene,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_update(),
+    fn(engine, frame) {
+      if engine.frame_targets_scene(frame, scene) && scene.enabled() {
+        run(frame)
+      }
+    },
+    key~,
+  )
+}
+
+///|
+/// Registers a scene-scoped callback after render systems when the scene is visible.
+pub fn Engine::on_scene_render(
+  self : Engine,
+  scene : Scene,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_render(),
+    fn(engine, frame) {
+      if engine.frame_targets_scene(frame, scene) && scene.visible() {
+        run(frame)
+      }
+    },
+    slot=AfterSystems,
+    key~,
+  )
 }
 
 ///|
@@ -694,6 +788,11 @@ fn Engine::ensure_initialized(self : Engine, caller : String) -> Unit {
 pub fn Engine::shutdown(self : Engine) -> Unit {
   self.ensure_initialized("Engine::shutdown")
   self.run_phase(phase_shutdown(), zero_frame_state())
+  for i = 0; i < self.surfaces.length(); i = i + 1 {
+    self.surfaces[i].release()
+  }
+  self.render_target_resources.release()
+  self.renderer.release()
 }
 
 ///|

@@ -223,6 +223,12 @@ pub fn renderPipeline_release(pipeline : GPURenderPipeline) -> Unit {
 }
 
 ///|
+/// Implements `pipelineLayout_release`.
+pub fn pipelineLayout_release(layout : GPUPipelineLayout) -> Unit {
+  @raw.pipelineLayout_release(layout.raw)
+}
+
+///|
 /// Implements `bindGroupLayout_release`.
 pub fn bindGroupLayout_release(layout : GPUBindGroupLayout) -> Unit {
   @raw.bindGroupLayout_release(layout.raw)

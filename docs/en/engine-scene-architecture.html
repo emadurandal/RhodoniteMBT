@@ -37,19 +37,23 @@ flowchart TB
   E --> S[Scene list]
   SF --> SI[surface-local InputState]
   SF --> SS[SurfaceState]
+  SF --> RT[RenderTargetResources]
   S --> W[World]
   S --> SR[SystemRunner]
-  R[Renderer] --> GPU[GPU resources]
+  E --> R[Renderer]
+  R[Renderer] --> GPU[device-wide GPU resources]
+  RT --> TG[surface-sized target resources]
   R --> S
   W --> ECS[ECS data and builtin blobs]
           </div>
           <table>
             <thead><tr><th>Type</th><th>Responsibility</th></tr></thead>
             <tbody>
-              <tr><td><code>Engine</code></td><td>Owns GPU context, scenes, surfaces, time, input, phase groups, and on-demand render state.</td></tr>
+              <tr><td><code>Engine</code></td><td>Owns GPU context, the standard renderer, render target resources, scenes, surfaces, time, input, phase groups, and on-demand render state.</td></tr>
               <tr><td><code>Scene</code></td><td>Runtime scene with one <code>World</code>, one <code>SystemRunner</code>, a main camera, and enabled/visible flags.</td></tr>
               <tr><td><code>World</code></td><td>ECS storage only; it does not own engine lifecycle or GPU resources.</td></tr>
-              <tr><td><code>Renderer</code></td><td>Owns GPU resources, mesh/material/instance tables, scene renderable extraction, and draw calls.</td></tr>
+              <tr><td><code>Renderer</code></td><td>Owns device-wide GPU resources, explicit pipeline layouts, format-keyed pipelines, mesh/material/instance tables, scene renderable extraction, and draw calls.</td></tr>
+              <tr><td><code>RenderTargetResources</code></td><td>Owns surface-local render target state such as color format, extent, and depth attachments.</td></tr>
               <tr><td><code>FrameState</code></td><td>Passes delta, frame index, elapsed time, surface snapshot, and optional surface input to phases and systems.</td></tr>
             </tbody>
           </table>
@@ -75,6 +79,7 @@ flowchart TD
             <li><code>phase_startup()</code> and <code>phase_shutdown()</code> are one-shot phases, not group members.</li>
             <li>Custom phase group/order edits are performed during <code>Engine::initialize()</code> startup handlers.</li>
             <li><code>Engine::add_phase_handler</code> can take a registration key; handlers with the same phase, slot, and key are deduplicated.</li>
+            <li>Use <code>Engine::on_scene_update</code> / <code>Engine::on_scene_render</code> (TypeScript: <code>Engine.onSceneUpdate</code> / <code>Engine.onSceneRender</code>) for common scene-scoped callbacks. They hide the standard update/render phases, use the standard slots, target only matching multi-surface frames, and apply the scene <code>enabled</code>/<code>visible</code> checks. <code>Engine::on_frame_update</code> / <code>Engine::on_frame_render</code> (TypeScript: <code>Engine.onFrameUpdate</code> / <code>Engine.onFrameRender</code>) are the frame-wide variants; use <code>Engine::add_phase_handler</code> only when custom phases or slots are needed.</li>
             <li>Scenes implicitly declare the standard transform/camera runtime integration once a main camera is assigned; the scene uses the builtin orbit/home/lens component ids. MoonBit samples call <code>Scene::use_common_runtime</code>, and TypeScript samples call <code>Scene.useCommonRuntime</code>, only when boolean flags need to change optional standard systems such as transform propagation or orbit camera blob sync. <code>Engine::initialize()</code> and scene-only <code>prepare_render_state</code> reflect that declaration into common scene systems, and engine-owned scenes also get orbit-camera input handlers. In TypeScript, the default transform propagation calls <code>world.updateGlobalTransformsFromTransforms()</code> when the scene world exposes it; custom worlds can pass <code>propagateTransforms</code>, and samples can disable propagation with <code>transformPropagation: false</code>. Binding a scene with <code>Engine::set_surface_scene</code> / <code>Engine.setSurfaceScene</code> also installs any declared orbit-camera input handler for that scene.</li>
             <li>Scene-only or offscreen rendering code can call <code>Scene::prepare_render_state</code> to run <code>update</code>, <code>post_update</code>, and <code>render_extract</code> once without spelling out each phase.</li>
             <li>When a surface is suspended, update phases still run and render extraction/prepare/render/present are skipped.</li>
@@ -82,16 +87,16 @@ flowchart TD
           </ul>
 
           <h2>Surface Model</h2>
-          <p>Single-surface code updates the current snapshot through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input.</p>
+          <p>Single-surface code updates the current snapshot and render target resources through <code>set_surface_active</code> and <code>set_surface_suspended</code>. Multi-surface code uses <code>add_surface</code>, <code>add_surface_for_scene</code>, <code>set_surface_scene</code>, <code>surface_input</code>, and <code>run_multi_surface_frame</code>. Every surface has surface-local input and render target resources.</p>
 
           <h2>Renderer v1</h2>
-          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes.</p>
+          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes into caller-supplied <code>RenderTargetResources</code>.</p>
           <ul>
             <li>handles: <code>MeshHandle</code>, <code>MaterialHandle</code>, <code>InstanceBufferHandle</code></li>
             <li>components: <code>RenderableDesc</code> and <code>RenderableFlags</code>; the Renderable component id is registered and owned internally by <code>Scene</code></li>
             <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>, <code>CubeMeshDesc</code>, <code>cube_mesh_desc</code></li>
             <li>resources: <code>register_static_indexed_mesh_desc</code>, <code>register_cube_mesh</code>, <code>register_unlit_material</code>, <code>register_static_instance_buffer</code></li>
-            <li>draw paths: <code>render_scene_renderables</code> and <code>render_instanced_mesh</code> for MassCubes</li>
+            <li>draw paths: <code>render_scene_renderables(scene, target, view)</code> and <code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code> for MassCubes</li>
           </ul>
           <p>Textures, skinning, transparent sorting, shadows, and LOD are not v1 renderer responsibilities yet.</p>
 

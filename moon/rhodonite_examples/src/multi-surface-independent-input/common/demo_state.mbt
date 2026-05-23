@@ -11,9 +11,6 @@ pub(all) struct SurfaceDemoState {
 ///|
 /// Coordinates one shared platform demo across multiple presentation surfaces.
 pub(all) struct MultiSurfaceDemoState {
-  device : @wgpu.GPUDevice
-  queue : @wgpu.GPUQueue
-  format : String
   surfaces : Array[SurfaceDemoState]
 }
 
@@ -22,8 +19,8 @@ pub(all) struct MultiSurfaceDemoState {
 pub fn create_demo_state_for_engine(
   engine : @app.Engine,
 ) -> MultiSurfaceDemoState {
-  let (device, _canvas_context, format, queue) = engine.gpu_context().get()
-  { device, queue, format, surfaces: [] }
+  ignore(engine)
+  { surfaces: [] }
 }
 
 ///|
@@ -51,38 +48,16 @@ fn MultiSurfaceDemoState::ensure_surface(
     Some(index) => self.surfaces[index]
     None => {
       let scene = @app.Scene::new("multi-surface-independent-input")
-      let demo = @scene_graph.create_demo_state_for_scene(
+      let demo = @scene_graph.create_demo_state_with_renderer(
         scene,
-        self.device,
-        self.queue,
-        self.format,
+        engine.renderer(),
+        engine.surface(id).render_target_resources(),
       )
+      engine.set_surface_scene(id, scene)
       let surface_demo = { id, demo }
       self.surfaces.push(surface_demo)
-      engine.set_surface_scene(id, scene)
       surface_demo
     }
-  }
-}
-
-///|
-/// Handles surface resize/suspend state for the target surface demo.
-fn MultiSurfaceDemoState::handle_surface_frame(
-  self : MultiSurfaceDemoState,
-  engine : @app.Engine,
-  frame : @app.FrameState,
-) -> Unit {
-  match frame.surface_id() {
-    Some(id) => {
-      let surface_demo = self.ensure_surface(engine, id)
-      if frame.surface_changed() && frame.surface_active() {
-        surface_demo.demo.resize_surface_resources(
-          frame.surface_width(),
-          frame.surface_height(),
-        )
-      }
-    }
-    None => ()
   }
 }
 
@@ -145,14 +120,6 @@ fn MultiSurfaceDemoState::render_surface_frame(
 }
 
 ///|
-/// Releases all surface-local scene graph demo resources.
-fn MultiSurfaceDemoState::release(self : MultiSurfaceDemoState) -> Unit {
-  for i = 0; i < self.surfaces.length(); i = i + 1 {
-    self.surfaces[i].demo.release()
-  }
-}
-
-///|
 /// Creates scene graph demo state for every engine surface before the first frame.
 fn MultiSurfaceDemoState::prepare_all_surfaces(
   self : MultiSurfaceDemoState,
@@ -172,21 +139,13 @@ pub fn register_engine_handlers(
   engine.add_phase_handler(@app.phase_startup(), fn(engine, _frame) {
     demo_state.prepare_all_surfaces(engine)
   })
-  engine.add_phase_handler(@app.phase_surface(), fn(engine, frame) {
-    demo_state.handle_surface_frame(engine, frame)
-  })
   engine.add_phase_handler(@app.phase_input(), fn(engine, frame) {
     demo_state.handle_input_frame(engine, frame)
   })
-  engine.add_phase_handler(@app.phase_update(), fn(engine, frame) {
+  engine.on_frame_update(fn(frame) {
     demo_state.update_surface_frame(engine, frame)
   })
-  engine.add_phase_handler(
-    @app.phase_render(),
-    fn(engine, frame) { demo_state.render_surface_frame(engine, frame) },
-    slot=@app.PhaseSlot::AfterSystems,
-  )
-  engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
-    demo_state.release()
+  engine.on_frame_render(fn(frame) {
+    demo_state.render_surface_frame(engine, frame)
   })
 }

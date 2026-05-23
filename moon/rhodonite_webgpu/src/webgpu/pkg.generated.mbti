@@ -62,6 +62,8 @@ pub fn global_transform_words_buffer_byte_size(Int) -> UInt64
 
 pub fn navigatorGPU() -> @webgpu_objects.GPU
 
+pub fn pipelineLayout_release(GPUPipelineLayout) -> Unit
+
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
 
 pub fn rgba8_copy_bytes_per_row(UInt) -> UInt64
@@ -119,6 +121,10 @@ pub(all) struct GPUBindGroupLayout {
   raw : @webgpu_objects.GPUBindGroupLayout
 }
 
+pub(all) struct GPUBindGroupLayoutDescriptor {
+  buffer_entries : Array[GPUBufferBindGroupLayoutEntry]
+}
+
 pub(all) enum GPUBindingResource {
   Sampler(GPUSampler)
   Texture(GPUTexture)
@@ -132,6 +138,14 @@ pub(all) struct GPUBuffer {
   raw : @webgpu_objects.GPUBuffer
 }
 pub fn GPUBuffer::release(Self) -> Unit
+
+pub(all) struct GPUBufferBindGroupLayoutEntry {
+  binding : UInt
+  visibility : UInt64
+  buffer_type : UInt
+  has_dynamic_offset : Bool
+  min_binding_size : UInt64
+}
 
 pub(all) struct GPUBufferBinding {
   buffer : GPUBuffer
@@ -165,12 +179,14 @@ pub(all) struct GPUDevice {
   raw : @webgpu_objects.WebGPUDevice
 }
 pub fn GPUDevice::create_bind_group(Self, GPUBindGroupDescriptor) -> GPUBindGroup
+pub fn GPUDevice::create_bind_group_layout(Self, GPUBindGroupLayoutDescriptor) -> GPUBindGroupLayout
 pub fn GPUDevice::create_buffer(Self, UInt64, UInt64) -> GPUBuffer
-pub fn GPUDevice::create_camera_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
+pub fn GPUDevice::create_camera_words_bind_group(Self, GPUBindGroupLayout, GPUBuffer, UInt) -> GPUBindGroup
 pub fn GPUDevice::create_camera_words_buffer(Self, @ecs.World) -> GPUBuffer
 pub fn GPUDevice::create_command_encoder(Self) -> GPUCommandEncoder
-pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPURenderPipeline, GPUBuffer, UInt, UInt) -> GPUBindGroup
+pub fn GPUDevice::create_global_transform_words_bind_group(Self, GPUBindGroupLayout, GPUBuffer, UInt) -> GPUBindGroup
 pub fn GPUDevice::create_global_transform_words_buffer(Self, @ecs.World) -> GPUBuffer
+pub fn GPUDevice::create_pipeline_layout(Self, GPUPipelineLayoutDescriptor) -> GPUPipelineLayout
 pub fn GPUDevice::create_render_pipeline(Self, GPURenderPipelineDescriptor) -> GPURenderPipeline
 pub fn GPUDevice::create_rgba8_render_texture(Self, UInt, UInt) -> GPUTexture
 pub fn GPUDevice::create_shader_module(Self, String) -> @webgpu_objects.GPUShaderModule
@@ -203,6 +219,15 @@ pub fn GPUInstance::get_preferred_canvas_format_for_surface(Self, GPUAdapter, GP
 pub fn GPUInstance::process_events(Self) -> Unit
 pub fn GPUInstance::release(Self) -> Unit
 pub async fn GPUInstance::request_adapter(Self) -> GPUAdapter
+
+pub(all) struct GPUPipelineLayout {
+  raw : @webgpu_objects.GPUPipelineLayout
+}
+pub fn GPUPipelineLayout::release(Self) -> Unit
+
+pub(all) struct GPUPipelineLayoutDescriptor {
+  bind_group_layouts : Array[GPUBindGroupLayout]
+}
 
 pub(all) struct GPUQueue {
   raw : @webgpu_objects.WebGPUQueue
@@ -255,6 +280,7 @@ pub fn GPURenderPipeline::get_bind_group_layout(Self, UInt) -> GPUBindGroupLayou
 pub fn GPURenderPipeline::release(Self) -> Unit
 
 pub(all) struct GPURenderPipelineDescriptor {
+  layout : GPUPipelineLayout?
   vertex : @webgpu_objects.GPUShaderModule
   fragment : @webgpu_objects.GPUShaderModule
   topology : @webgpu_enums.GPUPrimitiveTopology
@@ -322,4 +348,3 @@ pub using @webgpu_enums {type GPUVertexStepMode}
 pub using @webgpu_objects {type HTMLCanvasElement}
 
 // Traits
-

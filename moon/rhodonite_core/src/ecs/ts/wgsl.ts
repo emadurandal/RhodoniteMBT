@@ -64,15 +64,14 @@ export function globalTransformRefInstanceVertexBufferLayout(
 
 export function globalTransformWordsBindGroup(
 	device: GPUDevice,
-	pipeline: GPURenderPipeline,
+	layout: GPUBindGroupLayout,
 	buffer: GPUBuffer,
 	options: {
-		readonly groupIndex?: number;
 		readonly binding?: number;
 	} = {},
 ): GPUBindGroup {
 	return device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(options.groupIndex ?? 0),
+		layout,
 		entries: [
 			{
 				binding: options.binding ?? 0,
@@ -157,15 +156,14 @@ export function cameraWordsBindingDefault(): string {
 
 export function cameraWordsBindGroup(
 	device: GPUDevice,
-	pipeline: GPURenderPipeline,
+	layout: GPUBindGroupLayout,
 	buffer: GPUBuffer,
 	options: {
-		readonly groupIndex?: number;
 		readonly binding?: number;
 	} = {},
 ): GPUBindGroup {
 	return device.createBindGroup({
-		layout: pipeline.getBindGroupLayout(options.groupIndex ?? 1),
+		layout,
 		entries: [
 			{
 				binding: options.binding ?? 0,

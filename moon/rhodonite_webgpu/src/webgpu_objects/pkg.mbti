@@ -38,8 +38,10 @@ pub fn webgpu_instance_process_events(WebGPUInstance) -> Unit
 pub fn webgpu_instance_release(WebGPUInstance) -> Unit
 pub fn webgpu_context_get(WebGPUContext) -> (WebGPUDevice, WebGPUCanvasContext, String, WebGPUQueue)
 pub fn webgpu_device_create_shader_module(WebGPUDevice, String) -> GPUShaderModule
-pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String], vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout], depth_stencil_format~ : String) -> GPURenderPipeline
+pub fn webgpu_device_create_render_pipeline(WebGPUDevice, GPUPipelineLayout?, GPUShaderModule, GPUShaderModule, topology~ : @webgpu_enums.GPUPrimitiveTopology, formats~ : Array[String], vertex_buffers~ : Array[@webgpu_enums.GPUVertexBufferLayout], depth_stencil_format~ : String) -> GPURenderPipeline
 pub fn webgpu_render_pipeline_get_bind_group_layout(GPURenderPipeline, UInt) -> GPUBindGroupLayout
+pub fn webgpu_device_create_bind_group_layout(WebGPUDevice, Array[UInt], Array[UInt64], Array[UInt], Array[Bool], Array[UInt64]) -> GPUBindGroupLayout
+pub fn webgpu_device_create_pipeline_layout(WebGPUDevice, Array[GPUBindGroupLayout]) -> GPUPipelineLayout
 pub fn gp_bind_group_entry_buffer(UInt, GPUBuffer) -> GPUBindGroupEntry
 pub fn gp_bind_group_entry_buffer_binding(UInt, GPUBuffer, UInt64, UInt64) -> GPUBindGroupEntry
 pub fn gp_bind_group_entry_texture_view(UInt, GPUTextureView) -> GPUBindGroupEntry
@@ -73,6 +75,7 @@ pub fn webgpu_render_pass_encoder_set_bind_group(WebGPURenderPassEncoder, UInt, 
 pub fn webgpu_render_pass_encoder_end(WebGPURenderPassEncoder) -> Unit
 pub fn shaderModule_release(GPUShaderModule) -> Unit
 pub fn renderPipeline_release(GPURenderPipeline) -> Unit
+pub fn pipelineLayout_release(GPUPipelineLayout) -> Unit
 pub fn bindGroupLayout_release(GPUBindGroupLayout) -> Unit
 pub fn bindGroup_release(GPUBindGroup) -> Unit
 pub fn buffer_release(GPUBuffer) -> Unit
@@ -96,6 +99,7 @@ type GPUSampler
 type GPUExternalTexture
 type GPUShaderModule
 type GPURenderPipeline
+type GPUPipelineLayout
 type GPUCommandEncoder
 type GPURenderPassEncoder
 type GPUCommandBuffer

@@ -118,9 +118,15 @@ pub fn Engine::insert_phase_before_in_group(Self, PhaseGroupKey, @ecs.PhaseKey, 
 pub fn Engine::main_scene(Self) -> Scene
 pub fn Engine::new(@webgpu.GPUContext) -> Self
 pub fn Engine::new_with_main_scene(@webgpu.GPUContext, Scene) -> Self
+pub fn Engine::on_frame_render(Self, (FrameState) -> Unit, key? : String?) -> Unit
+pub fn Engine::on_frame_update(Self, (FrameState) -> Unit, key? : String?) -> Unit
+pub fn Engine::on_scene_render(Self, Scene, (FrameState) -> Unit, key? : String?) -> Unit
+pub fn Engine::on_scene_update(Self, Scene, (FrameState) -> Unit, key? : String?) -> Unit
 pub fn Engine::phase_group_order(Self, PhaseGroupKey) -> Array[@ecs.PhaseKey]
 pub fn Engine::remove_surface(Self, SurfaceId) -> Unit
 pub fn Engine::render_requested(Self) -> Bool
+pub fn Engine::render_target_resources(Self) -> RenderTargetResources
+pub fn Engine::renderer(Self) -> Renderer
 pub fn Engine::request_continuous_render(Self, String) -> Unit
 pub fn Engine::request_render(Self, String) -> Unit
 pub fn Engine::run_frame(Self, Float) -> Int
@@ -140,17 +146,13 @@ pub fn Engine::surface_id_at(Self, Int) -> SurfaceId
 pub fn Engine::surface_input(Self, SurfaceId) -> @input.InputState
 pub fn Engine::surface_state(Self) -> SurfaceState
 
-pub(all) struct EngineSurface {
-  id : SurfaceId
-  gpu_surface : @webgpu.GPUSurface
-  mut scene : Scene
-  input_state : @input.InputState
-  mut state : SurfaceState
-  mut changed : Bool
+pub struct EngineSurface {
+  // private fields
 }
 pub fn EngineSurface::gpu_surface(Self) -> @webgpu.GPUSurface
 pub fn EngineSurface::id(Self) -> SurfaceId
 pub fn EngineSurface::input(Self) -> @input.InputState
+pub fn EngineSurface::render_target_resources(Self) -> RenderTargetResources
 pub fn EngineSurface::scene(Self) -> Scene
 pub fn EngineSurface::set_scene(Self, Scene) -> Unit
 pub fn EngineSurface::state(Self) -> SurfaceState
@@ -205,6 +207,16 @@ pub(all) enum PhaseSlot {
   AfterSystems
 } derive(Eq)
 
+pub struct RenderTargetResources {
+  // private fields
+}
+pub fn RenderTargetResources::active(Self) -> Bool
+pub fn RenderTargetResources::depth_view(Self) -> @webgpu_objects.GPUTextureView?
+pub fn RenderTargetResources::format(Self) -> String
+pub fn RenderTargetResources::new(@webgpu.GPUDevice, Int, Int, String) -> Self
+pub fn RenderTargetResources::release(Self) -> Unit
+pub fn RenderTargetResources::resize(Self, Int, Int, String) -> Unit
+
 pub(all) struct RenderableDesc {
   // private fields
 }
@@ -223,16 +235,15 @@ pub struct Renderer {
   // private fields
 }
 pub fn Renderer::device(Self) -> @webgpu.GPUDevice
-pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, String, Int, Int, @webgpu_enums.GPUVertexBufferLayout) -> Self
+pub fn Renderer::new(@webgpu.GPUDevice, @webgpu.GPUQueue, @webgpu_enums.GPUVertexBufferLayout) -> Self
 pub fn Renderer::register_cube_mesh(Self, desc? : CubeMeshDesc) -> MeshHandle
 pub fn Renderer::register_static_indexed_mesh(Self, FixedArray[Byte], FixedArray[Byte], Int) -> MeshHandle
 pub fn Renderer::register_static_indexed_mesh_desc(Self, StaticIndexedMeshDesc) -> MeshHandle
 pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> InstanceBufferHandle
 pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
-pub fn Renderer::render_instanced_mesh(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
-pub fn Renderer::render_scene_renderables(Self, Scene, @webgpu_objects.GPUTextureView) -> Unit
-pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
+pub fn Renderer::render_instanced_mesh(Self, Scene, MeshHandle, InstanceBufferHandle, Int, RenderTargetResources, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_scene_renderables(Self, Scene, RenderTargetResources, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::update_static_instance_buffer(Self, InstanceBufferHandle, FixedArray[Byte]) -> Bool
 pub fn Renderer::upload_global_transform_writes(Self, @ecs.World, Array[@ecs.GpuWriteView]) -> Unit
 

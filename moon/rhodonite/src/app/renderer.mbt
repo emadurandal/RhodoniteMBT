@@ -6,6 +6,14 @@
 let renderer_instance_stride : Int = 24
 
 ///|
+/// Shader visibility bit for vertex-stage renderer bindings.
+let renderer_shader_stage_vertex : UInt64 = 1UL
+
+///|
+/// WebGPU buffer binding type used for read-only storage buffers.
+let renderer_buffer_binding_read_only_storage : UInt = 4U
+
+///|
 /// Handle for a renderer-owned instance vertex buffer.
 pub(all) struct InstanceBufferHandle {
   priv index : Int
@@ -101,13 +109,130 @@ priv struct RendererDrawItem {
 }
 
 ///|
+/// Surface-local render target resources used by the v1 renderer.
+pub struct RenderTargetResources {
+  priv device : @wgpu.GPUDevice
+  priv mut format : String
+  priv mut width : Int
+  priv mut height : Int
+  priv mut depth_texture : @wgpu.GPUTexture?
+  priv mut depth_view : @wgpu.GPUTextureView?
+}
+
+///|
+/// Creates render target resources for one color target format and extent.
+pub fn RenderTargetResources::new(
+  device : @wgpu.GPUDevice,
+  width : Int,
+  height : Int,
+  format : String,
+) -> RenderTargetResources {
+  let target = {
+    device,
+    format,
+    width: 0,
+    height: 0,
+    depth_texture: None,
+    depth_view: None,
+  }
+  target.resize(width, height, format)
+  target
+}
+
+///|
+/// Returns whether this target has valid surface-sized resources.
+pub fn RenderTargetResources::active(self : RenderTargetResources) -> Bool {
+  self.width > 0 &&
+  self.height > 0 &&
+  (match self.depth_view {
+    Some(_) => true
+    None => false
+  })
+}
+
+///|
+/// Returns the color format used to select a compatible render pipeline.
+pub fn RenderTargetResources::format(self : RenderTargetResources) -> String {
+  self.format
+}
+
+///|
+/// Returns the current depth view when the target is active.
+pub fn RenderTargetResources::depth_view(
+  self : RenderTargetResources,
+) -> @wgpu.GPUTextureView? {
+  self.depth_view
+}
+
+///|
+/// Recreates surface-sized depth resources for the supplied extent and format.
+pub fn RenderTargetResources::resize(
+  self : RenderTargetResources,
+  width : Int,
+  height : Int,
+  format : String,
+) -> Unit {
+  self.release_depth_resources()
+  if format != "" {
+    self.format = format
+  }
+  self.width = width
+  self.height = height
+  if width <= 0 || height <= 0 {
+    self.width = 0
+    self.height = 0
+    return
+  }
+  let texture = self.device.create_texture(
+    width.reinterpret_as_uint(),
+    height.reinterpret_as_uint(),
+    "depth24plus",
+    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+  )
+  self.depth_texture = Some(texture)
+  self.depth_view = Some(texture.create_view())
+}
+
+///|
+/// Releases only the target-local depth resources.
+fn RenderTargetResources::release_depth_resources(
+  self : RenderTargetResources,
+) -> Unit {
+  match self.depth_view {
+    Some(view) => @wgpu.textureView_release(view)
+    None => ()
+  }
+  match self.depth_texture {
+    Some(texture) => texture.release()
+    None => ()
+  }
+  self.depth_view = None
+  self.depth_texture = None
+}
+
+///|
+/// Releases target-local GPU resources.
+pub fn RenderTargetResources::release(self : RenderTargetResources) -> Unit {
+  self.release_depth_resources()
+}
+
+///|
+/// Render pipeline cached for one color target format.
+priv struct RendererPipelineEntry {
+  format : String
+  pipeline : @wgpu.GPURenderPipeline
+}
+
+///|
 /// Minimal engine-owned renderer for ECS Renderable entities.
 pub struct Renderer {
   priv device : @wgpu.GPUDevice
   priv queue : @wgpu.GPUQueue
-  priv pipeline : @wgpu.GPURenderPipeline
-  priv mut depth_texture : @wgpu.GPUTexture?
-  priv mut depth_view : @wgpu.GPUTextureView?
+  priv transform_layout : @wgpu.GPUBindGroupLayout
+  priv camera_layout : @wgpu.GPUBindGroupLayout
+  priv pipeline_layout : @wgpu.GPUPipelineLayout
+  priv vertex_layout : @wgpu.GPUVertexBufferLayout
+  priv pipeline_entries : Array[RendererPipelineEntry]
   priv meshes : Array[RendererMesh]
   priv materials : Array[RendererMaterial]
   priv instance_buffers : Array[RendererInstanceBuffer]
@@ -188,11 +313,13 @@ fn renderable_instance_vertex_buffer_layout() -> @wgpu.GPUVertexBufferLayout {
 /// Creates the v1 unlit render pipeline.
 fn create_renderable_unlit_pipeline(
   device : @wgpu.GPUDevice,
+  pipeline_layout : @wgpu.GPUPipelineLayout,
   format : String,
   vertex_layout : @wgpu.GPUVertexBufferLayout,
 ) -> @wgpu.GPURenderPipeline {
   let shader = device.create_shader_module(renderable_unlit_wgsl())
   let pipeline = device.create_render_pipeline({
+    layout: Some(pipeline_layout),
     vertex: shader,
     fragment: shader,
     topology: @wgpu.GPUPrimitiveTopology::TriangleList,
@@ -205,22 +332,45 @@ fn create_renderable_unlit_pipeline(
 }
 
 ///|
-/// Creates a renderer for the supplied WebGPU device and surface format.
+/// Creates shared renderer resources for the supplied WebGPU device.
 pub fn Renderer::new(
   device : @wgpu.GPUDevice,
   queue : @wgpu.GPUQueue,
-  format : String,
-  width : Int,
-  height : Int,
   vertex_layout : @wgpu.GPUVertexBufferLayout,
 ) -> Renderer {
-  let pipeline = create_renderable_unlit_pipeline(device, format, vertex_layout)
-  let renderer = {
+  let transform_layout = device.create_bind_group_layout({
+    buffer_entries: [
+      {
+        binding: 0U,
+        visibility: renderer_shader_stage_vertex,
+        buffer_type: renderer_buffer_binding_read_only_storage,
+        has_dynamic_offset: false,
+        min_binding_size: 0UL,
+      },
+    ],
+  })
+  let camera_layout = device.create_bind_group_layout({
+    buffer_entries: [
+      {
+        binding: 0U,
+        visibility: renderer_shader_stage_vertex,
+        buffer_type: renderer_buffer_binding_read_only_storage,
+        has_dynamic_offset: false,
+        min_binding_size: 0UL,
+      },
+    ],
+  })
+  let pipeline_layout = device.create_pipeline_layout({
+    bind_group_layouts: [transform_layout, camera_layout],
+  })
+  {
     device,
     queue,
-    pipeline,
-    depth_texture: None,
-    depth_view: None,
+    transform_layout,
+    camera_layout,
+    pipeline_layout,
+    vertex_layout,
+    pipeline_entries: [],
     meshes: [],
     materials: [],
     instance_buffers: [],
@@ -233,38 +383,28 @@ pub fn Renderer::new(
     transform_word_capacity: 0,
     camera_word_capacity: 0,
   }
-  renderer.resize_surface_resources(width, height)
-  renderer
 }
 
 ///|
-/// Recreates the surface-sized depth attachment.
-pub fn Renderer::resize_surface_resources(
+/// Returns a pipeline compatible with the supplied target format.
+fn Renderer::pipeline_for_format(
   self : Renderer,
-  width : Int,
-  height : Int,
-) -> Unit {
-  match self.depth_view {
-    Some(view) => @wgpu.textureView_release(view)
-    None => ()
+  format : String,
+) -> @wgpu.GPURenderPipeline {
+  for i = 0; i < self.pipeline_entries.length(); i = i + 1 {
+    let entry = self.pipeline_entries[i]
+    if entry.format == format {
+      return entry.pipeline
+    }
   }
-  match self.depth_texture {
-    Some(texture) => texture.release()
-    None => ()
-  }
-  if width <= 0 || height <= 0 {
-    self.depth_texture = None
-    self.depth_view = None
-    return
-  }
-  let texture = self.device.create_texture(
-    width.reinterpret_as_uint(),
-    height.reinterpret_as_uint(),
-    "depth24plus",
-    @wgpu.GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+  let pipeline = create_renderable_unlit_pipeline(
+    self.device,
+    self.pipeline_layout,
+    format,
+    self.vertex_layout,
   )
-  self.depth_texture = Some(texture)
-  self.depth_view = Some(texture.create_view())
+  self.pipeline_entries.push({ format, pipeline })
+  pipeline
 }
 
 ///|
@@ -450,9 +590,8 @@ fn Renderer::ensure_scene_buffers(self : Renderer, world : @ecs.World) -> Unit {
       Some(buffer) =>
         self.bind_transforms = Some(
           self.device.create_global_transform_words_bind_group(
-            self.pipeline,
+            self.transform_layout,
             buffer,
-            0U,
             0U,
           ),
         )
@@ -469,9 +608,8 @@ fn Renderer::ensure_scene_buffers(self : Renderer, world : @ecs.World) -> Unit {
       Some(buffer) =>
         self.bind_camera = Some(
           self.device.create_camera_words_bind_group(
-            self.pipeline,
+            self.camera_layout,
             buffer,
-            1U,
             0U,
           ),
         )
@@ -585,12 +723,14 @@ fn Renderer::build_instance_bytes(
 pub fn Renderer::render_scene_renderables(
   self : Renderer,
   scene : Scene,
+  target : RenderTargetResources,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
-  let depth_view = match self.depth_view {
+  let depth_view = match target.depth_view() {
     Some(view) => view
     None => return
   }
+  let pipeline = self.pipeline_for_format(target.format())
   let world = scene.world()
   self.ensure_scene_buffers(world)
   let items = self.extract_draw_items(scene)
@@ -632,7 +772,7 @@ pub fn Renderer::render_scene_renderables(
       depth_store_op: @wgpu.GPUStoreOp::Store,
     }),
   })
-  render_pass.set_pipeline(self.pipeline)
+  render_pass.set_pipeline(pipeline)
   match self.bind_transforms {
     Some(group) => render_pass.set_bind_group(0U, group, [])
     None => ()
@@ -687,6 +827,7 @@ pub fn Renderer::render_instanced_mesh(
   mesh : MeshHandle,
   instances : InstanceBufferHandle,
   instance_count : Int,
+  target : RenderTargetResources,
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   if instance_count <= 0 ||
@@ -694,10 +835,11 @@ pub fn Renderer::render_instanced_mesh(
     !self.has_instance_buffer(instances.index) {
     return
   }
-  let depth_view = match self.depth_view {
+  let depth_view = match target.depth_view() {
     Some(view) => view
     None => return
   }
+  let pipeline = self.pipeline_for_format(target.format())
   let instance_entry = self.instance_buffers[instances.index]
   let instance_byte_length = instance_count * renderer_instance_stride
   if instance_byte_length > instance_entry.byte_capacity {
@@ -732,7 +874,7 @@ pub fn Renderer::render_instanced_mesh(
       depth_store_op: @wgpu.GPUStoreOp::Store,
     }),
   })
-  render_pass.set_pipeline(self.pipeline)
+  render_pass.set_pipeline(pipeline)
   match self.bind_transforms {
     Some(group) => render_pass.set_bind_group(0U, group, [])
     None => ()
@@ -782,13 +924,10 @@ pub fn Renderer::release(self : Renderer) -> Unit {
   release_buffer(self.transform_storage)
   release_buffer(self.camera_storage)
   release_buffer(self.renderable_instance_buffer)
-  match self.depth_view {
-    Some(view) => @wgpu.textureView_release(view)
-    None => ()
+  for i = 0; i < self.pipeline_entries.length(); i = i + 1 {
+    self.pipeline_entries[i].pipeline.release()
   }
-  match self.depth_texture {
-    Some(texture) => texture.release()
-    None => ()
-  }
-  self.pipeline.release()
+  self.pipeline_layout.release()
+  @wgpu.bindGroupLayout_release(self.transform_layout)
+  @wgpu.bindGroupLayout_release(self.camera_layout)
 }

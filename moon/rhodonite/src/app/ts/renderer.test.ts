@@ -17,6 +17,7 @@ import {
 	MaterialHandle,
 	MeshHandle,
 	Renderer,
+	RenderTargetResources,
 	RenderableDesc,
 	RenderableFlags,
 	Scene,
@@ -48,20 +49,20 @@ function renderableBytes(
 function testRenderer(device = new FakeDevice()): {
 	readonly device: FakeDevice;
 	readonly renderer: Renderer;
+	readonly target: RenderTargetResources;
 } {
+	const gpuDevice = device as unknown as GPUDevice;
 	return {
 		device,
 		renderer: Renderer.new(
-			device as unknown as GPUDevice,
+			gpuDevice,
 			device.queue as unknown as GPUQueue,
-			"rgba8unorm",
-			64,
-			32,
 			{
 				arrayStride: 12,
 				attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
 			},
 		),
+		target: RenderTargetResources.new(gpuDevice, 64, 32, "rgba8unorm"),
 	};
 }
 
@@ -196,7 +197,7 @@ describe("Renderer TypeScript renderable API", () => {
 	});
 
 	it("records prepared instanced draw calls through WebGPU resources", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		const mesh = renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2, 3, 4, 5, 6]),
 			new Uint8Array([0, 0, 1, 0, 2, 0]),
@@ -208,7 +209,7 @@ describe("Renderer TypeScript renderable API", () => {
 		renderer.ensureStorageBuffers({ transformWords: 16, cameraWords: 72 });
 		renderer.uploadGlobalTransformBytes(new Uint8Array([9, 8, 7, 6]), 4);
 		renderer.uploadCameraBytes(new Uint8Array([5, 4, 3, 2]), 8);
-		renderer.renderPreparedInstancedMesh(mesh, instances, 2, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 2, target, colorView);
 
 		expect(device.bindGroups).toHaveLength(2);
 		expect(device.queue.writes.map((write) => write.bytes.byteLength)).toEqual([
@@ -254,7 +255,7 @@ describe("Renderer TypeScript renderable API", () => {
 	});
 
 	it("skips prepared instanced draws when handles or instance counts are invalid", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		const mesh = renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2, 3, 4, 5, 6]),
 			new Uint8Array([0, 0, 1, 0, 2, 0]),
@@ -263,17 +264,17 @@ describe("Renderer TypeScript renderable API", () => {
 		const instances = renderer.registerStaticInstanceBuffer(new Uint8Array(24));
 		const colorView = { kind: "color" } as unknown as GPUTextureView;
 
-		renderer.renderPreparedInstancedMesh(new MeshHandle(99), instances, 1, colorView);
-		renderer.renderPreparedInstancedMesh(mesh, new InstanceBufferHandle(99), 1, colorView);
-		renderer.renderPreparedInstancedMesh(mesh, instances, 0, colorView);
-		renderer.renderPreparedInstancedMesh(mesh, instances, 2, colorView);
+		renderer.renderPreparedInstancedMesh(new MeshHandle(99), instances, 1, target, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, new InstanceBufferHandle(99), 1, target, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 0, target, colorView);
+		renderer.renderPreparedInstancedMesh(mesh, instances, 2, target, colorView);
 
 		expect(device.encoders).toHaveLength(0);
 		expect(device.queue.submissions).toHaveLength(0);
 	});
 
 	it("skips prepared instanced draws when depth resources are inactive", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		const mesh = renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2, 3, 4, 5, 6]),
 			new Uint8Array([0, 0, 1, 0, 2, 0]),
@@ -282,8 +283,8 @@ describe("Renderer TypeScript renderable API", () => {
 		const instances = renderer.registerStaticInstanceBuffer(new Uint8Array(24));
 		const colorView = { kind: "color" } as unknown as GPUTextureView;
 
-		renderer.resizeSurfaceResources(0, 32);
-		renderer.renderPreparedInstancedMesh(mesh, instances, 1, colorView);
+		target.resize(0, 32, target.format());
+		renderer.renderPreparedInstancedMesh(mesh, instances, 1, target, colorView);
 
 		expect(device.textures[0]?.destroyed).toBe(true);
 		expect(device.encoders).toHaveLength(0);
@@ -311,7 +312,7 @@ describe("Renderer TypeScript renderable API", () => {
 	});
 
 	it("skips renderables that lack GlobalTransform", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		const world = World.new();
 		const scene = new Scene<World, EntityId>("render-test", world);
 		const entity = world.createEntity();
@@ -341,7 +342,7 @@ describe("Renderer TypeScript renderable API", () => {
 			false,
 		);
 
-		renderer.renderSceneRenderables(scene, colorView);
+		renderer.renderSceneRenderables(scene, target, colorView);
 
 		const drawCalls = device.encoders[0]?.pass.calls.filter(
 			(call) => call.name === "drawIndexed",
@@ -350,7 +351,7 @@ describe("Renderer TypeScript renderable API", () => {
 	});
 
 	it("extracts visible renderables into one draw call per entity", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		const world = World.new();
 		const scene = new Scene<World, EntityId>("render-test", world);
 		const [entity] = world.spawnTransformGlobalBatchIdentity(1);
@@ -378,7 +379,7 @@ describe("Renderer TypeScript renderable API", () => {
 			),
 		).toBe(true);
 
-		renderer.renderSceneRenderables(scene, colorView);
+		renderer.renderSceneRenderables(scene, target, colorView);
 
 		expect(device.queue.submissions).toHaveLength(1);
 		const instanceWrite = device.queue.writes.find(
@@ -400,7 +401,7 @@ describe("Renderer TypeScript renderable API", () => {
 	});
 
 	it("releases owned GPU resources", () => {
-		const { device, renderer } = testRenderer();
+		const { device, renderer, target } = testRenderer();
 		renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2]),
 			new Uint8Array([0, 0]),
@@ -409,6 +410,7 @@ describe("Renderer TypeScript renderable API", () => {
 		renderer.registerStaticInstanceBuffer(new Uint8Array(24));
 		renderer.ensureStorageBuffers({ transformWords: 16, cameraWords: 72 });
 		renderer.release();
+		target.release();
 
 		expect(device.buffers.every((buffer) => buffer.destroyed)).toBe(true);
 		expect(device.textures.every((texture) => texture.destroyed)).toBe(true);

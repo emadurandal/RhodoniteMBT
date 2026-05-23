@@ -52,6 +52,9 @@ pub type GPUExternalTexture
 pub type GPUBindGroupLayout
 
 ///|
+pub type GPUPipelineLayout
+
+///|
 pub type GPUBindGroup
 
 ///|

@@ -129,6 +129,8 @@ export class FakeCommandEncoder {
 export class FakeDevice {
 	readonly buffers: FakeBuffer[] = [];
 	readonly textures: FakeTexture[] = [];
+	readonly bindGroupLayouts: GPUBindGroupLayout[] = [];
+	readonly pipelineLayouts: GPUPipelineLayout[] = [];
 	readonly bindGroups: GPUBindGroup[] = [];
 	readonly encoders: FakeCommandEncoder[] = [];
 	readonly queue = new FakeQueue();
@@ -143,8 +145,28 @@ export class FakeDevice {
 	): GPURenderPipeline {
 		return {
 			descriptor,
+			destroyed: false,
+			destroy() {
+				this.destroyed = true;
+			},
 			getBindGroupLayout: (index: number) => ({ index }),
 		} as unknown as GPURenderPipeline;
+	}
+
+	createBindGroupLayout(
+		descriptor: GPUBindGroupLayoutDescriptor,
+	): GPUBindGroupLayout {
+		const layout = { descriptor } as unknown as GPUBindGroupLayout;
+		this.bindGroupLayouts.push(layout);
+		return layout;
+	}
+
+	createPipelineLayout(
+		descriptor: GPUPipelineLayoutDescriptor,
+	): GPUPipelineLayout {
+		const layout = { descriptor } as unknown as GPUPipelineLayout;
+		this.pipelineLayouts.push(layout);
+		return layout;
 	}
 
 	createTexture(descriptor: GPUTextureDescriptor): GPUTexture {
@@ -199,5 +221,8 @@ export function installFakeWebGpuConstants(): void {
 	});
 	vi.stubGlobal("GPUTextureUsage", {
 		RENDER_ATTACHMENT: 1,
+	});
+	vi.stubGlobal("GPUShaderStage", {
+		VERTEX: 1,
 	});
 }

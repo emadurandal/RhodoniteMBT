@@ -116,6 +116,10 @@ pub fn GPUDevice::create_render_pipeline(
   {
     raw: @raw.webgpu_device_create_render_pipeline(
       self.raw,
+      match descriptor.layout {
+        Some(layout) => Some(layout.raw)
+        None => None
+      },
       descriptor.vertex,
       descriptor.fragment,
       topology=descriptor.topology,
@@ -125,6 +129,51 @@ pub fn GPUDevice::create_render_pipeline(
         Some(s) => s
         None => ""
       },
+    ),
+  }
+}
+
+///|
+/// Implements `GPUDevice::create_bind_group_layout`.
+pub fn GPUDevice::create_bind_group_layout(
+  self : GPUDevice,
+  descriptor : GPUBindGroupLayoutDescriptor,
+) -> GPUBindGroupLayout {
+  let bindings : Array[UInt] = []
+  let visibilities : Array[UInt64] = []
+  let buffer_types : Array[UInt] = []
+  let has_dynamic_offsets : Array[Bool] = []
+  let min_binding_sizes : Array[UInt64] = []
+  for i = 0; i < descriptor.buffer_entries.length(); i = i + 1 {
+    let entry = descriptor.buffer_entries[i]
+    bindings.push(entry.binding)
+    visibilities.push(entry.visibility)
+    buffer_types.push(entry.buffer_type)
+    has_dynamic_offsets.push(entry.has_dynamic_offset)
+    min_binding_sizes.push(entry.min_binding_size)
+  }
+  {
+    raw: @raw.webgpu_device_create_bind_group_layout(
+      self.raw,
+      bindings,
+      visibilities,
+      buffer_types,
+      has_dynamic_offsets,
+      min_binding_sizes,
+    ),
+  }
+}
+
+///|
+/// Implements `GPUDevice::create_pipeline_layout`.
+pub fn GPUDevice::create_pipeline_layout(
+  self : GPUDevice,
+  descriptor : GPUPipelineLayoutDescriptor,
+) -> GPUPipelineLayout {
+  {
+    raw: @raw.webgpu_device_create_pipeline_layout(
+      self.raw,
+      descriptor.bind_group_layouts.map(fn(layout) { layout.raw }),
     ),
   }
 }
@@ -853,13 +902,12 @@ pub fn GPUDevice::create_bind_group(
 /// Creates a bind group for the builtin ECS GlobalTransform packed word storage buffer.
 pub fn GPUDevice::create_global_transform_words_bind_group(
   self : GPUDevice,
-  pipeline : GPURenderPipeline,
+  layout : GPUBindGroupLayout,
   buffer : GPUBuffer,
-  group_index : UInt,
   binding : UInt,
 ) -> GPUBindGroup {
   self.create_bind_group({
-    layout: pipeline.get_bind_group_layout(group_index),
+    layout,
     entries: [{ binding, resource: GPUBindingResource::Buffer(buffer) }],
   })
 }
@@ -868,13 +916,12 @@ pub fn GPUDevice::create_global_transform_words_bind_group(
 /// Creates a bind group for the builtin ECS Camera packed word storage buffer.
 pub fn GPUDevice::create_camera_words_bind_group(
   self : GPUDevice,
-  pipeline : GPURenderPipeline,
+  layout : GPUBindGroupLayout,
   buffer : GPUBuffer,
-  group_index : UInt,
   binding : UInt,
 ) -> GPUBindGroup {
   self.create_bind_group({
-    layout: pipeline.get_bind_group_layout(group_index),
+    layout,
     entries: [{ binding, resource: GPUBindingResource::Buffer(buffer) }],
   })
 }
@@ -883,6 +930,12 @@ pub fn GPUDevice::create_camera_words_bind_group(
 /// Implements `GPURenderPipeline::release`.
 pub fn GPURenderPipeline::release(self : GPURenderPipeline) -> Unit {
   renderPipeline_release(self)
+}
+
+///|
+/// Implements `GPUPipelineLayout::release`.
+pub fn GPUPipelineLayout::release(self : GPUPipelineLayout) -> Unit {
+  @raw.pipelineLayout_release(self.raw)
 }
 
 ///|

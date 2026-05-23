@@ -37,19 +37,23 @@ flowchart TB
   E --> S[Scene list]
   SF --> SI[surface-local InputState]
   SF --> SS[SurfaceState]
+  SF --> RT[RenderTargetResources]
   S --> W[World]
   S --> SR[SystemRunner]
-  R[Renderer] --> GPU[GPU resources]
+  E --> R[Renderer]
+  R[Renderer] --> GPU[device-wide GPU resources]
+  RT --> TG[surface-sized target resources]
   R --> S
   W --> ECS[ECS data and builtin blobs]
           </div>
           <table>
             <thead><tr><th>Type</th><th>Responsibility</th></tr></thead>
             <tbody>
-              <tr><td><code>Engine</code></td><td>GPUContext、scenes、surfaces、time、input、phase groups、on-demand render state を所有する。</td></tr>
+              <tr><td><code>Engine</code></td><td>GPUContext、標準 Renderer、render target resources、scenes、surfaces、time、input、phase groups、on-demand render state を所有する。</td></tr>
               <tr><td><code>Scene</code></td><td>1つの <code>World</code> と <code>SystemRunner</code>、main camera、enabled/visible state を持つ runtime scene。</td></tr>
               <tr><td><code>World</code></td><td>ECS storage。engine lifecycle や GPU resource ownership は持たない。</td></tr>
-              <tr><td><code>Renderer</code></td><td>GPU resources、mesh/material/instance buffer table、scene renderable extraction と draw を扱う。</td></tr>
+              <tr><td><code>Renderer</code></td><td>device-wide GPU resources、explicit pipeline layouts、format-keyed pipeline、mesh/material/instance buffer table、scene renderable extraction と draw を扱う。</td></tr>
+              <tr><td><code>RenderTargetResources</code></td><td>color format、extent、depth attachment など surface-local render target state を所有する。</td></tr>
               <tr><td><code>FrameState</code></td><td>delta、frame index、elapsed、surface snapshot、surface-local input を phase/system へ渡す。</td></tr>
             </tbody>
           </table>
@@ -75,6 +79,7 @@ flowchart TD
             <li><code>phase_startup()</code> と <code>phase_shutdown()</code> は one-shot phase。group には追加しません。</li>
             <li>custom phase group / phase order の編集は <code>Engine::initialize()</code> 中の startup handler で行います。</li>
             <li><code>Engine::add_phase_handler</code> は registration key を受け取れます。同じ phase、slot、key の handler は重複登録されません。</li>
+            <li>通常の scene-scoped callback には <code>Engine::on_scene_update</code> / <code>Engine::on_scene_render</code>（TypeScript では <code>Engine.onSceneUpdate</code> / <code>Engine.onSceneRender</code>）を使います。標準 update/render phase と slot、multi-surface frame の対象 scene 判定、scene の <code>enabled</code>/<code>visible</code> 判定を隠蔽します。frame-wide な callback には <code>Engine::on_frame_update</code> / <code>Engine::on_frame_render</code>（TypeScript では <code>Engine.onFrameUpdate</code> / <code>Engine.onFrameRender</code>）を使い、custom phase や slot が必要な場合だけ <code>Engine::add_phase_handler</code> を使います。</li>
             <li>Scene は main camera が設定された時点で標準 transform/camera runtime integration を暗黙宣言します。scene は builtin orbit/home/lens component id を使います。MoonBit sample は transform propagation や orbit camera blob sync などの optional standard system の bool flag を変えたいときだけ <code>Scene::use_common_runtime</code> を呼びます。TypeScript sample は対応する <code>Scene.useCommonRuntime</code> を使います。<code>Engine::initialize()</code> と scene 単体の <code>prepare_render_state</code> がこの宣言を common scene systems に反映し、engine 管理下の scene には orbit-camera input handler も追加します。TypeScript の default transform propagation は scene world が <code>world.updateGlobalTransformsFromTransforms()</code> を公開していればそれを呼びます。custom world は <code>propagateTransforms</code> を渡せ、sample 側は <code>transformPropagation: false</code> で無効化できます。<code>Engine::set_surface_scene</code> / <code>Engine.setSurfaceScene</code> で scene を surface に bind したときも、宣言済み orbit-camera input handler がその scene 向けに追加されます。</li>
             <li>Scene 単体や offscreen rendering では、<code>Scene::prepare_render_state</code> で <code>update</code>、<code>post_update</code>、<code>render_extract</code> を一度に実行でき、各 phase をユーザーコードに並べる必要はありません。</li>
             <li>surface suspended 中は update までは進み、render extraction 以降は skip されます。</li>
@@ -82,7 +87,7 @@ flowchart TD
           </ul>
 
           <h2>Surface Model</h2>
-          <p>single-surface では <code>Engine::set_surface_active</code> / <code>set_surface_suspended</code> が legacy-compatible な surface snapshot を更新します。multi-surface では <code>Engine::add_surface</code>、<code>add_surface_for_scene</code>、<code>set_surface_scene</code>、<code>surface_input</code>、<code>run_multi_surface_frame</code> を使います。</p>
+          <p>single-surface では <code>Engine::set_surface_active</code> / <code>set_surface_suspended</code> が surface snapshot と render target resources を更新します。multi-surface では <code>Engine::add_surface</code>、<code>add_surface_for_scene</code>、<code>set_surface_scene</code>、<code>surface_input</code>、<code>run_multi_surface_frame</code> を使います。</p>
           <div class="mermaid">
 flowchart LR
   P[Platform event loop] --> E[Engine]
@@ -91,16 +96,16 @@ flowchart LR
   S1 --> Scene1[Scene A systems and render]
   S2 --> Scene2[Scene B systems and render]
           </div>
-          <p>各 surface は surface-local <code>InputState</code> を持ちます。canvas/window A の pointer event は B の camera/controller に影響しません。</p>
+          <p>各 surface は surface-local <code>InputState</code> と <code>RenderTargetResources</code> を持ちます。canvas/window A の pointer event は B の camera/controller に影響しません。</p>
 
           <h2>Renderer v1</h2>
-          <p><code>Renderer</code> は現在 intentionally narrow な engine-owned renderer です。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して unlit static indexed mesh を描画します。</p>
+          <p><code>Renderer</code> は現在 intentionally narrow な engine-owned renderer です。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して、caller-supplied <code>RenderTargetResources</code> へ unlit static indexed mesh を描画します。</p>
           <ul>
             <li>handles: <code>MeshHandle</code>、<code>MaterialHandle</code>、<code>InstanceBufferHandle</code></li>
             <li>components: <code>RenderableDesc</code>、<code>RenderableFlags</code>。Renderable component id は <code>Scene</code> が内部で登録・所有する。</li>
             <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>、<code>CubeMeshDesc</code>、<code>cube_mesh_desc</code></li>
             <li>resources: <code>register_static_indexed_mesh_desc</code>、<code>register_cube_mesh</code>、<code>register_unlit_material</code>、<code>register_static_instance_buffer</code></li>
-            <li>draw paths: <code>render_scene_renderables</code> と MassCubes 用の <code>render_instanced_mesh</code></li>
+            <li>draw paths: <code>render_scene_renderables(scene, target, view)</code> と MassCubes 用の <code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code></li>
           </ul>
           <p>Texture、skinning、transparent sorting、shadow、LOD はまだ v1 renderer の責務ではありません。</p>
 

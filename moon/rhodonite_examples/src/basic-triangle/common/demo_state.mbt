@@ -38,6 +38,7 @@ fn create_pipeline(
 ) -> @wgpu.GPURenderPipeline {
   let shader = device.create_shader_module(triangle_shader_code)
   let pipeline_descriptor : @wgpu.GPURenderPipelineDescriptor = {
+    layout: None,
     vertex: shader,
     fragment: shader,
     topology: @wgpu.GPUPrimitiveTopology::TriangleList,
@@ -131,11 +132,7 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.add_phase_handler(
-    @app.phase_render(),
-    fn(_engine, _frame) { render_current_frame(demo_state) },
-    slot=@app.PhaseSlot::AfterSystems,
-  )
+  engine.on_frame_render(fn(_frame) { render_current_frame(demo_state) })
   engine.add_phase_handler(@app.phase_shutdown(), fn(_engine, _frame) {
     demo_state.release()
   })
