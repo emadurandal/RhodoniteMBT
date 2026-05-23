@@ -173,7 +173,9 @@ pub fn RenderTargetResources::resize(
   format : String,
 ) -> Unit {
   self.release_depth_resources()
-  self.format = format
+  if format != "" {
+    self.format = format
+  }
   self.width = width
   self.height = height
   if width <= 0 || height <= 0 {

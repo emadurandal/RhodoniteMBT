@@ -192,7 +192,11 @@ pub fn Engine::set_surface_suspended(self : Engine) -> Unit {
   }
   let generation = self.surface_state.generation() + 1
   self.surface_state = SurfaceState::suspended(generation)
-  self.render_target_resources.resize(0, 0, "")
+  self.render_target_resources.resize(
+    0,
+    0,
+    self.render_target_resources.format(),
+  )
   self.surface_changed = true
   self.request_render("surface")
 }
