@@ -576,6 +576,33 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		return this.commonRuntimeValue?.implicit !== true;
 	}
 
+	installCommonHandlersRuntime(
+		options: CommonHandlersOptions<TWorld> = {},
+	):
+		| {
+				readonly orbit: CommonOrbitCameraSystems<TWorld, TMainCamera>;
+				readonly requireMainCamera: boolean;
+		  }
+		| undefined {
+		const explicit = this.commonRuntimeValue?.implicit === false
+			? this.commonRuntimeValue
+			: undefined;
+		const runtime: CommonRuntimeConfig<TWorld, TMainCamera> = explicit ?? {
+			systems: this.commonOrbitCameraValue ?? {},
+			options,
+			implicit: false,
+		};
+		this.commonOrbitCameraValue = runtime.systems;
+		const orbit = this.installCommonSystems(runtime.options);
+		if (orbit === undefined) {
+			return undefined;
+		}
+		return {
+			orbit,
+			requireMainCamera: runtime.implicit !== true,
+		};
+	}
+
 	installCommonSystems(
 		options: CommonHandlersOptions<TWorld> = {},
 	): CommonOrbitCameraSystems<TWorld, TMainCamera> | undefined {
@@ -1795,11 +1822,16 @@ export class Engine {
 		scene: Scene<TWorld, TMainCamera>,
 		options: CommonHandlersOptions<TWorld> = {},
 	): void {
-		const orbit = scene.installCommonSystems(options);
-		if (orbit === undefined) {
+		const runtime = scene.installCommonHandlersRuntime(options);
+		if (runtime === undefined) {
 			return;
 		}
-		this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit);
+		this.addCommonRuntimeOrbitCameraInputHandler(
+			scene,
+			runtime.orbit,
+			false,
+			runtime.requireMainCamera,
+		);
 	}
 
 	private declaredCommonRuntimeScenes(): Scene<unknown, unknown>[] {

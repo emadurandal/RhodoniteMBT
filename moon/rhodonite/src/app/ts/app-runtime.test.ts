@@ -412,6 +412,38 @@ describe("app-runtime Engine", () => {
 		expect(orbitUpdateCount).toBe(1);
 	});
 
+	it("honors explicit common runtime flags in addCommonHandlers", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene<ReturnType<typeof fakeOrbitWorld>, string>();
+		scene.setWorld(fakeOrbitWorld());
+		scene.setMainCamera("camera");
+
+		let orbitUpdateCount = 0;
+		let transformSyncCount = 0;
+		let blobSyncCount = 0;
+		scene.useCommonRuntime({
+			orbitCameraBlobSync: false,
+		}, {
+			updateOrbitCameraControllerFromInput: () => {
+				orbitUpdateCount += 1;
+			},
+			syncOrbitCameraTransform: () => {
+				transformSyncCount += 1;
+			},
+			syncOrbitCameraBlob: () => {
+				blobSyncCount += 1;
+			},
+		});
+		engine.addCommonHandlers(scene);
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(orbitUpdateCount).toBe(1);
+		expect(transformSyncCount).toBe(1);
+		expect(blobSyncCount).toBe(0);
+	});
+
 	it("installs declared common runtime orbit input during initialize", async () => {
 		const engine = await createTestEngine();
 		const scene = engine.mainScene<ReturnType<typeof fakeOrbitWorld>, string>();

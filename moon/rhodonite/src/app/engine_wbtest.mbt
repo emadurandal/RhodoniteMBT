@@ -79,3 +79,19 @@ test "push unique declared common runtime scene skips duplicates" {
   assert_true(result[0].same(main))
   assert_true(result[1].same(surface_only))
 }
+
+///|
+test "common handlers honor explicit common runtime flags" {
+  let scene = Scene::new("explicit-common-runtime")
+  scene.use_common_runtime(
+    transform_propagation=false,
+    orbit_camera_blob_sync=false,
+  )
+  let config = common_handlers_runtime_config(
+    scene,
+    CommonHandlersOptions::default(),
+  )
+  assert_true(!config.transform_propagation)
+  assert_true(config.orbit_camera_transform)
+  assert_true(!config.orbit_camera_blob_sync)
+}

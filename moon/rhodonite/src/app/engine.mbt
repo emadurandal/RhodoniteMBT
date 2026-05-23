@@ -468,21 +468,42 @@ pub fn CommonHandlersOptions::default() -> CommonHandlersOptions {
 }
 
 ///|
+/// Chooses common handler systems from explicit scene runtime flags when present.
+fn common_handlers_runtime_config(
+  scene : Scene,
+  options : CommonHandlersOptions,
+) -> CommonRuntimeConfig {
+  match scene.explicit_common_runtime() {
+    Some(config) => config
+    None =>
+      {
+        transform_propagation: options.transform_propagation,
+        orbit_camera_transform: true,
+        orbit_camera_blob_sync: true,
+        implicit: false,
+      }
+  }
+}
+
+///|
 /// Adds standard engine handlers and scene systems shared by ECS samples.
 pub fn Engine::add_common_handlers(
   self : Engine,
   scene : Scene,
   options? : CommonHandlersOptions = CommonHandlersOptions::default(),
 ) -> Unit {
+  let config = common_handlers_runtime_config(scene, options)
   scene.add_common_systems(
-    transform_propagation=options.transform_propagation,
-    orbit_camera_transform=true,
-    orbit_camera_blob_sync=true,
+    transform_propagation=config.transform_propagation,
+    orbit_camera_transform=config.orbit_camera_transform,
+    orbit_camera_blob_sync=config.orbit_camera_blob_sync,
   )
-  self.add_orbit_camera_controller_input_handler(
-    scene,
-    key=Some(common_orbit_camera_input_handler_key(scene)),
-  )
+  if config.orbit_camera_transform || config.orbit_camera_blob_sync {
+    self.add_orbit_camera_controller_input_handler(
+      scene,
+      key=Some(common_orbit_camera_input_handler_key(scene)),
+    )
+  }
 }
 
 ///|

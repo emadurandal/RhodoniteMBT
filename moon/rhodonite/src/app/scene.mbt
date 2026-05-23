@@ -374,6 +374,15 @@ fn Scene::apply_common_runtime(self : Scene) -> CommonRuntimeConfig? {
 }
 
 ///|
+/// Returns the explicitly configured common runtime when the user overrode defaults.
+fn Scene::explicit_common_runtime(self : Scene) -> CommonRuntimeConfig? {
+  match self.common_runtime {
+    Some(config) => if config.implicit { None } else { Some(config) }
+    None => None
+  }
+}
+
+///|
 /// Implements `Scene::set_main_camera`.
 pub fn Scene::set_main_camera(self : Scene, camera : @ecs.EntityId?) -> Unit {
   self.main_camera = camera
