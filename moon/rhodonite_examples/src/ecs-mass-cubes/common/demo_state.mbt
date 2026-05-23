@@ -595,8 +595,7 @@ pub fn create_demo_state_for_scene(
   let camera_lens = world.camera_lens_component()
   scene.use_common_runtime(
     transform_propagation=false,
-    orbit_component=Some(orbit_controller),
-    home_component=Some(camera_home),
+    orbit_camera_blob_sync=false,
   )
   let per_side = grid_side_len(entity_count)
   let inst_bytes_len = entity_count * instance_stride

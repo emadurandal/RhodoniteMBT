@@ -254,9 +254,9 @@ pub struct Scene {
   // private fields
 }
 pub fn Scene::add_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId) -> Unit
-pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::add_orbit_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
-pub fn Scene::add_orbit_camera_systems(Self, @ecs.ComponentTypeId, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_orbit_camera_systems(Self, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::add_orbit_camera_transform_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
@@ -274,7 +274,7 @@ pub fn Scene::same(Self, Self) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
-pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
 

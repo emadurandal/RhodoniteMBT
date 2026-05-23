@@ -88,7 +88,7 @@ rhodonite/render_frame:
           <p>multi-surface では <code>Platform</code> が device/event loop を共有し、<code>Surface</code> が canvas/window/swapchain/input を所有します。render path の camera/controller は <code>Engine::surface_input(surface_id)</code> または <code>FrameState::input()</code> を読みます。</p>
 
           <h2>Camera Controllers</h2>
-          <p>MoonBit samples は builtin の <code>OrbitCameraController</code>、<code>CameraHomeTransform</code>、<code>CameraLens</code> component を使い、標準 camera runtime integration を <code>Scene::use_common_runtime</code> で宣言します。camera component id を渡さない場合、scene は world の builtin id を使います。TypeScript samples は対応する <code>Scene.useCommonRuntime</code> を使います。<code>Engine::initialize()</code> が builtin orbit-camera input handler を keyed phase handler registration 経由で追加するため、common runtime reflection を繰り返しても同じ handler を再登録しません。TypeScript samples は <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> と <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code> で同じ byte layout と phase order を使います。</p>
+          <p>MoonBit samples は builtin の <code>OrbitCameraController</code>、<code>CameraHomeTransform</code>、<code>CameraLens</code> component を使い、標準 camera runtime integration を <code>Scene::use_common_runtime</code> で宣言します。どの標準 system を入れるかは bool flag で選びます。TypeScript samples は対応する <code>Scene.useCommonRuntime</code> を使います。<code>Engine::initialize()</code> が builtin orbit-camera input handler を keyed phase handler registration 経由で追加するため、common runtime reflection を繰り返しても同じ handler を再登録しません。TypeScript samples は <code>moon/rhodonite_core/src/ecs/ts/camera-control.ts</code> と <code>moon/rhodonite/src/app/ts/orbit-camera-input.ts</code> で同じ byte layout と phase order を使います。</p>
         </article>
       </main>
     </div>

@@ -422,10 +422,11 @@ fn Engine::try_install_declared_common_runtime(
 ) -> Unit {
   match scene.apply_common_runtime() {
     Some(config) =>
-      match config.orbit_component {
-        Some(orbit) =>
-          self.add_common_runtime_orbit_camera_input_handler(scene, orbit)
-        None => ()
+      if config.orbit_camera_transform || config.orbit_camera_blob_sync {
+        self.add_common_runtime_orbit_camera_input_handler(
+          scene,
+          scene.world().orbit_camera_controller_component(),
+        )
       }
     None => ()
   }
@@ -467,24 +468,16 @@ pub fn Engine::add_common_handlers(
   scene : Scene,
   options? : CommonHandlersOptions = CommonHandlersOptions::default(),
 ) -> Unit {
-  let orbit_component = scene.inferred_common_orbit_component()
-  let home_component = scene.inferred_common_home_component(orbit_component)
-  let lens_component = scene.inferred_common_lens_component(orbit_component)
   scene.add_common_systems(
     transform_propagation=options.transform_propagation,
-    orbit_component~,
-    home_component~,
-    lens_component~,
+    orbit_camera_transform=true,
+    orbit_camera_blob_sync=true,
   )
-  match orbit_component {
-    Some(orbit) =>
-      self.add_orbit_camera_controller_input_handler(
-        scene,
-        orbit,
-        key=Some(common_orbit_camera_input_handler_key(scene)),
-      )
-    None => ()
-  }
+  self.add_orbit_camera_controller_input_handler(
+    scene,
+    scene.world().orbit_camera_controller_component(),
+    key=Some(common_orbit_camera_input_handler_key(scene)),
+  )
 }
 
 ///|
