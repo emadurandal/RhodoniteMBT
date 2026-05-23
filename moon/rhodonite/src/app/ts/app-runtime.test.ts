@@ -69,6 +69,15 @@ function fakeCanvas(): HTMLCanvasElement & FakeEventTarget {
 	}) as unknown as HTMLCanvasElement & FakeEventTarget;
 }
 
+function fakeOrbitWorld() {
+	const component = { index: 4 };
+	return {
+		orbitCameraControllerComponent: () => component,
+		cameraHomeTransformComponent: () => component,
+		cameraLensComponent: () => component,
+	};
+}
+
 function stubAnimationFrame(): {
 	callbacks: FrameRequestCallback[];
 	cancel: ReturnType<typeof vi.fn>;
@@ -357,62 +366,19 @@ describe("app-runtime Engine", () => {
 		expect(afterInputCount).toBe(1);
 	});
 
-	it("scopes addCommonHandlers orbit input to the surface-bound scene", async () => {
-		const engine = await createTestEngine();
-		const sceneA = new Scene("surface-a", {});
-		const sceneB = new Scene("surface-b", {});
-		sceneA.setMainCamera("camera-a");
-
-		let orbitUpdateCount = 0;
-		sceneA.addCommonSystems({
-			orbitControllerComponent: "orbit",
-			updateOrbitCameraControllerFromInput: () => {
-				orbitUpdateCount += 1;
-			},
-		});
-		engine.addCommonHandlers(sceneA);
-		engine.initialize();
-		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneA });
-		engine.addSurface(createTestGpuSurface(fakeCanvas()), { scene: sceneB });
-
-		engine.runMultiSurfaceFrame(1 / 60);
-
-		expect(orbitUpdateCount).toBe(1);
-	});
-
-	it("deduplicates repeated addCommonHandlers orbit input registrations", async () => {
-		const engine = await createTestEngine();
-		const scene = new Scene("dedupe", {});
-		scene.setMainCamera("camera");
-
-		let orbitUpdateCount = 0;
-		scene.addCommonSystems({
-			orbitControllerComponent: "orbit",
-			updateOrbitCameraControllerFromInput: () => {
-				orbitUpdateCount += 1;
-			},
-		});
-		engine.addCommonHandlers(scene);
-		engine.addCommonHandlers(scene);
-		engine.initialize();
-
-		engine.runFrame(1 / 60);
-
-		expect(orbitUpdateCount).toBe(1);
-	});
-
 	it("installs declared common runtime orbit input during initialize", async () => {
 		const engine = await createTestEngine();
-		const scene = engine.mainScene<Record<string, never>, string>();
-		scene.setWorld({});
+		const scene = engine.mainScene<ReturnType<typeof fakeOrbitWorld>, string>();
+		scene.setWorld(fakeOrbitWorld());
 		scene.setMainCamera("camera");
 
 		let orbitUpdateCount = 0;
-		scene.useCommonRuntime({
-			orbitControllerComponent: "orbit",
+		scene.useCommonRuntime({}, {
 			updateOrbitCameraControllerFromInput: () => {
 				orbitUpdateCount += 1;
 			},
+			syncOrbitCameraTransform: () => {},
+			syncOrbitCameraBlob: () => {},
 		});
 		engine.initialize();
 
@@ -433,7 +399,10 @@ describe("app-runtime Engine", () => {
 				propagationCount += 1;
 			},
 		});
-		scene.useCommonRuntime({});
+		scene.useCommonRuntime({
+			orbitCameraTransform: false,
+			orbitCameraBlobSync: false,
+		});
 		engine.initialize();
 
 		engine.runFrame(1 / 60);
@@ -447,13 +416,14 @@ describe("app-runtime Engine", () => {
 		let orbitUpdateCount = 0;
 
 		engine.addPhaseHandler(Phase.Startup, () => {
-			const scene = new Scene("startup-surface", {});
+			const scene = new Scene("startup-surface", fakeOrbitWorld());
 			scene.setMainCamera("camera");
-			scene.useCommonRuntime({
-				orbitControllerComponent: "orbit",
+			scene.useCommonRuntime({}, {
 				updateOrbitCameraControllerFromInput: () => {
 					orbitUpdateCount += 1;
 				},
+				syncOrbitCameraTransform: () => {},
+				syncOrbitCameraBlob: () => {},
 			});
 			engine.setSurfaceScene(surfaceId, scene);
 		});
@@ -470,13 +440,14 @@ describe("app-runtime Engine", () => {
 		let orbitUpdateCount = 0;
 
 		engine.initialize();
-		const scene = new Scene("surface-after-init", {});
+		const scene = new Scene("surface-after-init", fakeOrbitWorld());
 		scene.setMainCamera("camera");
-		scene.useCommonRuntime({
-			orbitControllerComponent: "orbit",
+		scene.useCommonRuntime({}, {
 			updateOrbitCameraControllerFromInput: () => {
 				orbitUpdateCount += 1;
 			},
+			syncOrbitCameraTransform: () => {},
+			syncOrbitCameraBlob: () => {},
 		});
 		engine.setSurfaceScene(surfaceId, scene);
 

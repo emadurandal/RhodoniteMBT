@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	ComponentTypeId,
 	type EntityId,
 	World,
 } from "../../../../rhodonite_core/src/ecs/ts/index.ts";
@@ -26,7 +27,6 @@ import {
 	cubeMeshDesc,
 	cubeVertexCount,
 	cubeVertexPositionBytes,
-	registerRenderableComponent,
 	renderableComponentBytes,
 	renderableComponentStride,
 	renderableFlagsDefault,
@@ -74,6 +74,16 @@ function f32At(bytes: Uint8Array, offset: number): number {
 		offset,
 		true,
 	);
+}
+
+function findComponentByName(world: World, name: string): ComponentTypeId | null {
+	for (let index = 0; index < 64; index += 1) {
+		const id = ComponentTypeId.new(index);
+		if (world.componentInfo(id)?.name() === name) {
+			return id;
+		}
+	}
+	return null;
 }
 
 describe("Renderer TypeScript renderable API", () => {
@@ -150,34 +160,29 @@ describe("Renderer TypeScript renderable API", () => {
 
 	it("registers a renderable CPU component and writes add/set rows", () => {
 		const world = World.new();
-		const renderable = registerRenderableComponent(world);
+		const scene = new Scene<World, EntityId>("renderable", world);
 		const entity = world.createEntity();
-
-		expect(world.componentCpuStride(renderable.id())).toBe(
-			renderableComponentStride(),
-		);
-		expect(world.componentInfo(renderable.id())?.name()).toBe(
-			"RhodoniteRenderable",
-		);
 
 		expect(
 			addRenderable(
-				world,
+				scene,
 				entity,
-				renderable,
 				RenderableDesc.new(new MeshHandle(1), new MaterialHandle(2)),
 			),
 		).toBe(true);
-		expect(renderable.entities()).toEqual([entity]);
-		expect(world.componentBytesCopy(entity, renderable.id())).toEqual(
+		const renderable = findComponentByName(world, "RhodoniteRenderable");
+		expect(renderable).not.toBeNull();
+		expect(world.componentCpuStride(renderable!)).toBe(
+			renderableComponentStride(),
+		);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(
 			renderableBytes(1, 2),
 		);
 
 		expect(
 			setRenderable(
-				world,
+				scene,
 				entity,
-				renderable,
 				RenderableDesc.new(
 					new MeshHandle(3),
 					new MaterialHandle(4),
@@ -185,8 +190,7 @@ describe("Renderer TypeScript renderable API", () => {
 				),
 			),
 		).toBe(true);
-		expect(renderable.entities()).toEqual([entity]);
-		expect(world.componentBytesCopy(entity, renderable.id())).toEqual(
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(
 			renderableBytes(3, 4, renderableFlagsNone()),
 		);
 	});
@@ -313,7 +317,6 @@ describe("Renderer TypeScript renderable API", () => {
 		const entity = world.createEntity();
 		const camera = world.createEntity();
 		const identity = identityMat4ColMajor();
-		const renderable = registerRenderableComponent(world);
 		const mesh = renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2, 3, 4, 5, 6]),
 			new Uint8Array([0, 0, 1, 0, 2, 0]),
@@ -329,9 +332,8 @@ describe("Renderer TypeScript renderable API", () => {
 		).toBe(true);
 		expect(
 			addRenderable(
-				world,
+				scene,
 				entity,
-				renderable,
 				RenderableDesc.new(mesh, material),
 			),
 		).toBe(true);
@@ -339,7 +341,7 @@ describe("Renderer TypeScript renderable API", () => {
 			false,
 		);
 
-		renderer.renderSceneRenderables(scene, renderable, colorView);
+		renderer.renderSceneRenderables(scene, colorView);
 
 		const drawCalls = device.encoders[0]?.pass.calls.filter(
 			(call) => call.name === "drawIndexed",
@@ -354,7 +356,6 @@ describe("Renderer TypeScript renderable API", () => {
 		const [entity] = world.spawnTransformGlobalBatchIdentity(1);
 		const camera = world.createEntity();
 		const identity = identityMat4ColMajor();
-		const renderable = registerRenderableComponent(world);
 		const mesh = renderer.registerStaticIndexedMesh(
 			new Uint8Array([1, 2, 3, 4, 5, 6]),
 			new Uint8Array([0, 0, 1, 0, 2, 0]),
@@ -371,14 +372,13 @@ describe("Renderer TypeScript renderable API", () => {
 		).toBe(true);
 		expect(
 			addRenderable(
-				world,
+				scene,
 				entity!,
-				renderable,
 				RenderableDesc.new(mesh, material),
 			),
 		).toBe(true);
 
-		renderer.renderSceneRenderables(scene, renderable, colorView);
+		renderer.renderSceneRenderables(scene, colorView);
 
 		expect(device.queue.submissions).toHaveLength(1);
 		const instanceWrite = device.queue.writes.find(

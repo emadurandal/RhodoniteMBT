@@ -280,14 +280,22 @@ fn Engine::frame_targets_scene(
 /// Builds the standard orbit camera input phase handler for one scene.
 fn orbit_camera_controller_input_phase_handler(
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
+  require_main_camera : Bool,
   caller : String,
 ) -> (Engine, FrameState) -> Unit {
   fn(engine, frame) {
     if !engine.frame_targets_scene(frame, scene) {
       return
     }
-    let camera = scene_main_camera_or_abort(scene, caller)
+    let camera = match scene.main_camera() {
+      Some(camera) => camera
+      None =>
+        if require_main_camera {
+          abort(caller + ": Scene.main_camera is not set")
+        } else {
+          return
+        }
+    }
     let input = match frame.input() {
       Some(input) => input
       None => engine.input()
@@ -296,7 +304,6 @@ fn orbit_camera_controller_input_phase_handler(
       @ecs.update_orbit_camera_controller_from_mouse_frame(
         scene.world(),
         camera,
-        orbit_component,
         input.mouse_down(Left),
         input.mouse_pressed(Left),
         input.mouse_down(Middle),
@@ -321,15 +328,15 @@ fn common_orbit_camera_input_handler_key(scene : Scene) -> String {
 fn Engine::register_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
   phase : PhaseKey,
   slot : PhaseSlot,
   key : String?,
+  require_main_camera : Bool,
   unchecked : Bool,
   caller : String,
 ) -> Unit {
   let handler = orbit_camera_controller_input_phase_handler(
-    scene, orbit_component, caller,
+    scene, require_main_camera, caller,
   )
   if unchecked {
     match key {
@@ -355,13 +362,12 @@ fn Engine::register_orbit_camera_controller_input_handler(
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
   phase? : PhaseKey = phase_input(),
   slot? : PhaseSlot = BeforeSystems,
   key? : String? = None,
 ) -> Unit {
   self.register_orbit_camera_controller_input_handler(
-    scene, orbit_component, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
+    scene, phase, slot, key, true, false, "Engine::add_orbit_camera_controller_input_handler",
   )
 }
 
@@ -370,15 +376,15 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 fn Engine::add_common_runtime_orbit_camera_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
+  require_main_camera : Bool,
 ) -> Unit {
   let key = common_orbit_camera_input_handler_key(scene)
   self.register_orbit_camera_controller_input_handler(
     scene,
-    orbit_component,
     phase_input(),
     BeforeSystems,
     Some(key),
+    require_main_camera,
     true,
     "Engine::add_common_runtime_orbit_camera_input_handler",
   )
@@ -422,10 +428,11 @@ fn Engine::try_install_declared_common_runtime(
 ) -> Unit {
   match scene.apply_common_runtime() {
     Some(config) =>
-      match config.orbit_component {
-        Some(orbit) =>
-          self.add_common_runtime_orbit_camera_input_handler(scene, orbit)
-        None => ()
+      if config.orbit_camera_transform || config.orbit_camera_blob_sync {
+        self.add_common_runtime_orbit_camera_input_handler(
+          scene,
+          !config.implicit,
+        )
       }
     None => ()
   }
@@ -437,53 +444,6 @@ fn Engine::install_declared_common_runtimes(self : Engine) -> Unit {
   let scenes = declared_common_runtime_scenes(self)
   for i = 0; i < scenes.length(); i = i + 1 {
     self.try_install_declared_common_runtime(scenes[i])
-  }
-}
-
-///|
-/// Options for installing standard engine handlers and scene systems.
-pub(all) struct CommonHandlersOptions {
-  transform_propagation : Bool
-}
-
-///|
-/// Builds common handler options with standard systems enabled by default.
-pub fn CommonHandlersOptions::new(
-  transform_propagation? : Bool = true,
-) -> CommonHandlersOptions {
-  { transform_propagation, }
-}
-
-///|
-/// Returns default common handler options.
-pub fn CommonHandlersOptions::default() -> CommonHandlersOptions {
-  CommonHandlersOptions::new()
-}
-
-///|
-/// Adds standard engine handlers and scene systems shared by ECS samples.
-pub fn Engine::add_common_handlers(
-  self : Engine,
-  scene : Scene,
-  options? : CommonHandlersOptions = CommonHandlersOptions::default(),
-) -> Unit {
-  let orbit_component = scene.inferred_common_orbit_component()
-  let home_component = scene.inferred_common_home_component(orbit_component)
-  let lens_component = scene.inferred_common_lens_component(orbit_component)
-  scene.add_common_systems(
-    transform_propagation=options.transform_propagation,
-    orbit_component~,
-    home_component~,
-    lens_component~,
-  )
-  match orbit_component {
-    Some(orbit) =>
-      self.add_orbit_camera_controller_input_handler(
-        scene,
-        orbit,
-        key=Some(common_orbit_camera_input_handler_key(scene)),
-      )
-    None => ()
   }
 }
 

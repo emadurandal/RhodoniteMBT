@@ -164,23 +164,17 @@ function orbitCameraControllerBytes(
 export function registerOrbitCameraControllerComponent(
 	world: World,
 ): ComponentTypeId {
-	return world.registerCpuComponent(
-		"OrbitCameraController",
-		ORBIT_CAMERA_CONTROLLER_STRIDE,
-	);
+	return world.orbitCameraControllerComponent();
 }
 
 export function registerCameraHomeTransformComponent(
 	world: World,
 ): ComponentTypeId {
-	return world.registerCpuComponent(
-		"CameraHomeTransform",
-		CAMERA_HOME_TRANSFORM_STRIDE,
-	);
+	return world.cameraHomeTransformComponent();
 }
 
 export function registerCameraLensComponent(world: World): ComponentTypeId {
-	return world.registerCpuComponent("CameraLens", CAMERA_LENS_STRIDE);
+	return world.cameraLensComponent();
 }
 
 export function addOrbitCameraController(
@@ -489,9 +483,9 @@ function readOrbitCameraPoseComponent(
 export function updateOrbitCameraControllerComponentFromMouseFrame(
 	world: World,
 	camera: EntityId,
-	component: ComponentTypeId,
 	frame: OrbitCameraInputFrame,
 ): boolean {
+	const component = world.orbitCameraControllerComponent();
 	const bytes = componentBytesOrThrow(
 		world,
 		camera,
@@ -732,9 +726,6 @@ function orbitOrthographicCameraDescTrs(
 export function setupOrbitOrthographicCamera(
 	world: World,
 	camera: EntityId,
-	orbitComponent: ComponentTypeId,
-	homeComponent: ComponentTypeId,
-	lensComponent: ComponentTypeId,
 	desc: OrbitOrthographicCameraDesc,
 ): boolean {
 	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
@@ -749,7 +740,7 @@ export function setupOrbitOrthographicCamera(
 		addOrbitCameraControllerWithPose(
 			world,
 			camera,
-			orbitComponent,
+			world.orbitCameraControllerComponent(),
 			desc.yaw,
 			desc.pitch,
 			desc.panX,
@@ -757,11 +748,15 @@ export function setupOrbitOrthographicCamera(
 			desc.dolly,
 			desc.distance,
 		) &&
-		setCameraHomeFromCurrentTransform(world, camera, homeComponent) &&
+		setCameraHomeFromCurrentTransform(
+			world,
+			camera,
+			world.cameraHomeTransformComponent(),
+		) &&
 		addCameraLensOrthographic(
 			world,
 			camera,
-			lensComponent,
+			world.cameraLensComponent(),
 			desc.near,
 			desc.far,
 			desc.aspect,

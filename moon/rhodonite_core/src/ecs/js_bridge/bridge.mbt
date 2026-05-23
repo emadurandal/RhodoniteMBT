@@ -105,6 +105,28 @@ pub fn world_camera_component(world : @ecs.World) -> @ecs.ComponentTypeId {
 }
 
 ///|
+/// Implements `world_orbit_camera_controller_component`.
+pub fn world_orbit_camera_controller_component(
+  world : @ecs.World,
+) -> @ecs.ComponentTypeId {
+  world.orbit_camera_controller_component()
+}
+
+///|
+/// Implements `world_camera_home_transform_component`.
+pub fn world_camera_home_transform_component(
+  world : @ecs.World,
+) -> @ecs.ComponentTypeId {
+  world.camera_home_transform_component()
+}
+
+///|
+/// Implements `world_camera_lens_component`.
+pub fn world_camera_lens_component(world : @ecs.World) -> @ecs.ComponentTypeId {
+  world.camera_lens_component()
+}
+
+///|
 /// Implements `world_register_cpu_component`.
 pub fn world_register_cpu_component(
   world : @ecs.World,

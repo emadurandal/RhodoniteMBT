@@ -2,39 +2,134 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
-test "scene infers common orbit camera component ids from registered systems" {
+test "scene owns the standard Renderable component" {
+  let scene = Scene::new("renderable")
+  match scene.world().component_cpu_stride(scene.renderable_component_id) {
+    Some(stride) => assert_eq(stride, renderable_component_stride())
+    None => abort("missing Renderable component")
+  }
+}
+
+///|
+test "scene common systems use builtin camera component ids" {
   let scene = Scene::new("camera")
   let world = scene.world()
-  let orbit = world.register_cpu_component("RuntimeTestOrbit", 4)
-  let home = world.register_cpu_component("RuntimeTestHome", 4)
-  let lens = world.register_cpu_component("RuntimeTestLens", 4)
   scene.add_common_systems(
-    orbit_component=Some(orbit),
-    home_component=Some(home),
-    lens_component=Some(lens),
+    orbit_camera_transform=true,
+    orbit_camera_blob_sync=true,
   )
-  assert_true(scene.inferred_common_orbit_component() == Some(orbit))
-  assert_true(scene.inferred_common_home_component(Some(orbit)) == Some(home))
-  assert_true(scene.inferred_common_lens_component(Some(orbit)) == Some(lens))
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 1)
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].home_component ==
+    world.camera_home_transform_component(),
+  )
+  assert_true(
+    scene.orbit_camera_blob_sync_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_blob_sync_registrations[0].lens_component ==
+    world.camera_lens_component(),
+  )
+}
+
+///|
+test "scene implicit common runtime waits for a main camera" {
+  let scene = Scene::new("implicit-common-runtime-pending")
+  assert_true(scene.apply_common_runtime() is None)
+  assert_eq(scene.transform_propagation_registrations.length(), 0)
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 0)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 0)
+}
+
+///|
+test "scene main camera allows implicit common runtime application" {
+  let scene = Scene::new("implicit-common-runtime")
+  let world = scene.world()
+  let camera = world.create_entity()
+  scene.set_main_camera(Some(camera))
+  assert_true(scene.apply_common_runtime() is Some(_))
+  match scene.common_runtime {
+    Some(config) => {
+      assert_true(config.implicit)
+      assert_true(config.transform_propagation)
+      assert_true(config.orbit_camera_transform)
+      assert_true(config.orbit_camera_blob_sync)
+    }
+    None => abort("missing common runtime config")
+  }
+  assert_eq(scene.transform_propagation_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 1)
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_blob_sync_registrations[0].lens_component ==
+    world.camera_lens_component(),
+  )
 }
 
 ///|
 test "scene common runtime records and installs standard systems" {
   let scene = Scene::new("common-runtime")
   let world = scene.world()
-  let orbit = world.register_cpu_component("RuntimeOrbit", 4)
-  let home = world.register_cpu_component("RuntimeHome", 4)
-  let lens = world.register_cpu_component("RuntimeLens", 4)
-  scene.use_common_runtime(
-    transform_propagation=true,
-    orbit_component=Some(orbit),
-    home_component=Some(home),
-    lens_component=Some(lens),
-  )
+  scene.use_common_runtime(transform_propagation=true)
   assert_true(scene.apply_common_runtime() is Some(_))
-  assert_true(scene.inferred_common_orbit_component() == Some(orbit))
-  assert_true(scene.inferred_common_home_component(Some(orbit)) == Some(home))
-  assert_true(scene.inferred_common_lens_component(Some(orbit)) == Some(lens))
+  match scene.common_runtime {
+    Some(config) => {
+      assert_true(!config.implicit)
+      assert_true(config.transform_propagation)
+      assert_true(config.orbit_camera_transform)
+      assert_true(config.orbit_camera_blob_sync)
+    }
+    None => abort("missing common runtime config")
+  }
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 1)
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_blob_sync_registrations[0].lens_component ==
+    world.camera_lens_component(),
+  )
+}
+
+///|
+test "scene common runtime can skip orbit camera blob sync" {
+  let scene = Scene::new("common-runtime-no-blob")
+  let world = scene.world()
+  scene.use_common_runtime(
+    transform_propagation=false,
+    orbit_camera_blob_sync=false,
+  )
+  match scene.common_runtime {
+    Some(config) => {
+      assert_true(!config.implicit)
+      assert_true(!config.transform_propagation)
+      assert_true(config.orbit_camera_transform)
+      assert_true(!config.orbit_camera_blob_sync)
+    }
+    None => abort("missing common runtime config")
+  }
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 0)
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].home_component ==
+    world.camera_home_transform_component(),
+  )
 }
 
 ///|

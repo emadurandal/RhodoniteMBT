@@ -101,7 +101,8 @@ sequenceDiagram
           <h2>Camera Control</h2>
           <p>camera control は input source、controller component、transform、lens、Camera blob sync に分かれます。</p>
           <ul>
-            <li><code>OrbitCameraController</code> は yaw/pitch、pan、dolly、distance、sensitivity、clamp、reset request を持つ user component。</li>
+            <li><code>OrbitCameraController</code>、<code>CameraHomeTransform</code>、<code>CameraLens</code> は <code>World::new</code> が builtin camera-control component として登録し、<code>World::orbit_camera_controller_component</code>、<code>World::camera_home_transform_component</code>、<code>World::camera_lens_component</code> で取得する。</li>
+            <li><code>OrbitCameraController</code> は yaw/pitch、pan、dolly、distance、sensitivity、clamp、reset request を持つ。</li>
             <li><code>CameraHomeTransform</code> は reset target の local <code>Transform3D</code> snapshot。</li>
             <li><code>CameraLens</code> は projection kind、near/far、aspect、FOV または orthographic half-height。</li>
             <li><code>orbit_camera_transform_system</code> は controller から <code>Transform3D</code> と parentless <code>GlobalTransform</code> を更新する。</li>

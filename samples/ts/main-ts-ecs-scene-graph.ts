@@ -5,13 +5,7 @@ import "./style.css";
 import {
 	World,
 	createOrbitOrthographicCameraDescFromYzPosition,
-	registerCameraHomeTransformComponent,
-	registerCameraLensComponent,
-	registerOrbitCameraControllerComponent,
 	setupOrbitOrthographicCamera,
-	syncOrbitCameraBlobComponent,
-	syncOrbitCameraTransformComponent,
-	type ComponentTypeId,
 	type EntityId,
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
@@ -24,17 +18,14 @@ import {
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
-	RenderableComponent,
 	RenderableDesc,
 	Renderer,
 	Scene,
 	UnlitMaterialDesc,
 	addRenderable,
 	cubePosition3VertexLayout,
-	registerRenderableComponent,
 	runBrowserWebGpuCanvasDemo,
 	runPlatform,
-	updateOrbitCameraControllerComponentFromInput,
 	type FrameState,
 } from "../../moon/rhodonite/src/app/ts/index.ts";
 import {
@@ -56,9 +47,6 @@ type DemoState = {
 	readonly renderer: Renderer;
 	readonly scene: Scene<World, EntityId>;
 	readonly world: World;
-	readonly renderableComponent: RenderableComponent;
-	readonly orbitControllerComponent: ComponentTypeId;
-	readonly cameraLensComponent: ComponentTypeId;
 	readonly objects: DemoObjects;
 	rendererWidth: number;
 	rendererHeight: number;
@@ -133,11 +121,11 @@ function pushLocalTransforms(world: World, objects: DemoObjects, t: number): voi
 }
 
 function addRenderableObject(
-	world: World,
-	renderableComponent: RenderableComponent,
+	scene: Scene<World, EntityId>,
 	cubeMesh: MeshHandle,
 	material: MaterialHandle,
 ): EntityId {
+	const world = scene.world();
 	const entity = world.createEntity();
 	setYRotationTrs(world, entity, 0, 0, 0, 0, 1);
 	if (!world.setGlobalTransform(entity, identity())) {
@@ -145,9 +133,8 @@ function addRenderableObject(
 	}
 	if (
 		!addRenderable(
-			world,
+			scene,
 			entity,
-			renderableComponent,
 			RenderableDesc.new(cubeMesh, material),
 		)
 	) {
@@ -161,19 +148,12 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	const world = World.new();
 	scene.setWorld(world);
 
-	const orbitControllerComponent = registerOrbitCameraControllerComponent(world);
-	const cameraHomeComponent = registerCameraHomeTransformComponent(world);
-	const cameraLensComponent = registerCameraLensComponent(world);
-	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 
 	if (
 		!setupOrbitOrthographicCamera(
 			world,
 			camera,
-			orbitControllerComponent,
-			cameraHomeComponent,
-			cameraLensComponent,
 			createOrbitOrthographicCameraDescFromYzPosition(
 				CAMERA_ELEVATION_RAD,
 				2,
@@ -188,16 +168,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.useCommonRuntime(
-		{
-			orbitControllerComponent,
-			homeComponent: cameraHomeComponent,
-			updateOrbitCameraControllerFromInput:
-				updateOrbitCameraControllerComponentFromInput,
-			syncOrbitCameraTransform: syncOrbitCameraTransformComponent,
-		},
-		{ transformPropagation: true },
-	);
 
 	const renderer = new Renderer(
 		engine.device,
@@ -218,9 +188,9 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		UnlitMaterialDesc.new(1.0, 0.0, 1.0),
 	);
 	const objects = {
-		sun: addRenderableObject(world, renderableComponent, cubeMesh, sunMaterial),
-		earth: addRenderableObject(world, renderableComponent, cubeMesh, earthMaterial),
-		moon: addRenderableObject(world, renderableComponent, cubeMesh, moonMaterial),
+		sun: addRenderableObject(scene, cubeMesh, sunMaterial),
+		earth: addRenderableObject(scene, cubeMesh, earthMaterial),
+		moon: addRenderableObject(scene, cubeMesh, moonMaterial),
 	};
 	if (!world.setChildOf(objects.earth, objects.sun)) {
 		throw new Error("Failed to set earth ChildOf.");
@@ -230,17 +200,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	}
 
 	pushLocalTransforms(world, objects, 0);
-	scene.setSchedule(
-		(systemWorld) => {
-			syncOrbitCameraBlobComponent(
-				systemWorld,
-				camera,
-				orbitControllerComponent,
-				cameraLensComponent,
-			);
-		},
-		Phase.RenderExtract,
-	);
 	scene.prepareRenderState();
 
 	return {
@@ -248,9 +207,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		renderer,
 		scene,
 		world,
-		renderableComponent,
-		orbitControllerComponent,
-		cameraLensComponent,
 		objects,
 		rendererWidth: CANVAS_WIDTH,
 		rendererHeight: CANVAS_HEIGHT,
@@ -274,11 +230,7 @@ function resizeRendererIfNeeded(demo: DemoState, frame: FrameState): void {
 
 function renderCurrentFrame(demo: DemoState): void {
 	const colorView = demo.engine.context.getCurrentTexture().createView();
-	demo.renderer.renderSceneRenderables(
-		demo.scene,
-		demo.renderableComponent,
-		colorView,
-	);
+	demo.renderer.renderSceneRenderables(demo.scene, colorView);
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {

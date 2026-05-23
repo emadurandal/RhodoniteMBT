@@ -54,7 +54,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(addCameraLensOrthographic(world, camera, lens, 0.1, 80, 4 / 3, 1, 0)).toBe(true);
 
 		expect(
-			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, orbit, {
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
 				leftDown: false,
 				leftPressed: false,
 				middleDown: false,
@@ -91,17 +91,14 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 	it("sets up an orbit orthographic camera from a pitched Y/Z position", () => {
 		const world = World.new();
 		const camera = world.createEntity();
-		const orbit = registerOrbitCameraControllerComponent(world);
-		const home = registerCameraHomeTransformComponent(world);
-		const lens = registerCameraLensComponent(world);
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
 
 		expect(
 			setupOrbitOrthographicCamera(
 				world,
 				camera,
-				orbit,
-				home,
-				lens,
 				createOrbitOrthographicCameraDescFromYzPosition(
 					0.38,
 					2,
@@ -130,7 +127,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(addOrbitCameraControllerWithDistance(world, camera, orbit, 0, 0.42, 16)).toBe(true);
 		expect(setCameraHomeFromCurrentTransform(world, camera, home)).toBe(true);
 		expect(
-			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, orbit, {
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
 				leftDown: true,
 				leftPressed: false,
 				middleDown: false,

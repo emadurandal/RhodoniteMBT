@@ -123,13 +123,11 @@ fn upload_current_camera(world : @ecs.World, camera : @ecs.EntityId) -> Unit {
 fn update_orbit_camera_from_host_input(
   world : @ecs.World,
   camera : @ecs.EntityId,
-  orbit_controller : @ecs.ComponentTypeId,
 ) -> Unit {
   ignore(
     @ecs.update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
-      orbit_controller,
       host_input_mouse_down(0),
       host_input_mouse_pressed(0),
       host_input_mouse_down(1),
@@ -186,7 +184,7 @@ pub fn create_wasm_demo_state() -> Unit {
   let stride = 24
   host_initialize_demo_state(per_side, stride)
   host_write_initial_global_transforms(per_side, 0.0)
-  let orbit_controller = @ecs.register_orbit_camera_controller_component(world)
+  let orbit_controller = world.orbit_camera_controller_component()
   let camera = world.create_entity()
   ignore(
     @ecs.add_orbit_camera_controller(
@@ -231,11 +229,7 @@ pub fn ecs_mass_cubes_wasm_update_tick() -> Unit {
       let wave_time = demo_state.frame.val.to_double() * 0.018 * 1.8
       host_write_global_transform_y(wave_time)
       host_begin_input_frame()
-      update_orbit_camera_from_host_input(
-        demo_state.world,
-        demo_state.camera,
-        demo_state.orbit_controller,
-      )
+      update_orbit_camera_from_host_input(demo_state.world, demo_state.camera)
     }
   }
 }

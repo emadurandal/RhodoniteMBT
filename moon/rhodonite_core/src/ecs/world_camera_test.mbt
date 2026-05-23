@@ -6,6 +6,21 @@ test "builtin Camera uses ComponentTypeId index 3" {
   let world = World::new()
   assert_eq(world.camera_component().index, 3)
   assert_true(world.component_cpu_stride(world.camera_component()) is Some(4))
+  assert_eq(world.orbit_camera_controller_component().index, 4)
+  assert_eq(world.camera_home_transform_component().index, 5)
+  assert_eq(world.camera_lens_component().index, 6)
+  match world.component_cpu_stride(world.orbit_camera_controller_component()) {
+    Some(stride) => assert_eq(stride, 80)
+    None => abort("missing OrbitCameraController component")
+  }
+  match world.component_cpu_stride(world.camera_home_transform_component()) {
+    Some(stride) => assert_eq(stride, 48)
+    None => abort("missing CameraHomeTransform component")
+  }
+  match world.component_cpu_stride(world.camera_lens_component()) {
+    Some(stride) => assert_eq(stride, 32)
+    None => abort("missing CameraLens component")
+  }
 }
 
 ///|
@@ -48,8 +63,8 @@ test "builtin Camera stores matrices in packed camera blob" {
 ///|
 test "orbit camera reset restores home Transform3D" {
   let world = World::new()
-  let orbit = register_orbit_camera_controller_component(world)
-  let home = register_camera_home_transform_component(world)
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
   let camera = world.create_entity()
   assert_true(
     world.set_transform_trs(
@@ -73,7 +88,6 @@ test "orbit camera reset restores home Transform3D" {
     update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
-      orbit,
       true,
       false,
       false,
@@ -123,7 +137,7 @@ test "orbit camera reset restores home Transform3D" {
 ///|
 test "camera blob sync system writes from GlobalTransform and CameraLens" {
   let world = World::new()
-  let lens = register_camera_lens_component(world)
+  let lens = world.camera_lens_component()
   let camera = world.create_entity()
   assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
   assert_true(
@@ -172,8 +186,8 @@ test "camera blob sync system writes from GlobalTransform and CameraLens" {
 ///|
 test "orbit camera blob sync applies orthographic dolly scale" {
   let world = World::new()
-  let orbit = register_orbit_camera_controller_component(world)
-  let lens = register_camera_lens_component(world)
+  let orbit = world.orbit_camera_controller_component()
+  let lens = world.camera_lens_component()
   let camera = world.create_entity()
   assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
   assert_true(
@@ -203,7 +217,6 @@ test "orbit camera blob sync applies orthographic dolly scale" {
     update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
-      orbit,
       false,
       false,
       false,
@@ -244,18 +257,15 @@ test "orbit camera blob sync applies orthographic dolly scale" {
 ///|
 test "setup orbit orthographic camera initializes transform components and camera blob" {
   let world = World::new()
-  let orbit = register_orbit_camera_controller_component(world)
-  let home = register_camera_home_transform_component(world)
-  let lens = register_camera_lens_component(world)
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let lens = world.camera_lens_component()
   let camera = world.create_entity()
   let pitch = 0.38
   assert_true(
     setup_orbit_orthographic_camera(
       world,
       camera,
-      orbit,
-      home,
-      lens,
       OrbitOrthographicCameraDesc::new_yz_pitched(
         pitch,
         (2.0 : Float),

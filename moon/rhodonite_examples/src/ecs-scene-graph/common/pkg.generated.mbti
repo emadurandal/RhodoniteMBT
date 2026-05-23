@@ -25,6 +25,8 @@ pub fn render_current_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -
 
 pub fn render_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
 
+pub fn setup_engine(@app.Engine) -> Bool
+
 // Errors
 
 // Types and methods
@@ -34,10 +36,6 @@ pub(all) struct DemoState {
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
-  renderable : @app.RenderableComponent
-  orbit_controller : @ecs.ComponentTypeId
-  camera_home : @ecs.ComponentTypeId
-  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 pub fn DemoState::release(Self) -> Unit

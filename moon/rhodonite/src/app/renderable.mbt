@@ -101,34 +101,20 @@ pub fn RenderableDesc::flags(self : RenderableDesc) -> RenderableFlags {
 }
 
 ///|
-/// ECS component id for render participation data.
-pub(all) struct RenderableComponent {
-  priv id : @ecs.ComponentTypeId
-}
-
-///|
-/// Implements `RenderableComponent::id`.
-pub fn RenderableComponent::id(
-  self : RenderableComponent,
-) -> @ecs.ComponentTypeId {
-  self.id
-}
-
-///|
 /// Byte stride of the Renderable ECS component payload.
 pub fn renderable_component_stride() -> Int {
   16
 }
 
 ///|
-/// Registers the CPU-only Renderable component in `world`.
-pub fn register_renderable_component(world : @ecs.World) -> RenderableComponent {
-  {
-    id: world.register_cpu_component(
-      "RhodoniteRenderable",
-      renderable_component_stride(),
-    ),
-  }
+/// Registers the scene-owned CPU-only Renderable component in `world`.
+fn register_scene_renderable_component(
+  world : @ecs.World,
+) -> @ecs.ComponentTypeId {
+  world.register_cpu_component(
+    "RhodoniteRenderable",
+    renderable_component_stride(),
+  )
 }
 
 ///|
@@ -165,30 +151,31 @@ pub fn renderable_flags_from_view(bytes : ArrayView[Byte]) -> RenderableFlags {
 ///|
 /// Adds or updates the Renderable component on an entity.
 pub fn set_renderable(
-  world : @ecs.World,
+  scene : Scene,
   entity : @ecs.EntityId,
-  component : RenderableComponent,
   desc : RenderableDesc,
 ) -> Bool {
+  let world = scene.world()
+  let component = scene.renderable_component_id
   let bytes = renderable_component_bytes(desc)
-  if world.has_component(entity, component.id) {
-    world.set_component_bytes(entity, component.id, bytes)
+  if world.has_component(entity, component) {
+    world.set_component_bytes(entity, component, bytes)
   } else {
-    world.add_component_bytes(entity, component.id, bytes)
+    world.add_component_bytes(entity, component, bytes)
   }
 }
 
 ///|
 /// Adds the Renderable component to an entity.
 pub fn add_renderable(
-  world : @ecs.World,
+  scene : Scene,
   entity : @ecs.EntityId,
-  component : RenderableComponent,
   desc : RenderableDesc,
 ) -> Bool {
+  let world = scene.world()
   world.add_component_bytes(
     entity,
-    component.id,
+    scene.renderable_component_id,
     renderable_component_bytes(desc),
   )
 }

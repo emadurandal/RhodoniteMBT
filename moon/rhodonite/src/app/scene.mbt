@@ -16,9 +16,20 @@ fn alloc_scene_instance_id() -> Int {
 /// Declarative standard scene runtime setup consumed by the owning engine.
 struct CommonRuntimeConfig {
   transform_propagation : Bool
-  orbit_component : @ecs.ComponentTypeId?
-  home_component : @ecs.ComponentTypeId?
-  lens_component : @ecs.ComponentTypeId?
+  orbit_camera_transform : Bool
+  orbit_camera_blob_sync : Bool
+  implicit : Bool
+}
+
+///|
+/// Returns the default implicit runtime config for scenes with a main camera.
+fn default_common_runtime_config() -> CommonRuntimeConfig {
+  {
+    transform_propagation: true,
+    orbit_camera_transform: true,
+    orbit_camera_blob_sync: true,
+    implicit: true,
+  }
 }
 
 ///|
@@ -27,6 +38,7 @@ pub struct Scene {
   priv instance_id : Int
   priv name : String
   priv world : @ecs.World
+  priv renderable_component_id : @ecs.ComponentTypeId
   priv system_runner : @ecs.SystemRunner
   priv mut main_camera : @ecs.EntityId?
   priv mut enabled : Bool
@@ -53,10 +65,12 @@ pub fn Scene::new(name : String) -> Scene {
 ///|
 /// Builds a scene around an already configured ECS world.
 pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
+  let renderable_component_id = register_scene_renderable_component(world)
   {
     instance_id: alloc_scene_instance_id(),
     name,
     world,
+    renderable_component_id,
     system_runner: @ecs.SystemRunner::new(),
     main_camera: None,
     enabled: true,
@@ -65,7 +79,7 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     camera_blob_sync_registrations: [],
     orbit_camera_transform_registrations: [],
     orbit_camera_blob_sync_registrations: [],
-    common_runtime: None,
+    common_runtime: Some(default_common_runtime_config()),
   }
 }
 
@@ -231,108 +245,6 @@ fn Scene::has_camera_blob_sync_registration(
 }
 
 ///|
-/// Merges inferred component ids and aborts when a scene has multiple candidates.
-fn merge_inferred_common_component(
-  caller : String,
-  field : String,
-  current : @ecs.ComponentTypeId?,
-  next : @ecs.ComponentTypeId,
-) -> @ecs.ComponentTypeId? {
-  match current {
-    Some(component) =>
-      if component == next {
-        current
-      } else {
-        abort(
-          caller + ": cannot infer " + field + " from multiple registrations",
-        )
-      }
-    None => Some(next)
-  }
-}
-
-///|
-/// Infers the scene's registered orbit camera component from standard systems.
-fn Scene::inferred_common_orbit_component(
-  self : Scene,
-) -> @ecs.ComponentTypeId? {
-  let mut component : @ecs.ComponentTypeId? = None
-  for i = 0; i < self.orbit_camera_transform_registrations.length(); i = i + 1 {
-    component = merge_inferred_common_component(
-      "Scene::inferred_common_orbit_component",
-      "orbit_component",
-      component,
-      self.orbit_camera_transform_registrations[i].orbit_component,
-    )
-  }
-  for i = 0; i < self.orbit_camera_blob_sync_registrations.length(); i = i + 1 {
-    component = merge_inferred_common_component(
-      "Scene::inferred_common_orbit_component",
-      "orbit_component",
-      component,
-      self.orbit_camera_blob_sync_registrations[i].orbit_component,
-    )
-  }
-  component
-}
-
-///|
-/// Infers the registered home component paired with an orbit camera component.
-fn Scene::inferred_common_home_component(
-  self : Scene,
-  orbit_component : @ecs.ComponentTypeId?,
-) -> @ecs.ComponentTypeId? {
-  match orbit_component {
-    Some(orbit) => {
-      let mut component : @ecs.ComponentTypeId? = None
-      for i = 0
-          i < self.orbit_camera_transform_registrations.length()
-          i = i + 1 {
-        let reg = self.orbit_camera_transform_registrations[i]
-        if reg.orbit_component == orbit {
-          component = merge_inferred_common_component(
-            "Scene::inferred_common_home_component",
-            "home_component",
-            component,
-            reg.home_component,
-          )
-        }
-      }
-      component
-    }
-    None => None
-  }
-}
-
-///|
-/// Infers the registered lens component paired with an orbit camera component.
-fn Scene::inferred_common_lens_component(
-  self : Scene,
-  orbit_component : @ecs.ComponentTypeId?,
-) -> @ecs.ComponentTypeId? {
-  match orbit_component {
-    Some(orbit) => {
-      let mut component : @ecs.ComponentTypeId? = None
-      for i = 0
-          i < self.orbit_camera_blob_sync_registrations.length()
-          i = i + 1 {
-        let reg = self.orbit_camera_blob_sync_registrations[i]
-        if reg.orbit_component == orbit {
-          component = merge_inferred_common_component(
-            "Scene::inferred_common_lens_component",
-            "lens_component",
-            component,
-            reg.lens_component,
-          )
-        }
-      }
-      component
-    }
-    None => None
-  }
-}
-
-///|
 /// Adds the Camera blob synchronization system for one engine phase.
 pub fn Scene::add_camera_blob_sync_system(
   self : Scene,
@@ -380,20 +292,24 @@ pub fn Scene::add_orbit_camera_blob_sync_system(
 /// Adds the standard orbit-camera transform and Camera blob sync systems.
 pub fn Scene::add_orbit_camera_systems(
   self : Scene,
-  orbit_component : @ecs.ComponentTypeId,
-  home_component : @ecs.ComponentTypeId,
-  lens_component : @ecs.ComponentTypeId,
+  orbit_camera_transform? : Bool = true,
+  orbit_camera_blob_sync? : Bool = true,
 ) -> Unit {
-  self.add_orbit_camera_transform_system(
-    phase_post_update(),
-    orbit_component,
-    home_component,
-  )
-  self.add_orbit_camera_blob_sync_system(
-    phase_render_extract(),
-    orbit_component,
-    lens_component,
-  )
+  let orbit = self.world.orbit_camera_controller_component()
+  if orbit_camera_transform {
+    self.add_orbit_camera_transform_system(
+      phase_post_update(),
+      orbit,
+      self.world.camera_home_transform_component(),
+    )
+  }
+  if orbit_camera_blob_sync {
+    self.add_orbit_camera_blob_sync_system(
+      phase_render_extract(),
+      orbit,
+      self.world.camera_lens_component(),
+    )
+  }
 }
 
 ///|
@@ -404,51 +320,16 @@ pub fn Scene::add_orbit_camera_systems(
 pub fn Scene::add_common_systems(
   self : Scene,
   transform_propagation? : Bool = false,
-  orbit_component? : @ecs.ComponentTypeId? = None,
-  home_component? : @ecs.ComponentTypeId? = None,
-  lens_component? : @ecs.ComponentTypeId? = None,
+  orbit_camera_transform? : Bool = false,
+  orbit_camera_blob_sync? : Bool = false,
 ) -> Unit {
   if transform_propagation {
     self.add_transform_propagation_system(phase_update())
   }
-  match orbit_component {
-    Some(orbit) => {
-      match home_component {
-        Some(home) =>
-          self.add_orbit_camera_transform_system(
-            phase_post_update(),
-            orbit,
-            home,
-          )
-        None => ()
-      }
-      match lens_component {
-        Some(lens) =>
-          self.add_orbit_camera_blob_sync_system(
-            phase_render_extract(),
-            orbit,
-            lens,
-          )
-        None => ()
-      }
-    }
-    None => {
-      match home_component {
-        Some(_) =>
-          abort(
-            "Scene::add_common_systems: home_component requires orbit_component",
-          )
-        None => ()
-      }
-      match lens_component {
-        Some(_) =>
-          abort(
-            "Scene::add_common_systems: lens_component requires orbit_component",
-          )
-        None => ()
-      }
-    }
-  }
+  self.add_orbit_camera_systems(
+    orbit_camera_transform~,
+    orbit_camera_blob_sync~,
+  )
 }
 
 ///|
@@ -456,21 +337,20 @@ pub fn Scene::add_common_systems(
 pub fn Scene::use_common_runtime(
   self : Scene,
   transform_propagation? : Bool = true,
-  orbit_component? : @ecs.ComponentTypeId? = None,
-  home_component? : @ecs.ComponentTypeId? = None,
-  lens_component? : @ecs.ComponentTypeId? = None,
+  orbit_camera_transform? : Bool = true,
+  orbit_camera_blob_sync? : Bool = true,
 ) -> Unit {
-  self.common_runtime = Some({
+  let config = {
     transform_propagation,
-    orbit_component,
-    home_component,
-    lens_component,
-  })
+    orbit_camera_transform,
+    orbit_camera_blob_sync,
+    implicit: false,
+  }
+  self.common_runtime = Some(config)
   self.add_common_systems(
-    transform_propagation~,
-    orbit_component~,
-    home_component~,
-    lens_component~,
+    transform_propagation=config.transform_propagation,
+    orbit_camera_transform=config.orbit_camera_transform,
+    orbit_camera_blob_sync=config.orbit_camera_blob_sync,
   )
 }
 
@@ -479,11 +359,13 @@ pub fn Scene::use_common_runtime(
 fn Scene::apply_common_runtime(self : Scene) -> CommonRuntimeConfig? {
   match self.common_runtime {
     Some(config) => {
+      if config.implicit && self.main_camera is None {
+        return None
+      }
       self.add_common_systems(
         transform_propagation=config.transform_propagation,
-        orbit_component=config.orbit_component,
-        home_component=config.home_component,
-        lens_component=config.lens_component,
+        orbit_camera_transform=config.orbit_camera_transform,
+        orbit_camera_blob_sync=config.orbit_camera_blob_sync,
       )
       Some(config)
     }
@@ -559,14 +441,6 @@ pub fn Scene::prepare_render_state(
   self : Scene,
   frame? : FrameState = FrameState::zero(),
 ) -> Bool {
+  ignore(self.apply_common_runtime())
   self.run_systems_for_phases(default_render_state_preparation_phases(), frame)
-}
-
-///|
-/// Returns the scene main camera or aborts because a camera-bound engine handler requires one.
-fn scene_main_camera_or_abort(scene : Scene, caller : String) -> @ecs.EntityId {
-  match scene.main_camera() {
-    Some(camera) => camera
-    None => abort(caller + ": Scene.main_camera is not set")
-  }
 }

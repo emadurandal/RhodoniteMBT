@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-	type ComponentTypeId,
 	type EntityId,
 	type OrbitCameraController,
 	type OrbitCameraInputFrame,
@@ -29,13 +28,11 @@ export function orbitCameraInputFrameFromInput(
 export function updateOrbitCameraControllerComponentFromInput(
 	world: World,
 	camera: EntityId,
-	component: ComponentTypeId,
 	input: InputState,
 ): boolean {
 	return updateOrbitCameraControllerComponentFromMouseFrame(
 		world,
 		camera,
-		component,
 		orbitCameraInputFrameFromInput(input),
 	);
 }

@@ -279,27 +279,6 @@ export class RenderableDesc {
 	}
 }
 
-export class RenderableComponent {
-	private readonly idValue: ComponentTypeId;
-	private readonly entitiesValue = new Map<string, EntityId>();
-
-	constructor(id: ComponentTypeId) {
-		this.idValue = id;
-	}
-
-	id(): ComponentTypeId {
-		return this.idValue;
-	}
-
-	track(entity: EntityId): void {
-		this.entitiesValue.set(entityKey(entity), entity);
-	}
-
-	entities(): EntityId[] {
-		return Array.from(this.entitiesValue.values());
-	}
-}
-
 export class UnlitMaterialDesc {
 	private readonly baseColorRValue: number;
 	private readonly baseColorGValue: number;
@@ -362,13 +341,28 @@ export function renderableComponentStride(): number {
 	return RENDERABLE_COMPONENT_STRIDE;
 }
 
-export function registerRenderableComponent(world: World): RenderableComponent {
-	return new RenderableComponent(
-		world.registerCpuComponent(
-			RENDERABLE_COMPONENT_NAME,
-			RENDERABLE_COMPONENT_STRIDE,
-		),
+type SceneRenderableRegistration = {
+	readonly world: World;
+	readonly id: ComponentTypeId;
+};
+
+const sceneRenderableComponents = new WeakMap<
+	Scene<World, EntityId>,
+	SceneRenderableRegistration
+>();
+
+function sceneRenderableComponent(scene: Scene<World, EntityId>): ComponentTypeId {
+	const world = scene.world();
+	const existing = sceneRenderableComponents.get(scene);
+	if (existing !== undefined && existing.world === world) {
+		return existing.id;
+	}
+	const id = world.registerCpuComponent(
+		RENDERABLE_COMPONENT_NAME,
+		RENDERABLE_COMPONENT_STRIDE,
 	);
+	sceneRenderableComponents.set(scene, { world, id });
+	return id;
 }
 
 export function renderableComponentBytes(desc: RenderableDesc): Uint8Array {
@@ -382,36 +376,28 @@ export function renderableComponentBytes(desc: RenderableDesc): Uint8Array {
 }
 
 export function addRenderable(
-	world: World,
+	scene: Scene<World, EntityId>,
 	entity: EntityId,
-	component: RenderableComponent,
 	desc: RenderableDesc,
 ): boolean {
-	const added = world.addComponentBytes(
+	return scene.world().addComponentBytes(
 		entity,
-		component.id(),
+		sceneRenderableComponent(scene),
 		renderableComponentBytes(desc),
 	);
-	if (added) {
-		component.track(entity);
-	}
-	return added;
 }
 
 export function setRenderable(
-	world: World,
+	scene: Scene<World, EntityId>,
 	entity: EntityId,
-	component: RenderableComponent,
 	desc: RenderableDesc,
 ): boolean {
+	const world = scene.world();
+	const component = sceneRenderableComponent(scene);
 	const bytes = renderableComponentBytes(desc);
-	const changed = world.hasComponent(entity, component.id())
-		? world.setComponentBytes(entity, component.id(), bytes)
-		: world.addComponentBytes(entity, component.id(), bytes);
-	if (changed) {
-		component.track(entity);
-	}
-	return changed;
+	return world.hasComponent(entity, component)
+		? world.setComponentBytes(entity, component, bytes)
+		: world.addComponentBytes(entity, component, bytes);
 }
 
 export class Renderer {
@@ -588,7 +574,6 @@ export class Renderer {
 
 	renderSceneRenderables(
 		scene: Scene<World, EntityId>,
-		renderable: RenderableComponent,
 		colorView: GPUTextureView,
 	): void {
 		if (this.depthView === null) {
@@ -596,7 +581,7 @@ export class Renderer {
 		}
 		const world = scene.world();
 		this.ensureSceneBuffers(world);
-		const items = this.extractDrawItems(world, renderable);
+		const items = this.extractDrawItems(world, sceneRenderableComponent(scene));
 		const instanceBuffer =
 			items.length > 0 ? this.writeRenderableInstances(world, items) : null;
 		if (this.transformStorage !== null) {
@@ -803,13 +788,13 @@ export class Renderer {
 
 	private extractDrawItems(
 		world: World,
-		renderable: RenderableComponent,
+		renderable: ComponentTypeId,
 	): RendererDrawItem[] {
 		const items: RendererDrawItem[] = [];
-		Query.new([renderable.id(), world.globalTransformComponent()]).forEach(
+		Query.new([renderable, world.globalTransformComponent()]).forEach(
 			world,
 			(row) => {
-				row.read(renderable.id(), (bytes) => {
+				row.read(renderable, (bytes) => {
 					if (bytes.length < RENDERABLE_COMPONENT_STRIDE) {
 						return;
 					}
@@ -871,10 +856,6 @@ export class Renderer {
 		}
 		return this.renderableInstanceBuffer;
 	}
-}
-
-function entityKey(entity: EntityId): string {
-	return `${entity.index()}:${entity.generation()}`;
 }
 
 function cubeLocalCorners(): [number, number, number][] {

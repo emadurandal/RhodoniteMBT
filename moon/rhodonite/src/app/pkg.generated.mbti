@@ -10,7 +10,7 @@ import {
 }
 
 // Values
-pub fn add_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
+pub fn add_renderable(Scene, @ecs.EntityId, RenderableDesc) -> Bool
 
 pub fn cube_index_count() -> Int
 
@@ -70,8 +70,6 @@ pub fn primitive_position3_vertex_layout() -> @webgpu_enums.GPUVertexBufferLayou
 
 pub fn primitive_position3_vertex_stride() -> Int
 
-pub fn register_renderable_component(@ecs.World) -> RenderableComponent
-
 pub fn renderable_component_bytes(RenderableDesc) -> FixedArray[Byte]
 
 pub fn renderable_component_stride() -> Int
@@ -88,17 +86,11 @@ pub fn renderable_material_handle_from_view(ArrayView[Byte]) -> MaterialHandle
 
 pub fn renderable_mesh_handle_from_view(ArrayView[Byte]) -> MeshHandle
 
-pub fn set_renderable(@ecs.World, @ecs.EntityId, RenderableComponent, RenderableDesc) -> Bool
+pub fn set_renderable(Scene, @ecs.EntityId, RenderableDesc) -> Bool
 
 // Errors
 
 // Types and methods
-pub(all) struct CommonHandlersOptions {
-  transform_propagation : Bool
-}
-pub fn CommonHandlersOptions::default() -> Self
-pub fn CommonHandlersOptions::new(transform_propagation? : Bool) -> Self
-
 type CommonRuntimeConfig
 
 pub(all) struct CubeMeshDesc {
@@ -110,8 +102,7 @@ pub fn CubeMeshDesc::new(half_extent? : Double) -> Self
 pub struct Engine {
   // private fields
 }
-pub fn Engine::add_common_handlers(Self, Scene, options? : CommonHandlersOptions) -> Unit
-pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, @ecs.ComponentTypeId, phase? : @ecs.PhaseKey, slot? : PhaseSlot, key? : String?) -> Unit
+pub fn Engine::add_orbit_camera_controller_input_handler(Self, Scene, phase? : @ecs.PhaseKey, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_phase_group(Self, PhaseGroupKey) -> Unit
 pub fn Engine::add_phase_handler(Self, @ecs.PhaseKey, (Self, FrameState) -> Unit, slot? : PhaseSlot, key? : String?) -> Unit
 pub fn Engine::add_surface(Self, @webgpu.GPUSurface) -> SurfaceId
@@ -214,11 +205,6 @@ pub(all) enum PhaseSlot {
   AfterSystems
 } derive(Eq)
 
-pub(all) struct RenderableComponent {
-  // private fields
-}
-pub fn RenderableComponent::id(Self) -> @ecs.ComponentTypeId
-
 pub(all) struct RenderableDesc {
   // private fields
 }
@@ -245,7 +231,7 @@ pub fn Renderer::register_static_instance_buffer(Self, FixedArray[Byte]) -> Inst
 pub fn Renderer::register_unlit_material(Self, UnlitMaterialDesc) -> MaterialHandle
 pub fn Renderer::release(Self) -> Unit
 pub fn Renderer::render_instanced_mesh(Self, Scene, MeshHandle, InstanceBufferHandle, Int, @webgpu_objects.GPUTextureView) -> Unit
-pub fn Renderer::render_scene_renderables(Self, Scene, RenderableComponent, @webgpu_objects.GPUTextureView) -> Unit
+pub fn Renderer::render_scene_renderables(Self, Scene, @webgpu_objects.GPUTextureView) -> Unit
 pub fn Renderer::resize_surface_resources(Self, Int, Int) -> Unit
 pub fn Renderer::update_static_instance_buffer(Self, InstanceBufferHandle, FixedArray[Byte]) -> Bool
 pub fn Renderer::upload_global_transform_writes(Self, @ecs.World, Array[@ecs.GpuWriteView]) -> Unit
@@ -254,9 +240,9 @@ pub struct Scene {
   // private fields
 }
 pub fn Scene::add_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId) -> Unit
-pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Scene::add_common_systems(Self, transform_propagation? : Bool, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::add_orbit_camera_blob_sync_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
-pub fn Scene::add_orbit_camera_systems(Self, @ecs.ComponentTypeId, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
+pub fn Scene::add_orbit_camera_systems(Self, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::add_orbit_camera_transform_system(Self, @ecs.PhaseKey, @ecs.ComponentTypeId, @ecs.ComponentTypeId) -> Unit
 pub fn Scene::add_structural_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
 pub fn Scene::add_system(Self, @ecs.PhaseKey, String, Array[@ecs.ComponentTypeId], Array[@ecs.ComponentTypeId], (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit) -> Unit
@@ -273,7 +259,7 @@ pub fn Scene::same(Self, Self) -> Bool
 pub fn Scene::set_enabled(Self, Bool) -> Unit
 pub fn Scene::set_main_camera(Self, @ecs.EntityId?) -> Unit
 pub fn Scene::set_visible(Self, Bool) -> Unit
-pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_component? : @ecs.ComponentTypeId?, home_component? : @ecs.ComponentTypeId?, lens_component? : @ecs.ComponentTypeId?) -> Unit
+pub fn Scene::use_common_runtime(Self, transform_propagation? : Bool, orbit_camera_transform? : Bool, orbit_camera_blob_sync? : Bool) -> Unit
 pub fn Scene::visible(Self) -> Bool
 pub fn Scene::world(Self) -> @ecs.World
 

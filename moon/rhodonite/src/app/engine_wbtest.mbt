@@ -46,7 +46,7 @@ test "phase handler registration key deduplicates exact phase slot key matches" 
 }
 
 ///|
-test "common runtime orbit input key matches common handlers key" {
+test "common runtime orbit input key matches keyed registration" {
   let scene = Scene::new("dedupe")
   let key = common_orbit_camera_input_handler_key(scene)
   let handlers : Array[PhaseHandler] = [

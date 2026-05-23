@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { requestLargeStorageBufferDevice } from "./webgpu-device-limits.ts";
+import {
+	syncOrbitCameraBlobComponent,
+	syncOrbitCameraTransformComponent,
+	updateOrbitCameraControllerComponentFromMouseFrame,
+	type ComponentTypeId,
+	type EntityId,
+} from "../../../../rhodonite_core/src/ecs/ts/index.ts";
 
 export type EngineCallback = (engine: Engine, frame: FrameState) => void;
 
@@ -101,40 +108,63 @@ type SceneScheduleHandler<TWorld> = {
 	callback: SceneScheduleCallback<TWorld>;
 };
 
-export type CommonOrbitCameraSystems<TWorld, TMainCamera, TComponent> = {
-	readonly orbitControllerComponent: TComponent;
-	readonly homeComponent?: TComponent;
-	readonly updateOrbitCameraControllerFromInput: (
+export type CommonOrbitCameraSystems<TWorld, TMainCamera> = {
+	readonly updateOrbitCameraControllerFromInput?: (
 		world: TWorld,
 		camera: TMainCamera,
-		orbitComponent: TComponent,
 		input: InputState,
 	) => void;
 	readonly syncOrbitCameraTransform?: (
 		world: TWorld,
 		camera: TMainCamera,
-		orbitComponent: TComponent,
-		homeComponent: TComponent,
+		orbitComponent: ComponentTypeId,
+		homeComponent: ComponentTypeId,
+	) => void;
+	readonly syncOrbitCameraBlob?: (
+		world: TWorld,
+		camera: TMainCamera,
+		orbitComponent: ComponentTypeId,
+		lensComponent: ComponentTypeId,
 	) => void;
 };
 
-export type CommonSceneSystems<TWorld, TMainCamera, TComponent> = Partial<
-	CommonOrbitCameraSystems<TWorld, TMainCamera, TComponent>
-> & {
+export type CommonSceneSystems<TWorld, TMainCamera> =
+	CommonOrbitCameraSystems<TWorld, TMainCamera> & {
 	readonly propagateTransforms?: (world: TWorld) => void;
 };
 
-export type CommonHandlersOptions = {
+export type CommonRuntimeOptions<TWorld = unknown> = {
 	readonly transformPropagation?: boolean;
+	readonly orbitCameraTransform?: boolean;
+	readonly orbitCameraBlobSync?: boolean;
+	readonly propagateTransforms?: (world: TWorld) => void;
 };
 
-type CommonRuntimeConfig<TWorld, TMainCamera, TComponent> = {
-	readonly systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>;
-	readonly options: CommonHandlersOptions;
+type CommonRuntimeConfig<TWorld, TMainCamera> = {
+	readonly systems: CommonSceneSystems<TWorld, TMainCamera>;
+	readonly options: CommonRuntimeOptions<TWorld>;
+	readonly implicit: boolean;
 };
+
+function defaultCommonRuntimeConfig<TWorld, TMainCamera>(): CommonRuntimeConfig<
+	TWorld,
+	TMainCamera
+> {
+	return {
+		systems: {},
+		options: {},
+		implicit: true,
+	};
+}
 
 type BuiltinTransformPropagationWorld = {
 	updateGlobalTransformsFromTransforms: () => void;
+};
+
+type BuiltinOrbitCameraWorld = {
+	orbitCameraControllerComponent: () => ComponentTypeId;
+	cameraHomeTransformComponent: () => ComponentTypeId;
+	cameraLensComponent: () => ComponentTypeId;
 };
 
 function defaultTransformPropagation(world: unknown): void {
@@ -142,6 +172,72 @@ function defaultTransformPropagation(world: unknown): void {
 	if (typeof candidate.updateGlobalTransformsFromTransforms === "function") {
 		candidate.updateGlobalTransformsFromTransforms();
 	}
+}
+
+function builtinOrbitCameraWorld(world: unknown): BuiltinOrbitCameraWorld {
+	const candidate = world as Partial<BuiltinOrbitCameraWorld>;
+	if (
+		typeof candidate.orbitCameraControllerComponent !== "function" ||
+		typeof candidate.cameraHomeTransformComponent !== "function" ||
+		typeof candidate.cameraLensComponent !== "function"
+	) {
+		throw new Error(
+			"Scene common orbit camera runtime requires a World with builtin orbit camera component accessors.",
+		);
+	}
+	return candidate as BuiltinOrbitCameraWorld;
+}
+
+function inputFrame(input: InputState) {
+	return {
+		leftDown: input.mouseDown(MouseButton.Left),
+		leftPressed: input.mousePressed(MouseButton.Left),
+		middleDown: input.mouseDown(MouseButton.Middle),
+		middlePressed: input.mousePressed(MouseButton.Middle),
+		pointerDeltaX: input.pointerDeltaX(),
+		pointerDeltaY: input.pointerDeltaY(),
+		wheelDeltaY: input.wheelDeltaY(),
+	};
+}
+
+function defaultOrbitCameraInput(
+	world: unknown,
+	camera: unknown,
+	input: InputState,
+): void {
+	updateOrbitCameraControllerComponentFromMouseFrame(
+		world as Parameters<typeof updateOrbitCameraControllerComponentFromMouseFrame>[0],
+		camera as EntityId,
+		inputFrame(input),
+	);
+}
+
+function defaultOrbitCameraTransform(
+	world: unknown,
+	camera: unknown,
+	orbitComponent: ComponentTypeId,
+	homeComponent: ComponentTypeId,
+): void {
+	syncOrbitCameraTransformComponent(
+		world as Parameters<typeof syncOrbitCameraTransformComponent>[0],
+		camera as EntityId,
+		orbitComponent,
+		homeComponent,
+	);
+}
+
+function defaultOrbitCameraBlobSync(
+	world: unknown,
+	camera: unknown,
+	orbitComponent: ComponentTypeId,
+	lensComponent: ComponentTypeId,
+): void {
+	syncOrbitCameraBlobComponent(
+		world as Parameters<typeof syncOrbitCameraBlobComponent>[0],
+		camera as EntityId,
+		orbitComponent,
+		lensComponent,
+	);
 }
 
 export class FrameState {
@@ -400,13 +496,13 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	private mainCameraValue: TMainCamera | null = null;
 	private readonly scheduleHandlers: SceneScheduleHandler<TWorld>[] = [];
 	private commonOrbitCameraValue:
-		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
+		| CommonOrbitCameraSystems<TWorld, TMainCamera>
 		| undefined;
 	private commonRuntimeValue:
-		| CommonRuntimeConfig<TWorld, TMainCamera, unknown>
-		| undefined;
-	private commonTransformPropagationValue: ((world: TWorld) => void) | undefined;
+		| CommonRuntimeConfig<TWorld, TMainCamera>
+		| undefined = defaultCommonRuntimeConfig();
 	private commonOrbitCameraTransformScheduled = false;
+	private commonOrbitCameraBlobSyncScheduled = false;
 	private commonTransformPropagationScheduled = false;
 	private enabledValue = true;
 	private visibleValue = true;
@@ -442,87 +538,67 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		this.scheduleHandlers.push({ phase, callback: schedule });
 	}
 
-	addCommonSystems<TComponent>(
-		systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>,
+	addCommonSystems(
+		options: CommonRuntimeOptions<TWorld> = {},
+		systems: CommonSceneSystems<TWorld, TMainCamera> = {},
 	): void {
-		const {
-			propagateTransforms,
-			orbitControllerComponent,
-			homeComponent,
-			updateOrbitCameraControllerFromInput,
-			syncOrbitCameraTransform,
-		} = systems;
-		if (propagateTransforms !== undefined) {
-			this.commonTransformPropagationValue = propagateTransforms;
-		}
-		if (homeComponent !== undefined && orbitControllerComponent === undefined) {
-			throw new Error(
-				"Scene.addCommonSystems: homeComponent requires orbitControllerComponent.",
-			);
-		}
-		if (orbitControllerComponent === undefined) {
-			return;
-		}
-		if (updateOrbitCameraControllerFromInput === undefined) {
-			throw new Error(
-				"Scene.addCommonSystems: orbitControllerComponent requires updateOrbitCameraControllerFromInput.",
-			);
-		}
-		if (homeComponent !== undefined && syncOrbitCameraTransform === undefined) {
-			throw new Error(
-				"Scene.addCommonSystems: homeComponent requires syncOrbitCameraTransform.",
-			);
-		}
-		this.commonOrbitCameraValue = {
-			orbitControllerComponent,
-			homeComponent,
-			updateOrbitCameraControllerFromInput,
-			syncOrbitCameraTransform,
-		} as CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>;
+		this.commonOrbitCameraValue = systems;
+		this.installCommonSystems({ ...options, transformPropagation: false });
 	}
 
-	useCommonRuntime<TComponent>(
-		systems: CommonSceneSystems<TWorld, TMainCamera, TComponent>,
-		options: CommonHandlersOptions = {},
+	useCommonRuntime(
+		options: CommonRuntimeOptions<TWorld> = {},
+		systems: CommonSceneSystems<TWorld, TMainCamera> = {},
 	): void {
 		this.commonRuntimeValue = {
-			systems: systems as CommonSceneSystems<TWorld, TMainCamera, unknown>,
+			systems,
 			options,
+			implicit: false,
 		};
 		this.applyCommonRuntime();
 	}
 
 	applyCommonRuntime():
-		| CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>
+		| CommonOrbitCameraSystems<TWorld, TMainCamera>
 		| undefined {
 		const runtime = this.commonRuntimeValue;
 		if (runtime === undefined) {
 			return undefined;
 		}
-		this.addCommonSystems(runtime.systems);
+		if (runtime.implicit && this.mainCameraValue === null) {
+			return undefined;
+		}
+		this.commonOrbitCameraValue = runtime.systems;
 		return this.installCommonSystems(runtime.options);
 	}
 
+	commonRuntimeRequiresMainCamera(): boolean {
+		return this.commonRuntimeValue?.implicit !== true;
+	}
+
 	installCommonSystems(
-		options: CommonHandlersOptions = {},
-	): CommonOrbitCameraSystems<TWorld, TMainCamera, unknown> | undefined {
-		const { transformPropagation = true } = options;
+		options: CommonRuntimeOptions<TWorld> = {},
+	): CommonOrbitCameraSystems<TWorld, TMainCamera> | undefined {
+		const {
+			transformPropagation = true,
+			orbitCameraTransform = true,
+			orbitCameraBlobSync = true,
+			propagateTransforms,
+		} = options;
 		if (
 			transformPropagation &&
 			!this.commonTransformPropagationScheduled
 		) {
-			const propagateTransforms =
-				this.commonTransformPropagationValue ?? defaultTransformPropagation;
+			const propagate = propagateTransforms ?? defaultTransformPropagation;
 			this.setSchedule((world) => {
-				propagateTransforms(world);
+				propagate(world);
 			}, Phase.Update);
 			this.commonTransformPropagationScheduled = true;
 		}
-		const orbit = this.commonOrbitCameraValue;
+		const orbit: CommonOrbitCameraSystems<TWorld, TMainCamera> =
+			this.commonOrbitCameraValue ?? {};
 		if (
-			orbit !== undefined &&
-			orbit.homeComponent !== undefined &&
-			orbit.syncOrbitCameraTransform !== undefined &&
+			orbitCameraTransform &&
 			!this.commonOrbitCameraTransformScheduled
 		) {
 			this.setSchedule((world) => {
@@ -530,16 +606,40 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 				if (camera === null) {
 					throw new Error("Scene.installCommonSystems requires Scene.mainCamera.");
 				}
-				orbit.syncOrbitCameraTransform?.(
+				const builtin = builtinOrbitCameraWorld(world);
+				const syncTransform =
+					orbit.syncOrbitCameraTransform ?? defaultOrbitCameraTransform;
+				syncTransform(
 					world,
 					camera,
-					orbit.orbitControllerComponent,
-					orbit.homeComponent,
+					builtin.orbitCameraControllerComponent(),
+					builtin.cameraHomeTransformComponent(),
 				);
 			}, Phase.PostUpdate);
 			this.commonOrbitCameraTransformScheduled = true;
 		}
-		return orbit;
+		if (
+			orbitCameraBlobSync &&
+			!this.commonOrbitCameraBlobSyncScheduled
+		) {
+			this.setSchedule((world) => {
+				const camera = this.mainCamera();
+				if (camera === null) {
+					throw new Error("Scene.installCommonSystems requires Scene.mainCamera.");
+				}
+				const builtin = builtinOrbitCameraWorld(world);
+				const syncBlob =
+					orbit.syncOrbitCameraBlob ?? defaultOrbitCameraBlobSync;
+				syncBlob(
+					world,
+					camera,
+					builtin.orbitCameraControllerComponent(),
+					builtin.cameraLensComponent(),
+				);
+			}, Phase.RenderExtract);
+			this.commonOrbitCameraBlobSyncScheduled = true;
+		}
+		return orbitCameraTransform || orbitCameraBlobSync ? orbit : undefined;
 	}
 
 	setEnabled(enabled: boolean): void {
@@ -581,6 +681,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 
 	prepareRenderState(frame: FrameState = FrameState.zero()): boolean {
+		this.applyCommonRuntime();
 		return this.runSchedulePhases(defaultRenderStatePreparationPhases(), frame);
 	}
 }
@@ -1656,8 +1757,9 @@ export class Engine {
 
 	private addCommonRuntimeOrbitCameraInputHandler<TWorld, TMainCamera>(
 		scene: Scene<TWorld, TMainCamera>,
-		orbit: CommonOrbitCameraSystems<TWorld, TMainCamera, unknown>,
+		orbit: CommonOrbitCameraSystems<TWorld, TMainCamera>,
 		unchecked = false,
+		requireMainCamera = true,
 	): void {
 		const register = unchecked
 			? this.addPhaseHandlerUnchecked.bind(this)
@@ -1670,30 +1772,23 @@ export class Engine {
 				}
 				const camera = scene.mainCamera();
 				if (camera === null) {
-					throw new Error("Engine common runtime requires Scene.mainCamera.");
+					if (requireMainCamera) {
+						throw new Error("Engine common runtime requires Scene.mainCamera.");
+					}
+					return;
 				}
 				const input = frame.input ?? engine.input;
-				orbit.updateOrbitCameraControllerFromInput(
+				const update =
+					orbit.updateOrbitCameraControllerFromInput ?? defaultOrbitCameraInput;
+				update(
 					scene.world(),
 					camera,
-					orbit.orbitControllerComponent,
 					input,
 				);
 			},
 			PhaseSlot.BeforeSystems,
 			`rhodonite/orbit-camera-input/${runtimeSceneIdentity(scene)}`,
 		);
-	}
-
-	addCommonHandlers<TWorld, TMainCamera>(
-		scene: Scene<TWorld, TMainCamera>,
-		options: CommonHandlersOptions = {},
-	): void {
-		const orbit = scene.installCommonSystems(options);
-		if (orbit === undefined) {
-			return;
-		}
-		this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit);
 	}
 
 	private declaredCommonRuntimeScenes(): Scene<unknown, unknown>[] {
@@ -1720,7 +1815,12 @@ export class Engine {
 	): void {
 		const orbit = scene.applyCommonRuntime();
 		if (orbit !== undefined) {
-			this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
+			this.addCommonRuntimeOrbitCameraInputHandler(
+				scene,
+				orbit,
+				true,
+				scene.commonRuntimeRequiresMainCamera(),
+			);
 		}
 	}
 

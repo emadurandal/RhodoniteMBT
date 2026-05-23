@@ -381,6 +381,8 @@ fn World::can_add_missing_component_from_setter(
 /// Builtin [`ChildOf`] is registered at index `2` as parent entity index/generation.
 /// Builtin [`Camera`] is registered at index `3` as CPU ref storage;
 /// matrix payloads live in the world's packed u32 Camera blob.
+/// Builtin orbit camera controller, camera home transform, and camera lens
+/// components follow as standard camera-control CPU components.
 pub fn World::new_with_global_transform_format(
   global_transform_gpu_format : @comp.GlobalTransformGpuFormat,
 ) -> World {
@@ -411,6 +413,15 @@ pub fn World::new_with_global_transform_format(
     abort("builtin Camera layout invalid")
   }
   let camera_component_id = registry.register_cpu("Camera", cam_layout.stride)
+  let orbit_camera_controller_component_id = registry.register_cpu(
+    "OrbitCameraController", orbit_camera_controller_stride,
+  )
+  let camera_home_transform_component_id = registry.register_cpu(
+    "CameraHomeTransform", camera_home_transform_stride,
+  )
+  let camera_lens_component_id = registry.register_cpu(
+    "CameraLens", camera_lens_stride,
+  )
   let global_transform_blob = GlobalTransformBlobStore::new()
   let camera_blob = CameraBlobStore::new()
   let generations : Array[Int] = []
@@ -434,8 +445,12 @@ pub fn World::new_with_global_transform_format(
   let global_transform_archetypes : Array[Int] = []
   let child_of_archetypes : Array[Int] = []
   let camera_archetypes : Array[Int] = []
+  let orbit_camera_controller_archetypes : Array[Int] = []
+  let camera_home_transform_archetypes : Array[Int] = []
+  let camera_lens_archetypes : Array[Int] = []
   let component_archetypes : Array[Array[Int]] = [
     transform_archetypes, global_transform_archetypes, child_of_archetypes, camera_archetypes,
+    orbit_camera_controller_archetypes, camera_home_transform_archetypes, camera_lens_archetypes,
   ]
   let query_depth = 0
   let component_registration_lock_depth = 0
@@ -469,6 +484,9 @@ pub fn World::new_with_global_transform_format(
     global_transform_default_format: global_transform_gpu_format,
     child_of_component_id,
     camera_component_id,
+    orbit_camera_controller_component_id,
+    camera_home_transform_component_id,
+    camera_lens_component_id,
   }
 }
 
@@ -989,4 +1007,24 @@ pub fn World::child_of_component(self : World) -> ComponentTypeId {
 /// Implements `World::camera_component`.
 pub fn World::camera_component(self : World) -> ComponentTypeId {
   self.camera_component_id
+}
+
+///|
+/// Implements `World::orbit_camera_controller_component`.
+pub fn World::orbit_camera_controller_component(
+  self : World,
+) -> ComponentTypeId {
+  self.orbit_camera_controller_component_id
+}
+
+///|
+/// Implements `World::camera_home_transform_component`.
+pub fn World::camera_home_transform_component(self : World) -> ComponentTypeId {
+  self.camera_home_transform_component_id
+}
+
+///|
+/// Implements `World::camera_lens_component`.
+pub fn World::camera_lens_component(self : World) -> ComponentTypeId {
+  self.camera_lens_component_id
 }

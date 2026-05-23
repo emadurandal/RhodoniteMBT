@@ -134,29 +134,25 @@ pub fn camera_projection_orthographic() -> Float {
 }
 
 ///|
-/// Registers the builtin-style orbit camera controller CPU component.
+/// Returns the world's builtin orbit camera controller CPU component.
 pub fn register_orbit_camera_controller_component(
   world : World,
 ) -> ComponentTypeId {
-  world.register_cpu_component(
-    "OrbitCameraController", orbit_camera_controller_stride,
-  )
+  world.orbit_camera_controller_component()
 }
 
 ///|
-/// Registers the camera home transform CPU component.
+/// Returns the world's builtin camera home transform CPU component.
 pub fn register_camera_home_transform_component(
   world : World,
 ) -> ComponentTypeId {
-  world.register_cpu_component(
-    "CameraHomeTransform", camera_home_transform_stride,
-  )
+  world.camera_home_transform_component()
 }
 
 ///|
-/// Registers the camera lens CPU component.
+/// Returns the world's builtin camera lens CPU component.
 pub fn register_camera_lens_component(world : World) -> ComponentTypeId {
-  world.register_cpu_component("CameraLens", camera_lens_stride)
+  world.camera_lens_component()
 }
 
 ///|
@@ -457,7 +453,6 @@ pub fn orbit_camera_pose(
 pub fn update_orbit_camera_controller_from_mouse_frame(
   world : World,
   camera : EntityId,
-  component : ComponentTypeId,
   left_down : Bool,
   left_pressed : Bool,
   middle_down : Bool,
@@ -466,6 +461,7 @@ pub fn update_orbit_camera_controller_from_mouse_frame(
   pointer_delta_y : Float,
   wheel_delta_y : Float,
 ) -> Bool {
+  let component = world.orbit_camera_controller_component()
   match world.component_bytes(camera, component) {
     Some(bytes) => {
       let yaw = fixed_f32(bytes, orbit_yaw_offset)
@@ -673,9 +669,6 @@ fn orbit_orthographic_camera_desc_projection(
 pub fn setup_orbit_orthographic_camera(
   world : World,
   camera : EntityId,
-  orbit_component : ComponentTypeId,
-  home_component : ComponentTypeId,
-  lens_component : ComponentTypeId,
   desc : OrbitOrthographicCameraDesc,
 ) -> Bool {
   let (px, py, pz, qx, qy, qz, qw) = orbit_camera_desc_trs(desc)
@@ -714,7 +707,7 @@ pub fn setup_orbit_orthographic_camera(
   add_orbit_camera_controller_with_pose(
     world,
     camera,
-    orbit_component,
+    world.orbit_camera_controller_component(),
     desc.yaw,
     desc.pitch,
     desc.pan_x,
@@ -722,11 +715,15 @@ pub fn setup_orbit_orthographic_camera(
     desc.dolly,
     desc.distance,
   ) &&
-  set_camera_home_from_current_transform(world, camera, home_component) &&
+  set_camera_home_from_current_transform(
+    world,
+    camera,
+    world.camera_home_transform_component(),
+  ) &&
   add_camera_lens_orthographic(
     world,
     camera,
-    lens_component,
+    world.camera_lens_component(),
     desc.near,
     desc.far,
     desc.aspect,
