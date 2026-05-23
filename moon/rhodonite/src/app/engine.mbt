@@ -286,6 +286,74 @@ pub fn Engine::add_phase_handler(
 }
 
 ///|
+/// Registers a frame-wide callback before standard update scene systems.
+pub fn Engine::on_frame_update(
+  self : Engine,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_update(),
+    fn(_engine, frame) { run(frame) },
+    key~,
+  )
+}
+
+///|
+/// Registers a frame-wide callback after standard render scene systems.
+pub fn Engine::on_frame_render(
+  self : Engine,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_render(),
+    fn(_engine, frame) { run(frame) },
+    slot=AfterSystems,
+    key~,
+  )
+}
+
+///|
+/// Registers a scene-scoped callback before update systems when the scene is enabled.
+pub fn Engine::on_scene_update(
+  self : Engine,
+  scene : Scene,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_update(),
+    fn(engine, frame) {
+      if engine.frame_targets_scene(frame, scene) && scene.enabled() {
+        run(frame)
+      }
+    },
+    key~,
+  )
+}
+
+///|
+/// Registers a scene-scoped callback after render systems when the scene is visible.
+pub fn Engine::on_scene_render(
+  self : Engine,
+  scene : Scene,
+  run : (FrameState) -> Unit,
+  key? : String? = None,
+) -> Unit {
+  self.add_phase_handler(
+    phase_render(),
+    fn(engine, frame) {
+      if engine.frame_targets_scene(frame, scene) && scene.visible() {
+        run(frame)
+      }
+    },
+    slot=AfterSystems,
+    key~,
+  )
+}
+
+///|
 /// Reports whether a surface-scoped frame should run handlers for `scene`.
 fn Engine::frame_targets_scene(
   self : Engine,

@@ -368,6 +368,109 @@ describe("app-runtime Engine", () => {
 		expect(afterInputCount).toBe(1);
 	});
 
+	it("runs frame callbacks in the standard update and render slots", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene<Record<string, never>>();
+		scene.setWorld({});
+		const calls: string[] = [];
+
+		engine.onFrameUpdate(() => {
+			calls.push("frame-update");
+		});
+		scene.setSchedule(() => {
+			calls.push("update-system");
+		}, Phase.Update);
+		scene.setSchedule(() => {
+			calls.push("render-system");
+		}, Phase.Render);
+		engine.onFrameRender(() => {
+			calls.push("frame-render");
+		});
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(calls).toEqual([
+			"frame-update",
+			"update-system",
+			"render-system",
+			"frame-render",
+		]);
+	});
+
+	it("deduplicates keyed frame and scene callback registrations", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene();
+		let frameUpdateCount = 0;
+		let sceneRenderCount = 0;
+
+		engine.onFrameUpdate(() => {
+			frameUpdateCount += 1;
+		}, "test/frame-update");
+		engine.onFrameUpdate(() => {
+			frameUpdateCount += 1;
+		}, "test/frame-update");
+		engine.onSceneRender(scene, () => {
+			sceneRenderCount += 1;
+		}, "test/scene-render");
+		engine.onSceneRender(scene, () => {
+			sceneRenderCount += 1;
+		}, "test/scene-render");
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(frameUpdateCount).toBe(1);
+		expect(sceneRenderCount).toBe(1);
+	});
+
+	it("runs scene callbacks only for matching multi-surface scenes", async () => {
+		const engine = await createTestEngine();
+		const first = new Scene("first");
+		const second = new Scene("second");
+		const firstSurface = engine.addSurface(createTestGpuSurface(fakeCanvas()));
+		const secondSurface = engine.addSurface(createTestGpuSurface(fakeCanvas()));
+		const updateSurfaces: Array<number | undefined> = [];
+		const renderSurfaces: Array<number | undefined> = [];
+
+		engine.setSurfaceScene(firstSurface, first);
+		engine.setSurfaceScene(secondSurface, second);
+		engine.onSceneUpdate(first, (frame) => {
+			updateSurfaces.push(frame.surfaceId);
+		});
+		engine.onSceneRender(second, (frame) => {
+			renderSurfaces.push(frame.surfaceId);
+		});
+		engine.initialize();
+
+		engine.runMultiSurfaceFrame(1 / 60);
+
+		expect(updateSurfaces).toEqual([firstSurface]);
+		expect(renderSurfaces).toEqual([secondSurface]);
+	});
+
+	it("skips scene callbacks when the scene is disabled or hidden", async () => {
+		const engine = await createTestEngine();
+		const scene = engine.mainScene();
+		let updateCount = 0;
+		let renderCount = 0;
+
+		scene.setEnabled(false);
+		scene.setVisible(false);
+		engine.onSceneUpdate(scene, () => {
+			updateCount += 1;
+		});
+		engine.onSceneRender(scene, () => {
+			renderCount += 1;
+		});
+		engine.initialize();
+
+		engine.runFrame(1 / 60);
+
+		expect(updateCount).toBe(0);
+		expect(renderCount).toBe(0);
+	});
+
 	it("installs declared common runtime orbit input during initialize", async () => {
 		const engine = await createTestEngine();
 		const scene = engine.mainScene<ReturnType<typeof fakeOrbitWorld>, string>();

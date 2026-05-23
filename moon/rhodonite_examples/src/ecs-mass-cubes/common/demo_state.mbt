@@ -937,17 +937,11 @@ pub fn register_engine_handlers(
   engine : @app.Engine,
   demo_state : DemoState,
 ) -> Unit {
-  engine.add_phase_handler(@app.phase_update(), fn(_engine, frame) {
+  engine.on_scene_update(demo_state.scene, fn(frame) {
     demo_state.begin_perf_frame()
     demo_state.update_scene(frame)
   })
-  engine.add_phase_handler(
-    @app.phase_render(),
-    fn(_engine, _frame) {
-      if demo_state.scene.visible() {
-        render_current_frame(demo_state, record_perf=true)
-      }
-    },
-    slot=@app.PhaseSlot::AfterSystems,
-  )
+  engine.on_scene_render(demo_state.scene, fn(_frame) {
+    render_current_frame(demo_state, record_perf=true)
+  })
 }

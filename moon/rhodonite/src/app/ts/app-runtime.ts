@@ -17,6 +17,8 @@ import {
 
 export type EngineCallback = (engine: Engine, frame: FrameState) => void;
 
+export type EngineFrameCallback = (frame: FrameState) => void;
+
 export type SceneScheduleCallback<TWorld> = (
 	world: TWorld,
 	frame: FrameState,
@@ -1761,6 +1763,62 @@ export class Engine {
 			);
 		}
 		this.addPhaseHandlerUnchecked(phase, callback, slot, key);
+	}
+
+	onFrameUpdate(callback: EngineFrameCallback, key?: string): void {
+		this.addPhaseHandler(
+			Phase.Update,
+			(_engine, frame) => {
+				callback(frame);
+			},
+			PhaseSlot.BeforeSystems,
+			key,
+		);
+	}
+
+	onFrameRender(callback: EngineFrameCallback, key?: string): void {
+		this.addPhaseHandler(
+			Phase.Render,
+			(_engine, frame) => {
+				callback(frame);
+			},
+			PhaseSlot.AfterSystems,
+			key,
+		);
+	}
+
+	onSceneUpdate(
+		scene: RuntimeScene,
+		callback: EngineFrameCallback,
+		key?: string,
+	): void {
+		this.addPhaseHandler(
+			Phase.Update,
+			(engine, frame) => {
+				if (engine.frameTargetsScene(frame, scene) && scene.enabled()) {
+					callback(frame);
+				}
+			},
+			PhaseSlot.BeforeSystems,
+			key,
+		);
+	}
+
+	onSceneRender(
+		scene: RuntimeScene,
+		callback: EngineFrameCallback,
+		key?: string,
+	): void {
+		this.addPhaseHandler(
+			Phase.Render,
+			(engine, frame) => {
+				if (engine.frameTargetsScene(frame, scene) && scene.visible()) {
+					callback(frame);
+				}
+			},
+			PhaseSlot.AfterSystems,
+			key,
+		);
 	}
 
 	private addPhaseHandlerUnchecked(
