@@ -483,9 +483,9 @@ function readOrbitCameraPoseComponent(
 export function updateOrbitCameraControllerComponentFromMouseFrame(
 	world: World,
 	camera: EntityId,
-	component: ComponentTypeId,
 	frame: OrbitCameraInputFrame,
 ): boolean {
+	const component = world.orbitCameraControllerComponent();
 	const bytes = componentBytesOrThrow(
 		world,
 		camera,

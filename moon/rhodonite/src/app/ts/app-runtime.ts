@@ -112,7 +112,6 @@ export type CommonOrbitCameraSystems<TWorld, TMainCamera> = {
 	readonly updateOrbitCameraControllerFromInput?: (
 		world: TWorld,
 		camera: TMainCamera,
-		orbitComponent: ComponentTypeId,
 		input: InputState,
 	) => void;
 	readonly syncOrbitCameraTransform?: (
@@ -192,13 +191,11 @@ function inputFrame(input: InputState) {
 function defaultOrbitCameraInput(
 	world: unknown,
 	camera: unknown,
-	orbitComponent: ComponentTypeId,
 	input: InputState,
 ): void {
 	updateOrbitCameraControllerComponentFromMouseFrame(
 		world as Parameters<typeof updateOrbitCameraControllerComponentFromMouseFrame>[0],
 		camera as EntityId,
-		orbitComponent,
 		inputFrame(input),
 	);
 }
@@ -1756,13 +1753,11 @@ export class Engine {
 					throw new Error("Engine common runtime requires Scene.mainCamera.");
 				}
 				const input = frame.input ?? engine.input;
-				const builtin = builtinOrbitCameraWorld(scene.world());
 				const update =
 					orbit.updateOrbitCameraControllerFromInput ?? defaultOrbitCameraInput;
 				update(
 					scene.world(),
 					camera,
-					builtin.orbitCameraControllerComponent(),
 					input,
 				);
 			},

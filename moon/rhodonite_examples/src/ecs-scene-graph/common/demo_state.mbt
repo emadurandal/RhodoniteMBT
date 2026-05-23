@@ -20,9 +20,6 @@ pub(all) struct DemoState {
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
   renderable : @app.RenderableComponent
-  orbit_controller : @ecs.ComponentTypeId
-  camera_home : @ecs.ComponentTypeId
-  camera_lens : @ecs.ComponentTypeId
   frame : @ref.Ref[Int]
 }
 
@@ -64,7 +61,6 @@ pub fn DemoState::update_camera_from_input(
     @ecs.update_orbit_camera_controller_from_mouse_frame(
       self.scene.world(),
       camera,
-      self.orbit_controller,
       input.mouse_down(Left),
       input.mouse_pressed(Left),
       input.mouse_down(Middle),
@@ -109,9 +105,6 @@ pub fn create_demo_state_for_scene(
     @app.cube_position3_vertex_layout(),
   )
   let world = scene.world()
-  let orbit_controller = world.orbit_camera_controller_component()
-  let camera_home = world.camera_home_transform_component()
-  let camera_lens = world.camera_lens_component()
   let renderable = scene.renderable_component()
   let camera = world.create_entity()
   let sun = world.create_entity()
@@ -179,18 +172,7 @@ pub fn create_demo_state_for_scene(
     ),
   )
   push_local_transforms(world, bodies, 0.0)
-  {
-    context,
-    renderer,
-    scene,
-    bodies,
-    gt,
-    renderable,
-    orbit_controller,
-    camera_home,
-    camera_lens,
-    frame: @ref.new(0),
-  }
+  { context, renderer, scene, bodies, gt, renderable, frame: @ref.new(0) }
 }
 
 ///|

@@ -54,7 +54,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(addCameraLensOrthographic(world, camera, lens, 0.1, 80, 4 / 3, 1, 0)).toBe(true);
 
 		expect(
-			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, orbit, {
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
 				leftDown: false,
 				leftPressed: false,
 				middleDown: false,
@@ -127,7 +127,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(addOrbitCameraControllerWithDistance(world, camera, orbit, 0, 0.42, 16)).toBe(true);
 		expect(setCameraHomeFromCurrentTransform(world, camera, home)).toBe(true);
 		expect(
-			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, orbit, {
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
 				leftDown: true,
 				leftPressed: false,
 				middleDown: false,

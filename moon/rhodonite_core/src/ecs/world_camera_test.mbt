@@ -88,7 +88,6 @@ test "orbit camera reset restores home Transform3D" {
     update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
-      orbit,
       true,
       false,
       false,
@@ -218,7 +217,6 @@ test "orbit camera blob sync applies orthographic dolly scale" {
     update_orbit_camera_controller_from_mouse_frame(
       world,
       camera,
-      orbit,
       false,
       false,
       false,

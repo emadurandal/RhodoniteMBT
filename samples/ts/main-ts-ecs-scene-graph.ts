@@ -6,7 +6,6 @@ import {
 	World,
 	createOrbitOrthographicCameraDescFromYzPosition,
 	setupOrbitOrthographicCamera,
-	type ComponentTypeId,
 	type EntityId,
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
 import {
@@ -51,8 +50,6 @@ type DemoState = {
 	readonly scene: Scene<World, EntityId>;
 	readonly world: World;
 	readonly renderableComponent: RenderableComponent;
-	readonly orbitControllerComponent: ComponentTypeId;
-	readonly cameraLensComponent: ComponentTypeId;
 	readonly objects: DemoObjects;
 	rendererWidth: number;
 	rendererHeight: number;
@@ -155,8 +152,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	const world = World.new();
 	scene.setWorld(world);
 
-	const orbitControllerComponent = world.orbitCameraControllerComponent();
-	const cameraLensComponent = world.cameraLensComponent();
 	const renderableComponent = registerRenderableComponent(world);
 	const camera = world.createEntity();
 
@@ -219,8 +214,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		scene,
 		world,
 		renderableComponent,
-		orbitControllerComponent,
-		cameraLensComponent,
 		objects,
 		rendererWidth: CANVAS_WIDTH,
 		rendererHeight: CANVAS_HEIGHT,

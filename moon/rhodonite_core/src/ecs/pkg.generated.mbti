@@ -55,7 +55,7 @@ pub fn setup_orbit_orthographic_camera(World, EntityId, OrbitOrthographicCameraD
 
 pub fn transform_propagation_system(World, PhaseKey) -> System
 
-pub fn update_orbit_camera_controller_from_mouse_frame(World, EntityId, ComponentTypeId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
+pub fn update_orbit_camera_controller_from_mouse_frame(World, EntityId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 

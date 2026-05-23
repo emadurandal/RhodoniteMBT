@@ -453,7 +453,6 @@ pub fn orbit_camera_pose(
 pub fn update_orbit_camera_controller_from_mouse_frame(
   world : World,
   camera : EntityId,
-  component : ComponentTypeId,
   left_down : Bool,
   left_pressed : Bool,
   middle_down : Bool,
@@ -462,6 +461,7 @@ pub fn update_orbit_camera_controller_from_mouse_frame(
   pointer_delta_y : Float,
   wheel_delta_y : Float,
 ) -> Bool {
+  let component = world.orbit_camera_controller_component()
   match world.component_bytes(camera, component) {
     Some(bytes) => {
       let yaw = fixed_f32(bytes, orbit_yaw_offset)

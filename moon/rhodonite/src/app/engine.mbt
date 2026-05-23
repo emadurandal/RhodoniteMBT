@@ -280,7 +280,6 @@ fn Engine::frame_targets_scene(
 /// Builds the standard orbit camera input phase handler for one scene.
 fn orbit_camera_controller_input_phase_handler(
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
   caller : String,
 ) -> (Engine, FrameState) -> Unit {
   fn(engine, frame) {
@@ -296,7 +295,6 @@ fn orbit_camera_controller_input_phase_handler(
       @ecs.update_orbit_camera_controller_from_mouse_frame(
         scene.world(),
         camera,
-        orbit_component,
         input.mouse_down(Left),
         input.mouse_pressed(Left),
         input.mouse_down(Middle),
@@ -321,16 +319,13 @@ fn common_orbit_camera_input_handler_key(scene : Scene) -> String {
 fn Engine::register_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
   phase : PhaseKey,
   slot : PhaseSlot,
   key : String?,
   unchecked : Bool,
   caller : String,
 ) -> Unit {
-  let handler = orbit_camera_controller_input_phase_handler(
-    scene, orbit_component, caller,
-  )
+  let handler = orbit_camera_controller_input_phase_handler(scene, caller)
   if unchecked {
     match key {
       Some(value) =>
@@ -355,13 +350,12 @@ fn Engine::register_orbit_camera_controller_input_handler(
 pub fn Engine::add_orbit_camera_controller_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
   phase? : PhaseKey = phase_input(),
   slot? : PhaseSlot = BeforeSystems,
   key? : String? = None,
 ) -> Unit {
   self.register_orbit_camera_controller_input_handler(
-    scene, orbit_component, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
+    scene, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
   )
 }
 
@@ -370,12 +364,10 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 fn Engine::add_common_runtime_orbit_camera_input_handler(
   self : Engine,
   scene : Scene,
-  orbit_component : @ecs.ComponentTypeId,
 ) -> Unit {
   let key = common_orbit_camera_input_handler_key(scene)
   self.register_orbit_camera_controller_input_handler(
     scene,
-    orbit_component,
     phase_input(),
     BeforeSystems,
     Some(key),
@@ -423,10 +415,7 @@ fn Engine::try_install_declared_common_runtime(
   match scene.apply_common_runtime() {
     Some(config) =>
       if config.orbit_camera_transform || config.orbit_camera_blob_sync {
-        self.add_common_runtime_orbit_camera_input_handler(
-          scene,
-          scene.world().orbit_camera_controller_component(),
-        )
+        self.add_common_runtime_orbit_camera_input_handler(scene)
       }
     None => ()
   }
@@ -475,7 +464,6 @@ pub fn Engine::add_common_handlers(
   )
   self.add_orbit_camera_controller_input_handler(
     scene,
-    scene.world().orbit_camera_controller_component(),
     key=Some(common_orbit_camera_input_handler_key(scene)),
   )
 }
