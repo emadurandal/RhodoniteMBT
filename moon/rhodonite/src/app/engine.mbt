@@ -280,13 +280,22 @@ fn Engine::frame_targets_scene(
 /// Builds the standard orbit camera input phase handler for one scene.
 fn orbit_camera_controller_input_phase_handler(
   scene : Scene,
+  require_main_camera : Bool,
   caller : String,
 ) -> (Engine, FrameState) -> Unit {
   fn(engine, frame) {
     if !engine.frame_targets_scene(frame, scene) {
       return
     }
-    let camera = scene_main_camera_or_abort(scene, caller)
+    let camera = match scene.main_camera() {
+      Some(camera) => camera
+      None =>
+        if require_main_camera {
+          abort(caller + ": Scene.main_camera is not set")
+        } else {
+          return
+        }
+    }
     let input = match frame.input() {
       Some(input) => input
       None => engine.input()
@@ -322,10 +331,13 @@ fn Engine::register_orbit_camera_controller_input_handler(
   phase : PhaseKey,
   slot : PhaseSlot,
   key : String?,
+  require_main_camera : Bool,
   unchecked : Bool,
   caller : String,
 ) -> Unit {
-  let handler = orbit_camera_controller_input_phase_handler(scene, caller)
+  let handler = orbit_camera_controller_input_phase_handler(
+    scene, require_main_camera, caller,
+  )
   if unchecked {
     match key {
       Some(value) =>
@@ -355,7 +367,7 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
   key? : String? = None,
 ) -> Unit {
   self.register_orbit_camera_controller_input_handler(
-    scene, phase, slot, key, false, "Engine::add_orbit_camera_controller_input_handler",
+    scene, phase, slot, key, true, false, "Engine::add_orbit_camera_controller_input_handler",
   )
 }
 
@@ -364,6 +376,7 @@ pub fn Engine::add_orbit_camera_controller_input_handler(
 fn Engine::add_common_runtime_orbit_camera_input_handler(
   self : Engine,
   scene : Scene,
+  require_main_camera : Bool,
 ) -> Unit {
   let key = common_orbit_camera_input_handler_key(scene)
   self.register_orbit_camera_controller_input_handler(
@@ -371,6 +384,7 @@ fn Engine::add_common_runtime_orbit_camera_input_handler(
     phase_input(),
     BeforeSystems,
     Some(key),
+    require_main_camera,
     true,
     "Engine::add_common_runtime_orbit_camera_input_handler",
   )
@@ -415,7 +429,10 @@ fn Engine::try_install_declared_common_runtime(
   match scene.apply_common_runtime() {
     Some(config) =>
       if config.orbit_camera_transform || config.orbit_camera_blob_sync {
-        self.add_common_runtime_orbit_camera_input_handler(scene)
+        self.add_common_runtime_orbit_camera_input_handler(
+          scene,
+          !config.implicit,
+        )
       }
     None => ()
   }

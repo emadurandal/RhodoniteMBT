@@ -143,7 +143,19 @@ export type CommonHandlersOptions<TWorld = unknown> = {
 type CommonRuntimeConfig<TWorld, TMainCamera> = {
 	readonly systems: CommonSceneSystems<TWorld, TMainCamera>;
 	readonly options: CommonHandlersOptions<TWorld>;
+	readonly implicit: boolean;
 };
+
+function defaultCommonRuntimeConfig<TWorld, TMainCamera>(): CommonRuntimeConfig<
+	TWorld,
+	TMainCamera
+> {
+	return {
+		systems: {},
+		options: {},
+		implicit: true,
+	};
+}
 
 type BuiltinTransformPropagationWorld = {
 	updateGlobalTransformsFromTransforms: () => void;
@@ -488,7 +500,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		| undefined;
 	private commonRuntimeValue:
 		| CommonRuntimeConfig<TWorld, TMainCamera>
-		| undefined;
+		| undefined = defaultCommonRuntimeConfig();
 	private commonOrbitCameraTransformScheduled = false;
 	private commonOrbitCameraBlobSyncScheduled = false;
 	private commonTransformPropagationScheduled = false;
@@ -541,6 +553,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		this.commonRuntimeValue = {
 			systems,
 			options,
+			implicit: false,
 		};
 		this.applyCommonRuntime();
 	}
@@ -552,8 +565,15 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 		if (runtime === undefined) {
 			return undefined;
 		}
+		if (runtime.implicit && this.mainCameraValue === null) {
+			return undefined;
+		}
 		this.commonOrbitCameraValue = runtime.systems;
 		return this.installCommonSystems(runtime.options);
+	}
+
+	commonRuntimeRequiresMainCamera(): boolean {
+		return this.commonRuntimeValue?.implicit !== true;
 	}
 
 	installCommonSystems(
@@ -661,6 +681,7 @@ export class Scene<TWorld = unknown, TMainCamera = unknown> {
 	}
 
 	prepareRenderState(frame: FrameState = FrameState.zero()): boolean {
+		this.applyCommonRuntime();
 		return this.runSchedulePhases(defaultRenderStatePreparationPhases(), frame);
 	}
 }
@@ -1738,6 +1759,7 @@ export class Engine {
 		scene: Scene<TWorld, TMainCamera>,
 		orbit: CommonOrbitCameraSystems<TWorld, TMainCamera>,
 		unchecked = false,
+		requireMainCamera = true,
 	): void {
 		const register = unchecked
 			? this.addPhaseHandlerUnchecked.bind(this)
@@ -1750,7 +1772,10 @@ export class Engine {
 				}
 				const camera = scene.mainCamera();
 				if (camera === null) {
-					throw new Error("Engine common runtime requires Scene.mainCamera.");
+					if (requireMainCamera) {
+						throw new Error("Engine common runtime requires Scene.mainCamera.");
+					}
+					return;
 				}
 				const input = frame.input ?? engine.input;
 				const update =
@@ -1801,7 +1826,12 @@ export class Engine {
 	): void {
 		const orbit = scene.applyCommonRuntime();
 		if (orbit !== undefined) {
-			this.addCommonRuntimeOrbitCameraInputHandler(scene, orbit, true);
+			this.addCommonRuntimeOrbitCameraInputHandler(
+				scene,
+				orbit,
+				true,
+				scene.commonRuntimeRequiresMainCamera(),
+			);
 		}
 	}
 

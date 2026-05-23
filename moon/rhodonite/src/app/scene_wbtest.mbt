@@ -39,6 +39,44 @@ test "scene common systems use builtin camera component ids" {
 }
 
 ///|
+test "scene implicit common runtime waits for a main camera" {
+  let scene = Scene::new("implicit-common-runtime-pending")
+  assert_true(scene.apply_common_runtime() is None)
+  assert_eq(scene.transform_propagation_registrations.length(), 0)
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 0)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 0)
+}
+
+///|
+test "scene main camera allows implicit common runtime application" {
+  let scene = Scene::new("implicit-common-runtime")
+  let world = scene.world()
+  let camera = world.create_entity()
+  scene.set_main_camera(Some(camera))
+  assert_true(scene.apply_common_runtime() is Some(_))
+  match scene.common_runtime {
+    Some(config) => {
+      assert_true(config.implicit)
+      assert_true(config.transform_propagation)
+      assert_true(config.orbit_camera_transform)
+      assert_true(config.orbit_camera_blob_sync)
+    }
+    None => abort("missing common runtime config")
+  }
+  assert_eq(scene.transform_propagation_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_transform_registrations.length(), 1)
+  assert_eq(scene.orbit_camera_blob_sync_registrations.length(), 1)
+  assert_true(
+    scene.orbit_camera_transform_registrations[0].orbit_component ==
+    world.orbit_camera_controller_component(),
+  )
+  assert_true(
+    scene.orbit_camera_blob_sync_registrations[0].lens_component ==
+    world.camera_lens_component(),
+  )
+}
+
+///|
 test "scene common runtime records and installs standard systems" {
   let scene = Scene::new("common-runtime")
   let world = scene.world()
@@ -46,6 +84,7 @@ test "scene common runtime records and installs standard systems" {
   assert_true(scene.apply_common_runtime() is Some(_))
   match scene.common_runtime {
     Some(config) => {
+      assert_true(!config.implicit)
       assert_true(config.transform_propagation)
       assert_true(config.orbit_camera_transform)
       assert_true(config.orbit_camera_blob_sync)
@@ -74,6 +113,7 @@ test "scene common runtime can skip orbit camera blob sync" {
   )
   match scene.common_runtime {
     Some(config) => {
+      assert_true(!config.implicit)
       assert_true(!config.transform_propagation)
       assert_true(config.orbit_camera_transform)
       assert_true(!config.orbit_camera_blob_sync)

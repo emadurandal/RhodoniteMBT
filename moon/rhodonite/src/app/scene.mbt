@@ -18,6 +18,18 @@ struct CommonRuntimeConfig {
   transform_propagation : Bool
   orbit_camera_transform : Bool
   orbit_camera_blob_sync : Bool
+  implicit : Bool
+}
+
+///|
+/// Returns the default implicit runtime config for scenes with a main camera.
+fn default_common_runtime_config() -> CommonRuntimeConfig {
+  {
+    transform_propagation: true,
+    orbit_camera_transform: true,
+    orbit_camera_blob_sync: true,
+    implicit: true,
+  }
 }
 
 ///|
@@ -67,7 +79,7 @@ pub fn Scene::new_with_world(name : String, world : @ecs.World) -> Scene {
     camera_blob_sync_registrations: [],
     orbit_camera_transform_registrations: [],
     orbit_camera_blob_sync_registrations: [],
-    common_runtime: None,
+    common_runtime: Some(default_common_runtime_config()),
   }
 }
 
@@ -332,6 +344,7 @@ pub fn Scene::use_common_runtime(
     transform_propagation,
     orbit_camera_transform,
     orbit_camera_blob_sync,
+    implicit: false,
   }
   self.common_runtime = Some(config)
   self.add_common_systems(
@@ -346,6 +359,9 @@ pub fn Scene::use_common_runtime(
 fn Scene::apply_common_runtime(self : Scene) -> CommonRuntimeConfig? {
   match self.common_runtime {
     Some(config) => {
+      if config.implicit && self.main_camera is None {
+        return None
+      }
       self.add_common_systems(
         transform_propagation=config.transform_propagation,
         orbit_camera_transform=config.orbit_camera_transform,
@@ -425,14 +441,6 @@ pub fn Scene::prepare_render_state(
   self : Scene,
   frame? : FrameState = FrameState::zero(),
 ) -> Bool {
+  ignore(self.apply_common_runtime())
   self.run_systems_for_phases(default_render_state_preparation_phases(), frame)
-}
-
-///|
-/// Returns the scene main camera or aborts because a camera-bound engine handler requires one.
-fn scene_main_camera_or_abort(scene : Scene, caller : String) -> @ecs.EntityId {
-  match scene.main_camera() {
-    Some(camera) => camera
-    None => abort(caller + ": Scene.main_camera is not set")
-  }
 }

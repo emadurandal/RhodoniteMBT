@@ -168,7 +168,6 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 		throw new Error("Failed to setup orbit orthographic camera.");
 	}
 	scene.setMainCamera(camera);
-	scene.useCommonRuntime({ transformPropagation: true });
 
 	const renderer = new Renderer(
 		engine.device,
