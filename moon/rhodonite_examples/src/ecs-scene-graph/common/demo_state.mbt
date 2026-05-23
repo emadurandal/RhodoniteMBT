@@ -141,7 +141,7 @@ pub fn DemoState::update_scene(
 
 ///|
 /// Creates demo state backed by caller-owned renderer and target resources.
-pub fn create_demo_state_with_renderer(
+pub fn create_demo_state(
   scene : @app.Scene,
   renderer : @app.Renderer,
   target : @app.RenderTargetResources,
@@ -214,20 +214,6 @@ pub fn create_demo_state_with_renderer(
 }
 
 ///|
-/// Implements `create_demo_state_for_engine`.
-pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
-  Some(
-    create_demo_state_with_renderer(
-      engine.main_scene(),
-      engine.renderer(),
-      engine.render_target_resources(),
-      context=Some(canvas_context),
-    ),
-  )
-}
-
-///|
 /// Registers engine phase handlers that drive this DemoState.
 pub fn register_engine_handlers(
   engine : @app.Engine,
@@ -244,11 +230,13 @@ pub fn register_engine_handlers(
 ///|
 /// Creates DemoState and registers the sample engine handlers.
 pub fn setup_engine(engine : @app.Engine) -> Bool {
-  match create_demo_state_for_engine(engine) {
-    Some(demo_state) => {
-      register_engine_handlers(engine, demo_state)
-      true
-    }
-    None => false
-  }
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
+  let demo_state = create_demo_state(
+    engine.main_scene(),
+    engine.renderer(),
+    engine.render_target_resources(),
+    context=Some(canvas_context),
+  )
+  register_engine_handlers(engine, demo_state)
+  true
 }

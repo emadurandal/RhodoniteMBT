@@ -121,7 +121,7 @@ flowchart LR
           <p><code>PlatformOptions</code> は <code>interactive</code>、<code>render_loop</code>、<code>interactive_on_demand</code>、<code>render_on_demand</code>、<code>single_frame</code> を持ちます。</p>
 
           <h2>Sample Layout</h2>
-          <p>samples は <code>DemoState</code> という名前で sample-local GPU/pipeline/state をまとめ、<code>create_demo_state_for_engine(engine)</code> と <code>register_engine_handlers(engine, demo_state)</code> を公開する方向に揃えています。ECS samples は <code>Scene</code> を render source とし、basic triangle のような low-level sample は main scene を実行境界としてだけ使います。</p>
+          <p>samples は <code>DemoState</code> という名前で sample-local GPU/pipeline/state をまとめ、platform setup から demo state を作成して <code>register_engine_handlers(engine, demo_state)</code> で engine に接続する方向に揃えています。ECS samples は <code>Scene</code> を render source とし、basic triangle のような low-level sample は main scene を実行境界としてだけ使います。</p>
 
           <h2>Validation</h2>
           <pre><code class="language-bash">moon check --target all
