@@ -102,15 +102,6 @@ pub fn DemoState::render_scene(
 }
 
 ///|
-/// Renders the current scene state to a target view without advancing the scene.
-pub fn render_current_frame_to_view(
-  demo_state : DemoState,
-  color_view : @wgpu.GPUTextureView,
-) -> Unit {
-  demo_state.render_scene(demo_state.scene, color_view)
-}
-
-///|
 /// Renders the current scene state without advancing app time or running systems.
 pub fn render_current_frame(demo_state : DemoState) -> Unit {
   let canvas_context = match demo_state.context {
@@ -120,7 +111,7 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
   @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
-  render_current_frame_to_view(demo_state, color_view)
+  demo_state.render_scene(demo_state.scene, color_view)
   @wgpu.textureView_release(color_view)
   @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   canvas_context.present()

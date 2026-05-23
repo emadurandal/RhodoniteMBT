@@ -136,7 +136,7 @@ fn MultiSurfaceDemoState::render_surface_frame(
       }
       let surface = engine.surface(id).gpu_surface()
       let view = surface.acquire_view()
-      @scene_graph.render_current_frame_to_view(surface_demo.demo, view)
+      surface_demo.demo.render_scene(surface_demo.demo.scene, view)
       @wgpu.textureView_release(view)
       surface.present()
     }

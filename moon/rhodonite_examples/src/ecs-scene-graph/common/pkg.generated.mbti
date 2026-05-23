@@ -16,8 +16,6 @@ pub fn register_engine_handlers(@app.Engine, DemoState) -> Unit
 
 pub fn render_current_frame(DemoState) -> Unit
 
-pub fn render_current_frame_to_view(DemoState, @webgpu_objects.GPUTextureView) -> Unit
-
 pub fn setup_engine(@app.Engine) -> Bool
 
 // Errors
