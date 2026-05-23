@@ -432,8 +432,6 @@ pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   renderer : @app.Renderer
   target : @app.RenderTargetResources
-  owns_renderer : Bool
-  owns_target : Bool
   scene : @app.Scene
   mesh : @app.MeshHandle
   instances : @app.InstanceBufferHandle
@@ -547,49 +545,14 @@ pub fn create_engine(context : @wgpu.GPUContext) -> @app.Engine {
 ///|
 /// Implements `create_demo_state_for_engine`.
 pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  let (device, canvas_context, format, queue) = engine.gpu_context().get()
-  ignore(device)
-  ignore(queue)
-  ignore(format)
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
   Some(
     create_demo_state_with_renderer(
       engine.main_scene(),
       engine.renderer(),
       engine.render_target_resources(),
-      owns_renderer=false,
-      owns_target=false,
       context=Some(canvas_context),
     ),
-  )
-}
-
-///|
-/// Implements `create_demo_state_for_scene`.
-pub fn create_demo_state_for_scene(
-  scene : @app.Scene,
-  device : @wgpu.GPUDevice,
-  queue : @wgpu.GPUQueue,
-  format : String,
-  context? : @wgpu.GPUCanvasContext? = None,
-) -> DemoState {
-  let renderer = @app.Renderer::new(
-    device,
-    queue,
-    @app.cube_position3_vertex_layout(),
-  )
-  let target = @app.RenderTargetResources::new(
-    device,
-    canvas_width.reinterpret_as_int(),
-    canvas_height.reinterpret_as_int(),
-    format,
-  )
-  create_demo_state_with_renderer(
-    scene,
-    renderer,
-    target,
-    owns_renderer=true,
-    owns_target=true,
-    context~,
   )
 }
 
@@ -599,8 +562,6 @@ pub fn create_demo_state_with_renderer(
   scene : @app.Scene,
   renderer : @app.Renderer,
   target : @app.RenderTargetResources,
-  owns_renderer? : Bool = false,
-  owns_target? : Bool = false,
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
   let world = scene.world()
@@ -710,8 +671,6 @@ pub fn create_demo_state_with_renderer(
     context,
     renderer,
     target,
-    owns_renderer,
-    owns_target,
     scene,
     mesh,
     instances,
@@ -991,21 +950,4 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSystems,
   )
-}
-
-///|
-/// Implements `DemoState::release`.
-pub fn DemoState::release(self : DemoState) -> Unit {
-  if self.owns_target {
-    self.target.release()
-  }
-  if self.owns_renderer {
-    self.renderer.release()
-  }
-}
-
-///|
-/// Implements `demo_state_release`.
-pub fn demo_state_release(demo_state : DemoState) -> Unit {
-  demo_state.release()
 }

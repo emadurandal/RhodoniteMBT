@@ -53,8 +53,6 @@ fn MultiSurfaceDemoState::ensure_surface(
         scene,
         engine.renderer(),
         engine.surface(id).render_target_resources(),
-        owns_renderer=false,
-        owns_target=false,
       )
       let surface_demo = { id, demo }
       self.surfaces.push(surface_demo)

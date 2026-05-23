@@ -2,13 +2,6 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
-/// Canvas resolution (matches demo HTML).
-let canvas_width : UInt = 800U
-
-///|
-let canvas_height : UInt = 600U
-
-///|
 let camera_elevation_rad : Double = 0.38
 
 ///|
@@ -17,8 +10,6 @@ pub(all) struct DemoState {
   context : @wgpu.GPUCanvasContext?
   renderer : @app.Renderer
   target : @app.RenderTargetResources
-  owns_renderer : Bool
-  owns_target : Bool
   scene : @app.Scene
   bodies : Array[@ecs.EntityId]
   gt : @ecs.ComponentTypeId
@@ -69,40 +60,8 @@ pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
       engine.main_scene(),
       engine.renderer(),
       engine.render_target_resources(),
-      owns_renderer=false,
-      owns_target=false,
       context=Some(canvas_context),
     ),
-  )
-}
-
-///|
-/// Implements `create_demo_state_for_scene`.
-pub fn create_demo_state_for_scene(
-  scene : @app.Scene,
-  device : @wgpu.GPUDevice,
-  queue : @wgpu.GPUQueue,
-  format : String,
-  context? : @wgpu.GPUCanvasContext? = None,
-) -> DemoState {
-  let renderer = @app.Renderer::new(
-    device,
-    queue,
-    @app.cube_position3_vertex_layout(),
-  )
-  let target = @app.RenderTargetResources::new(
-    device,
-    canvas_width.reinterpret_as_int(),
-    canvas_height.reinterpret_as_int(),
-    format,
-  )
-  create_demo_state_with_renderer(
-    scene,
-    renderer,
-    target,
-    owns_renderer=true,
-    owns_target=true,
-    context~,
   )
 }
 
@@ -112,8 +71,6 @@ pub fn create_demo_state_with_renderer(
   scene : @app.Scene,
   renderer : @app.Renderer,
   target : @app.RenderTargetResources,
-  owns_renderer? : Bool = false,
-  owns_target? : Bool = false,
   context? : @wgpu.GPUCanvasContext? = None,
 ) -> DemoState {
   let world = scene.world()
@@ -179,17 +136,7 @@ pub fn create_demo_state_with_renderer(
     ),
   )
   push_local_transforms(world, bodies, 0.0)
-  {
-    context,
-    renderer,
-    target,
-    owns_renderer,
-    owns_target,
-    scene,
-    bodies,
-    gt,
-    frame: @ref.new(0),
-  }
+  { context, renderer, target, scene, bodies, gt, frame: @ref.new(0) }
 }
 
 ///|
@@ -365,15 +312,4 @@ pub fn register_engine_handlers(
     },
     slot=@app.PhaseSlot::AfterSystems,
   )
-}
-
-///|
-/// Implements `DemoState::release`.
-pub fn DemoState::release(self : DemoState) -> Unit {
-  if self.owns_target {
-    self.target.release()
-  }
-  if self.owns_renderer {
-    self.renderer.release()
-  }
 }
