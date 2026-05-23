@@ -18,7 +18,6 @@ import {
 	MaterialHandle,
 	MeshHandle,
 	Phase,
-	PhaseSlot,
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
@@ -306,11 +305,7 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 			ensureSurfaceState(demo, frame.surfaceId);
 		}
 	});
-	engine.addPhaseHandler(
-		Phase.Render,
-		(_engine, frame) => renderSurface(demo, frame),
-		PhaseSlot.AfterSystems,
-	);
+	engine.onFrameRender((frame) => renderSurface(demo, frame));
 }
 
 async function initialize(first: HTMLCanvasElement, second: HTMLCanvasElement): Promise<void> {

@@ -13,8 +13,6 @@ import {
 	Engine,
 	MaterialHandle,
 	MeshHandle,
-	Phase,
-	PhaseSlot,
 	PlatformApp,
 	PlatformConfig,
 	PlatformOptions,
@@ -214,18 +212,12 @@ function renderCurrentFrame(demo: DemoState): void {
 }
 
 function registerEngineHandlers(engine: Engine, demo: DemoState): void {
-	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
+	engine.onSceneUpdate(demo.scene, (frame) => {
 		updateScene(demo, frame);
 	});
-	engine.addPhaseHandler(
-		Phase.Render,
-		() => {
-			if (demo.scene.visible()) {
-				renderCurrentFrame(demo);
-			}
-		},
-		PhaseSlot.AfterSystems,
-	);
+	engine.onSceneRender(demo.scene, () => {
+		renderCurrentFrame(demo);
+	});
 }
 
 export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array> {

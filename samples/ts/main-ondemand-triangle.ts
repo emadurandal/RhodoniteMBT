@@ -135,11 +135,7 @@ function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
 		},
 		PhaseSlot.AfterSystems,
 	);
-	engine.addPhaseHandler(
-		Phase.Render,
-		() => renderCurrentFrame(demoState),
-		PhaseSlot.AfterSystems,
-	);
+	engine.onFrameRender(() => renderCurrentFrame(demoState));
 	engine.addPhaseHandler(Phase.Shutdown, () => releaseDemoState(demoState));
 }
 

@@ -26,7 +26,6 @@ import {
 	type InstanceBufferHandle,
 	type MeshHandle,
 	Phase,
-	PhaseSlot,
 	Scene,
 	PlatformConfig,
 	PlatformApp,
@@ -386,19 +385,13 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 }
 
 function registerEngineHandlers(engine: Engine, demoState: DemoState): void {
-	engine.addPhaseHandler(Phase.Update, (_engine, frame) => {
+	engine.onSceneUpdate(demoState.scene, (frame) => {
 		beginPerfFrame(demoState);
 		updateScene(demoState, frame);
 	});
-	engine.addPhaseHandler(
-		Phase.Render,
-		() => {
-			if (demoState.scene.visible()) {
-				renderCurrentFrame(demoState);
-			}
-		},
-		PhaseSlot.AfterSystems,
-	);
+	engine.onSceneRender(demoState.scene, () => {
+		renderCurrentFrame(demoState);
+	});
 }
 
 function updatePerfOverlay(fps: number, cpuMs: number): void {
