@@ -48,7 +48,7 @@ fn MultiSurfaceDemoState::ensure_surface(
     Some(index) => self.surfaces[index]
     None => {
       let scene = @app.Scene::new("multi-surface-independent-input")
-      let demo = @scene_graph.create_demo_state_with_renderer(
+      let demo = @scene_graph.create_demo_state(
         scene,
         engine.renderer(),
         engine.surface(id).render_target_resources(),
@@ -62,6 +62,31 @@ fn MultiSurfaceDemoState::ensure_surface(
 }
 
 ///|
+/// Applies surface-local input to the scene camera orbit controller.
+fn update_camera_from_input(
+  demo : @scene_graph.DemoState,
+  input : @input.InputState,
+) -> Unit {
+  let camera = match demo.scene.main_camera() {
+    Some(camera) => camera
+    None => abort("update_camera_from_input requires a main camera")
+  }
+  ignore(
+    @ecs.update_orbit_camera_controller_from_mouse_frame(
+      demo.scene.world(),
+      camera,
+      input.mouse_down(Left),
+      input.mouse_pressed(Left),
+      input.mouse_down(Middle),
+      input.mouse_pressed(Middle),
+      input.pointer_delta_x(),
+      input.pointer_delta_y(),
+      input.wheel_delta_y(),
+    ),
+  )
+}
+
+///|
 /// Applies the frame's surface-local input to the matching surface camera.
 fn MultiSurfaceDemoState::handle_input_frame(
   self : MultiSurfaceDemoState,
@@ -71,7 +96,7 @@ fn MultiSurfaceDemoState::handle_input_frame(
   match (frame.surface_id(), frame.input()) {
     (Some(id), Some(input)) => {
       let surface_demo = self.ensure_surface(engine, id)
-      surface_demo.demo.update_camera_from_input(input)
+      update_camera_from_input(surface_demo.demo, input)
     }
     _ => ()
   }
@@ -111,7 +136,7 @@ fn MultiSurfaceDemoState::render_surface_frame(
       }
       let surface = engine.surface(id).gpu_surface()
       let view = surface.acquire_view()
-      @scene_graph.render_current_frame_to_view(surface_demo.demo, view)
+      surface_demo.demo.render_scene(surface_demo.demo.scene, view)
       @wgpu.textureView_release(view)
       surface.present()
     }
