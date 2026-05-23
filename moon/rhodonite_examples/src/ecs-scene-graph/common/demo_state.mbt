@@ -120,6 +120,20 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
 }
 
 ///|
+/// Registers engine phase handlers that drive this DemoState.
+pub fn register_engine_handlers(
+  engine : @app.Engine,
+  demo_state : DemoState,
+) -> Unit {
+  engine.on_scene_update(demo_state.scene, fn(frame) {
+    demo_state.update_scene(frame)
+  })
+  engine.on_scene_render(demo_state.scene, fn(_frame) {
+    render_current_frame(demo_state)
+  })
+}
+
+///|
 /// Creates demo state backed by caller-owned renderer and target resources.
 pub fn create_demo_state(
   scene : @app.Scene,
@@ -200,20 +214,6 @@ pub fn create_demo_state(
   }
   demo_state.update_scene(@app.FrameState::new((0.0 : Float), 0, 0.0))
   demo_state
-}
-
-///|
-/// Registers engine phase handlers that drive this DemoState.
-pub fn register_engine_handlers(
-  engine : @app.Engine,
-  demo_state : DemoState,
-) -> Unit {
-  engine.on_scene_update(demo_state.scene, fn(frame) {
-    demo_state.update_scene(frame)
-  })
-  engine.on_scene_render(demo_state.scene, fn(_frame) {
-    render_current_frame(demo_state)
-  })
 }
 
 ///|
