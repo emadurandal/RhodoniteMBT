@@ -48,12 +48,12 @@ fn MultiSurfaceDemoState::ensure_surface(
     Some(index) => self.surfaces[index]
     None => {
       let scene = @app.Scene::new("multi-surface-independent-input")
-      engine.set_surface_scene(id, scene)
       let demo = @scene_graph.create_demo_state_with_renderer(
         scene,
         engine.renderer(),
         engine.surface(id).render_target_resources(),
       )
+      engine.set_surface_scene(id, scene)
       let surface_demo = { id, demo }
       self.surfaces.push(surface_demo)
       surface_demo
