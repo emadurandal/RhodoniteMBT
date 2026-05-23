@@ -17,16 +17,125 @@ pub(all) struct DemoState {
 }
 
 ///|
-/// Implements `create_demo_state_for_engine`.
-pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
-  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
-  Some(
-    create_demo_state_with_renderer(
-      engine.main_scene(),
-      engine.renderer(),
-      engine.render_target_resources(),
-      context=Some(canvas_context),
+/// Implements `quat_y`.
+fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
+  let half = angle * 0.5
+  let s = @math.sin(half)
+  let c = @math.cos(half)
+  (0.0, s, 0.0, c)
+}
+
+///|
+/// Implements `push_local_transforms`.
+fn push_local_transforms(
+  world : @ecs.World,
+  bodies : Array[@ecs.EntityId],
+  t : Double,
+) -> Unit {
+  let sun_angle = t * 0.35
+  let earth_orbit = t * 0.9
+  let earth_spin = t * 2.2
+  let moon_orbit = t * 2.8
+  let (sqx, sqy, sqz, sqw) = quat_y(sun_angle)
+  ignore(
+    world.set_transform_trs(
+      bodies[0],
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      sqx,
+      sqy,
+      sqz,
+      sqw,
+      (0.55 : Float),
+      (0.55 : Float),
+      (0.55 : Float),
     ),
+  )
+  let ex = @math.cos(earth_orbit) * 2.35
+  let ez = @math.sin(earth_orbit) * 2.35
+  let (eqx, eqy, eqz, eqw) = quat_y(earth_spin)
+  ignore(
+    world.set_transform_trs(
+      bodies[1],
+      Float::from_double(ex),
+      (0.0 : Float),
+      Float::from_double(ez),
+      eqx,
+      eqy,
+      eqz,
+      eqw,
+      (0.22 : Float),
+      (0.22 : Float),
+      (0.22 : Float),
+    ),
+  )
+  let moon_orbit_radius = 1.05
+  let mx = @math.cos(moon_orbit) * moon_orbit_radius
+  let mz = @math.sin(moon_orbit) * moon_orbit_radius
+  ignore(
+    world.set_transform_trs(
+      bodies[2],
+      Float::from_double(mx),
+      (0.0 : Float),
+      Float::from_double(mz),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (0.5 : Float),
+      (0.5 : Float),
+      (0.5 : Float),
+    ),
+  )
+}
+
+///|
+/// Renders a scene by uploading scene-owned ECS data and issuing draw commands.
+pub fn DemoState::render_scene(
+  self : DemoState,
+  scene : @app.Scene,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  self.renderer.render_scene_renderables(scene, self.target, color_view)
+  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
+}
+
+///|
+/// Renders the current scene state to a target view without advancing the scene.
+pub fn render_current_frame_to_view(
+  demo_state : DemoState,
+  color_view : @wgpu.GPUTextureView,
+) -> Unit {
+  demo_state.render_scene(demo_state.scene, color_view)
+}
+
+///|
+/// Renders the current scene state without advancing app time or running systems.
+pub fn render_current_frame(demo_state : DemoState) -> Unit {
+  let canvas_context = match demo_state.context {
+    Some(c) => c
+    None => abort("render_current_frame requires a canvas context")
+  }
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
+  let texture = canvas_context.get_current_texture()
+  let color_view = texture.create_view()
+  render_current_frame_to_view(demo_state, color_view)
+  @wgpu.textureView_release(color_view)
+  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
+  canvas_context.present()
+}
+
+///|
+/// Updates sample animation inputs before the owning engine runs the scene system_runner.
+pub fn DemoState::update_scene(
+  self : DemoState,
+  frame : @app.FrameState,
+) -> Unit {
+  push_local_transforms(
+    self.scene.world(),
+    self.bodies,
+    frame.elapsed_seconds(),
   )
 }
 
@@ -105,138 +214,17 @@ pub fn create_demo_state_with_renderer(
 }
 
 ///|
-/// Implements `quat_y`.
-fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
-  let half = angle * 0.5
-  let s = @math.sin(half)
-  let c = @math.cos(half)
-  (0.0, s, 0.0, c)
-}
-
-///|
-/// Implements `push_local_transforms`.
-fn push_local_transforms(
-  world : @ecs.World,
-  bodies : Array[@ecs.EntityId],
-  t : Double,
-) -> Unit {
-  let sun_angle = t * 0.35
-  let earth_orbit = t * 0.9
-  let earth_spin = t * 2.2
-  let moon_orbit = t * 2.8
-  let (sqx, sqy, sqz, sqw) = quat_y(sun_angle)
-  ignore(
-    world.set_transform_trs(
-      bodies[0],
-      (0.0 : Float),
-      (0.0 : Float),
-      (0.0 : Float),
-      sqx,
-      sqy,
-      sqz,
-      sqw,
-      (0.55 : Float),
-      (0.55 : Float),
-      (0.55 : Float),
+/// Implements `create_demo_state_for_engine`.
+pub fn create_demo_state_for_engine(engine : @app.Engine) -> DemoState? {
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
+  Some(
+    create_demo_state_with_renderer(
+      engine.main_scene(),
+      engine.renderer(),
+      engine.render_target_resources(),
+      context=Some(canvas_context),
     ),
   )
-  let ex = @math.cos(earth_orbit) * 2.35
-  let ez = @math.sin(earth_orbit) * 2.35
-  let (eqx, eqy, eqz, eqw) = quat_y(earth_spin)
-  ignore(
-    world.set_transform_trs(
-      bodies[1],
-      Float::from_double(ex),
-      (0.0 : Float),
-      Float::from_double(ez),
-      eqx,
-      eqy,
-      eqz,
-      eqw,
-      (0.22 : Float),
-      (0.22 : Float),
-      (0.22 : Float),
-    ),
-  )
-  let moon_orbit_radius = 1.05
-  let mx = @math.cos(moon_orbit) * moon_orbit_radius
-  let mz = @math.sin(moon_orbit) * moon_orbit_radius
-  ignore(
-    world.set_transform_trs(
-      bodies[2],
-      Float::from_double(mx),
-      (0.0 : Float),
-      Float::from_double(mz),
-      0.0,
-      0.0,
-      0.0,
-      1.0,
-      (0.5 : Float),
-      (0.5 : Float),
-      (0.5 : Float),
-    ),
-  )
-}
-
-///|
-/// Renders the current scene state without advancing app time or running systems.
-pub fn render_current_frame(demo_state : DemoState) -> Unit {
-  let canvas_context = match demo_state.context {
-    Some(c) => c
-    None => abort("render_current_frame requires a canvas context")
-  }
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
-  let texture = canvas_context.get_current_texture()
-  let color_view = texture.create_view()
-  render_current_frame_to_view(demo_state, color_view)
-  @wgpu.textureView_release(color_view)
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
-  canvas_context.present()
-}
-
-///|
-/// Updates sample animation inputs before the owning engine runs the scene system_runner.
-pub fn DemoState::update_scene(
-  self : DemoState,
-  frame : @app.FrameState,
-) -> Unit {
-  push_local_transforms(
-    self.scene.world(),
-    self.bodies,
-    frame.elapsed_seconds(),
-  )
-}
-
-///|
-/// Renders the current scene state to a target view without advancing the scene.
-pub fn render_current_frame_to_view(
-  demo_state : DemoState,
-  color_view : @wgpu.GPUTextureView,
-) -> Unit {
-  demo_state.render_scene(demo_state.scene, color_view)
-}
-
-///|
-/// Renders a scene by uploading scene-owned ECS data and issuing draw commands.
-pub fn DemoState::render_scene(
-  self : DemoState,
-  scene : @app.Scene,
-  color_view : @wgpu.GPUTextureView,
-) -> Unit {
-  self.renderer.render_scene_renderables(scene, self.target, color_view)
-  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
-}
-
-///|
-/// Creates DemoState and registers the sample engine handlers.
-pub fn setup_engine(engine : @app.Engine) -> Bool {
-  match create_demo_state_for_engine(engine) {
-    Some(demo_state) => {
-      register_engine_handlers(engine, demo_state)
-      true
-    }
-    None => false
-  }
 }
 
 ///|
@@ -251,4 +239,16 @@ pub fn register_engine_handlers(
   engine.on_scene_render(demo_state.scene, fn(_frame) {
     render_current_frame(demo_state)
   })
+}
+
+///|
+/// Creates DemoState and registers the sample engine handlers.
+pub fn setup_engine(engine : @app.Engine) -> Bool {
+  match create_demo_state_for_engine(engine) {
+    Some(demo_state) => {
+      register_engine_handlers(engine, demo_state)
+      true
+    }
+    None => false
+  }
 }
