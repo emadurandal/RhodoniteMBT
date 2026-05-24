@@ -327,6 +327,29 @@ pub(all) enum WorldCommand {
   RemoveComponent(EntityId, ComponentTypeId)
 }
 
+pub struct WorldHistory {
+  // private fields
+}
+pub fn WorldHistory::add_component(Self, World, EntityId, ComponentTypeId) -> Bool
+pub fn WorldHistory::add_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn WorldHistory::begin_transaction(Self, String) -> Bool
+pub fn WorldHistory::can_redo(Self) -> Bool
+pub fn WorldHistory::can_undo(Self) -> Bool
+pub fn WorldHistory::cancel_transaction(Self) -> Bool
+pub fn WorldHistory::clear(Self) -> Unit
+pub fn WorldHistory::commit_transaction(Self) -> Bool
+pub fn WorldHistory::create_entity(Self, World) -> EntityId
+pub fn WorldHistory::destroy_entity(Self, World, EntityId) -> Bool
+pub fn WorldHistory::enabled(Self) -> Bool
+pub fn WorldHistory::new() -> Self
+pub fn WorldHistory::redo(Self, World) -> Bool
+pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
+pub fn WorldHistory::set_child_of(Self, World, EntityId, EntityId) -> Bool
+pub fn WorldHistory::set_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn WorldHistory::set_enabled(Self, Bool) -> Unit
+pub fn WorldHistory::set_transform_trs(Self, World, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
+pub fn WorldHistory::undo(Self, World) -> Bool
+
 // Type aliases
 
 // Traits

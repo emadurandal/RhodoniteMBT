@@ -17,6 +17,7 @@
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
         <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
         <a href="./input-architecture.html">Input</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
         <a href="./ecs-design-notes.html">ECS Design Notes</a>
@@ -89,6 +90,9 @@ flowchart LR
 
           <h2>TypeScript Wrapper</h2>
           <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, <code>ChildOf</code> parent links, query APIs, spawn batch, camera-control byte layouts, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
+
+          <h2>Undo / Redo</h2>
+          <p>Undo/redo is provided by <code>WorldHistory</code>, an optional tracked transaction layer over <code>World</code>. See <a href="./undo-redo.html">Undo / Redo</a> for scope, EntityId restoration, enabled-state behavior, and performance notes.</p>
         </article>
       </main>
     </div>

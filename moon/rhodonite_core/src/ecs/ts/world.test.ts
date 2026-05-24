@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { GpuLayout, Query, RawQuery, World, getF32 } from "./index.ts";
+import { GpuLayout, Query, RawQuery, World, WorldHistory, getF32 } from "./index.ts";
 
 function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	const bytes = new Uint8Array(stride);
@@ -208,5 +208,42 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.orbitCameraControllerComponent().index()).toBe(4);
 		expect(world.cameraHomeTransformComponent().index()).toBe(5);
 		expect(world.cameraLensComponent().index()).toBe(6);
+	});
+
+	it("tracks undo and redo through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryCpu", 4);
+		const entity = history.createEntity(world);
+
+		expect(world.isAlive(entity)).toBe(true);
+		expect(history.addComponentBytes(world, entity, cpu, new Uint8Array([1, 2, 3, 4]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([5, 6, 7, 8]))).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([5, 6, 7, 8]));
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([1, 2, 3, 4]));
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([5, 6, 7, 8]));
+
+		expect(history.destroyEntity(world, entity)).toBe(true);
+		expect(world.isAlive(entity)).toBe(false);
+		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(entity)).toBe(true);
+		expect(entity.generation()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([5, 6, 7, 8]));
+	});
+
+	it("clears history when disabled", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryDisabled", 4);
+		const entity = world.createEntity();
+
+		history.setEnabled(false);
+		expect(history.enabled()).toBe(false);
+		expect(history.addComponentBytes(world, entity, cpu, new Uint8Array([9, 9, 9, 9]))).toBe(true);
+		expect(world.hasComponent(entity, cpu)).toBe(true);
+		expect(history.canUndo()).toBe(false);
 	});
 });
