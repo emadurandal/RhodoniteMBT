@@ -253,6 +253,7 @@ pub struct CommandBuffer {
   priv system_name : String
   priv writes : Array[ComponentTypeId]
   priv structural_write : Bool
+  priv history : WorldHistory?
 }
 
 ///|

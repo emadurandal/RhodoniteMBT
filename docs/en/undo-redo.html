@@ -52,16 +52,27 @@ ignore(history.redo(world))</code></pre>
             <li>When history is enabled, tracked methods record undo/redo deltas.</li>
             <li>When disabled, tracked methods delegate directly to <code>World</code> and record nothing.</li>
             <li>Disabling history clears undo, redo, and any open transaction. Re-enabling starts from the current world state as a new baseline.</li>
-            <li>Direct calls to <code>World</code>, <code>CommandBuffer</code>, query mutable views, and batch-spawn APIs are intentionally untracked.</li>
+            <li>Direct calls to <code>World</code>, raw <code>SystemRunner::run_phase</code>, query mutable views, and batch-spawn APIs are intentionally untracked.</li>
           </ul>
 
           <h2>Raw Mutation Guard</h2>
-          <p><code>WorldHistory</code> can optionally guard a transaction so accidental raw <code>World</code> mutations fail fast instead of silently bypassing history. Enable it with <code>set_raw_mutation_guard_enabled(true)</code> and start the transaction with <code>begin_guarded_transaction(world, label)</code>. During that transaction, use tracked <code>WorldHistory</code> APIs for edits; direct <code>World</code> mutation, <code>CommandBuffer</code> reservation/apply paths, batch spawn writes, and mutable query views abort until the transaction is committed or cancelled.</p>
+          <p><code>WorldHistory</code> can optionally guard a transaction so accidental raw <code>World</code> mutations fail fast instead of silently bypassing history. Enable it with <code>set_raw_mutation_guard_enabled(true)</code> and start the transaction with <code>begin_guarded_transaction(world, label)</code>. During that transaction, use tracked <code>WorldHistory</code> APIs for edits; direct <code>World</code> mutation, raw <code>SystemRunner::run_phase</code>, batch spawn writes, and mutable query views abort until the transaction is committed or cancelled.</p>
           <pre><code class="language-moonbit">history.set_raw_mutation_guard_enabled(true)
 ignore(history.begin_guarded_transaction(world, "Edit"))
 ignore(history.set_component_bytes(world, entity, component, bytes))
 ignore(history.commit_transaction())</code></pre>
           <p>The guard is off by default to preserve existing runtime behavior. It is intended for editor/importer code that is actively migrating to tracked APIs, not for animation or simulation hot paths.</p>
+
+          <h2>Tracked Command Buffers</h2>
+          <p>Use <code>WorldHistory::run_system_phase</code> when editor systems queue mutations through <code>CommandBuffer</code>. It runs the phase like <code>SystemRunner::run_phase</code>, but applies queued commands through tracked history methods and records them under the supplied label.</p>
+          <pre><code class="language-moonbit">ignore(history.run_system_phase(
+  runner,
+  world,
+  SystemContext::new(0.016, frame_index),
+  phase,
+  "Apply Commands",
+))</code></pre>
+          <p>If a transaction is already open, tracked system phases are merged into that transaction. If one queued command fails, later commands still run as before; successful commands remain undoable while the method returns <code>false</code>.</p>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> keeps up to 100 committed undo records by default. <code>set_max_undo_records</code> changes that limit; when the stack exceeds the limit, the oldest records are discarded first. Passing <code>0</code> clears undo/redo state and makes future tracked calls delegate without retaining records. Use <code>undo_len</code> and <code>redo_len</code> to inspect the current retained record counts.</p>

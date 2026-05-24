@@ -125,6 +125,24 @@ fn WorldHistory::ensure_guarded_world(
 }
 
 ///|
+/// Arms the raw mutation guard even when the optional public guard flag is off.
+fn WorldHistory::force_guarded_world(
+  self : WorldHistory,
+  world : World,
+) -> Unit {
+  if !self.recording_enabled() || !self.open || self.applying {
+    return
+  }
+  match self.guarded_world {
+    Some(_) => ()
+    None => {
+      world.begin_history_raw_mutation_guard()
+      self.guarded_world = Some(world)
+    }
+  }
+}
+
+///|
 /// Opens a tracked mutation bypass used by WorldHistory methods.
 fn WorldHistory::begin_tracked_world_mutation(
   self : WorldHistory,
@@ -715,6 +733,39 @@ fn WorldHistory::record_entity_destroyed(
 }
 
 ///|
+/// Reserves an entity id for a tracked command-buffer create.
+fn WorldHistory::reserve_entity_for_command(
+  self : WorldHistory,
+  world : World,
+) -> EntityId {
+  self.begin_tracked_world_mutation(world)
+  let entity = world.reserve_entity_for_command()
+  self.end_tracked_world_mutation(world)
+  entity
+}
+
+///|
+/// Finalizes a reserved entity and records the creation in history.
+fn WorldHistory::finalize_reserved_entity(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    return world.finalize_reserved_entity(entity)
+  }
+  let auto = self.begin_auto("finalize_reserved_entity")
+  self.begin_tracked_world_mutation(world)
+  let ok = world.finalize_reserved_entity(entity)
+  self.end_tracked_world_mutation(world)
+  if ok {
+    self.record_entity_created(entity)
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Creates an entity and records the creation in history.
 pub fn WorldHistory::create_entity(
   self : WorldHistory,
@@ -962,6 +1013,29 @@ pub fn WorldHistory::set_camera_matrices(
     }
   }
   self.finish_auto(auto, ok)
+  ok
+}
+
+///|
+/// Runs one system phase with command-buffer mutations recorded in history.
+pub fn WorldHistory::run_system_phase(
+  self : WorldHistory,
+  runner : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  label : String,
+) -> Bool {
+  if self.applying {
+    return false
+  }
+  if !self.recording_enabled() {
+    return runner.run_phase(world, ctx, phase)
+  }
+  let auto = self.begin_auto(label)
+  self.force_guarded_world(world)
+  let ok = runner.run_phase_tracked(world, ctx, phase, self)
+  self.finish_auto(auto, true)
   ok
 }
 

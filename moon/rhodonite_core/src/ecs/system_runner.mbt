@@ -91,6 +91,51 @@ fn run_system_batch(
 }
 
 ///|
+/// Runs one system batch and applies queued commands through WorldHistory.
+fn run_system_batch_tracked(
+  batch : Array[System],
+  world : World,
+  ctx : SystemContext,
+  history : WorldHistory,
+) -> Bool {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.length(); i = i + 1 {
+    let system = batch[i]
+    let commands = CommandBuffer::new_for_history_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+      history,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let mut ok = true
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch[i]
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    if !command_buffers[i].apply_tracked(history) {
+      ok = false
+    }
+    world.exit_system_access(system_access)
+  }
+  ok
+}
+
+///|
 /// Implements `SystemContext::new`.
 pub fn SystemContext::new(
   delta_seconds : Float,
@@ -300,6 +345,44 @@ pub fn SystemRunner::run_phase(
   }
   if batch.length() > 0 {
     if !run_system_batch(batch, world, ctx) {
+      ok = false
+    }
+    while batch.length() > 0 {
+      let _ = batch.pop()
+    }
+  }
+  world.unlock_component_registration()
+  ok
+}
+
+///|
+/// Runs systems in one phase and records command-buffer mutations through WorldHistory.
+fn SystemRunner::run_phase_tracked(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  history : WorldHistory,
+) -> Bool {
+  world.lock_component_registration()
+  let mut ok = true
+  let batch : Array[System] = []
+  for i = 0; i < self.systems.length(); i = i + 1 {
+    let system = self.systems[i]
+    if system.phase == phase {
+      if system_batch_conflicts_with(batch, system) {
+        if !run_system_batch_tracked(batch, world, ctx, history) {
+          ok = false
+        }
+        while batch.length() > 0 {
+          let _ = batch.pop()
+        }
+      }
+      batch.push(system)
+    }
+  }
+  if batch.length() > 0 {
+    if !run_system_batch_tracked(batch, world, ctx, history) {
       ok = false
     }
     while batch.length() > 0 {

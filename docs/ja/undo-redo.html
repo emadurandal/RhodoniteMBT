@@ -52,16 +52,27 @@ ignore(history.redo(world))</code></pre>
             <li>履歴が有効な場合、tracked method は undo/redo delta を記録します。</li>
             <li>無効な場合、tracked method は <code>World</code> に即委譲し、何も記録しません。</li>
             <li>履歴を無効化すると undo stack、redo stack、open transaction は clear されます。再度有効化した時点の world state が新しい baseline です。</li>
-            <li><code>World</code> の直接呼び出し、<code>CommandBuffer</code>、query mutable view、batch spawn API は意図的に untracked です。</li>
+            <li><code>World</code> の直接呼び出し、raw <code>SystemRunner::run_phase</code>、query mutable view、batch spawn API は意図的に untracked です。</li>
           </ul>
 
           <h2>Raw Mutation Guard</h2>
-          <p><code>WorldHistory</code> は optional に transaction を guard できます。これにより、履歴を通さない raw <code>World</code> mutation を silently に見逃さず、即 abort できます。<code>set_raw_mutation_guard_enabled(true)</code> で有効化し、<code>begin_guarded_transaction(world, label)</code> で transaction を開始します。この transaction 中は tracked な <code>WorldHistory</code> API で編集します。直接の <code>World</code> mutation、<code>CommandBuffer</code> の reservation/apply path、batch spawn write、mutable query view は commit/cancel まで abort します。</p>
+          <p><code>WorldHistory</code> は optional に transaction を guard できます。これにより、履歴を通さない raw <code>World</code> mutation を silently に見逃さず、即 abort できます。<code>set_raw_mutation_guard_enabled(true)</code> で有効化し、<code>begin_guarded_transaction(world, label)</code> で transaction を開始します。この transaction 中は tracked な <code>WorldHistory</code> API で編集します。直接の <code>World</code> mutation、raw <code>SystemRunner::run_phase</code>、batch spawn write、mutable query view は commit/cancel まで abort します。</p>
           <pre><code class="language-moonbit">history.set_raw_mutation_guard_enabled(true)
 ignore(history.begin_guarded_transaction(world, "Edit"))
 ignore(history.set_component_bytes(world, entity, component, bytes))
 ignore(history.commit_transaction())</code></pre>
           <p>guard は既存 runtime behavior を維持するためデフォルトでは off です。animation や simulation の hot path ではなく、tracked API へ移行中の editor/importer code で使う想定です。</p>
+
+          <h2>Tracked Command Buffers</h2>
+          <p>editor system が <code>CommandBuffer</code> に mutation を queue する場合は <code>WorldHistory::run_system_phase</code> を使います。これは <code>SystemRunner::run_phase</code> と同じように phase を実行しつつ、queued command を tracked history method 経由で apply し、指定した label の record に保存します。</p>
+          <pre><code class="language-moonbit">ignore(history.run_system_phase(
+  runner,
+  world,
+  SystemContext::new(0.016, frame_index),
+  phase,
+  "Apply Commands",
+))</code></pre>
+          <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
