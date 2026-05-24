@@ -6,6 +6,7 @@ import {
 	ComponentTypeId,
 	type EntityId,
 	World,
+	WorldHistory,
 } from "../../../../rhodonite_core/src/ecs/ts/index.ts";
 import {
 	FakeDevice,
@@ -194,6 +195,45 @@ describe("Renderer TypeScript renderable API", () => {
 		expect(world.componentBytesCopy(entity, renderable!)).toEqual(
 			renderableBytes(3, 4, renderableFlagsNone()),
 		);
+	});
+
+	it("tracks renderable handle bytes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const scene = new Scene<World, EntityId>("renderable-history", world);
+		const seed = world.createEntity();
+		const entity = world.createEntity();
+
+		expect(
+			addRenderable(
+				scene,
+				seed,
+				RenderableDesc.new(new MeshHandle(99), new MaterialHandle(100)),
+			),
+		).toBe(true);
+		const renderable = findComponentByName(world, "RhodoniteRenderable");
+		expect(renderable).not.toBeNull();
+
+		const first = renderableBytes(1, 2);
+		const second = renderableBytes(3, 4, renderableFlagsNone());
+		expect(history.addComponentBytes(world, entity, renderable!, first)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(first);
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(entity, renderable!)).toBe(false);
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(first);
+
+		expect(history.setComponentBytes(world, entity, renderable!, second)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(second);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(first);
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(second);
+
+		expect(history.removeComponent(world, entity, renderable!)).toBe(true);
+		expect(world.hasComponent(entity, renderable!)).toBe(false);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, renderable!)).toEqual(second);
 	});
 
 	it("records prepared instanced draw calls through WebGPU resources", () => {

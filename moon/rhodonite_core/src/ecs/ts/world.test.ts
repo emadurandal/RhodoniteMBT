@@ -274,6 +274,34 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.canUndo()).toBe(false);
 	});
 
+	it("exposes WorldHistory undo and redo labels", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryLabels", 4);
+		const entity = world.createEntity();
+
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.beginTransaction("Move Entity")).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.undoLabel()).toBeNull();
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLabel()).toBe("Move Entity");
+		expect(history.redoLabel()).toBeNull();
+
+		expect(history.beginTransaction("")).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLabel()).toBe("");
+		expect(history.undo(world)).toBe(true);
+		expect(history.undoLabel()).toBe("Move Entity");
+		expect(history.redoLabel()).toBe("");
+		history.clear();
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+	});
+
 	it("treats zero max undo records as unrecorded tracked changes", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

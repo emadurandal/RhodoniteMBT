@@ -57,6 +57,9 @@ ignore(history.redo(world))</code></pre>
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
 
+          <h2>Labels</h2>
+          <p>transaction label は UI metadata です。<code>undo_label</code> と <code>redo_label</code> は次に実行可能な undo / redo record の label を返すため、editor UI は <code>Undo Move Entity</code> のような command 表示を作れます。label は world state、transaction ordering、delta application には影響しません。</p>
+
           <h2>Restoration Policy</h2>
           <p>履歴は安定した ECS identity と authoring data を復元します。GPU-facing な derived data は有効な component presence として戻し、通常の system で再生成します。</p>
           <table>

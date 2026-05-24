@@ -70,3 +70,38 @@ test "set_renderable adds and updates the component payload" {
     None => abort("missing renderable bytes")
   }
 }
+
+///|
+test "WorldHistory undoes and redoes Renderable add remove and set bytes" {
+  let scene = Scene::new("renderable-history")
+  let world = scene.world()
+  let history = @ecs.WorldHistory::new()
+  let component = scene.renderable_component_id
+  let entity = world.create_entity()
+  let first = renderable_component_bytes(
+    RenderableDesc::new(MeshHandle::{ index: 1 }, MaterialHandle::{ index: 2 }),
+  )
+  let second = renderable_component_bytes(
+    RenderableDesc::new(
+      MeshHandle::{ index: 3 },
+      MaterialHandle::{ index: 4 },
+      flags=renderable_flags_none(),
+    ),
+  )
+  assert_true(history.add_component_bytes(world, entity, component, first))
+  assert_true(world.component_bytes(entity, component) == Some(first))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(entity, component))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(entity, component) == Some(first))
+  assert_true(history.set_component_bytes(world, entity, component, second))
+  assert_true(world.component_bytes(entity, component) == Some(second))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, component) == Some(first))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(entity, component) == Some(second))
+  assert_true(history.remove_component(world, entity, component))
+  assert_true(!world.has_component(entity, component))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, component) == Some(second))
+}

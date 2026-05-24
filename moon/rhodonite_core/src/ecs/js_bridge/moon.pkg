@@ -65,6 +65,8 @@ options(
         "world_history_clear",
         "world_history_undo_len",
         "world_history_redo_len",
+        "world_history_undo_label",
+        "world_history_redo_label",
         "world_history_begin_transaction",
         "world_history_commit_transaction",
         "world_history_cancel_transaction",

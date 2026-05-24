@@ -445,6 +445,24 @@ pub fn WorldHistory::redo_len(self : WorldHistory) -> Int {
 }
 
 ///|
+/// Returns the label for the next undoable record, when undo is currently available.
+pub fn WorldHistory::undo_label(self : WorldHistory) -> String? {
+  if !self.can_undo() {
+    return None
+  }
+  Some(self.undo_stack[self.undo_stack.length() - 1].label)
+}
+
+///|
+/// Returns the label for the next redoable record, when redo is currently available.
+pub fn WorldHistory::redo_label(self : WorldHistory) -> String? {
+  if !self.can_redo() {
+    return None
+  }
+  Some(self.redo_stack[self.redo_stack.length() - 1].label)
+}
+
+///|
 /// Begins a named transaction if tracking is enabled and no transaction is open.
 pub fn WorldHistory::begin_transaction(
   self : WorldHistory,

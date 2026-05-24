@@ -278,6 +278,71 @@ test "WorldHistory max_undo_records zero clears and keeps future changes unrecor
 }
 
 ///|
+test "WorldHistory exposes undo and redo labels for UI state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLabels", 4)
+  let entity = world.create_entity()
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction("Move Entity"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some("Move Entity"))
+  assert_true(history.redo_label() is None)
+  assert_true(history.begin_transaction("Rename Entity"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some("Rename Entity"))
+  assert_true(history.undo(world))
+  assert_true(history.undo_label() is Some("Move Entity"))
+  assert_true(history.redo_label() is Some("Rename Entity"))
+  assert_true(history.redo(world))
+  assert_true(history.undo_label() is Some("Rename Entity"))
+  assert_true(history.redo_label() is None)
+}
+
+///|
+test "WorldHistory clears labels with history state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLabelClears", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction(""))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some(""))
+  history.clear()
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is Some("set_component_bytes"))
+  history.set_enabled(false)
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  history.set_enabled(true)
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is Some("set_component_bytes"))
+  history.set_max_undo_records(0)
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+}
+
+///|
 test "WorldHistory restores destroyed GlobalTransform presence for recompute" {
   let world = World::new()
   let history = WorldHistory::new()

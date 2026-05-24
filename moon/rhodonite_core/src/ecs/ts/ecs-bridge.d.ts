@@ -212,6 +212,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_clear(history: MoonWorldHistory): void;
 	export function world_history_undo_len(history: MoonWorldHistory): number;
 	export function world_history_redo_len(history: MoonWorldHistory): number;
+	export function world_history_undo_label(
+		history: MoonWorldHistory,
+	): string | undefined;
+	export function world_history_redo_label(
+		history: MoonWorldHistory,
+	): string | undefined;
 	export function world_history_begin_transaction(
 		history: MoonWorldHistory,
 		label: string,

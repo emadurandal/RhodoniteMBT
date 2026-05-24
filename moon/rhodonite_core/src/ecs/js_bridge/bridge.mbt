@@ -494,6 +494,18 @@ pub fn world_history_redo_len(history : @ecs.WorldHistory) -> Int {
 }
 
 ///|
+/// Implements `world_history_undo_label`.
+pub fn world_history_undo_label(history : @ecs.WorldHistory) -> String? {
+  history.undo_label()
+}
+
+///|
+/// Implements `world_history_redo_label`.
+pub fn world_history_redo_label(history : @ecs.WorldHistory) -> String? {
+  history.redo_label()
+}
+
+///|
 /// Implements `world_history_begin_transaction`.
 pub fn world_history_begin_transaction(
   history : @ecs.WorldHistory,

@@ -70,6 +70,7 @@ import {
 	world_history_max_undo_records,
 	world_history_new,
 	world_history_redo,
+	world_history_redo_label,
 	world_history_redo_len,
 	world_history_remove_component,
 	world_history_set_child_of,
@@ -78,6 +79,7 @@ import {
 	world_history_set_max_undo_records,
 	world_history_set_transform_trs,
 	world_history_undo,
+	world_history_undo_label,
 	world_history_undo_len,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -486,6 +488,14 @@ export class WorldHistory {
 
 	redoLen(): number {
 		return world_history_redo_len(this.inner);
+	}
+
+	undoLabel(): string | null {
+		return world_history_undo_label(this.inner) ?? null;
+	}
+
+	redoLabel(): string | null {
+		return world_history_redo_label(this.inner) ?? null;
 	}
 
 	beginTransaction(label: string): boolean {
