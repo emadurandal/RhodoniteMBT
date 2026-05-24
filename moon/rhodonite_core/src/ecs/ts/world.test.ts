@@ -473,10 +473,13 @@ describe("ECS TypeScript wrapper", () => {
 		const entity = world.createEntity();
 
 		expect(history.maxUndoRecords()).toBe(100);
+		expect(history.maxUndoBytes()).toBe(0);
 		history.setMaxUndoRecords(2);
 		expect(history.maxUndoRecords()).toBe(2);
 		expect(history.undoLen()).toBe(0);
 		expect(history.redoLen()).toBe(0);
+		expect(history.undoBytes()).toBe(0);
+		expect(history.redoBytes()).toBe(0);
 
 		expect(
 			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
@@ -485,14 +488,43 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
 		expect(history.undoLen()).toBe(2);
+		expect(history.undoBytes()).toBe(16);
 
 		expect(history.undo(world)).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(history.undoLen()).toBe(1);
 		expect(history.redoLen()).toBe(1);
+		expect(history.undoBytes()).toBe(8);
+		expect(history.redoBytes()).toBe(8);
 		expect(history.undo(world)).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
+	});
+
+	it("limits WorldHistory retained payload bytes", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryByteLimit", 4);
+		const entity = world.createEntity();
+
+		history.setMaxUndoBytes(8);
+		expect(history.maxUndoBytes()).toBe(8);
+		expect(() => history.setMaxUndoBytes(-1)).toThrow();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(history.undoBytes()).toBe(8);
+		expect(history.undo(world)).toBe(true);
+		expect(history.redoBytes()).toBe(8);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+
+		history.setMaxUndoBytes(4);
+		expect(history.redoLen()).toBe(0);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(history.undoBytes()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
 	});
 
 	it("exposes WorldHistory undo and redo labels", () => {

@@ -79,7 +79,8 @@ ignore(history.commit_transaction())</code></pre>
           <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
           <h2>History Limits</h2>
-          <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
+          <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で件数上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
+          <p><code>set_max_undo_bytes</code> は retained undo/redo stack に任意の payload byte budget を追加します。デフォルトは <code>0</code> で、byte 数は無制限です。<code>undo_bytes</code> と <code>redo_bytes</code> は保持中の payload bytes を返します。label、entity id、container overhead は含みません。1 件の committed record が非ゼロの byte budget より大きい場合、world mutation は成功したまま、その record は undo 用に保持されません。</p>
 
           <h2>Apply Validation</h2>
           <p><code>undo</code> または <code>redo</code> が record を適用する前に、<code>WorldHistory</code> は現在の world が record 内の全 delta を順序通り受け入れられるか検証します。検証に失敗した場合、method は world を変更せず、undo/redo stack 間で record を移動せずに <code>false</code> を返します。これにより untracked edit 後の stale record を保護しつつ、create 後に component を追加するような依存関係を持つ valid transaction は通常通り replay できます。</p>

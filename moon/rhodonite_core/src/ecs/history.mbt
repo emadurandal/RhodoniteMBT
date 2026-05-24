@@ -43,6 +43,7 @@ priv struct WorldHistoryRecord {
 pub struct WorldHistory {
   priv mut enabled : Bool
   priv mut max_undo_records : Int
+  priv mut max_undo_bytes : Int
   priv mut open : Bool
   priv mut applying : Bool
   priv mut current_label : String
@@ -60,6 +61,74 @@ fn default_max_undo_records() -> Int {
 }
 
 ///|
+/// Default payload byte budget for a new history; zero means unlimited.
+fn default_max_undo_bytes() -> Int {
+  0
+}
+
+///|
+/// Returns the captured payload byte count for one entity snapshot.
+fn entity_snapshot_payload_bytes(snapshot : EntitySnapshot) -> Int {
+  let mut total = 0
+  for i = 0; i < snapshot.components.length(); i = i + 1 {
+    total = total + snapshot.components[i].bytes.length()
+  }
+  total
+}
+
+///|
+/// Returns the captured payload byte count for one delta.
+fn world_delta_payload_bytes(delta : WorldDelta) -> Int {
+  match delta {
+    EntityCreated(_) => 0
+    EntityDestroyed(snapshot) => entity_snapshot_payload_bytes(snapshot)
+    ComponentAdded(_, _, bytes) => bytes.length()
+    ComponentRemoved(_, _, bytes) => bytes.length()
+    ComponentChanged(_, _, before, after) => before.length() + after.length()
+    CameraChanged(_, before, after) =>
+      match before {
+        Some(bytes) => bytes.length() + after.length()
+        None => after.length()
+      }
+  }
+}
+
+///|
+/// Returns the captured payload byte count for one committed history record.
+fn world_history_record_payload_bytes(record : WorldHistoryRecord) -> Int {
+  let mut total = 0
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    total = total + world_delta_payload_bytes(record.deltas[i])
+  }
+  total
+}
+
+///|
+/// Returns the captured payload byte count for a history stack.
+fn world_history_stack_payload_bytes(
+  records : Array[WorldHistoryRecord],
+) -> Int {
+  let mut total = 0
+  for i = 0; i < records.length(); i = i + 1 {
+    total = total + world_history_record_payload_bytes(records[i])
+  }
+  total
+}
+
+///|
+/// Drops the oldest record from a history stack.
+fn drop_oldest_history_record(records : Array[WorldHistoryRecord]) -> Unit {
+  if records.length() == 0 {
+    return
+  }
+  let last = records.length() - 1
+  for i = 0; i < last; i = i + 1 {
+    records[i] = records[i + 1]
+  }
+  let _ = records.pop()
+}
+
+///|
 /// Drops the oldest records until the stack fits `limit`.
 fn trim_history_stack_to_limit(
   records : Array[WorldHistoryRecord],
@@ -70,11 +139,22 @@ fn trim_history_stack_to_limit(
     return
   }
   while records.length() > limit {
-    let last = records.length() - 1
-    for i = 0; i < last; i = i + 1 {
-      records[i] = records[i + 1]
-    }
-    let _ = records.pop()
+    drop_oldest_history_record(records)
+  }
+}
+
+///|
+/// Drops the oldest records until the stack fits the configured byte budget.
+fn trim_history_stack_to_byte_limit(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Unit {
+  if limit <= 0 {
+    return
+  }
+  while records.length() > 0 &&
+        world_history_stack_payload_bytes(records) > limit {
+    drop_oldest_history_record(records)
   }
 }
 
@@ -89,6 +169,18 @@ fn WorldHistory::recording_enabled(self : WorldHistory) -> Bool {
 fn WorldHistory::trim_stacks_to_limit(self : WorldHistory) -> Unit {
   trim_history_stack_to_limit(self.undo_stack, self.max_undo_records)
   trim_history_stack_to_limit(self.redo_stack, self.max_undo_records)
+  trim_history_stack_to_byte_limit(self.undo_stack, self.max_undo_bytes)
+  trim_history_stack_to_byte_limit(self.redo_stack, self.max_undo_bytes)
+}
+
+///|
+/// Reports whether `record` can be retained under the configured byte budget.
+fn WorldHistory::record_fits_byte_limit(
+  self : WorldHistory,
+  record : WorldHistoryRecord,
+) -> Bool {
+  self.max_undo_bytes <= 0 ||
+  world_history_record_payload_bytes(record) <= self.max_undo_bytes
 }
 
 ///|
@@ -854,6 +946,7 @@ pub fn WorldHistory::new() -> WorldHistory {
   {
     enabled: true,
     max_undo_records: default_max_undo_records(),
+    max_undo_bytes: default_max_undo_bytes(),
     open: false,
     applying: false,
     current_label: "",
@@ -878,6 +971,12 @@ pub fn WorldHistory::max_undo_records(self : WorldHistory) -> Int {
 }
 
 ///|
+/// Returns the maximum retained undo payload bytes; zero means unlimited.
+pub fn WorldHistory::max_undo_bytes(self : WorldHistory) -> Int {
+  self.max_undo_bytes
+}
+
+///|
 /// Sets the maximum number of undo records; zero clears history and disables recording.
 pub fn WorldHistory::set_max_undo_records(
   self : WorldHistory,
@@ -892,6 +991,19 @@ pub fn WorldHistory::set_max_undo_records(
   } else {
     self.trim_stacks_to_limit()
   }
+}
+
+///|
+/// Sets the maximum retained undo payload bytes; zero means unlimited.
+pub fn WorldHistory::set_max_undo_bytes(
+  self : WorldHistory,
+  limit : Int,
+) -> Unit {
+  if limit < 0 {
+    abort("WorldHistory::set_max_undo_bytes: limit must be non-negative")
+  }
+  self.max_undo_bytes = limit
+  self.trim_stacks_to_limit()
 }
 
 ///|
@@ -943,6 +1055,18 @@ pub fn WorldHistory::undo_len(self : WorldHistory) -> Int {
 /// Returns the number of committed redo records currently retained.
 pub fn WorldHistory::redo_len(self : WorldHistory) -> Int {
   self.redo_stack.length()
+}
+
+///|
+/// Returns the payload bytes currently retained on the undo stack.
+pub fn WorldHistory::undo_bytes(self : WorldHistory) -> Int {
+  world_history_stack_payload_bytes(self.undo_stack)
+}
+
+///|
+/// Returns the payload bytes currently retained on the redo stack.
+pub fn WorldHistory::redo_bytes(self : WorldHistory) -> Int {
+  world_history_stack_payload_bytes(self.redo_stack)
 }
 
 ///|
@@ -999,11 +1123,11 @@ pub fn WorldHistory::commit_transaction(self : WorldHistory) -> Bool {
     return false
   }
   if self.current_deltas.length() > 0 {
-    self.undo_stack.push({
-      label: self.current_label,
-      deltas: self.current_deltas,
-    })
-    self.trim_stacks_to_limit()
+    let record = { label: self.current_label, deltas: self.current_deltas }
+    if self.record_fits_byte_limit(record) {
+      self.undo_stack.push(record)
+      self.trim_stacks_to_limit()
+    }
     self.redo_stack.clear()
   }
   self.clear_current()

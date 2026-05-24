@@ -370,20 +370,29 @@ test "WorldHistory exposes default record limit and stack lengths" {
   let component = world.register_cpu_component("HistoryLengths", 4)
   let entity = world.create_entity()
   assert_eq(history.max_undo_records(), 100)
+  assert_eq(history.max_undo_bytes(), 0)
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 0)
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
     history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
   )
   assert_eq(history.undo_len(), 1)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 0)
   assert_true(history.undo(world))
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 1)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 8)
   assert_true(history.redo(world))
   assert_eq(history.undo_len(), 1)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 0)
 }
 
 ///|
@@ -416,6 +425,97 @@ test "WorldHistory trims old undo records to max_undo_records" {
     None => abort("expected value after second limited undo")
   }
   assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory trims old records to max_undo_bytes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryByteLimit", 4)
+  let entity = world.create_entity()
+  history.set_max_undo_bytes(16)
+  assert_eq(history.max_undo_bytes(), 16)
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 2)
+  assert_eq(history.undo_bytes(), 16)
+  assert_true(history.undo(world))
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 8)
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after byte limited undo")
+  }
+  assert_true(history.undo(world))
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 16)
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(2, 0, 0, 0))
+    None => abort("expected value after second byte limited undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory trims existing stacks when max_undo_bytes is lowered" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLowerByteLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 3)
+  history.set_max_undo_bytes(8)
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 8)
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after lowered byte-limit undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory drops oversize record while keeping mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryOversizeByteLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_eq(history.redo_len(), 1)
+  history.set_max_undo_bytes(4)
+  assert_eq(history.redo_len(), 0)
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_true(!history.can_undo())
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected oversize mutation to remain applied")
+  }
 }
 
 ///|

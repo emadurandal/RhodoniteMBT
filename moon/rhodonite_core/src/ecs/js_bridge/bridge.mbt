@@ -484,12 +484,27 @@ pub fn world_history_max_undo_records(history : @ecs.WorldHistory) -> Int {
 }
 
 ///|
+/// Implements `world_history_max_undo_bytes`.
+pub fn world_history_max_undo_bytes(history : @ecs.WorldHistory) -> Int {
+  history.max_undo_bytes()
+}
+
+///|
 /// Implements `world_history_set_max_undo_records`.
 pub fn world_history_set_max_undo_records(
   history : @ecs.WorldHistory,
   limit : Int,
 ) -> Unit {
   history.set_max_undo_records(limit)
+}
+
+///|
+/// Implements `world_history_set_max_undo_bytes`.
+pub fn world_history_set_max_undo_bytes(
+  history : @ecs.WorldHistory,
+  limit : Int,
+) -> Unit {
+  history.set_max_undo_bytes(limit)
 }
 
 ///|
@@ -508,6 +523,18 @@ pub fn world_history_undo_len(history : @ecs.WorldHistory) -> Int {
 /// Implements `world_history_redo_len`.
 pub fn world_history_redo_len(history : @ecs.WorldHistory) -> Int {
   history.redo_len()
+}
+
+///|
+/// Implements `world_history_undo_bytes`.
+pub fn world_history_undo_bytes(history : @ecs.WorldHistory) -> Int {
+  history.undo_bytes()
+}
+
+///|
+/// Implements `world_history_redo_bytes`.
+pub fn world_history_redo_bytes(history : @ecs.WorldHistory) -> Int {
+  history.redo_bytes()
 }
 
 ///|
