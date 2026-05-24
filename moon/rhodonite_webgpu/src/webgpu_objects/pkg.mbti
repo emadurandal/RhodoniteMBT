@@ -59,6 +59,7 @@ pub fn webgpu_texture_create_view(WebGPUTexture) -> GPUTextureView
 pub fn webgpu_command_encoder_begin_render_pass(WebGPUCommandEncoder, WebGPURenderPassDescriptor) -> WebGPURenderPassEncoder
 pub fn webgpu_command_encoder_finish(WebGPUCommandEncoder) -> GPUCommandBuffer
 pub fn webgpu_queue_submit(WebGPUQueue, GPUCommandBuffer) -> Unit
+pub async fn webgpu_queue_on_submitted_work_done(WebGPUQueue) -> Unit
 pub fn webgpu_queue_write_buffer(WebGPUQueue, GPUBuffer, UInt64, Bytes) -> Unit
 pub fn webgpu_queue_write_buffer_array_view(WebGPUQueue, GPUBuffer, UInt64, ArrayView[Byte]) -> Unit
 pub fn webgpu_queue_write_buffer_bytes_range(WebGPUQueue, GPUBuffer, UInt64, Bytes, UInt64, UInt64) -> Unit

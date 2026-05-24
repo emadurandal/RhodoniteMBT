@@ -1134,7 +1134,7 @@ pub fn run_sdl_metal_webgpu_input_render_loop(
     previous_ticks = current_ticks
     @wgpu.webgpu_instance_process_events(session.instance)
     render_frame(delta_seconds)
-    let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+    let _ = @wgpu.webgpu_device_poll(session.device, wait=false)
     @wgpu.webgpu_instance_process_events(session.instance)
   }
   session
@@ -1255,7 +1255,7 @@ pub fn run_sdl_metal_webgpu_input_on_demand_render_loop(
       previous_ticks = current_ticks
       @wgpu.webgpu_instance_process_events(session.instance)
       render_frame(delta_seconds)
-      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=false)
       @wgpu.webgpu_instance_process_events(session.instance)
     }
   }
@@ -1572,7 +1572,7 @@ fn run_sdl_multi_window_on_demand_platform_loop(
       previous_ticks = current_ticks
       @wgpu.webgpu_instance_process_events(session.instance)
       ignore(engine.run_multi_surface_frame(delta_seconds))
-      let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+      let _ = @wgpu.webgpu_device_poll(session.device, wait=false)
       @wgpu.webgpu_instance_process_events(session.instance)
     }
   }
@@ -1625,7 +1625,7 @@ fn run_sdl_multi_window_platform_loop(
             enqueue_sdl_multi_window_focused_mouse_state(session, engine)
           }
           ignore(engine.run_multi_surface_frame(delta_seconds))
-          let _ = @wgpu.webgpu_device_poll(session.device, wait=true)
+          let _ = @wgpu.webgpu_device_poll(session.device, wait=false)
           @wgpu.webgpu_instance_process_events(session.instance)
         }
       }

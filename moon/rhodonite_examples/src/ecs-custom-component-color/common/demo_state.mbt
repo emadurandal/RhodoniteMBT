@@ -305,7 +305,6 @@ pub fn DemoState::render_scene(
     self.target,
     color_view,
   )
-  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 
 ///|

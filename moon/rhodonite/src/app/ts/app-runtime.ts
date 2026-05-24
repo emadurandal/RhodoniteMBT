@@ -953,13 +953,13 @@ export class MultiSurfacePlatform {
 		return this.attachPreparedCanvas(canvas, gpuSurface);
 	}
 
-	launch(): void {
+	async launch(): Promise<void> {
 		if (this.launched || this.disposed) {
 			return;
 		}
 		this.launched = true;
 		this.engine.initialize();
-		this.startFrameLoop();
+		await this.startFrameLoop();
 	}
 
 	dispose(): void {
@@ -996,9 +996,10 @@ export class MultiSurfacePlatform {
 		this.engine.runMultiSurfaceFrame(deltaSeconds);
 	}
 
-	private startFrameLoop(): void {
+	private async startFrameLoop(): Promise<void> {
 		if (this.options.frameMode === "single-frame") {
 			this.runFrameTick(0);
+			await this.engine.queue.onSubmittedWorkDone();
 			return;
 		}
 		if (this.options.frameMode === "on-demand") {
@@ -1363,13 +1364,14 @@ export function installBrowserInput(
 	});
 }
 
-export function startPlatform(
+export async function startPlatform(
 	engine: Engine,
 	options: PlatformOptions = PlatformOptions.interactive(),
-): Platform {
+): Promise<Platform> {
 	syncBrowserEngineSurface(engine);
 	if (options.frameMode === "single-frame") {
 		engine.runFrame(0);
+		await engine.queue.onSubmittedWorkDone();
 	}
 	const inputBinding = options.installInput
 		? installBrowserInput(engine, options)
@@ -1422,7 +1424,7 @@ export async function runPlatform(
 		return undefined;
 	}
 	engine.initialize();
-	const platform = startPlatform(engine, options);
+	const platform = await startPlatform(engine, options);
 	replacePlatformForCanvas(config.canvas, platform);
 	return platform;
 }
@@ -1444,7 +1446,7 @@ export async function runMultiSurfacePlatform(
 	for (const config of configs) {
 		platform.attachCanvas(config.canvas);
 	}
-	platform.launch();
+	await platform.launch();
 	return platform;
 }
 

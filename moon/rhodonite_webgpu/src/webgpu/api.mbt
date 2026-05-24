@@ -93,6 +93,12 @@ pub fn webgpu_device_poll(device : GPUDevice, wait? : Bool = false) -> Bool {
 }
 
 ///|
+/// Waits until all work submitted before the call has completed.
+pub async fn webgpu_queue_on_submitted_work_done(queue : GPUQueue) -> Unit {
+  @raw.webgpu_queue_on_submitted_work_done(queue.raw)
+}
+
+///|
 /// Implements `webgpu_device_release`.
 pub fn webgpu_device_release(device : GPUDevice) -> Unit {
   @raw.webgpu_device_release(device.raw)

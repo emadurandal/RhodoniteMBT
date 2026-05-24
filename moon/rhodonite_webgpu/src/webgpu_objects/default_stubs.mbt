@@ -603,6 +603,12 @@ pub fn webgpu_queue_submit(
 }
 
 ///|
+/// Waits for queue completion in real JS/native builds.
+pub async fn webgpu_queue_on_submitted_work_done(_queue : WebGPUQueue) -> Unit {
+  unavailable()
+}
+
+///|
 /// Writes bytes into a buffer in real JS/native builds.
 pub fn webgpu_queue_write_buffer(
   _queue : WebGPUQueue,

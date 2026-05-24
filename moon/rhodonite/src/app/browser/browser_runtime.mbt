@@ -631,8 +631,15 @@ pub fn install_browser_surface_input(
 }
 
 ///|
+/// Waits for browser queue completion for one engine.
+async fn wait_browser_engine_queue(engine : @app.Engine) -> Unit {
+  let (_device, _context, _format, queue) = engine.gpu_context().get()
+  queue.on_submitted_work_done()
+}
+
+///|
 /// Starts the standard browser platform resources for an initialized engine.
-pub fn start_platform(
+pub async fn start_platform(
   engine : @app.Engine,
   canvas : @wgpu.HTMLCanvasElement,
   options : PlatformOptions,
@@ -643,6 +650,7 @@ pub fn start_platform(
     OnDemand => Some(start_browser_engine_on_demand_canvas_loop(engine, canvas))
     SingleFrame => {
       ignore(engine.run_frame((0.0 : Float)))
+      wait_browser_engine_queue(engine)
       None
     }
   }
@@ -656,7 +664,7 @@ pub fn start_platform(
 
 ///|
 /// Initializes the engine and starts the frame loop after all canvases are attached.
-pub fn MultiSurfacePlatform::launch(self : MultiSurfacePlatform) -> Unit {
+pub async fn MultiSurfacePlatform::launch(self : MultiSurfacePlatform) -> Unit {
   if self.launched || self.disposed {
     return
   }
@@ -667,7 +675,9 @@ pub fn MultiSurfacePlatform::launch(self : MultiSurfacePlatform) -> Unit {
 
 ///|
 /// Starts the frame loop for a multi-surface browser platform.
-fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
+async fn MultiSurfacePlatform::start_frame_loop(
+  self : MultiSurfacePlatform,
+) -> Unit {
   let frame_loop = match self.options.frame_mode {
     Loop =>
       Some(
@@ -692,6 +702,7 @@ fn MultiSurfacePlatform::start_frame_loop(self : MultiSurfacePlatform) -> Unit {
     }
     SingleFrame => {
       self.run_frame_tick((0.0 : Float))
+      wait_browser_engine_queue(self.engine)
       None
     }
   }

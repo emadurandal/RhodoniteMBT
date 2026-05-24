@@ -107,11 +107,11 @@ flowchart LR
             <thead><tr><th>Platform</th><th>Package</th><th>Entrypoints</th></tr></thead>
             <tbody>
               <tr><td>Browser MoonBit JS</td><td><code>emadurandal/rhodonite/app/browser</code></td><td><code>run_platform</code>, <code>run_multi_surface_platform</code>, <code>start_platform</code>, <code>stop_platform</code></td></tr>
-              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>, <code>runMultiSurfacePlatform</code>, <code>stopPlatform</code></td></tr>
+              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>, <code>runMultiSurfacePlatform</code>, <code>startPlatform</code>, <code>stopPlatform</code></td></tr>
               <tr><td>Native SDL3</td><td><code>emadurandal/rhodonite_app_sdl3/sdl3</code></td><td><code>run_platform</code>, <code>run_multi_window_platform</code></td></tr>
             </tbody>
           </table>
-          <p><code>PlatformOptions</code> has <code>interactive</code>, <code>render_loop</code>, <code>interactive_on_demand</code>, <code>render_on_demand</code>, and <code>single_frame</code>.</p>
+          <p><code>PlatformOptions</code> has <code>interactive</code>, <code>render_loop</code>, <code>interactive_on_demand</code>, <code>render_on_demand</code>, and <code>single_frame</code>. Browser <code>start_platform</code> / <code>startPlatform</code> are async; in <code>single_frame</code> mode they return after the submitted GPU work for that one frame has completed.</p>
 
           <h2>Sample Layout</h2>
           <p>Samples now consistently collect sample-local GPU, pipeline, scene, and animation state in a type named <code>DemoState</code>. Platform setup creates the demo state and connects it to the engine with <code>register_engine_handlers(engine, demo_state)</code>. ECS samples use <code>Scene</code> as the render source, while low-level samples such as basic triangle use the main scene only as the engine execution boundary.</p>

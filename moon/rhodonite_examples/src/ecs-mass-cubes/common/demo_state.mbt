@@ -772,7 +772,6 @@ pub fn render_current_frame(
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   let t_acquire_start = monotonic_ms()
   let texture = canvas_context.get_current_texture()
   if record_perf {
@@ -781,7 +780,6 @@ pub fn render_current_frame(
   let color_view = texture.create_view()
   render_current_frame_to_view(demo_state, color_view, record_perf~)
   @wgpu.textureView_release(color_view)
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   canvas_context.present()
 }
 
@@ -902,7 +900,6 @@ pub fn DemoState::render_scene(
     self.target,
     color_view,
   )
-  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 
 ///|

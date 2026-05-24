@@ -835,6 +835,12 @@ pub fn GPUQueue::submit(
 }
 
 ///|
+/// Waits until all queue work submitted before the call has completed.
+pub async fn GPUQueue::on_submitted_work_done(self : GPUQueue) -> Unit {
+  webgpu_queue_on_submitted_work_done(self)
+}
+
+///|
 /// Implements `GPUQueue::release`.
 pub fn GPUQueue::release(self : GPUQueue) -> Unit {
   webgpu_queue_release(self)
