@@ -507,6 +507,13 @@ describe("ECS TypeScript wrapper", () => {
 		expect(() =>
 			world.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0])),
 		).toThrow();
+		expect(() =>
+			SystemRunner.new().runPhase(
+				world,
+				SystemContext.new(0.016, 1),
+				PhaseKey.new("ts/raw-run-phase-guard"),
+			),
+		).toThrow();
 		expect(
 			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
 		).toBe(true);

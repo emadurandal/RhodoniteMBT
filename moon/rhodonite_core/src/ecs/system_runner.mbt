@@ -326,6 +326,7 @@ pub fn SystemRunner::run_phase(
   ctx : SystemContext,
   phase : PhaseKey,
 ) -> Bool {
+  world.assert_not_history_raw_mutation("SystemRunner::run_phase")
   world.lock_component_registration()
   let mut ok = true
   let batch : Array[System] = []
