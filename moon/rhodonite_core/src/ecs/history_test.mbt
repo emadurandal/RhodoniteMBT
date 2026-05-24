@@ -216,6 +216,32 @@ test "WorldHistory undoes and redoes bulk component byte changes" {
 }
 
 ///|
+test "WorldHistory bulk redo uses stored world bytes not caller buffers" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkCopiesAfter", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, component, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, component, bytes4(2, 0, 0, 0)))
+  let after0 = bytes4(3, 0, 0, 0)
+  let after1 = bytes4(4, 0, 0, 0)
+  assert_true(
+    history.set_component_bytes_many(world, component, [e0, e1], [
+      after0, after1,
+    ]),
+  )
+  after0[0] = (30 : Byte)
+  after1[0] = (40 : Byte)
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(4, 0, 0, 0)))
+}
+
+///|
 test "WorldHistory compresses repeated bulk component changes in one transaction" {
   let world = World::new()
   let history = WorldHistory::new()

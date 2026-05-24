@@ -1293,10 +1293,24 @@ pub fn WorldHistory::set_component_bytes_many(
   }
   self.end_tracked_world_mutation(world)
   if ok {
+    let after_list : Array[FixedArray[Byte]] = []
     for i = 0; i < entities.length(); i = i + 1 {
-      self.push_delta(
-        ComponentChanged(entities[i], component, before_list[i], bytes_list[i]),
-      )
+      match world.component_bytes(entities[i], component) {
+        Some(after) => after_list.push(after)
+        None => ok = false
+      }
+    }
+    if ok {
+      for i = 0; i < entities.length(); i = i + 1 {
+        self.push_delta(
+          ComponentChanged(
+            entities[i],
+            component,
+            before_list[i],
+            after_list[i],
+          ),
+        )
+      }
     }
   }
   self.finish_auto(auto, ok)
