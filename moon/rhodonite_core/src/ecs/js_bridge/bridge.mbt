@@ -461,9 +461,36 @@ pub fn world_history_set_enabled(
 }
 
 ///|
+/// Implements `world_history_max_undo_records`.
+pub fn world_history_max_undo_records(history : @ecs.WorldHistory) -> Int {
+  history.max_undo_records()
+}
+
+///|
+/// Implements `world_history_set_max_undo_records`.
+pub fn world_history_set_max_undo_records(
+  history : @ecs.WorldHistory,
+  limit : Int,
+) -> Unit {
+  history.set_max_undo_records(limit)
+}
+
+///|
 /// Implements `world_history_clear`.
 pub fn world_history_clear(history : @ecs.WorldHistory) -> Unit {
   history.clear()
+}
+
+///|
+/// Implements `world_history_undo_len`.
+pub fn world_history_undo_len(history : @ecs.WorldHistory) -> Int {
+  history.undo_len()
+}
+
+///|
+/// Implements `world_history_redo_len`.
+pub fn world_history_redo_len(history : @ecs.WorldHistory) -> Int {
+  history.redo_len()
 }
 
 ///|

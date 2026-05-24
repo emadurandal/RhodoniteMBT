@@ -246,4 +246,49 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.hasComponent(entity, cpu)).toBe(true);
 		expect(history.canUndo()).toBe(false);
 	});
+
+	it("limits WorldHistory undo records and exposes stack lengths", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryLimit", 4);
+		const entity = world.createEntity();
+
+		expect(history.maxUndoRecords()).toBe(100);
+		history.setMaxUndoRecords(2);
+		expect(history.maxUndoRecords()).toBe(2);
+		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(2);
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(history.undoLen()).toBe(1);
+		expect(history.redoLen()).toBe(1);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("treats zero max undo records as unrecorded tracked changes", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryZeroLimit", 4);
+		const entity = world.createEntity();
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		history.setMaxUndoRecords(0);
+		expect(history.maxUndoRecords()).toBe(0);
+		expect(history.undoLen()).toBe(0);
+		expect(history.beginTransaction("no-records")).toBe(false);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(history.canUndo()).toBe(false);
+	});
 });

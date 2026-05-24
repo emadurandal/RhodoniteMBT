@@ -54,6 +54,9 @@ ignore(history.redo(world))</code></pre>
             <li><code>World</code> の直接呼び出し、<code>CommandBuffer</code>、query mutable view、batch spawn API は意図的に untracked です。</li>
           </ul>
 
+          <h2>History Limits</h2>
+          <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
+
           <h2>Derived State</h2>
           <p><code>GlobalTransform</code> と <code>Camera</code> の component row は packed blob store への ref を持ちます。履歴は component の存在を fresh blob ref で戻し、derived payload は Undo/Redo 後に transform/camera system で再計算します。Renderer が所有する GPU resource と resource registration は v1 の履歴対象外です。</p>
 
