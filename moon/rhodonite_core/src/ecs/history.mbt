@@ -354,6 +354,44 @@ fn WorldHistory::push_component_delta(
 }
 
 ///|
+/// Pushes a Camera row delta, merging repeated matrix writes inside the transaction.
+fn WorldHistory::push_camera_delta(
+  self : WorldHistory,
+  entity : EntityId,
+  before : FixedArray[Byte]?,
+  after : FixedArray[Byte],
+) -> Unit {
+  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
+    match self.current_deltas[i] {
+      CameraChanged(e, old_before, _) =>
+        if e == entity {
+          match old_before {
+            Some(old) =>
+              if old == after {
+                remove_delta_at(self.current_deltas, i)
+              } else {
+                self.current_deltas[i] = CameraChanged(
+                  entity, old_before, after,
+                )
+              }
+            None =>
+              self.current_deltas[i] = CameraChanged(entity, old_before, after)
+          }
+          return
+        }
+      _ => ()
+    }
+  }
+  match before {
+    Some(old) =>
+      if old != after {
+        self.current_deltas.push(CameraChanged(entity, before, after))
+      }
+    None => self.current_deltas.push(CameraChanged(entity, before, after))
+  }
+}
+
+///|
 /// Records a delta into the active transaction.
 fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
   match delta {
@@ -373,6 +411,8 @@ fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
       )
     ComponentChanged(entity, component, before, after) =>
       self.push_component_delta(entity, component, before, after)
+    CameraChanged(entity, before, after) =>
+      self.push_camera_delta(entity, before, after)
     _ => self.current_deltas.push(delta)
   }
 }
