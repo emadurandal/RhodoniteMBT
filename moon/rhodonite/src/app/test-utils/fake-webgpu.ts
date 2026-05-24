@@ -143,14 +143,15 @@ export class FakeDevice {
 	createRenderPipeline(
 		descriptor: GPURenderPipelineDescriptor,
 	): GPURenderPipeline {
-		return {
+		const pipeline = {
 			descriptor,
 			destroyed: false,
 			destroy() {
 				this.destroyed = true;
 			},
 			getBindGroupLayout: (index: number) => ({ index }),
-		} as unknown as GPURenderPipeline;
+		};
+		return pipeline as unknown as GPURenderPipeline;
 	}
 
 	createBindGroupLayout(

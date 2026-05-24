@@ -1,0 +1,11 @@
+import {
+  "emadurandal/rhodonite/app" @app,
+  "emadurandal/rhodonite_core/binary/writes" @writes,
+  "emadurandal/rhodonite_core/ecs" @ecs,
+  "emadurandal/rhodonite_core/math/matrix44" @m44,
+  "emadurandal/rhodonite_examples/common/native_gpu_queue" @native_gpu_queue,
+  "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
+  "moonbitlang/core/math" @math,
+}
+
+supported_targets = "+js+native"
