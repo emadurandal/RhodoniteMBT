@@ -67,14 +67,19 @@ pnpm run pack:npm
 pnpm install
 pnpm run dev:js:basic-triangle
 pnpm run dev:js:ondemand-triangle
+pnpm run dev:js:ecs-scene-graph
+pnpm run dev:js:multi-surface-independent-input
+pnpm run dev:js:ecs-mass-cubes
 ```
 
-The browser demos also include a TypeScript-only WebGPU DemoState using the ECS
-TypeScript wrapper and TypeScript-only on-demand triangle paths:
+The browser demos also include TypeScript-only WebGPU DemoState paths using the
+ECS TypeScript wrapper, multi-surface runtime, and TypeScript-only on-demand
+triangle:
 
 ```bash
 pnpm run dev:js:ts-ecs-scene-graph
 pnpm run dev:js:ts-ecs-mass-cubes
+pnpm run dev:js:ts-multi-surface-independent-input
 pnpm run dev:js:ts-ondemand-triangle
 ```
 
@@ -109,6 +114,9 @@ $ sudo apt install libsdl3-dev
 pnpm install
 pnpm run dev:native:basic-triangle
 pnpm run dev:native:ondemand-triangle
+pnpm run dev:native:ecs-scene-graph
+pnpm run dev:native:multi-surface-independent-input
+pnpm run dev:native:ecs-mass-cubes
 ```
 
 The native demo scripts use `moon run --target native --release` from
@@ -156,12 +164,16 @@ pnpm run test:examples:visual:update
 ```
 
 The visual regression setup renders existing examples through native WebGPU and
-browser WebGPU, reads back offscreen RGBA8 textures, and compares PNG golden
-files with exact or perceptual comparison. See [docs/en/visual-regression-tests.html](docs/en/visual-regression-tests.html).
+browser WebGPU, reads back RGBA8 pixels from offscreen targets or presented
+browser canvases, and compares PNG golden files with exact or perceptual
+comparison. See [docs/en/visual-regression-tests.html](docs/en/visual-regression-tests.html).
 
 ## Publish order (outline)
 
-When publishing to the registry, run `moon publish` **per module** from shallow dependencies outward (each subdirectory). Details: [docs/en/module-boundaries.html](docs/en/module-boundaries.html) — Release units.
+After `moon login`, publish Mooncakes from the repository root with
+`pnpm run publish:moon`. The script publishes the library modules in dependency
+order and excludes `emadurandal/rhodonite_examples`. Details:
+[docs/en/module-boundaries.html](docs/en/module-boundaries.html) — Release units.
 
 For npm, run `pnpm run publish:npm`; it rebuilds the release JS bridge and emits
 the `packages/rhodonite-mbt/dist` package before invoking `npm publish`.
