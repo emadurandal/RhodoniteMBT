@@ -405,6 +405,54 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([5, 6, 7, 8]));
 	});
 
+	it("tracks bulk component byte changes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryBulkCpu", 4);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+		const missing = world.createEntity();
+
+		expect(world.addComponentBytes(e0, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(e1, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[e0, e1],
+				[new Uint8Array([3, 0, 0, 0]), new Uint8Array([4, 0, 0, 0])],
+			),
+		).toBe(true);
+		expect(history.undoLabel()).toBe("set_component_bytes_many");
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(world.componentBytesCopy(e1, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([1, 0, 0, 0]));
+		expect(world.componentBytesCopy(e1, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(world.componentBytesCopy(e1, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
+
+		expect(
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[e0, missing],
+				[new Uint8Array([5, 0, 0, 0]), new Uint8Array([6, 0, 0, 0])],
+			),
+		).toBe(false);
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(world.componentBytesCopy(missing, cpu)).toBeNull();
+		expect(() =>
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[e0],
+				[new Uint8Array([7, 0, 0, 0]), new Uint8Array([8, 0, 0, 0])],
+			),
+		).toThrow();
+	});
+
 	it("clears history when disabled", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

@@ -47,6 +47,9 @@ ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes; generic Camera component byte writes remain untracked because the row only stores a blob reference.</p>
 
+          <h2>Bulk Component Updates</h2>
+          <p>Use <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update the same component on many entities. It validates every target first; if any entity is missing the component or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes this as <code>WorldHistory.setComponentBytesMany(world, component, entities, bytesList)</code>.</p>
+
           <h2>Enabled State</h2>
           <ul>
             <li>When history is enabled, tracked methods record undo/redo deltas.</li>

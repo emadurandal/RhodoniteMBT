@@ -900,6 +900,62 @@ pub fn WorldHistory::set_component_bytes(
 }
 
 ///|
+/// Sets one component payload for many entities as one atomic history operation.
+pub fn WorldHistory::set_component_bytes_many(
+  self : WorldHistory,
+  world : World,
+  component : ComponentTypeId,
+  entities : Array[EntityId],
+  bytes_list : Array[FixedArray[Byte]],
+) -> Bool {
+  if entities.length() != bytes_list.length() {
+    abort(
+      "WorldHistory::set_component_bytes_many: entities and bytes_list length mismatch",
+    )
+  }
+  if !self.recording_enabled() ||
+    self.applying ||
+    world.history_blob_ref_component(component) {
+    let mut ok = true
+    for i = 0; i < entities.length(); i = i + 1 {
+      if !world.set_component_bytes(entities[i], component, bytes_list[i]) {
+        ok = false
+      }
+    }
+    return ok
+  }
+  let before_list : Array[FixedArray[Byte]] = []
+  for i = 0; i < entities.length(); i = i + 1 {
+    let before = match world.component_bytes(entities[i], component) {
+      Some(bytes) => bytes
+      None => return false
+    }
+    if before.length() != bytes_list[i].length() {
+      return false
+    }
+    before_list.push(before)
+  }
+  let auto = self.begin_auto("set_component_bytes_many")
+  self.begin_tracked_world_mutation(world)
+  let mut ok = true
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !world.set_component_bytes(entities[i], component, bytes_list[i]) {
+      ok = false
+    }
+  }
+  self.end_tracked_world_mutation(world)
+  if ok {
+    for i = 0; i < entities.length(); i = i + 1 {
+      self.push_delta(
+        ComponentChanged(entities[i], component, before_list[i], bytes_list[i]),
+      )
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Removes a component through the history layer.
 pub fn WorldHistory::remove_component(
   self : WorldHistory,

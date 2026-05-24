@@ -120,6 +120,104 @@ test "WorldHistory compresses repeated component changes inside a transaction" {
 }
 
 ///|
+test "WorldHistory undoes and redoes bulk component byte changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkSet", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, component, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, component, bytes4(2, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes_many(world, component, [e0, e1], [
+      bytes4(3, 0, 0, 0),
+      bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(4, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(4, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory compresses repeated bulk component changes in one transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkCompress", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, component, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, component, bytes4(2, 0, 0, 0)))
+  assert_true(history.begin_transaction("bulk-compress"))
+  assert_true(
+    history.set_component_bytes_many(world, component, [e0, e1], [
+      bytes4(3, 0, 0, 0),
+      bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_true(
+    history.set_component_bytes_many(world, component, [e0, e1], [
+      bytes4(5, 0, 0, 0),
+      bytes4(6, 0, 0, 0),
+    ]),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(5, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(6, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory bulk component byte changes are atomic on invalid target" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkAtomic", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    !history.set_component_bytes_many(world, component, [e0, e1], [
+      bytes4(3, 0, 0, 0),
+      bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) is None)
+}
+
+///|
+test "WorldHistory zero max undo records bulk changes without recording" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkZeroLimit", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, component, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, component, bytes4(2, 0, 0, 0)))
+  history.set_max_undo_records(0)
+  assert_true(
+    history.set_component_bytes_many(world, component, [e0, e1], [
+      bytes4(3, 0, 0, 0),
+      bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(4, 0, 0, 0)))
+}
+
+///|
 test "WorldHistory disabled mode delegates without recording history" {
   let world = World::new()
   let history = WorldHistory::new()
