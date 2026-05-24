@@ -112,7 +112,9 @@ sequenceDiagram
           </ul>
 
           <h2>TypeScript Wrapper</h2>
-          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、camera-control bytes、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
+          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、system scheduling、camera-control bytes、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
+          <p>wrapper は <code>PhaseKey</code>、<code>SystemContext</code>、<code>System</code>、<code>SystemRunner</code>、callback 内で使う <code>CommandBuffer</code> を公開します。system は <code>reads</code>、<code>writes</code>、必要なら structural write permission を宣言して作り、<code>SystemRunner.runPhase(world, ctx, phase)</code> で実行します。command-buffer mutation を undo/redo に記録する場合は <code>WorldHistory.runSystemPhase(..., label)</code> を使います。</p>
+          <p>npm root entrypoint では app scheduler の string <code>PhaseKey</code> を <code>PhaseKey</code> として維持し、ECS wrapper class は <code>EcsPhaseKey</code> でも export します。<code>rhodonite-mbt/ecs</code> subpath では ECS class を <code>PhaseKey</code> として export します。</p>
 
           <h2>Undo / Redo</h2>
           <p>Undo/Redo は <code>World</code> の上に置く optional な tracked transaction layer、<code>WorldHistory</code> が提供します。対象範囲、EntityId 復元、enabled state、performance notes は <a href="./undo-redo.html">Undo / Redo</a> に分けています。</p>

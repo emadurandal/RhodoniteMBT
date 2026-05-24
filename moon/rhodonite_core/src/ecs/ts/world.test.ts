@@ -2,7 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { GpuLayout, Query, RawQuery, World, WorldHistory, getF32 } from "./index.ts";
+import {
+	GpuLayout,
+	EntityId,
+	PhaseKey,
+	Query,
+	RawQuery,
+	System,
+	SystemContext,
+	SystemRunner,
+	World,
+	WorldHistory,
+	getF32,
+} from "./index.ts";
 
 function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	const bytes = new Uint8Array(stride);
@@ -272,6 +284,103 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.cameraLensComponent().index()).toBe(6);
 	});
 
+	it("runs TS systems with command-buffered component writes", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("TsSystemCpu", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+
+		const phase = PhaseKey.new("ts/update");
+		const ctx = SystemContext.new(0.016, 7);
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new("write-cpu", phase, [], [cpu], (systemWorld, systemCtx, commands) => {
+				expect(systemWorld.isAlive(entity)).toBe(true);
+				expect(systemCtx.deltaSeconds()).toBeCloseTo(0.016);
+				expect(systemCtx.frameIndex()).toBe(7);
+				expect(commands.isEmpty()).toBe(true);
+				commands.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0]));
+				expect(commands.len()).toBe(1);
+			}),
+		);
+
+		expect(runner.len()).toBe(1);
+		expect(runner.runPhase(world, ctx, phase)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
+	});
+
+	it("exposes structural TS systems and tracked system phases", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemCpu", 4);
+		const phase = PhaseKey.new("ts/tracked");
+		const runner = SystemRunner.new();
+		let createdIndex = -1;
+
+		runner.addSystem(
+			System.newWithStructuralWrite("spawn-cpu", phase, [], [cpu], (_world, _ctx, commands) => {
+				const entity = commands.createEntity();
+				createdIndex = entity.index();
+				commands.addComponentBytes(entity, cpu, new Uint8Array([4, 0, 0, 0]));
+			}),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 1),
+				phase,
+				"spawn from TS system",
+			),
+		).toBe(true);
+		const createdEntity = EntityId.new(createdIndex, 0);
+		const created = world.location(createdEntity);
+		expect(created).not.toBeNull();
+		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(createdEntity)).toBe(false);
+	});
+
+	it("tracks TS system command-buffer writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemWriteCpu", 4);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+
+		const phase = PhaseKey.new("ts/tracked-write");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new("tracked-write-cpu", phase, [], [cpu], (_world, _ctx, commands) => {
+				commands.setComponentBytes(entity, cpu, new Uint8Array([6, 0, 0, 0]));
+			}),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 2),
+				phase,
+				"tracked TS write",
+			),
+		).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([6, 0, 0, 0]),
+		);
+		expect(history.undoLabel()).toBe("tracked TS write");
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([6, 0, 0, 0]),
+		);
+	});
+
 	it("tracks undo and redo through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -321,7 +430,9 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.undoLen()).toBe(0);
 		expect(history.redoLen()).toBe(0);
 
-		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
@@ -380,5 +491,61 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
+	});
+
+	it("guards raw World mutations during guarded WorldHistory transactions", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryRawGuard", 4);
+		const entity = world.createEntity();
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.rawMutationGuardEnabled()).toBe(false);
+		history.setRawMutationGuardEnabled(true);
+		expect(history.rawMutationGuardEnabled()).toBe(true);
+		expect(history.beginGuardedTransaction(world, "guarded edit")).toBe(true);
+		expect(() =>
+			world.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0])),
+		).toThrow();
+		expect(() =>
+			SystemRunner.new().runPhase(
+				world,
+				SystemContext.new(0.016, 1),
+				PhaseKey.new("ts/raw-run-phase-guard"),
+			),
+		).toThrow();
+		expect(
+			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(
+			world.setComponentBytes(entity, cpu, new Uint8Array([3, 0, 0, 0])),
+		).toBe(true);
+
+		expect(history.beginGuardedTransaction(world, "guarded cancel")).toBe(true);
+		expect(() => world.removeComponent(entity, cpu)).toThrow();
+		expect(history.cancelTransaction()).toBe(true);
+		expect(world.removeComponent(entity, cpu)).toBe(true);
+
+		const queryWorld = World.new();
+		const queryHistory = WorldHistory.new();
+		const queryCpu = queryWorld.registerCpuComponent("TsHistoryRawGuardQuery", 4);
+		const queryEntity = queryWorld.createEntity();
+		expect(
+			queryWorld.addComponentBytes(
+				queryEntity,
+				queryCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		queryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			queryHistory.beginGuardedTransaction(queryWorld, "guarded query"),
+		).toBe(true);
+		expect(() =>
+			RawQuery.new([queryCpu]).forEachArchetype(queryWorld, (archetype) => {
+				archetype.writeColumn(queryCpu);
+			}),
+		).toThrow();
 	});
 });

@@ -124,3 +124,235 @@ test "CommandBuffer create_entity reserves id and applies components after query
     None => abort("expected CommandCreateSpawned bytes")
   }
 }
+
+///|
+test "WorldHistory tracks CommandBuffer component writes through system phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandWriteA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 1, 1, 1)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-write", update_phase(), [], [qa], (
+      _w,
+      _ctx,
+      commands,
+    ) => commands.set_component_bytes(e, qa, bytes4(2, 2, 2, 2))),
+  )
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+      "Command Write",
+    ),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 2, 2, 2)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 1, 1, 1)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 2, 2, 2)))
+}
+
+///|
+test "WorldHistory tracks CommandBuffer create with reserved entity id" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let source_component = world.register_cpu_component("HistoryCommandSource", 4)
+  let spawned_component = world.register_cpu_component(
+    "HistoryCommandSpawned", 4,
+  )
+  let source = world.create_entity()
+  assert_true(
+    world.add_component_bytes(source, source_component, bytes4(1, 2, 3, 4)),
+  )
+  let query = Query::new([source_component])
+  let mut spawned = EntityId::new(-1, 0)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_with_structural_write(
+      "history-command-create",
+      update_phase(),
+      [source_component],
+      [spawned_component],
+      (w, _ctx, commands) => {
+        query.for_each(w, _row => {
+          spawned = commands.create_entity()
+          commands.add_component_bytes(
+            spawned,
+            spawned_component,
+            bytes4(9, 8, 7, 6),
+          )
+        })
+      },
+    ),
+  )
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+      "Command Create",
+    ),
+  )
+  assert_true(world.is_alive(spawned))
+  assert_true(
+    world.component_bytes(spawned, spawned_component) ==
+    Some(bytes4(9, 8, 7, 6)),
+  )
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(spawned))
+  assert_true(history.redo(world))
+  assert_true(world.is_alive(spawned))
+  assert_eq(spawned.generation, 0)
+  assert_true(
+    world.component_bytes(spawned, spawned_component) ==
+    Some(bytes4(9, 8, 7, 6)),
+  )
+}
+
+///|
+test "WorldHistory keeps successful CommandBuffer deltas when a later command fails" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandPartialA", 4)
+  let e = world.create_entity()
+  let missing = EntityId::new(e.index + 100, 0)
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_with_structural_write(
+      "history-command-partial",
+      update_phase(),
+      [],
+      [qa],
+      (_w, _ctx, commands) => {
+        commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+        commands.destroy_entity(missing)
+      },
+    ),
+  )
+  assert_true(
+    !history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+      "Command Partial",
+    ),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory groups multiple tracked system phases in one open transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandMultiA", 4)
+  let e = world.create_entity()
+  let phase_a = PhaseKey::new("history-command-phase-a")
+  let phase_b = PhaseKey::new("history-command-phase-b")
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-a", phase_a, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+    }),
+  )
+  runner.add_system(
+    System::new("history-command-b", phase_b, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(3, 0, 0, 0))
+    }),
+  )
+  assert_true(history.begin_transaction("Command Multi"))
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase_a,
+      "ignored-a",
+    ),
+  )
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 2),
+      phase_b,
+      "ignored-b",
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory releases temporary command-buffer guard inside normal transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandTemporaryGuardA", 4)
+  let e = world.create_entity()
+  let phase = PhaseKey::new("history-command-temporary-guard")
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-guard", phase, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+    }),
+  )
+  assert_true(history.begin_transaction("Command Guard"))
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase,
+      "ignored",
+    ),
+  )
+  assert_true(world.set_component_bytes(e, qa, bytes4(3, 0, 0, 0)))
+  assert_true(history.set_component_bytes(world, e, qa, bytes4(4, 0, 0, 0)))
+  assert_true(history.commit_transaction())
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory keeps command-buffer guard inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandStickyGuardA", 4)
+  let e = world.create_entity()
+  let phase = PhaseKey::new("history-command-sticky-guard")
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-sticky", phase, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+    }),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "Command Sticky Guard"))
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase,
+      "ignored",
+    ),
+  )
+  assert_true(history.set_component_bytes(world, e, qa, bytes4(3, 0, 0, 0)))
+  assert_true(history.commit_transaction())
+}

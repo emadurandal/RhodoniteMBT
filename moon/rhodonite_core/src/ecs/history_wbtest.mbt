@@ -2,6 +2,17 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+/// Builds a four-byte component payload for history white-box tests.
+fn history_wb_bytes4(
+  a : Byte,
+  b : Byte,
+  c : Byte,
+  d : Byte,
+) -> FixedArray[Byte] {
+  [a, b, c, d]
+}
+
+///|
 test "WorldHistory compresses repeated CameraChanged deltas inside transaction" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -123,4 +134,56 @@ test "WorldHistory drops CameraChanged when transaction returns to original row"
   assert_eq(history.current_deltas.length(), 0)
   assert_true(history.commit_transaction())
   assert_eq(history.undo_len(), 0)
+}
+
+///|
+test "WorldHistory guarded transactions release raw mutation guard" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.raw_mutation_guard_enabled())
+  assert_true(history.begin_guarded_transaction(world, "guard commit"))
+  assert_eq(world.history_raw_mutation_guard_depth, 1)
+  assert_true(history.commit_transaction())
+  assert_eq(world.history_raw_mutation_guard_depth, 0)
+  assert_true(history.begin_guarded_transaction(world, "guard cancel"))
+  assert_eq(world.history_raw_mutation_guard_depth, 1)
+  assert_true(history.cancel_transaction())
+  assert_eq(world.history_raw_mutation_guard_depth, 0)
+  assert_true(history.begin_guarded_transaction(world, "guard disable"))
+  assert_eq(world.history_raw_mutation_guard_depth, 1)
+  history.set_raw_mutation_guard_enabled(false)
+  assert_false(history.raw_mutation_guard_enabled())
+  assert_eq(world.history_raw_mutation_guard_depth, 0)
+}
+
+///|
+test "WorldHistory tracked mutations bypass guarded raw mutation checks" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryGuardBypass", 4)
+  let entity = world.create_entity()
+  assert_true(
+    world.add_component_bytes(entity, component, history_wb_bytes4(1, 0, 0, 0)),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded set"))
+  assert_eq(world.history_raw_mutation_guard_depth, 1)
+  assert_eq(world.history_tracked_mutation_depth, 0)
+  assert_true(
+    history.set_component_bytes(
+      world,
+      entity,
+      component,
+      history_wb_bytes4(2, 0, 0, 0),
+    ),
+  )
+  assert_eq(world.history_tracked_mutation_depth, 0)
+  assert_true(history.commit_transaction())
+  assert_eq(world.history_raw_mutation_guard_depth, 0)
+  assert_true(history.undo(world))
+  assert_true(
+    world.component_bytes(entity, component) ==
+    Some(history_wb_bytes4(1, 0, 0, 0)),
+  )
 }

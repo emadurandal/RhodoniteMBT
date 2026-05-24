@@ -332,6 +332,7 @@ pub struct WorldHistory {
 }
 pub fn WorldHistory::add_component(Self, World, EntityId, ComponentTypeId) -> Bool
 pub fn WorldHistory::add_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn WorldHistory::begin_guarded_transaction(Self, World, String) -> Bool
 pub fn WorldHistory::begin_transaction(Self, String) -> Bool
 pub fn WorldHistory::can_redo(Self) -> Bool
 pub fn WorldHistory::can_undo(Self) -> Bool
@@ -343,15 +344,18 @@ pub fn WorldHistory::destroy_entity(Self, World, EntityId) -> Bool
 pub fn WorldHistory::enabled(Self) -> Bool
 pub fn WorldHistory::max_undo_records(Self) -> Int
 pub fn WorldHistory::new() -> Self
+pub fn WorldHistory::raw_mutation_guard_enabled(Self) -> Bool
 pub fn WorldHistory::redo(Self, World) -> Bool
 pub fn WorldHistory::redo_label(Self) -> String?
 pub fn WorldHistory::redo_len(Self) -> Int
 pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
+pub fn WorldHistory::run_system_phase(Self, SystemRunner, World, SystemContext, PhaseKey, String) -> Bool
 pub fn WorldHistory::set_camera_matrices(Self, World, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn WorldHistory::set_child_of(Self, World, EntityId, EntityId) -> Bool
 pub fn WorldHistory::set_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn WorldHistory::set_enabled(Self, Bool) -> Unit
 pub fn WorldHistory::set_max_undo_records(Self, Int) -> Unit
+pub fn WorldHistory::set_raw_mutation_guard_enabled(Self, Bool) -> Unit
 pub fn WorldHistory::set_transform_trs(Self, World, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
 pub fn WorldHistory::undo(Self, World) -> Bool
 pub fn WorldHistory::undo_label(Self) -> String?

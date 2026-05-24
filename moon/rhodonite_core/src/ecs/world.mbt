@@ -274,6 +274,64 @@ fn World::assert_not_querying(self : World, operation : String) -> Unit {
 }
 
 ///|
+/// Implements `World::history_raw_mutation_guard_active`.
+fn World::history_raw_mutation_guard_active(self : World) -> Bool {
+  self.history_raw_mutation_guard_depth > 0
+}
+
+///|
+/// Implements `World::history_tracked_mutation_active`.
+fn World::history_tracked_mutation_active(self : World) -> Bool {
+  self.history_tracked_mutation_depth > 0
+}
+
+///|
+/// Arms the raw mutation guard for one guarded history transaction.
+fn World::begin_history_raw_mutation_guard(self : World) -> Unit {
+  self.history_raw_mutation_guard_depth = self.history_raw_mutation_guard_depth +
+    1
+}
+
+///|
+/// Releases one raw mutation guard frame.
+fn World::end_history_raw_mutation_guard(self : World) -> Unit {
+  if self.history_raw_mutation_guard_depth > 0 {
+    self.history_raw_mutation_guard_depth = self.history_raw_mutation_guard_depth -
+      1
+  }
+}
+
+///|
+/// Enters a tracked history mutation that may call raw World APIs.
+fn World::begin_history_tracked_mutation(self : World) -> Unit {
+  self.history_tracked_mutation_depth = self.history_tracked_mutation_depth + 1
+}
+
+///|
+/// Leaves a tracked history mutation frame.
+fn World::end_history_tracked_mutation(self : World) -> Unit {
+  if self.history_tracked_mutation_depth > 0 {
+    self.history_tracked_mutation_depth = self.history_tracked_mutation_depth -
+      1
+  }
+}
+
+///|
+/// Blocks untracked raw mutations during a guarded WorldHistory transaction.
+fn World::assert_not_history_raw_mutation(
+  self : World,
+  operation : String,
+) -> Unit {
+  if self.history_raw_mutation_guard_active() &&
+    !self.history_tracked_mutation_active() {
+    abort(
+      operation +
+      " cannot be called during a guarded WorldHistory transaction. Hint: use the matching WorldHistory tracked API, or commit/cancel the transaction before mutating World directly.",
+    )
+  }
+}
+
+///|
 /// Blocks component registration while systems are running.
 fn World::assert_component_registration_open(
   self : World,
@@ -459,6 +517,8 @@ pub fn World::new_with_global_transform_format(
   let system_access_reads : Array[ComponentTypeId] = []
   let system_access_writes : Array[ComponentTypeId] = []
   let system_access_structural_write = false
+  let history_raw_mutation_guard_depth = 0
+  let history_tracked_mutation_depth = 0
   {
     registry,
     generations,
@@ -479,6 +539,8 @@ pub fn World::new_with_global_transform_format(
     system_access_reads,
     system_access_writes,
     system_access_structural_write,
+    history_raw_mutation_guard_depth,
+    history_tracked_mutation_depth,
     transform_component_id,
     global_transform_component_id,
     global_transform_default_format: global_transform_gpu_format,
@@ -652,6 +714,7 @@ fn World::is_reserved_entity(self : World, entity : EntityId) -> Bool {
 ///|
 /// Reserves an entity slot for a queued create command without touching archetype rows.
 fn World::reserve_entity_for_command(self : World) -> EntityId {
+  self.assert_not_history_raw_mutation("World::reserve_entity_for_command")
   self.assert_system_structural_write("World::reserve_entity_for_command")
   if self.free_indices.length() > 0 {
     let last = self.free_indices.length() - 1
@@ -672,6 +735,7 @@ fn World::reserve_entity_for_command(self : World) -> EntityId {
 ///|
 /// Makes a previously reserved entity alive and inserts it into the empty archetype.
 fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
+  self.assert_not_history_raw_mutation("World::finalize_reserved_entity")
   self.assert_not_querying("World::finalize_reserved_entity")
   self.assert_system_structural_write("World::finalize_reserved_entity")
   if !self.is_reserved_entity(entity) || self.alive[entity.index] {
@@ -687,6 +751,7 @@ fn World::finalize_reserved_entity(self : World, entity : EntityId) -> Bool {
 ///|
 /// Allocates or recycles a slot.
 pub fn World::create_entity(self : World) -> EntityId {
+  self.assert_not_history_raw_mutation("World::create_entity")
   self.assert_not_querying("World::create_entity")
   self.assert_system_structural_write("World::create_entity")
   let entity = if self.free_indices.length() > 0 {
@@ -712,6 +777,7 @@ pub fn World::create_entity(self : World) -> EntityId {
 ///|
 /// Removes the entity from its archetype (swap-remove) and frees the slot for reuse.
 pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
+  self.assert_not_history_raw_mutation("World::destroy_entity")
   self.assert_not_querying("World::destroy_entity")
   self.assert_system_structural_write("World::destroy_entity")
   if !self.is_alive(entity) {
@@ -775,6 +841,7 @@ pub fn World::set_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_component_bytes")
   self.assert_not_querying("World::set_component_bytes")
   self.assert_system_component_write(component, "World::set_component_bytes")
   let rc = match self.registry.get(component) {
@@ -855,6 +922,7 @@ pub fn World::add_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::add_component")
   self.assert_not_querying("World::add_component")
   self.assert_system_structural_write("World::add_component")
   self.assert_system_component_write(component, "World::add_component")
@@ -899,6 +967,7 @@ pub fn World::add_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::add_component_bytes")
   self.assert_not_querying("World::add_component_bytes")
   self.assert_system_structural_write("World::add_component_bytes")
   self.assert_system_component_write(component, "World::add_component_bytes")
@@ -923,6 +992,7 @@ pub fn World::remove_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::remove_component")
   self.assert_not_querying("World::remove_component")
   self.assert_system_structural_write("World::remove_component")
   self.assert_system_component_write(component, "World::remove_component")

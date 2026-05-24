@@ -49,6 +49,8 @@ pub struct WorldHistory {
   priv mut current_deltas : Array[WorldDelta]
   priv undo_stack : Array[WorldHistoryRecord]
   priv redo_stack : Array[WorldHistoryRecord]
+  priv mut raw_mutation_guard_enabled : Bool
+  priv mut guarded_world : World?
 }
 
 ///|
@@ -87,6 +89,78 @@ fn WorldHistory::recording_enabled(self : WorldHistory) -> Bool {
 fn WorldHistory::trim_stacks_to_limit(self : WorldHistory) -> Unit {
   trim_history_stack_to_limit(self.undo_stack, self.max_undo_records)
   trim_history_stack_to_limit(self.redo_stack, self.max_undo_records)
+}
+
+///|
+/// Releases the raw mutation guard currently armed on a world.
+fn WorldHistory::release_guard(self : WorldHistory) -> Unit {
+  match self.guarded_world {
+    Some(world) => {
+      world.end_history_raw_mutation_guard()
+      self.guarded_world = None
+    }
+    None => ()
+  }
+}
+
+///|
+/// Arms the raw mutation guard for this transaction if requested.
+fn WorldHistory::ensure_guarded_world(
+  self : WorldHistory,
+  world : World,
+) -> Unit {
+  if !self.raw_mutation_guard_enabled ||
+    !self.recording_enabled() ||
+    !self.open ||
+    self.applying {
+    return
+  }
+  match self.guarded_world {
+    Some(_) => ()
+    None => {
+      world.begin_history_raw_mutation_guard()
+      self.guarded_world = Some(world)
+    }
+  }
+}
+
+///|
+/// Arms the raw mutation guard even when the optional public guard flag is off.
+fn WorldHistory::force_guarded_world(
+  self : WorldHistory,
+  world : World,
+) -> Bool {
+  if !self.recording_enabled() || !self.open || self.applying {
+    return false
+  }
+  match self.guarded_world {
+    Some(_) => false
+    None => {
+      world.begin_history_raw_mutation_guard()
+      self.guarded_world = Some(world)
+      true
+    }
+  }
+}
+
+///|
+/// Opens a tracked mutation bypass used by WorldHistory methods.
+fn WorldHistory::begin_tracked_world_mutation(
+  self : WorldHistory,
+  world : World,
+) -> Unit {
+  self.ensure_guarded_world(world)
+  world.begin_history_tracked_mutation()
+}
+
+///|
+/// Closes a tracked mutation bypass used by WorldHistory methods.
+fn WorldHistory::end_tracked_world_mutation(
+  self : WorldHistory,
+  world : World,
+) -> Unit {
+  ignore(self)
+  world.end_history_tracked_mutation()
 }
 
 ///|
@@ -420,6 +494,7 @@ fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
 ///|
 /// Clears the current in-progress transaction without touching world state.
 fn WorldHistory::clear_current(self : WorldHistory) -> Unit {
+  self.release_guard()
   self.open = false
   self.current_label = ""
   self.current_deltas = []
@@ -437,6 +512,8 @@ pub fn WorldHistory::new() -> WorldHistory {
     current_deltas: [],
     undo_stack: [],
     redo_stack: [],
+    raw_mutation_guard_enabled: false,
+    guarded_world: None,
   }
 }
 
@@ -466,6 +543,27 @@ pub fn WorldHistory::set_max_undo_records(
     self.clear()
   } else {
     self.trim_stacks_to_limit()
+  }
+}
+
+///|
+/// Returns whether guarded transactions reject raw World mutations.
+pub fn WorldHistory::raw_mutation_guard_enabled(self : WorldHistory) -> Bool {
+  self.raw_mutation_guard_enabled
+}
+
+///|
+/// Enables or disables guarded transaction raw mutation checks.
+pub fn WorldHistory::set_raw_mutation_guard_enabled(
+  self : WorldHistory,
+  enabled : Bool,
+) -> Unit {
+  if self.raw_mutation_guard_enabled == enabled {
+    return
+  }
+  self.raw_mutation_guard_enabled = enabled
+  if !enabled {
+    self.release_guard()
   }
 }
 
@@ -529,6 +627,20 @@ pub fn WorldHistory::begin_transaction(
   self.open = true
   self.current_label = label
   self.current_deltas = []
+  true
+}
+
+///|
+/// Begins a named transaction and arms the raw mutation guard for `world` when enabled.
+pub fn WorldHistory::begin_guarded_transaction(
+  self : WorldHistory,
+  world : World,
+  label : String,
+) -> Bool {
+  if !self.begin_transaction(label) {
+    return false
+  }
+  self.ensure_guarded_world(world)
   true
 }
 
@@ -622,6 +734,39 @@ fn WorldHistory::record_entity_destroyed(
 }
 
 ///|
+/// Reserves an entity id for a tracked command-buffer create.
+fn WorldHistory::reserve_entity_for_command(
+  self : WorldHistory,
+  world : World,
+) -> EntityId {
+  self.begin_tracked_world_mutation(world)
+  let entity = world.reserve_entity_for_command()
+  self.end_tracked_world_mutation(world)
+  entity
+}
+
+///|
+/// Finalizes a reserved entity and records the creation in history.
+fn WorldHistory::finalize_reserved_entity(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    return world.finalize_reserved_entity(entity)
+  }
+  let auto = self.begin_auto("finalize_reserved_entity")
+  self.begin_tracked_world_mutation(world)
+  let ok = world.finalize_reserved_entity(entity)
+  self.end_tracked_world_mutation(world)
+  if ok {
+    self.record_entity_created(entity)
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Creates an entity and records the creation in history.
 pub fn WorldHistory::create_entity(
   self : WorldHistory,
@@ -631,7 +776,9 @@ pub fn WorldHistory::create_entity(
     return world.create_entity()
   }
   let auto = self.begin_auto("create_entity")
+  self.begin_tracked_world_mutation(world)
   let entity = world.create_entity()
+  self.end_tracked_world_mutation(world)
   self.record_entity_created(entity)
   self.finish_auto(auto, true)
   entity
@@ -652,7 +799,9 @@ pub fn WorldHistory::destroy_entity(
     None => return false
   }
   let auto = self.begin_auto("destroy_entity")
+  self.begin_tracked_world_mutation(world)
   let ok = world.destroy_entity(entity)
+  self.end_tracked_world_mutation(world)
   if ok {
     self.record_entity_destroyed(snapshot)
   }
@@ -675,7 +824,9 @@ pub fn WorldHistory::add_component(
     return false
   }
   let auto = self.begin_auto("add_component")
+  self.begin_tracked_world_mutation(world)
   let ok = world.add_component(entity, component)
+  self.end_tracked_world_mutation(world)
   if ok {
     match world.component_bytes(entity, component) {
       Some(after) => self.push_delta(ComponentAdded(entity, component, after))
@@ -702,7 +853,9 @@ pub fn WorldHistory::add_component_bytes(
     return false
   }
   let auto = self.begin_auto("add_component_bytes")
+  self.begin_tracked_world_mutation(world)
   let ok = world.add_component_bytes(entity, component, bytes)
+  self.end_tracked_world_mutation(world)
   if ok {
     match world.component_bytes(entity, component) {
       Some(after) => self.push_delta(ComponentAdded(entity, component, after))
@@ -732,7 +885,9 @@ pub fn WorldHistory::set_component_bytes(
     None => return false
   }
   let auto = self.begin_auto("set_component_bytes")
+  self.begin_tracked_world_mutation(world)
   let ok = world.set_component_bytes(entity, component, bytes)
+  self.end_tracked_world_mutation(world)
   if ok {
     match world.component_bytes(entity, component) {
       Some(after) =>
@@ -760,7 +915,9 @@ pub fn WorldHistory::remove_component(
     None => return false
   }
   let auto = self.begin_auto("remove_component")
+  self.begin_tracked_world_mutation(world)
   let ok = world.remove_component(entity, component)
+  self.end_tracked_world_mutation(world)
   if ok {
     self.push_delta(ComponentRemoved(entity, component, before))
   }
@@ -845,9 +1002,11 @@ pub fn WorldHistory::set_camera_matrices(
     None
   }
   let auto = self.begin_auto("set_camera_matrices")
+  self.begin_tracked_world_mutation(world)
   let ok = world.set_camera_matrices(
     entity, view, proj, near, far, aspect, projection_kind, flags,
   )
+  self.end_tracked_world_mutation(world)
   if ok {
     match world.camera_gpu_row(entity) {
       Some(after) => self.push_delta(CameraChanged(entity, before, after))
@@ -855,6 +1014,32 @@ pub fn WorldHistory::set_camera_matrices(
     }
   }
   self.finish_auto(auto, ok)
+  ok
+}
+
+///|
+/// Runs one system phase with command-buffer mutations recorded in history.
+pub fn WorldHistory::run_system_phase(
+  self : WorldHistory,
+  runner : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  label : String,
+) -> Bool {
+  if self.applying {
+    return false
+  }
+  if !self.recording_enabled() {
+    return runner.run_phase(world, ctx, phase)
+  }
+  let auto = self.begin_auto(label)
+  let forced_guard = self.force_guarded_world(world)
+  let ok = runner.run_phase_tracked(world, ctx, phase, self)
+  if forced_guard && !self.raw_mutation_guard_enabled {
+    self.release_guard()
+  }
+  self.finish_auto(auto, true)
   ok
 }
 
@@ -925,6 +1110,7 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
     None => return false
   }
   self.applying = true
+  world.begin_history_tracked_mutation()
   ignore(record.label)
   let mut ok = true
   for i = record.deltas.length() - 1; i >= 0; i = i - 1 {
@@ -932,6 +1118,7 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
       ok = false
     }
   }
+  world.end_history_tracked_mutation()
   self.applying = false
   if ok {
     self.redo_stack.push(record)
@@ -953,6 +1140,7 @@ pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
     None => return false
   }
   self.applying = true
+  world.begin_history_tracked_mutation()
   ignore(record.label)
   let mut ok = true
   for i = 0; i < record.deltas.length(); i = i + 1 {
@@ -960,6 +1148,7 @@ pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
       ok = false
     }
   }
+  world.end_history_tracked_mutation()
   self.applying = false
   if ok {
     self.undo_stack.push(record)

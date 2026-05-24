@@ -15,6 +15,26 @@ fn CommandBuffer::new_for_system(
     system_name,
     writes: copy_component_array(writes),
     structural_write,
+    history: None,
+  }
+}
+
+///|
+/// Implements `CommandBuffer::new_for_history_system`.
+fn CommandBuffer::new_for_history_system(
+  world : World,
+  system_name : String,
+  writes : Array[ComponentTypeId],
+  structural_write : Bool,
+  history : WorldHistory,
+) -> CommandBuffer {
+  {
+    commands: [],
+    world,
+    system_name,
+    writes: copy_component_array(writes),
+    structural_write,
+    history: Some(history),
   }
 }
 
@@ -69,7 +89,10 @@ pub fn CommandBuffer::is_empty(self : CommandBuffer) -> Bool {
 /// Reserves an entity id immediately and queues creation for after the current system returns.
 pub fn CommandBuffer::create_entity(self : CommandBuffer) -> EntityId {
   self.assert_structural_write("CommandBuffer::create_entity")
-  let entity = self.world.reserve_entity_for_command()
+  let entity = match self.history {
+    Some(history) => history.reserve_entity_for_command(self.world)
+    None => self.world.reserve_entity_for_command()
+  }
   self.commands.push(CreateEntity(entity))
   entity
 }
@@ -152,6 +175,37 @@ fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
         self.world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>
         self.world.remove_component(entity, component)
+    }
+    if !command_ok {
+      ok = false
+    }
+  }
+  while self.commands.length() > 0 {
+    let _ = self.commands.pop()
+  }
+  ok
+}
+
+///|
+/// Applies commands through WorldHistory tracked APIs, then clears the buffer.
+fn CommandBuffer::apply_tracked(
+  self : CommandBuffer,
+  history : WorldHistory,
+) -> Bool {
+  let mut ok = true
+  for i = 0; i < self.commands.length(); i = i + 1 {
+    let command_ok = match self.commands[i] {
+      CreateEntity(entity) =>
+        history.finalize_reserved_entity(self.world, entity)
+      DestroyEntity(entity) => history.destroy_entity(self.world, entity)
+      AddComponent(entity, component) =>
+        history.add_component(self.world, entity, component)
+      AddComponentBytes(entity, component, bytes) =>
+        history.add_component_bytes(self.world, entity, component, bytes)
+      SetComponentBytes(entity, component, bytes) =>
+        history.set_component_bytes(self.world, entity, component, bytes)
+      RemoveComponent(entity, component) =>
+        history.remove_component(self.world, entity, component)
     }
     if !command_ok {
       ok = false

@@ -94,6 +94,7 @@ pub fn World::set_global_transform(
   entity : EntityId,
   m : @m44.Matrix44F,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_global_transform")
   let id = self.global_transform_component_id
   self.assert_system_component_write(id, "World::set_global_transform")
   if !self.has_component(entity, id) {
@@ -133,6 +134,7 @@ pub fn World::set_global_transform_format(
   entity : EntityId,
   format : @comp.GlobalTransformGpuFormat,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_global_transform_format")
   let id = self.global_transform_component_id
   self.assert_system_component_write(id, "World::set_global_transform_format")
   if !self.is_alive(entity) {

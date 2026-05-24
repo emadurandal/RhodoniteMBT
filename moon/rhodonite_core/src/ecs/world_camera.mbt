@@ -83,6 +83,7 @@ pub fn World::set_camera_matrices(
   projection_kind : Float,
   flags : Float,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_camera_matrices")
   let id = self.camera_component_id
   self.assert_system_component_write(id, "World::set_camera_matrices")
   if !self.has_component(entity, id) {
@@ -140,6 +141,7 @@ fn World::write_camera_gpu_row_bytes(
   entity : EntityId,
   bytes : FixedArray[Byte],
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::write_camera_gpu_row_bytes")
   let id = self.camera_component_id
   self.assert_system_component_write(id, "World::write_camera_gpu_row_bytes")
   match self.camera_ref_unchecked(entity) {
