@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rendering Architecture - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/rendering.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Rendering Architecture</h1>
+          <p class="lead">描画の詳細は facade runtime の <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a> にあります。現在の renderer は unlit static mesh と sample-driven instancing のための narrow な v1 path です。</p>
+
+          <h2>Renderer v1</h2>
+          <p><code>Renderer</code> は <code>Engine</code> が所有し、device-wide GPU resources を所有します。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して、caller-supplied <code>RenderTargetResources</code> へ unlit static indexed mesh を描画します。</p>
+          <div class="mermaid">
+flowchart TB
+  E[Engine] --> R[Renderer]
+  E --> RT[RenderTargetResources]
+  S[Scene] --> W[World]
+  W --> Q[Renderable + GlobalTransform query]
+  R --> M[Mesh table]
+  R --> Mat[Material table]
+  R --> I[Instance buffer table]
+  Q --> Draw[Draw commands]
+  M --> Draw
+  Mat --> Draw
+  I --> Draw
+  RT --> Draw
+          </div>
+          <p>Texture、skinning、transparent sorting、shadow、LOD はまだ v1 renderer の責務ではありません。</p>
+
+          <h2>Renderable Model</h2>
+          <ul>
+            <li><code>RenderableDesc</code> は entity と登録済み mesh/material handle を結びます。</li>
+            <li><code>RenderableFlags</code> は render visibility などの per-renderable state を持ちます。</li>
+            <li>Renderable component id は <code>Scene</code> が内部で登録・所有します。</li>
+            <li>scene render pass は Renderable data と <code>GlobalTransform</code> の両方を持つ entity を抽出します。</li>
+          </ul>
+
+          <h2>Resource Registration</h2>
+          <table>
+            <thead><tr><th>API</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>register_static_indexed_mesh_desc</code></td><td>caller が記述した indexed mesh を upload し、<code>MeshHandle</code> を返します。</td></tr>
+              <tr><td><code>register_cube_mesh</code></td><td><code>CubeMeshDesc</code> / <code>cube_mesh_desc</code> から built-in position-only cube primitive を登録します。</td></tr>
+              <tr><td><code>register_unlit_material</code></td><td>v1 mesh path で使う unlit material を登録します。</td></tr>
+              <tr><td><code>register_static_instance_buffer</code></td><td>明示的な instanced draw path 用の per-instance transform/color data を登録します。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Draw Paths</h2>
+          <ul>
+            <li><code>render_scene_renderables(scene, target, view)</code> は通常の scene path です。ECS state から renderable を抽出し、登録済み mesh/material handle 経由で描画します。</li>
+            <li><code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code> は MassCubes が使う明示的な instanced path です。大量 cube sample を、cube ごとの renderable draw ではなく packed instance-buffer path に乗せます。</li>
+          </ul>
+
+          <h2>Example Mapping</h2>
+          <ul>
+            <li><code>ecs-scene-graph</code> は小さな hierarchy を通常の scene renderable path で描画します。</li>
+            <li><code>ecs-mass-cubes</code> は shared scene/camera state と明示的な instanced path を使って多数の cube を描画します。</li>
+            <li><code>basic-triangle</code> と <code>ondemand-triangle</code> は lower-level WebGPU sample です。engine phase と platform setup は使いますが、Renderer v1 ではなく sample 側で pipeline を直接所有します。</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

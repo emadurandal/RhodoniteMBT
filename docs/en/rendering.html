@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rendering Architecture - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/rendering.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Rendering Architecture</h1>
+          <p class="lead">Rendering details live under the facade runtime in <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a>. The current renderer is a narrow v1 path for unlit static meshes and sample-driven instancing.</p>
+
+          <h2>Renderer v1</h2>
+          <p><code>Renderer</code> is owned by <code>Engine</code> and owns device-wide GPU resources. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes into caller-supplied <code>RenderTargetResources</code>.</p>
+          <div class="mermaid">
+flowchart TB
+  E[Engine] --> R[Renderer]
+  E --> RT[RenderTargetResources]
+  S[Scene] --> W[World]
+  W --> Q[Renderable + GlobalTransform query]
+  R --> M[Mesh table]
+  R --> Mat[Material table]
+  R --> I[Instance buffer table]
+  Q --> Draw[Draw commands]
+  M --> Draw
+  Mat --> Draw
+  I --> Draw
+  RT --> Draw
+          </div>
+          <p>Textures, skinning, transparent sorting, shadows, and LOD are not v1 renderer responsibilities yet.</p>
+
+          <h2>Renderable Model</h2>
+          <ul>
+            <li><code>RenderableDesc</code> links an entity to registered mesh and material handles.</li>
+            <li><code>RenderableFlags</code> carries render visibility and related per-renderable state.</li>
+            <li>The Renderable component id is registered and owned internally by <code>Scene</code>.</li>
+            <li>A scene render pass extracts entities that have both Renderable data and a <code>GlobalTransform</code>.</li>
+          </ul>
+
+          <h2>Resource Registration</h2>
+          <table>
+            <thead><tr><th>API</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>register_static_indexed_mesh_desc</code></td><td>Uploads a caller-described indexed mesh and returns a <code>MeshHandle</code>.</td></tr>
+              <tr><td><code>register_cube_mesh</code></td><td>Registers the built-in position-only cube primitive from <code>CubeMeshDesc</code> / <code>cube_mesh_desc</code>.</td></tr>
+              <tr><td><code>register_unlit_material</code></td><td>Registers an unlit material used by the v1 mesh paths.</td></tr>
+              <tr><td><code>register_static_instance_buffer</code></td><td>Registers per-instance transform/color data for explicit instanced draw paths.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Draw Paths</h2>
+          <ul>
+            <li><code>render_scene_renderables(scene, target, view)</code> is the normal scene path. It extracts renderables from ECS state and draws them through registered mesh/material handles.</li>
+            <li><code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code> is the explicit instanced path used by MassCubes. It keeps the high-count sample on a packed instance-buffer path instead of creating one renderable draw per cube.</li>
+          </ul>
+
+          <h2>Example Mapping</h2>
+          <ul>
+            <li><code>ecs-scene-graph</code> uses the normal scene renderable path for a small hierarchy.</li>
+            <li><code>ecs-mass-cubes</code> uses shared scene/camera state and the explicit instanced path for many cubes.</li>
+            <li><code>basic-triangle</code> and <code>ondemand-triangle</code> are lower-level WebGPU samples. They use engine phases and platform setup, but own their pipeline directly instead of using Renderer v1.</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

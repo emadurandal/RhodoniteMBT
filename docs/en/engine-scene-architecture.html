@@ -15,6 +15,7 @@
         <p class="nav-section">Documents</p>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
         <a href="./ecs.html">ECS</a>
         <a href="./input-architecture.html">Input</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
@@ -98,16 +99,8 @@ flowchart LR
           </div>
           <p>Pointer events from canvas/window A do not affect the camera/controller owned by canvas/window B.</p>
 
-          <h2>Renderer v1</h2>
-          <p><code>Renderer</code> is currently an intentionally narrow engine-owned renderer. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes into caller-supplied <code>RenderTargetResources</code>.</p>
-          <ul>
-            <li>handles: <code>MeshHandle</code>, <code>MaterialHandle</code>, <code>InstanceBufferHandle</code></li>
-            <li>components: <code>RenderableDesc</code> and <code>RenderableFlags</code>; the Renderable component id is registered and owned internally by <code>Scene</code></li>
-            <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>, <code>CubeMeshDesc</code>, <code>cube_mesh_desc</code></li>
-            <li>resources: <code>register_static_indexed_mesh_desc</code>, <code>register_cube_mesh</code>, <code>register_unlit_material</code>, <code>register_static_instance_buffer</code></li>
-            <li>draw paths: <code>render_scene_renderables(scene, target, view)</code> and <code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code> for MassCubes</li>
-          </ul>
-          <p>Textures, skinning, transparent sorting, shadows, and LOD are not v1 renderer responsibilities yet.</p>
+          <h2>Rendering</h2>
+          <p><code>Engine</code> owns the standard <code>Renderer</code>, and scenes provide the ECS data that renderer paths consume. Renderer, Renderable, resource registration, and draw path details are covered in <a href="./rendering.html">Rendering Architecture</a>.</p>
 
           <h2>Platform Runners</h2>
           <table>
