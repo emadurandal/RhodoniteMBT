@@ -68,6 +68,76 @@ test "WorldHistory undoes and redoes component byte changes" {
 }
 
 ///|
+test "WorldHistory failed undo validation keeps stacks and world unchanged" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryUndoValidate", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 1, 1, 1)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 2, 2, 2)),
+  )
+  assert_true(world.destroy_entity(entity))
+  assert_true(!history.undo(world))
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  assert_true(!world.is_alive(entity))
+}
+
+///|
+test "WorldHistory failed redo validation keeps stacks and world unchanged" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryRedoValidate", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 1, 1, 1)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 2, 2, 2)),
+  )
+  assert_true(history.undo(world))
+  assert_true(world.remove_component(entity, component))
+  assert_true(!history.redo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  assert_true(!world.has_component(entity, component))
+}
+
+///|
+test "WorldHistory failed redo validation rejects stale created entity generation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = history.create_entity(world)
+  assert_true(history.undo(world))
+  let replacement = world.create_entity()
+  assert_eq(replacement.index, entity.index)
+  assert_true(world.destroy_entity(replacement))
+  assert_true(!history.redo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  assert_true(!world.is_alive(entity))
+}
+
+///|
+test "WorldHistory validates dependent create and component add transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryCreateAddValidate", 4)
+  assert_true(history.begin_transaction("create-add"))
+  let entity = history.create_entity(world)
+  assert_true(
+    history.add_component_bytes(world, entity, component, bytes4(7, 7, 7, 7)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(entity))
+  assert_true(history.redo(world))
+  assert_true(world.is_alive(entity))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(7, 7, 7, 7)),
+  )
+}
+
+///|
 test "WorldHistory undoes add and remove component across archetype moves" {
   let world = World::new()
   let history = WorldHistory::new()
