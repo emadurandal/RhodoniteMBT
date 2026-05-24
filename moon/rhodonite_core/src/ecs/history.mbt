@@ -144,16 +144,80 @@ fn world_history_stack_payload_bytes(
 }
 
 ///|
-/// Drops the oldest record from a history stack.
-fn drop_oldest_history_record(records : Array[WorldHistoryRecord]) -> Unit {
-  if records.length() == 0 {
-    return
+/// Drops `count` oldest records from a history stack.
+fn drop_oldest_history_records(
+  records : Array[WorldHistoryRecord],
+  count : Int,
+) -> Bool {
+  if count <= 0 || records.length() == 0 {
+    return false
   }
-  let last = records.length() - 1
-  for i = 0; i < last; i = i + 1 {
-    records[i] = records[i + 1]
+  if count >= records.length() {
+    records.clear()
+    return true
   }
-  let _ = records.pop()
+  let keep = records.length() - count
+  for i = 0; i < keep; i = i + 1 {
+    records[i] = records[i + count]
+  }
+  for i = 0; i < count; i = i + 1 {
+    let _ = records.pop()
+  }
+  true
+}
+
+///|
+/// Counts oldest records that must be dropped to satisfy a byte limit.
+fn history_byte_trim_drop_count(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Int {
+  if limit <= 0 {
+    return 0
+  }
+  let mut total = 0
+  let sizes : Array[Int] = []
+  for i = 0; i < records.length(); i = i + 1 {
+    let size = world_history_record_payload_bytes(records[i])
+    sizes.push(size)
+    total = total + size
+  }
+  let mut drop_count = 0
+  while drop_count < sizes.length() && total > limit {
+    total = total - sizes[drop_count]
+    drop_count = drop_count + 1
+  }
+  drop_count
+}
+
+///|
+/// Drops oldest records until `count` records remain.
+fn trim_history_stack_to_record_count(
+  records : Array[WorldHistoryRecord],
+  count : Int,
+) -> Bool {
+  if count <= 0 {
+    let trimmed = records.length() > 0
+    records.clear()
+    return trimmed
+  }
+  if records.length() <= count {
+    return false
+  }
+  drop_oldest_history_records(records, records.length() - count)
+}
+
+///|
+/// Drops oldest records until retained payload bytes fit `limit`.
+fn trim_history_stack_to_payload_bytes(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Bool {
+  if limit <= 0 {
+    return false
+  }
+  let drop_count = history_byte_trim_drop_count(records, limit)
+  drop_oldest_history_records(records, drop_count)
 }
 
 ///|
@@ -162,17 +226,7 @@ fn trim_history_stack_to_limit(
   records : Array[WorldHistoryRecord],
   limit : Int,
 ) -> Bool {
-  let mut trimmed = false
-  if limit <= 0 {
-    trimmed = records.length() > 0
-    records.clear()
-    return trimmed
-  }
-  while records.length() > limit {
-    drop_oldest_history_record(records)
-    trimmed = true
-  }
-  trimmed
+  trim_history_stack_to_record_count(records, limit)
 }
 
 ///|
@@ -181,16 +235,7 @@ fn trim_history_stack_to_byte_limit(
   records : Array[WorldHistoryRecord],
   limit : Int,
 ) -> Bool {
-  let mut trimmed = false
-  if limit <= 0 {
-    return false
-  }
-  while records.length() > 0 &&
-        world_history_stack_payload_bytes(records) > limit {
-    drop_oldest_history_record(records)
-    trimmed = true
-  }
-  trimmed
+  trim_history_stack_to_payload_bytes(records, limit)
 }
 
 ///|
