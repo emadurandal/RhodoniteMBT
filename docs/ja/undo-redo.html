@@ -65,6 +65,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Tracked Command Buffers</h2>
           <p>editor system が <code>CommandBuffer</code> に mutation を queue する場合は <code>WorldHistory::run_system_phase</code> を使います。これは <code>SystemRunner::run_phase</code> と同じように phase を実行しつつ、queued command を tracked history method 経由で apply し、指定した label の record に保存します。</p>
+          <p>TypeScript wrapper では同じ経路を <code>WorldHistory.runSystemPhase(runner, world, ctx, phase, label)</code> として公開します。<code>SystemRunner</code>、<code>System</code>、<code>SystemContext</code>、<code>CommandBuffer</code> は <code>@rhodonite/core/ecs</code> から利用できます。</p>
           <pre><code class="language-moonbit">ignore(history.run_system_phase(
   runner,
   world,
