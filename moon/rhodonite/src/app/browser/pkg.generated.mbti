@@ -37,7 +37,7 @@ pub fn start_browser_frame_loop((Double) -> Unit) -> BrowserFrameLoop
 
 pub fn start_browser_on_demand_frame_loop((Double) -> Unit, () -> Bool) -> BrowserFrameLoop
 
-pub fn start_platform(@app.Engine, @webgpu_objects.HTMLCanvasElement, PlatformOptions) -> Platform
+pub async fn start_platform(@app.Engine, @webgpu_objects.HTMLCanvasElement, PlatformOptions) -> Platform
 
 pub fn stop_platform(@webgpu_objects.HTMLCanvasElement) -> Unit
 
@@ -71,7 +71,7 @@ pub struct MultiSurfacePlatform {
 }
 pub fn MultiSurfacePlatform::attach_canvas(Self, @webgpu_objects.HTMLCanvasElement) -> @app.SurfaceId
 pub fn MultiSurfacePlatform::dispose(Self) -> Unit
-pub fn MultiSurfacePlatform::launch(Self) -> Unit
+pub async fn MultiSurfacePlatform::launch(Self) -> Unit
 
 pub struct Platform {
   // private fields

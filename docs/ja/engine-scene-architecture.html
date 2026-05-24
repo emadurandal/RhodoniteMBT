@@ -107,11 +107,11 @@ flowchart LR
             <thead><tr><th>Platform</th><th>Package</th><th>Entrypoints</th></tr></thead>
             <tbody>
               <tr><td>Browser MoonBit JS</td><td><code>emadurandal/rhodonite/app/browser</code></td><td><code>run_platform</code>、<code>run_multi_surface_platform</code>、<code>start_platform</code>、<code>stop_platform</code></td></tr>
-              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>、<code>runMultiSurfacePlatform</code>、<code>stopPlatform</code></td></tr>
+              <tr><td>Browser TypeScript</td><td><code>rhodonite-mbt/app</code></td><td><code>runPlatform</code>、<code>runMultiSurfacePlatform</code>、<code>startPlatform</code>、<code>stopPlatform</code></td></tr>
               <tr><td>Native SDL3</td><td><code>emadurandal/rhodonite_app_sdl3/sdl3</code></td><td><code>run_platform</code>、<code>run_multi_window_platform</code></td></tr>
             </tbody>
           </table>
-          <p><code>PlatformOptions</code> は <code>interactive</code>、<code>render_loop</code>、<code>interactive_on_demand</code>、<code>render_on_demand</code>、<code>single_frame</code> を持ちます。</p>
+          <p><code>PlatformOptions</code> は <code>interactive</code>、<code>render_loop</code>、<code>interactive_on_demand</code>、<code>render_on_demand</code>、<code>single_frame</code> を持ちます。Browser の <code>start_platform</code> / <code>startPlatform</code> は async で、<code>single_frame</code> mode ではその1フレームで submit された GPU work の完了後に戻ります。</p>
 
           <h2>Sample Layout</h2>
           <p>samples は <code>DemoState</code> という名前で sample-local GPU/pipeline/state をまとめ、platform setup から demo state を作成して <code>register_engine_handlers(engine, demo_state)</code> で engine に接続する方向に揃えています。ECS samples は <code>Scene</code> を render source とし、basic triangle のような low-level sample は main scene を実行境界としてだけ使います。</p>

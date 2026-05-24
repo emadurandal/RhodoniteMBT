@@ -100,7 +100,6 @@ pub fn DemoState::render_scene(
   color_view : @wgpu.GPUTextureView,
 ) -> Unit {
   self.renderer.render_scene_renderables(scene, self.target, color_view)
-  @native_gpu_queue.wait_native_gpu_queue(self.renderer.device())
 }
 
 ///|
@@ -110,12 +109,10 @@ pub fn render_current_frame(demo_state : DemoState) -> Unit {
     Some(c) => c
     None => abort("render_current_frame requires a canvas context")
   }
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   let texture = canvas_context.get_current_texture()
   let color_view = texture.create_view()
   demo_state.render_scene(demo_state.scene, color_view)
   @wgpu.textureView_release(color_view)
-  @native_gpu_queue.wait_native_gpu_queue(demo_state.renderer.device())
   canvas_context.present()
 }
 

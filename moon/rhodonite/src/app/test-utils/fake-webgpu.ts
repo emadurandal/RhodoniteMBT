@@ -29,6 +29,7 @@ export type FakeRenderPassCall = {
 export class FakeQueue {
 	readonly writes: FakeWrite[] = [];
 	readonly submissions: GPUCommandBuffer[][] = [];
+	onSubmittedWorkDoneCalls = 0;
 
 	writeBuffer(
 		buffer: GPUBuffer,
@@ -54,6 +55,10 @@ export class FakeQueue {
 
 	submit(commandBuffers: Iterable<GPUCommandBuffer>): void {
 		this.submissions.push(Array.from(commandBuffers));
+	}
+
+	async onSubmittedWorkDone(): Promise<void> {
+		this.onSubmittedWorkDoneCalls += 1;
 	}
 }
 
@@ -143,14 +148,15 @@ export class FakeDevice {
 	createRenderPipeline(
 		descriptor: GPURenderPipelineDescriptor,
 	): GPURenderPipeline {
-		return {
+		const pipeline = {
 			descriptor,
 			destroyed: false,
 			destroy() {
 				this.destroyed = true;
 			},
 			getBindGroupLayout: (index: number) => ({ index }),
-		} as unknown as GPURenderPipeline;
+		};
+		return pipeline as unknown as GPURenderPipeline;
 	}
 
 	createBindGroupLayout(

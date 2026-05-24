@@ -53,7 +53,12 @@ type SnapshotModule = {
 	render_basic_triangle_browser_snapshot: () => Promise<unknown>;
 	render_ondemand_triangle_browser_snapshot: () => Promise<unknown>;
 	render_ecs_scene_graph_browser_snapshot: () => Promise<unknown>;
+	render_ecs_custom_component_color_browser_snapshot: () => Promise<unknown>;
 	render_ecs_mass_cubes_browser_snapshot: () => Promise<unknown>;
+};
+
+type TsEcsCustomComponentColorModule = {
+	renderTsEcsCustomComponentColorBrowserSnapshot: () => Promise<unknown>;
 };
 
 type TsMassCubesModule = {
@@ -240,12 +245,14 @@ async function createSampleRenderRegistry(
 	snapshotModule: SnapshotModule,
 ): Promise<Map<string, () => Promise<Uint8Array>>> {
 	const [
+		tsCustomComponentColorModule,
 		tsMassCubesModule,
 		tsSceneGraphModule,
 		wasmHost,
 		wasmModule,
 		wasmGcModule,
 	] = await Promise.all([
+		import("../samples/ts/main-ts-ecs-custom-component-color") as Promise<TsEcsCustomComponentColorModule>,
 		import("../samples/ts/main-ts-ecs-mass-cubes") as Promise<TsMassCubesModule>,
 		import("../samples/ts/main-ts-ecs-scene-graph") as Promise<TsEcsSceneGraphModule>,
 		import("../samples/ts/ecs-mass-cubes-wasm-host") as Promise<WasmMassCubesModule>,
@@ -280,6 +287,13 @@ async function createSampleRenderRegistry(
 				),
 		],
 		[
+			"ecs-custom-component-color",
+			async () =>
+				toUint8Array(
+					await snapshotModule.render_ecs_custom_component_color_browser_snapshot(),
+				),
+		],
+		[
 			"ecs-mass-cubes",
 			async () =>
 				toUint8Array(await snapshotModule.render_ecs_mass_cubes_browser_snapshot()),
@@ -288,6 +302,13 @@ async function createSampleRenderRegistry(
 			"ts-ecs-mass-cubes",
 			async () =>
 				toUint8Array(await tsMassCubesModule.renderTsEcsMassCubesBrowserSnapshot()),
+		],
+		[
+			"ts-ecs-custom-component-color",
+			async () =>
+				toUint8Array(
+					await tsCustomComponentColorModule.renderTsEcsCustomComponentColorBrowserSnapshot(),
+				),
 		],
 		[
 			"ts-ecs-scene-graph",

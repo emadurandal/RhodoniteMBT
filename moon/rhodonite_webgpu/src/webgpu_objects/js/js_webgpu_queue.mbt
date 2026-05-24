@@ -25,6 +25,12 @@ pub fn webgpu_queue_submit(
 }
 
 ///|
+/// Implements `webgpu_queue_on_submitted_work_done`.
+pub async fn webgpu_queue_on_submitted_work_done(queue : WebGPUQueue) -> Unit {
+  @js_async.Promise::wait(queue_onSubmittedWorkDone(queue.queue))
+}
+
+///|
 /// Implements `webgpu_queue_write_buffer`.
 pub fn webgpu_queue_write_buffer(
   queue : WebGPUQueue,

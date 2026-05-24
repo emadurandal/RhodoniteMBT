@@ -476,3 +476,9 @@ extern "js" fn queue_submit(
   commandBuffer : GPUCommandBuffer,
 ) -> Unit =
   #| (queue, commandBuffer) => queue.submit([commandBuffer])
+
+///|
+extern "js" fn queue_onSubmittedWorkDone(
+  queue : GPUQueue,
+) -> @js_async.Promise[Unit] =
+  #| (queue) => queue.onSubmittedWorkDone()

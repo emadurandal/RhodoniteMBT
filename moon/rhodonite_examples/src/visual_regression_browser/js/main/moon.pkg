@@ -1,6 +1,7 @@
 import {
   "emadurandal/rhodonite/app/browser" @app_browser,
   "emadurandal/rhodonite_examples/basic-triangle/common" @basic_triangle,
+  "emadurandal/rhodonite_examples/ecs-custom-component-color/common" @ecs_custom_component_color,
   "emadurandal/rhodonite_examples/ecs-mass-cubes/common" @ecs_mass_cubes,
   "emadurandal/rhodonite_examples/ecs-scene-graph/common" @ecs_scene_graph,
   "emadurandal/rhodonite_examples/ondemand-triangle/common" @ondemand_triangle,
@@ -18,6 +19,7 @@ options(
         "render_basic_triangle_browser_snapshot",
         "render_ondemand_triangle_browser_snapshot",
         "render_ecs_scene_graph_browser_snapshot",
+        "render_ecs_custom_component_color_browser_snapshot",
         "render_ecs_mass_cubes_browser_snapshot",
       ],
       "format": "esm",

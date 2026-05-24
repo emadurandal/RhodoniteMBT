@@ -119,6 +119,25 @@ pub fn render_ecs_scene_graph_browser_snapshot() -> @js_async.Promise[Bytes] {
 }
 
 ///|
+async fn render_ecs_custom_component_color_browser_snapshot_async() -> Bytes raise Error {
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::default_engine(
+      @ecs_custom_component_color.setup_engine,
+    ),
+  )
+}
+
+///|
+/// Implements `render_ecs_custom_component_color_browser_snapshot`.
+pub fn render_ecs_custom_component_color_browser_snapshot() -> @js_async.Promise[
+  Bytes,
+] {
+  @js_async.Promise::from_async(() => {
+    render_ecs_custom_component_color_browser_snapshot_async()
+  })
+}
+
+///|
 async fn render_ecs_mass_cubes_browser_snapshot_async() -> Bytes raise Error {
   render_browser_platform_sample(
     @app_browser.PlatformApp::new(

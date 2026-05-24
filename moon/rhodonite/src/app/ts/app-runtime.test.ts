@@ -684,10 +684,13 @@ describe("app-runtime Engine", () => {
 		const engine = await Engine.create(canvas, { mainScene: new Scene("test") });
 		engine.initialize();
 
-		const platform = startPlatform(engine);
+		const platform = await startPlatform(engine);
 		platform.dispose();
 		platform.dispose();
 
+		expect(
+			(engine.queue as unknown as FakeDevice["queue"]).onSubmittedWorkDoneCalls,
+		).toBe(0);
 		expect(cancel).toHaveBeenCalled();
 		expect(canvas.removeEventListener).toHaveBeenCalledWith(
 			"pointermove",
@@ -708,10 +711,13 @@ describe("app-runtime Engine", () => {
 		});
 		engine.initialize();
 
-		const platform = startPlatform(engine, PlatformOptions.singleFrame());
+		const platform = await startPlatform(engine, PlatformOptions.singleFrame());
 		platform.dispose();
 
 		expect(frames).toEqual([1]);
+		expect(
+			(engine.queue as unknown as FakeDevice["queue"]).onSubmittedWorkDoneCalls,
+		).toBe(1);
 		expect(callbacks).toHaveLength(0);
 		expect(canvas.addEventListener).not.toHaveBeenCalledWith(
 			"pointermove",

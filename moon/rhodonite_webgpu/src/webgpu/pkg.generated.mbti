@@ -92,6 +92,8 @@ pub fn webgpu_instance_process_events(GPUInstance) -> Unit
 
 pub fn webgpu_instance_release(GPUInstance) -> Unit
 
+pub async fn webgpu_queue_on_submitted_work_done(GPUQueue) -> Unit
+
 pub fn webgpu_queue_release(GPUQueue) -> Unit
 
 // Errors
@@ -234,6 +236,7 @@ pub(all) struct GPUQueue {
 }
 pub fn GPUQueue::drain_and_upload_camera_writes(Self, GPUBuffer, @ecs.World) -> Unit
 pub fn GPUQueue::drain_and_upload_global_transform_writes(Self, GPUBuffer, @ecs.World) -> Unit
+pub async fn GPUQueue::on_submitted_work_done(Self) -> Unit
 pub fn GPUQueue::release(Self) -> Unit
 pub fn GPUQueue::submit(Self, @webgpu_objects.GPUCommandBuffer) -> Unit
 pub fn GPUQueue::upload_camera_writes(Self, GPUBuffer, Array[@ecs.GpuWriteView]) -> Unit
