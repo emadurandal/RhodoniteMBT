@@ -2,7 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { GpuLayout, Query, RawQuery, World, WorldHistory, getF32 } from "./index.ts";
+import {
+	GpuLayout,
+	EntityId,
+	PhaseKey,
+	Query,
+	RawQuery,
+	System,
+	SystemContext,
+	SystemRunner,
+	World,
+	WorldHistory,
+	getF32,
+} from "./index.ts";
 
 function f32Bytes(values: number[], stride = values.length * 4): Uint8Array {
 	const bytes = new Uint8Array(stride);
@@ -270,6 +282,63 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.orbitCameraControllerComponent().index()).toBe(4);
 		expect(world.cameraHomeTransformComponent().index()).toBe(5);
 		expect(world.cameraLensComponent().index()).toBe(6);
+	});
+
+	it("runs TS systems with command-buffered component writes", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("TsSystemCpu", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+
+		const phase = PhaseKey.new("ts/update");
+		const ctx = SystemContext.new(0.016, 7);
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new("write-cpu", phase, [], [cpu], (systemWorld, systemCtx, commands) => {
+				expect(systemWorld.isAlive(entity)).toBe(true);
+				expect(systemCtx.deltaSeconds()).toBeCloseTo(0.016);
+				expect(systemCtx.frameIndex()).toBe(7);
+				expect(commands.isEmpty()).toBe(true);
+				commands.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0]));
+				expect(commands.len()).toBe(1);
+			}),
+		);
+
+		expect(runner.len()).toBe(1);
+		expect(runner.runPhase(world, ctx, phase)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
+	});
+
+	it("exposes structural TS systems and tracked system phases", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemCpu", 4);
+		const phase = PhaseKey.new("ts/tracked");
+		const runner = SystemRunner.new();
+		let createdIndex = -1;
+
+		runner.addSystem(
+			System.newWithStructuralWrite("spawn-cpu", phase, [], [cpu], (_world, _ctx, commands) => {
+				const entity = commands.createEntity();
+				createdIndex = entity.index();
+				commands.addComponentBytes(entity, cpu, new Uint8Array([4, 0, 0, 0]));
+			}),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 1),
+				phase,
+				"spawn from TS system",
+			),
+		).toBe(true);
+		const createdEntity = EntityId.new(createdIndex, 0);
+		const created = world.location(createdEntity);
+		expect(created).not.toBeNull();
+		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(createdEntity)).toBe(false);
 	});
 
 	it("tracks undo and redo through WorldHistory", () => {

@@ -12,6 +12,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonEntityLocation = { archetype_index: number; row: number };
 	export type MoonWorld = object;
 	export type MoonWorldHistory = object;
+	export type MoonPhaseKey = object;
+	export type MoonSystemContext = object;
+	export type MoonSystem = object;
+	export type MoonSystemRunner = object;
+	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
 	export type MoonPreparedQuery = object;
@@ -418,6 +423,107 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+
+	export function phase_key_new(name: string): MoonPhaseKey;
+	export function phase_key_name(phase: MoonPhaseKey): string;
+	export function system_context_new(
+		deltaSeconds: number,
+		frameIndex: number,
+	): MoonSystemContext;
+	export function system_context_delta_seconds(ctx: MoonSystemContext): number;
+	export function system_context_frame_index(ctx: MoonSystemContext): number;
+
+	export function command_buffer_len(commands: MoonCommandBuffer): number;
+	export function command_buffer_is_empty(commands: MoonCommandBuffer): MoonBool;
+	export function command_buffer_create_entity(
+		commands: MoonCommandBuffer,
+	): MoonEntityId;
+	export function command_buffer_destroy_entity(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+	): void;
+	export function command_buffer_add_component(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+	): void;
+	export function command_buffer_add_component_bytes(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+		bytes: Uint8Array | number[],
+	): void;
+	export function command_buffer_set_component_bytes(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+		bytes: Uint8Array | number[],
+	): void;
+	export function command_buffer_remove_component(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+	): void;
+
+	export function system_new(
+		name: string,
+		phase: MoonPhaseKey,
+		reads: MoonComponentTypeId[],
+		writes: MoonComponentTypeId[],
+		run: (
+			world: MoonWorld,
+			ctx: MoonSystemContext,
+			commands: MoonCommandBuffer,
+		) => void,
+	): MoonSystem;
+	export function system_new_with_structural_write(
+		name: string,
+		phase: MoonPhaseKey,
+		reads: MoonComponentTypeId[],
+		writes: MoonComponentTypeId[],
+		run: (
+			world: MoonWorld,
+			ctx: MoonSystemContext,
+			commands: MoonCommandBuffer,
+		) => void,
+	): MoonSystem;
+	export function system_name(system: MoonSystem): string;
+	export function system_phase(system: MoonSystem): MoonPhaseKey;
+	export function system_reads(system: MoonSystem): MoonComponentTypeId[];
+	export function system_writes(system: MoonSystem): MoonComponentTypeId[];
+	export function system_structural_write(system: MoonSystem): MoonBool;
+	export function system_conflicts_with(
+		system: MoonSystem,
+		other: MoonSystem,
+	): MoonBool;
+	export function transform_propagation_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+	): MoonSystem;
+
+	export function system_runner_new(): MoonSystemRunner;
+	export function system_runner_len(runner: MoonSystemRunner): number;
+	export function system_runner_add_system(
+		runner: MoonSystemRunner,
+		system: MoonSystem,
+	): void;
+	export function system_runner_has_parallel_access_conflicts(
+		runner: MoonSystemRunner,
+	): MoonBool;
+	export function system_runner_run_phase(
+		runner: MoonSystemRunner,
+		world: MoonWorld,
+		ctx: MoonSystemContext,
+		phase: MoonPhaseKey,
+	): MoonBool;
+	export function world_history_run_system_phase(
+		history: MoonWorldHistory,
+		runner: MoonSystemRunner,
+		world: MoonWorld,
+		ctx: MoonSystemContext,
+		phase: MoonPhaseKey,
+		label: string,
+	): MoonBool;
 
 	export function gpu_layout_empty(stride: number): MoonGpuLayout;
 	export function gpu_layout_transform3d(): MoonGpuLayout;

@@ -75,6 +75,7 @@ import {
 	world_history_redo_label,
 	world_history_redo_len,
 	world_history_remove_component,
+	world_history_run_system_phase,
 	world_history_set_child_of,
 	world_history_set_camera_matrices_col_major,
 	world_history_set_component_bytes,
@@ -92,6 +93,7 @@ import {
 	type EntityLocation,
 	RegisteredComponent,
 } from "./types.ts";
+import type { PhaseKey, SystemContext, SystemRunner } from "./system.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
 
 export class SpawnBatchRow {
@@ -685,6 +687,25 @@ export class WorldHistory {
 				aspect,
 				projectionKind,
 				flags,
+			),
+		);
+	}
+
+	runSystemPhase(
+		runner: SystemRunner,
+		world: World,
+		ctx: SystemContext,
+		phase: PhaseKey,
+		label: string,
+	): boolean {
+		return moonBool(
+			world_history_run_system_phase(
+				this.inner,
+				runner.inner,
+				world.inner,
+				ctx.inner,
+				phase.inner,
+				label,
 			),
 		);
 	}

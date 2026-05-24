@@ -951,6 +951,232 @@ pub fn raw_query_archetype_write_column(
 }
 
 ///|
+/// Implements `phase_key_new`.
+pub fn phase_key_new(name : String) -> @ecs.PhaseKey {
+  @ecs.PhaseKey::new(name)
+}
+
+///|
+/// Implements `phase_key_name`.
+pub fn phase_key_name(phase : @ecs.PhaseKey) -> String {
+  phase.name()
+}
+
+///|
+/// Implements `system_context_new`.
+pub fn system_context_new(
+  delta_seconds : Float,
+  frame_index : Int,
+) -> @ecs.SystemContext {
+  @ecs.SystemContext::new(delta_seconds, frame_index)
+}
+
+///|
+/// Implements `system_context_delta_seconds`.
+pub fn system_context_delta_seconds(ctx : @ecs.SystemContext) -> Float {
+  ctx.delta_seconds
+}
+
+///|
+/// Implements `system_context_frame_index`.
+pub fn system_context_frame_index(ctx : @ecs.SystemContext) -> Int {
+  ctx.frame_index
+}
+
+///|
+/// Implements `command_buffer_len`.
+pub fn command_buffer_len(commands : @ecs.CommandBuffer) -> Int {
+  commands.len()
+}
+
+///|
+/// Implements `command_buffer_is_empty`.
+pub fn command_buffer_is_empty(commands : @ecs.CommandBuffer) -> Bool {
+  commands.is_empty()
+}
+
+///|
+/// Implements `command_buffer_create_entity`.
+pub fn command_buffer_create_entity(
+  commands : @ecs.CommandBuffer,
+) -> @ecs.EntityId {
+  commands.create_entity()
+}
+
+///|
+/// Implements `command_buffer_destroy_entity`.
+pub fn command_buffer_destroy_entity(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+) -> Unit {
+  commands.destroy_entity(entity)
+}
+
+///|
+/// Implements `command_buffer_add_component`.
+pub fn command_buffer_add_component(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+) -> Unit {
+  commands.add_component(entity, component)
+}
+
+///|
+/// Implements `command_buffer_add_component_bytes`.
+pub fn command_buffer_add_component_bytes(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Unit {
+  commands.add_component_bytes(entity, component, bytes)
+}
+
+///|
+/// Implements `command_buffer_set_component_bytes`.
+pub fn command_buffer_set_component_bytes(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Unit {
+  commands.set_component_bytes(entity, component, bytes)
+}
+
+///|
+/// Implements `command_buffer_remove_component`.
+pub fn command_buffer_remove_component(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+) -> Unit {
+  commands.remove_component(entity, component)
+}
+
+///|
+/// Wraps a JS callback into an ECS system.
+pub fn system_new(
+  name : String,
+  phase : @ecs.PhaseKey,
+  reads : Array[@ecs.ComponentTypeId],
+  writes : Array[@ecs.ComponentTypeId],
+  run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
+) -> @ecs.System {
+  @ecs.System::new(name, phase, reads, writes, run)
+}
+
+///|
+/// Wraps a JS callback into an ECS system that may queue structural changes.
+pub fn system_new_with_structural_write(
+  name : String,
+  phase : @ecs.PhaseKey,
+  reads : Array[@ecs.ComponentTypeId],
+  writes : Array[@ecs.ComponentTypeId],
+  run : (@ecs.World, @ecs.SystemContext, @ecs.CommandBuffer) -> Unit,
+) -> @ecs.System {
+  @ecs.System::new_with_structural_write(name, phase, reads, writes, run)
+}
+
+///|
+/// Implements `system_name`.
+pub fn system_name(system : @ecs.System) -> String {
+  system.name()
+}
+
+///|
+/// Implements `system_phase`.
+pub fn system_phase(system : @ecs.System) -> @ecs.PhaseKey {
+  system.phase()
+}
+
+///|
+/// Implements `system_reads`.
+pub fn system_reads(system : @ecs.System) -> Array[@ecs.ComponentTypeId] {
+  system.reads()
+}
+
+///|
+/// Implements `system_writes`.
+pub fn system_writes(system : @ecs.System) -> Array[@ecs.ComponentTypeId] {
+  system.writes()
+}
+
+///|
+/// Implements `system_structural_write`.
+pub fn system_structural_write(system : @ecs.System) -> Bool {
+  system.structural_write()
+}
+
+///|
+/// Implements `system_conflicts_with`.
+pub fn system_conflicts_with(system : @ecs.System, other : @ecs.System) -> Bool {
+  system.conflicts_with(other)
+}
+
+///|
+/// Implements `transform_propagation_system`.
+pub fn transform_propagation_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+) -> @ecs.System {
+  @ecs.transform_propagation_system(world, phase)
+}
+
+///|
+/// Implements `system_runner_new`.
+pub fn system_runner_new() -> @ecs.SystemRunner {
+  @ecs.SystemRunner::new()
+}
+
+///|
+/// Implements `system_runner_len`.
+pub fn system_runner_len(runner : @ecs.SystemRunner) -> Int {
+  runner.len()
+}
+
+///|
+/// Implements `system_runner_add_system`.
+pub fn system_runner_add_system(
+  runner : @ecs.SystemRunner,
+  system : @ecs.System,
+) -> Unit {
+  runner.add_system(system)
+}
+
+///|
+/// Implements `system_runner_has_parallel_access_conflicts`.
+pub fn system_runner_has_parallel_access_conflicts(
+  runner : @ecs.SystemRunner,
+) -> Bool {
+  runner.has_parallel_access_conflicts()
+}
+
+///|
+/// Implements `system_runner_run_phase`.
+pub fn system_runner_run_phase(
+  runner : @ecs.SystemRunner,
+  world : @ecs.World,
+  ctx : @ecs.SystemContext,
+  phase : @ecs.PhaseKey,
+) -> Bool {
+  runner.run_phase(world, ctx, phase)
+}
+
+///|
+/// Implements `world_history_run_system_phase`.
+pub fn world_history_run_system_phase(
+  history : @ecs.WorldHistory,
+  runner : @ecs.SystemRunner,
+  world : @ecs.World,
+  ctx : @ecs.SystemContext,
+  phase : @ecs.PhaseKey,
+  label : String,
+) -> Bool {
+  history.run_system_phase(runner, world, ctx, phase, label)
+}
+
+///|
 /// Implements `gpu_layout_empty`.
 pub fn gpu_layout_empty(stride : Int) -> @comp.GpuLayout {
   @comp.GpuLayout::empty(stride)
