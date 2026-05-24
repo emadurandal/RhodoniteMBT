@@ -15,6 +15,7 @@
         <p class="nav-section">Documents</p>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
         <a href="./ecs.html">ECS</a>
         <a href="./input-architecture.html">Input</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
@@ -80,12 +81,23 @@ flowchart LR
           <pre><code class="language-bash">pnpm run publish:moon
 PUBLISH_MOON_DOWNSTREAM_ONLY=1 pnpm run publish:moon
 PUBLISH_MOON_APP_SDL3_ONLY=1 pnpm run publish:moon</code></pre>
+          <p><code>emadurandal/rhodonite_examples</code> is repository-only and is not published by the script.</p>
 
           <h2>npm Package</h2>
           <p><a href="../../packages/rhodonite-mbt/"><code>packages/rhodonite-mbt</code></a> is an ESM-only npm package. It exports root, <code>./math</code>, <code>./ecs</code>, and <code>./app</code>. It bundles TypeScript wrappers plus the MoonBit JS bridge, not examples or SDL3 native runtime code.</p>
           <pre><code class="language-bash">pnpm run build:npm
 pnpm run pack:npm
 pnpm run publish:npm</code></pre>
+
+          <h2>Development Checklist</h2>
+          <pre><code class="language-bash">moon update
+moon check --target all
+moon info
+moon fmt
+pnpm run test:core:mbt
+pnpm run test:core:js
+pnpm run test:app:ts</code></pre>
+          <p>For rendering-affecting changes, also run <code>pnpm run test:examples:visual</code>.</p>
         </article>
       </main>
     </div>

@@ -15,6 +15,7 @@
         <p class="nav-section">Documents</p>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
         <a href="./ecs.html">ECS</a>
         <a href="./input-architecture.html">入力</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
@@ -98,16 +99,8 @@ flowchart LR
           </div>
           <p>各 surface は surface-local <code>InputState</code> と <code>RenderTargetResources</code> を持ちます。canvas/window A の pointer event は B の camera/controller に影響しません。</p>
 
-          <h2>Renderer v1</h2>
-          <p><code>Renderer</code> は現在 intentionally narrow な engine-owned renderer です。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して、caller-supplied <code>RenderTargetResources</code> へ unlit static indexed mesh を描画します。</p>
-          <ul>
-            <li>handles: <code>MeshHandle</code>、<code>MaterialHandle</code>、<code>InstanceBufferHandle</code></li>
-            <li>components: <code>RenderableDesc</code>、<code>RenderableFlags</code>。Renderable component id は <code>Scene</code> が内部で登録・所有する。</li>
-            <li>primitive descriptors: <code>StaticIndexedMeshDesc</code>、<code>CubeMeshDesc</code>、<code>cube_mesh_desc</code></li>
-            <li>resources: <code>register_static_indexed_mesh_desc</code>、<code>register_cube_mesh</code>、<code>register_unlit_material</code>、<code>register_static_instance_buffer</code></li>
-            <li>draw paths: <code>render_scene_renderables(scene, target, view)</code> と MassCubes 用の <code>render_instanced_mesh(scene, mesh, instances, count, target, view)</code></li>
-          </ul>
-          <p>Texture、skinning、transparent sorting、shadow、LOD はまだ v1 renderer の責務ではありません。</p>
+          <h2>Rendering</h2>
+          <p><code>Engine</code> は標準 <code>Renderer</code> を所有し、scene は renderer path が消費する ECS data を提供します。Renderer、Renderable、resource registration、draw path の詳細は <a href="./rendering.html">Rendering Architecture</a> に分けています。</p>
 
           <h2>Platform Runners</h2>
           <table>
