@@ -79,6 +79,7 @@ test "WorldHistory failed undo validation keeps stacks and world unchanged" {
   )
   assert_true(world.destroy_entity(entity))
   assert_true(!history.undo(world))
+  assert_eq(history.last_diagnostic(), "validation_failed")
   assert_eq(history.undo_len(), 1)
   assert_eq(history.redo_len(), 0)
   assert_true(!world.is_alive(entity))
@@ -97,6 +98,7 @@ test "WorldHistory failed redo validation keeps stacks and world unchanged" {
   assert_true(history.undo(world))
   assert_true(world.remove_component(entity, component))
   assert_true(!history.redo(world))
+  assert_eq(history.last_diagnostic(), "validation_failed")
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 1)
   assert_true(!world.has_component(entity, component))
@@ -112,6 +114,7 @@ test "WorldHistory failed redo validation rejects stale created entity generatio
   assert_eq(replacement.index, entity.index)
   assert_true(world.destroy_entity(replacement))
   assert_true(!history.redo(world))
+  assert_eq(history.last_diagnostic(), "validation_failed")
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 1)
   assert_true(!world.is_alive(entity))
@@ -369,21 +372,78 @@ test "WorldHistory exposes default record limit and stack lengths" {
   let history = WorldHistory::new()
   let component = world.register_cpu_component("HistoryLengths", 4)
   let entity = world.create_entity()
+  assert_eq(history.last_diagnostic(), "none")
   assert_eq(history.max_undo_records(), 100)
+  assert_eq(history.max_undo_bytes(), 0)
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 0)
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
     history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
   )
+  assert_eq(history.last_diagnostic(), "none")
   assert_eq(history.undo_len(), 1)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 0)
   assert_true(history.undo(world))
+  assert_eq(history.last_diagnostic(), "none")
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 1)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 8)
   assert_true(history.redo(world))
+  assert_eq(history.last_diagnostic(), "none")
   assert_eq(history.undo_len(), 1)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 0)
+}
+
+///|
+test "WorldHistory records diagnostics for common failure paths" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryDiagnostics", 4)
+  let entity = world.create_entity()
+  assert_true(!history.undo(world))
+  assert_eq(history.last_diagnostic(), "empty_undo_stack")
+  assert_true(!history.redo(world))
+  assert_eq(history.last_diagnostic(), "empty_redo_stack")
+  assert_true(!history.commit_transaction())
+  assert_eq(history.last_diagnostic(), "no_open_transaction")
+  assert_true(!history.cancel_transaction())
+  assert_eq(history.last_diagnostic(), "no_open_transaction")
+  assert_true(history.begin_transaction("open"))
+  assert_eq(history.last_diagnostic(), "none")
+  assert_true(!history.undo(world))
+  assert_eq(history.last_diagnostic(), "transaction_open")
+  assert_true(history.commit_transaction())
+  assert_eq(history.last_diagnostic(), "transaction_empty")
+  assert_true(
+    !history.set_component_bytes(world, entity, component, bytes4(1, 0, 0, 0)),
+  )
+  assert_eq(history.last_diagnostic(), "operation_failed")
+}
+
+///|
+test "WorldHistory records diagnostics for disabled recording delegates" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryDelegateDiagnostics", 4)
+  let entity = world.create_entity()
+  history.set_enabled(false)
+  assert_eq(history.last_diagnostic(), "none")
+  assert_true(
+    history.add_component_bytes(world, entity, component, bytes4(1, 0, 0, 0)),
+  )
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_eq(history.last_diagnostic(), "recording_disabled")
 }
 
 ///|
@@ -405,7 +465,9 @@ test "WorldHistory trims old undo records to max_undo_records" {
     history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
   )
   assert_eq(history.undo_len(), 2)
+  assert_eq(history.last_diagnostic(), "stack_trimmed_record_limit")
   assert_true(history.undo(world))
+  assert_eq(history.last_diagnostic(), "none")
   match world.component_bytes(entity, component) {
     Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
     None => abort("expected value after first limited undo")
@@ -416,6 +478,105 @@ test "WorldHistory trims old undo records to max_undo_records" {
     None => abort("expected value after second limited undo")
   }
   assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory trims old records to max_undo_bytes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryByteLimit", 4)
+  let entity = world.create_entity()
+  history.set_max_undo_bytes(16)
+  assert_eq(history.max_undo_bytes(), 16)
+  assert_eq(history.last_diagnostic(), "none")
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 2)
+  assert_eq(history.undo_bytes(), 16)
+  assert_eq(history.last_diagnostic(), "stack_trimmed_byte_limit")
+  assert_true(history.undo(world))
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.redo_bytes(), 8)
+  assert_eq(history.last_diagnostic(), "none")
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after byte limited undo")
+  }
+  assert_true(history.undo(world))
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.redo_bytes(), 16)
+  assert_eq(history.last_diagnostic(), "none")
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(2, 0, 0, 0))
+    None => abort("expected value after second byte limited undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory trims existing stacks when max_undo_bytes is lowered" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLowerByteLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 3)
+  history.set_max_undo_bytes(8)
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 8)
+  assert_eq(history.last_diagnostic(), "stack_trimmed_byte_limit")
+  assert_true(history.undo(world))
+  assert_eq(history.last_diagnostic(), "none")
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after lowered byte-limit undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory drops oversize record while keeping mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryOversizeByteLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_eq(history.redo_len(), 1)
+  history.set_max_undo_bytes(4)
+  assert_eq(history.redo_len(), 0)
+  assert_eq(history.last_diagnostic(), "stack_trimmed_byte_limit")
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.last_diagnostic(), "record_dropped_byte_limit")
+  assert_true(!history.can_undo())
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected oversize mutation to remain applied")
+  }
 }
 
 ///|
@@ -459,10 +620,13 @@ test "WorldHistory max_undo_records zero clears and keeps future changes unrecor
   assert_eq(history.max_undo_records(), 0)
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 0)
+  assert_eq(history.last_diagnostic(), "stack_trimmed_record_limit")
   assert_true(!history.begin_transaction("disabled-by-limit"))
+  assert_eq(history.last_diagnostic(), "recording_disabled")
   assert_true(
     history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
   )
+  assert_eq(history.last_diagnostic(), "recording_disabled")
   assert_eq(history.undo_len(), 0)
   assert_true(!history.can_undo())
   match world.component_bytes(entity, component) {

@@ -68,10 +68,13 @@ import {
 	world_history_create_entity,
 	world_history_destroy_entity,
 	world_history_enabled,
+	world_history_last_diagnostic,
+	world_history_max_undo_bytes,
 	world_history_max_undo_records,
 	world_history_new,
 	world_history_raw_mutation_guard_enabled,
 	world_history_redo,
+	world_history_redo_bytes,
 	world_history_redo_label,
 	world_history_redo_len,
 	world_history_remove_component,
@@ -81,10 +84,12 @@ import {
 	world_history_set_component_bytes,
 	world_history_set_component_bytes_many,
 	world_history_set_enabled,
+	world_history_set_max_undo_bytes,
 	world_history_set_max_undo_records,
 	world_history_set_raw_mutation_guard_enabled,
 	world_history_set_transform_trs,
 	world_history_undo,
+	world_history_undo_bytes,
 	world_history_undo_label,
 	world_history_undo_len,
 } from "@moon/rhodonite_core/ecs/js_bridge";
@@ -489,8 +494,16 @@ export class WorldHistory {
 		return world_history_max_undo_records(this.inner);
 	}
 
+	maxUndoBytes(): number {
+		return world_history_max_undo_bytes(this.inner);
+	}
+
 	setMaxUndoRecords(limit: number): void {
 		world_history_set_max_undo_records(this.inner, limit);
+	}
+
+	setMaxUndoBytes(limit: number): void {
+		world_history_set_max_undo_bytes(this.inner, limit);
 	}
 
 	clear(): void {
@@ -503,6 +516,18 @@ export class WorldHistory {
 
 	redoLen(): number {
 		return world_history_redo_len(this.inner);
+	}
+
+	undoBytes(): number {
+		return world_history_undo_bytes(this.inner);
+	}
+
+	redoBytes(): number {
+		return world_history_redo_bytes(this.inner);
+	}
+
+	lastDiagnostic(): string {
+		return world_history_last_diagnostic(this.inner);
 	}
 
 	undoLabel(): string | null {

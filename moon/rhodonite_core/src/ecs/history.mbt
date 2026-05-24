@@ -39,10 +39,18 @@ priv struct WorldHistoryRecord {
 }
 
 ///|
+/// Whether applying stack limits dropped at least one retained record.
+priv struct HistoryTrimResult {
+  record_limit : Bool
+  byte_limit : Bool
+}
+
+///|
 /// Optional tracked transaction layer for reversible [`World`] mutations.
 pub struct WorldHistory {
   priv mut enabled : Bool
   priv mut max_undo_records : Int
+  priv mut max_undo_bytes : Int
   priv mut open : Bool
   priv mut applying : Bool
   priv mut current_label : String
@@ -51,6 +59,7 @@ pub struct WorldHistory {
   priv redo_stack : Array[WorldHistoryRecord]
   priv mut raw_mutation_guard_enabled : Bool
   priv mut guarded_world : World?
+  priv mut last_diagnostic : String
 }
 
 ///|
@@ -60,22 +69,173 @@ fn default_max_undo_records() -> Int {
 }
 
 ///|
+/// Default payload byte budget for a new history; zero means unlimited.
+fn default_max_undo_bytes() -> Int {
+  0
+}
+
+///|
+/// Diagnostic code for normal history operation results.
+fn history_diagnostic_none() -> String {
+  "none"
+}
+
+///|
+/// Converts a stack-trim result to the public diagnostic code.
+fn history_trim_result_diagnostic(result : HistoryTrimResult) -> String {
+  if result.record_limit && result.byte_limit {
+    "stack_trimmed_limits"
+  } else if result.record_limit {
+    "stack_trimmed_record_limit"
+  } else if result.byte_limit {
+    "stack_trimmed_byte_limit"
+  } else {
+    history_diagnostic_none()
+  }
+}
+
+///|
+/// Returns the captured payload byte count for one entity snapshot.
+fn entity_snapshot_payload_bytes(snapshot : EntitySnapshot) -> Int {
+  let mut total = 0
+  for i = 0; i < snapshot.components.length(); i = i + 1 {
+    total = total + snapshot.components[i].bytes.length()
+  }
+  total
+}
+
+///|
+/// Returns the captured payload byte count for one delta.
+fn world_delta_payload_bytes(delta : WorldDelta) -> Int {
+  match delta {
+    EntityCreated(_) => 0
+    EntityDestroyed(snapshot) => entity_snapshot_payload_bytes(snapshot)
+    ComponentAdded(_, _, bytes) => bytes.length()
+    ComponentRemoved(_, _, bytes) => bytes.length()
+    ComponentChanged(_, _, before, after) => before.length() + after.length()
+    CameraChanged(_, before, after) =>
+      match before {
+        Some(bytes) => bytes.length() + after.length()
+        None => after.length()
+      }
+  }
+}
+
+///|
+/// Returns the captured payload byte count for one committed history record.
+fn world_history_record_payload_bytes(record : WorldHistoryRecord) -> Int {
+  let mut total = 0
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    total = total + world_delta_payload_bytes(record.deltas[i])
+  }
+  total
+}
+
+///|
+/// Returns the captured payload byte count for a history stack.
+fn world_history_stack_payload_bytes(
+  records : Array[WorldHistoryRecord],
+) -> Int {
+  let mut total = 0
+  for i = 0; i < records.length(); i = i + 1 {
+    total = total + world_history_record_payload_bytes(records[i])
+  }
+  total
+}
+
+///|
+/// Drops `count` oldest records from a history stack.
+fn drop_oldest_history_records(
+  records : Array[WorldHistoryRecord],
+  count : Int,
+) -> Bool {
+  if count <= 0 || records.length() == 0 {
+    return false
+  }
+  if count >= records.length() {
+    records.clear()
+    return true
+  }
+  let keep = records.length() - count
+  for i = 0; i < keep; i = i + 1 {
+    records[i] = records[i + count]
+  }
+  for i = 0; i < count; i = i + 1 {
+    let _ = records.pop()
+  }
+  true
+}
+
+///|
+/// Counts oldest records that must be dropped to satisfy a byte limit.
+fn history_byte_trim_drop_count(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Int {
+  if limit <= 0 {
+    return 0
+  }
+  let mut total = 0
+  let sizes : Array[Int] = []
+  for i = 0; i < records.length(); i = i + 1 {
+    let size = world_history_record_payload_bytes(records[i])
+    sizes.push(size)
+    total = total + size
+  }
+  let mut drop_count = 0
+  while drop_count < sizes.length() && total > limit {
+    total = total - sizes[drop_count]
+    drop_count = drop_count + 1
+  }
+  drop_count
+}
+
+///|
+/// Drops oldest records until `count` records remain.
+fn trim_history_stack_to_record_count(
+  records : Array[WorldHistoryRecord],
+  count : Int,
+) -> Bool {
+  if count <= 0 {
+    let trimmed = records.length() > 0
+    records.clear()
+    return trimmed
+  }
+  if records.length() <= count {
+    return false
+  }
+  drop_oldest_history_records(records, records.length() - count)
+}
+
+///|
+/// Drops oldest records until retained payload bytes fit `limit`.
+fn trim_history_stack_to_payload_bytes(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Bool {
+  if limit <= 0 {
+    return false
+  }
+  let drop_count = history_byte_trim_drop_count(records, limit)
+  drop_oldest_history_records(records, drop_count)
+}
+
+///|
 /// Drops the oldest records until the stack fits `limit`.
 fn trim_history_stack_to_limit(
   records : Array[WorldHistoryRecord],
   limit : Int,
-) -> Unit {
-  if limit <= 0 {
-    records.clear()
-    return
-  }
-  while records.length() > limit {
-    let last = records.length() - 1
-    for i = 0; i < last; i = i + 1 {
-      records[i] = records[i + 1]
-    }
-    let _ = records.pop()
-  }
+) -> Bool {
+  trim_history_stack_to_record_count(records, limit)
+}
+
+///|
+/// Drops the oldest records until the stack fits the configured byte budget.
+fn trim_history_stack_to_byte_limit(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Bool {
+  trim_history_stack_to_payload_bytes(records, limit)
 }
 
 ///|
@@ -85,10 +245,72 @@ fn WorldHistory::recording_enabled(self : WorldHistory) -> Bool {
 }
 
 ///|
-/// Trims undo and redo stacks to the configured record limit.
-fn WorldHistory::trim_stacks_to_limit(self : WorldHistory) -> Unit {
-  trim_history_stack_to_limit(self.undo_stack, self.max_undo_records)
-  trim_history_stack_to_limit(self.redo_stack, self.max_undo_records)
+/// Trims undo and redo stacks to the configured limits.
+fn WorldHistory::trim_stacks_to_limit(self : WorldHistory) -> HistoryTrimResult {
+  let undo_record_trimmed = trim_history_stack_to_limit(
+    self.undo_stack,
+    self.max_undo_records,
+  )
+  let redo_record_trimmed = trim_history_stack_to_limit(
+    self.redo_stack,
+    self.max_undo_records,
+  )
+  let undo_byte_trimmed = trim_history_stack_to_byte_limit(
+    self.undo_stack,
+    self.max_undo_bytes,
+  )
+  let redo_byte_trimmed = trim_history_stack_to_byte_limit(
+    self.redo_stack,
+    self.max_undo_bytes,
+  )
+  let record_trimmed = undo_record_trimmed || redo_record_trimmed
+  let byte_trimmed = undo_byte_trimmed || redo_byte_trimmed
+  { record_limit: record_trimmed, byte_limit: byte_trimmed }
+}
+
+///|
+/// Reports whether `record` can be retained under the configured byte budget.
+fn WorldHistory::record_fits_byte_limit(
+  self : WorldHistory,
+  record : WorldHistoryRecord,
+) -> Bool {
+  self.max_undo_bytes <= 0 ||
+  world_history_record_payload_bytes(record) <= self.max_undo_bytes
+}
+
+///|
+/// Stores the last public diagnostic code for this history.
+fn WorldHistory::set_diagnostic(self : WorldHistory, code : String) -> Unit {
+  self.last_diagnostic = code
+}
+
+///|
+/// Clears the last public diagnostic code after a normal result.
+fn WorldHistory::clear_diagnostic(self : WorldHistory) -> Unit {
+  self.last_diagnostic = history_diagnostic_none()
+}
+
+///|
+/// Stores the diagnostic represented by a trim result.
+fn WorldHistory::set_trim_diagnostic(
+  self : WorldHistory,
+  result : HistoryTrimResult,
+) -> Unit {
+  self.set_diagnostic(history_trim_result_diagnostic(result))
+}
+
+///|
+/// Stores the diagnostic for a delegated raw mutation result.
+fn WorldHistory::set_delegate_diagnostic(
+  self : WorldHistory,
+  ok : Bool,
+  reason : String,
+) -> Unit {
+  if ok {
+    self.set_diagnostic(reason)
+  } else {
+    self.set_diagnostic("operation_failed")
+  }
 }
 
 ///|
@@ -854,6 +1076,7 @@ pub fn WorldHistory::new() -> WorldHistory {
   {
     enabled: true,
     max_undo_records: default_max_undo_records(),
+    max_undo_bytes: default_max_undo_bytes(),
     open: false,
     applying: false,
     current_label: "",
@@ -862,6 +1085,7 @@ pub fn WorldHistory::new() -> WorldHistory {
     redo_stack: [],
     raw_mutation_guard_enabled: false,
     guarded_world: None,
+    last_diagnostic: history_diagnostic_none(),
   }
 }
 
@@ -878,6 +1102,18 @@ pub fn WorldHistory::max_undo_records(self : WorldHistory) -> Int {
 }
 
 ///|
+/// Returns the maximum retained undo payload bytes; zero means unlimited.
+pub fn WorldHistory::max_undo_bytes(self : WorldHistory) -> Int {
+  self.max_undo_bytes
+}
+
+///|
+/// Returns the diagnostic code from the most recent history operation.
+pub fn WorldHistory::last_diagnostic(self : WorldHistory) -> String {
+  self.last_diagnostic
+}
+
+///|
 /// Sets the maximum number of undo records; zero clears history and disables recording.
 pub fn WorldHistory::set_max_undo_records(
   self : WorldHistory,
@@ -888,10 +1124,28 @@ pub fn WorldHistory::set_max_undo_records(
   }
   self.max_undo_records = limit
   if limit == 0 {
+    let had_records = self.undo_stack.length() > 0 ||
+      self.redo_stack.length() > 0
     self.clear()
+    if had_records {
+      self.set_diagnostic("stack_trimmed_record_limit")
+    }
   } else {
-    self.trim_stacks_to_limit()
+    self.set_trim_diagnostic(self.trim_stacks_to_limit())
   }
+}
+
+///|
+/// Sets the maximum retained undo payload bytes; zero means unlimited.
+pub fn WorldHistory::set_max_undo_bytes(
+  self : WorldHistory,
+  limit : Int,
+) -> Unit {
+  if limit < 0 {
+    abort("WorldHistory::set_max_undo_bytes: limit must be non-negative")
+  }
+  self.max_undo_bytes = limit
+  self.set_trim_diagnostic(self.trim_stacks_to_limit())
 }
 
 ///|
@@ -919,6 +1173,7 @@ pub fn WorldHistory::set_raw_mutation_guard_enabled(
 /// Enables or disables tracking; disabling clears all existing history.
 pub fn WorldHistory::set_enabled(self : WorldHistory, enabled : Bool) -> Unit {
   if self.enabled == enabled {
+    self.clear_diagnostic()
     return
   }
   self.enabled = enabled
@@ -931,6 +1186,7 @@ pub fn WorldHistory::clear(self : WorldHistory) -> Unit {
   self.undo_stack.clear()
   self.redo_stack.clear()
   self.clear_current()
+  self.clear_diagnostic()
 }
 
 ///|
@@ -943,6 +1199,18 @@ pub fn WorldHistory::undo_len(self : WorldHistory) -> Int {
 /// Returns the number of committed redo records currently retained.
 pub fn WorldHistory::redo_len(self : WorldHistory) -> Int {
   self.redo_stack.length()
+}
+
+///|
+/// Returns the payload bytes currently retained on the undo stack.
+pub fn WorldHistory::undo_bytes(self : WorldHistory) -> Int {
+  world_history_stack_payload_bytes(self.undo_stack)
+}
+
+///|
+/// Returns the payload bytes currently retained on the redo stack.
+pub fn WorldHistory::redo_bytes(self : WorldHistory) -> Int {
+  world_history_stack_payload_bytes(self.redo_stack)
 }
 
 ///|
@@ -969,12 +1237,22 @@ pub fn WorldHistory::begin_transaction(
   self : WorldHistory,
   label : String,
 ) -> Bool {
-  if !self.recording_enabled() || self.open || self.applying {
+  if !self.recording_enabled() {
+    self.set_diagnostic("recording_disabled")
+    return false
+  }
+  if self.open {
+    self.set_diagnostic("transaction_open")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
     return false
   }
   self.open = true
   self.current_label = label
   self.current_deltas = []
+  self.clear_diagnostic()
   true
 }
 
@@ -995,16 +1273,30 @@ pub fn WorldHistory::begin_guarded_transaction(
 ///|
 /// Commits the active transaction and clears redo history.
 pub fn WorldHistory::commit_transaction(self : WorldHistory) -> Bool {
-  if !self.recording_enabled() || !self.open || self.applying {
+  if !self.recording_enabled() {
+    self.set_diagnostic("recording_disabled")
+    return false
+  }
+  if !self.open {
+    self.set_diagnostic("no_open_transaction")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
     return false
   }
   if self.current_deltas.length() > 0 {
-    self.undo_stack.push({
-      label: self.current_label,
-      deltas: self.current_deltas,
-    })
-    self.trim_stacks_to_limit()
-    self.redo_stack.clear()
+    let record = { label: self.current_label, deltas: self.current_deltas }
+    if self.record_fits_byte_limit(record) {
+      self.undo_stack.push(record)
+      self.redo_stack.clear()
+      self.set_trim_diagnostic(self.trim_stacks_to_limit())
+    } else {
+      self.redo_stack.clear()
+      self.set_diagnostic("record_dropped_byte_limit")
+    }
+  } else {
+    self.set_diagnostic("transaction_empty")
   }
   self.clear_current()
   true
@@ -1013,10 +1305,16 @@ pub fn WorldHistory::commit_transaction(self : WorldHistory) -> Bool {
 ///|
 /// Cancels the active transaction without reverting already-applied world changes.
 pub fn WorldHistory::cancel_transaction(self : WorldHistory) -> Bool {
-  if !self.open || self.applying {
+  if !self.open {
+    self.set_diagnostic("no_open_transaction")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
     return false
   }
   self.clear_current()
+  self.clear_diagnostic()
   true
 }
 
@@ -1050,12 +1348,18 @@ fn WorldHistory::finish_auto(
   ok : Bool,
 ) -> Unit {
   if !auto {
+    if ok {
+      self.clear_diagnostic()
+    } else {
+      self.set_diagnostic("operation_failed")
+    }
     return
   }
   if ok {
     ignore(self.commit_transaction())
   } else {
     ignore(self.cancel_transaction())
+    self.set_diagnostic("operation_failed")
   }
 }
 
@@ -1101,7 +1405,16 @@ fn WorldHistory::finalize_reserved_entity(
   entity : EntityId,
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.finalize_reserved_entity(entity)
+    let ok = world.finalize_reserved_entity(entity)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   let auto = self.begin_auto("finalize_reserved_entity")
   self.begin_tracked_world_mutation(world)
@@ -1121,7 +1434,15 @@ pub fn WorldHistory::create_entity(
   world : World,
 ) -> EntityId {
   if !self.recording_enabled() || self.applying {
-    return world.create_entity()
+    let entity = world.create_entity()
+    self.set_diagnostic(
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return entity
   }
   let auto = self.begin_auto("create_entity")
   self.begin_tracked_world_mutation(world)
@@ -1140,11 +1461,23 @@ pub fn WorldHistory::destroy_entity(
   entity : EntityId,
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.destroy_entity(entity)
+    let ok = world.destroy_entity(entity)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   let snapshot = match world.entity_snapshot(entity) {
     Some(snapshot) => snapshot
-    None => return false
+    None => {
+      self.set_diagnostic("operation_failed")
+      return false
+    }
   }
   let auto = self.begin_auto("destroy_entity")
   self.begin_tracked_world_mutation(world)
@@ -1166,9 +1499,19 @@ pub fn WorldHistory::add_component(
   component : ComponentTypeId,
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.add_component(entity, component)
+    let ok = world.add_component(entity, component)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   if world.has_component(entity, component) {
+    self.set_diagnostic("operation_failed")
     return false
   }
   let auto = self.begin_auto("add_component")
@@ -1195,9 +1538,19 @@ pub fn WorldHistory::add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.add_component_bytes(entity, component, bytes)
+    let ok = world.add_component_bytes(entity, component, bytes)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   if world.has_component(entity, component) {
+    self.set_diagnostic("operation_failed")
     return false
   }
   let auto = self.begin_auto("add_component_bytes")
@@ -1226,11 +1579,23 @@ pub fn WorldHistory::set_component_bytes(
   if !self.recording_enabled() ||
     self.applying ||
     world.history_blob_ref_component(component) {
-    return world.set_component_bytes(entity, component, bytes)
+    let ok = world.set_component_bytes(entity, component, bytes)
+    let reason = if !self.recording_enabled() {
+      "recording_disabled"
+    } else if self.applying {
+      "applying"
+    } else {
+      history_diagnostic_none()
+    }
+    self.set_delegate_diagnostic(ok, reason)
+    return ok
   }
   let before = match world.component_bytes(entity, component) {
     Some(before) => before
-    None => return false
+    None => {
+      self.set_diagnostic("operation_failed")
+      return false
+    }
   }
   let auto = self.begin_auto("set_component_bytes")
   self.begin_tracked_world_mutation(world)
@@ -1270,15 +1635,27 @@ pub fn WorldHistory::set_component_bytes_many(
         ok = false
       }
     }
+    let reason = if !self.recording_enabled() {
+      "recording_disabled"
+    } else if self.applying {
+      "applying"
+    } else {
+      history_diagnostic_none()
+    }
+    self.set_delegate_diagnostic(ok, reason)
     return ok
   }
   let before_list : Array[FixedArray[Byte]] = []
   for i = 0; i < entities.length(); i = i + 1 {
     let before = match world.component_bytes(entities[i], component) {
       Some(bytes) => bytes
-      None => return false
+      None => {
+        self.set_diagnostic("operation_failed")
+        return false
+      }
     }
     if before.length() != bytes_list[i].length() {
+      self.set_diagnostic("operation_failed")
       return false
     }
     before_list.push(before)
@@ -1326,11 +1703,23 @@ pub fn WorldHistory::remove_component(
   component : ComponentTypeId,
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.remove_component(entity, component)
+    let ok = world.remove_component(entity, component)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   let before = match world.component_bytes(entity, component) {
     Some(before) => before
-    None => return false
+    None => {
+      self.set_diagnostic("operation_failed")
+      return false
+    }
   }
   let auto = self.begin_auto("remove_component")
   self.begin_tracked_world_mutation(world)
@@ -1406,15 +1795,27 @@ pub fn WorldHistory::set_camera_matrices(
   flags : Float,
 ) -> Bool {
   if !self.recording_enabled() || self.applying {
-    return world.set_camera_matrices(
+    let ok = world.set_camera_matrices(
       entity, view, proj, near, far, aspect, projection_kind, flags,
     )
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
   }
   let camera = world.camera_component()
   let before = if world.has_component(entity, camera) {
     match world.camera_gpu_row(entity) {
       Some(bytes) => Some(bytes)
-      None => return false
+      None => {
+        self.set_diagnostic("operation_failed")
+        return false
+      }
     }
   } else {
     None
@@ -1446,10 +1847,13 @@ pub fn WorldHistory::run_system_phase(
   label : String,
 ) -> Bool {
   if self.applying {
+    self.set_diagnostic("applying")
     return false
   }
   if !self.recording_enabled() {
-    return runner.run_phase(world, ctx, phase)
+    let ok = runner.run_phase(world, ctx, phase)
+    self.set_delegate_diagnostic(ok, "recording_disabled")
+    return ok
   }
   let auto = self.begin_auto(label)
   let forced_guard = self.force_guarded_world(world)
@@ -1458,6 +1862,9 @@ pub fn WorldHistory::run_system_phase(
     self.release_guard()
   }
   self.finish_auto(auto, true)
+  if !ok {
+    self.set_diagnostic("operation_failed")
+  }
   ok
 }
 
@@ -1554,16 +1961,33 @@ fn WorldHistory::validate_record_for_redo(
 ///|
 /// Undoes the most recent committed transaction.
 pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
-  if !self.can_undo() {
+  if !self.enabled || self.max_undo_records <= 0 {
+    self.set_diagnostic("recording_disabled")
+    return false
+  }
+  if self.open {
+    self.set_diagnostic("transaction_open")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
+    return false
+  }
+  if self.undo_stack.length() == 0 {
+    self.set_diagnostic("empty_undo_stack")
     return false
   }
   let next = self.undo_stack[self.undo_stack.length() - 1]
   if !self.validate_record_for_undo(world, next) {
+    self.set_diagnostic("validation_failed")
     return false
   }
   let record = match self.undo_stack.pop() {
     Some(record) => record
-    None => return false
+    None => {
+      self.set_diagnostic("empty_undo_stack")
+      return false
+    }
   }
   self.applying = true
   world.begin_history_tracked_mutation()
@@ -1578,9 +2002,10 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
   self.applying = false
   if ok {
     self.redo_stack.push(record)
-    self.trim_stacks_to_limit()
+    self.set_trim_diagnostic(self.trim_stacks_to_limit())
   } else {
     self.clear()
+    self.set_diagnostic("apply_failed")
   }
   ok
 }
@@ -1588,16 +2013,33 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
 ///|
 /// Redoes the most recently undone transaction.
 pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
-  if !self.can_redo() {
+  if !self.enabled || self.max_undo_records <= 0 {
+    self.set_diagnostic("recording_disabled")
+    return false
+  }
+  if self.open {
+    self.set_diagnostic("transaction_open")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
+    return false
+  }
+  if self.redo_stack.length() == 0 {
+    self.set_diagnostic("empty_redo_stack")
     return false
   }
   let next = self.redo_stack[self.redo_stack.length() - 1]
   if !self.validate_record_for_redo(world, next) {
+    self.set_diagnostic("validation_failed")
     return false
   }
   let record = match self.redo_stack.pop() {
     Some(record) => record
-    None => return false
+    None => {
+      self.set_diagnostic("empty_redo_stack")
+      return false
+    }
   }
   self.applying = true
   world.begin_history_tracked_mutation()
@@ -1612,9 +2054,10 @@ pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
   self.applying = false
   if ok {
     self.undo_stack.push(record)
-    self.trim_stacks_to_limit()
+    self.set_trim_diagnostic(self.trim_stacks_to_limit())
   } else {
     self.clear()
+    self.set_diagnostic("apply_failed")
   }
   ok
 }
