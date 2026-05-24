@@ -6,6 +6,7 @@ import type {
 	MoonGpuWriteView,
 	MoonSpawnBatchRow,
 	MoonWorld,
+	MoonWorldHistory,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	bytes_get_f32,
@@ -55,6 +56,25 @@ import {
 	world_update_global_transforms_from_transforms,
 	world_extract_global_transform_refs,
 	world_write_global_transforms_dense_range_views,
+	world_history_add_component,
+	world_history_add_component_bytes,
+	world_history_begin_transaction,
+	world_history_can_redo,
+	world_history_can_undo,
+	world_history_cancel_transaction,
+	world_history_clear,
+	world_history_commit_transaction,
+	world_history_create_entity,
+	world_history_destroy_entity,
+	world_history_enabled,
+	world_history_new,
+	world_history_redo,
+	world_history_remove_component,
+	world_history_set_child_of,
+	world_history_set_component_bytes,
+	world_history_set_enabled,
+	world_history_set_transform_trs,
+	world_history_undo,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -422,6 +442,176 @@ export class World {
 			(index, entity, row) =>
 				f(index, new EntityId(entity), new SpawnBatchRow(row)),
 		).map((entity) => new EntityId(entity));
+	}
+}
+
+export class WorldHistory {
+	readonly inner: MoonWorldHistory;
+
+	constructor(inner: MoonWorldHistory) {
+		this.inner = inner;
+	}
+
+	static new(): WorldHistory {
+		return new WorldHistory(world_history_new());
+	}
+
+	enabled(): boolean {
+		return moonBool(world_history_enabled(this.inner));
+	}
+
+	setEnabled(enabled: boolean): void {
+		world_history_set_enabled(this.inner, enabled);
+	}
+
+	clear(): void {
+		world_history_clear(this.inner);
+	}
+
+	beginTransaction(label: string): boolean {
+		return moonBool(world_history_begin_transaction(this.inner, label));
+	}
+
+	commitTransaction(): boolean {
+		return moonBool(world_history_commit_transaction(this.inner));
+	}
+
+	cancelTransaction(): boolean {
+		return moonBool(world_history_cancel_transaction(this.inner));
+	}
+
+	canUndo(): boolean {
+		return moonBool(world_history_can_undo(this.inner));
+	}
+
+	canRedo(): boolean {
+		return moonBool(world_history_can_redo(this.inner));
+	}
+
+	undo(world: World): boolean {
+		return moonBool(world_history_undo(this.inner, world.inner));
+	}
+
+	redo(world: World): boolean {
+		return moonBool(world_history_redo(this.inner, world.inner));
+	}
+
+	createEntity(world: World): EntityId {
+		return new EntityId(world_history_create_entity(this.inner, world.inner));
+	}
+
+	destroyEntity(world: World, entity: EntityId): boolean {
+		return moonBool(
+			world_history_destroy_entity(this.inner, world.inner, entity.inner),
+		);
+	}
+
+	addComponent(
+		world: World,
+		entity: EntityId,
+		component: ComponentTypeId,
+	): boolean {
+		return moonBool(
+			world_history_add_component(
+				this.inner,
+				world.inner,
+				entity.inner,
+				component.inner,
+			),
+		);
+	}
+
+	addComponentBytes(
+		world: World,
+		entity: EntityId,
+		component: ComponentTypeId,
+		bytes: Uint8Array | ArrayLike<number>,
+	): boolean {
+		return moonBool(
+			world_history_add_component_bytes(
+				this.inner,
+				world.inner,
+				entity.inner,
+				component.inner,
+				bytesInput(bytes),
+			),
+		);
+	}
+
+	setComponentBytes(
+		world: World,
+		entity: EntityId,
+		component: ComponentTypeId,
+		bytes: Uint8Array | ArrayLike<number>,
+	): boolean {
+		return moonBool(
+			world_history_set_component_bytes(
+				this.inner,
+				world.inner,
+				entity.inner,
+				component.inner,
+				bytesInput(bytes),
+			),
+		);
+	}
+
+	removeComponent(
+		world: World,
+		entity: EntityId,
+		component: ComponentTypeId,
+	): boolean {
+		return moonBool(
+			world_history_remove_component(
+				this.inner,
+				world.inner,
+				entity.inner,
+				component.inner,
+			),
+		);
+	}
+
+	setTransformTrs(
+		world: World,
+		entity: EntityId,
+		px: number,
+		py: number,
+		pz: number,
+		qx: number,
+		qy: number,
+		qz: number,
+		qw: number,
+		sx: number,
+		sy: number,
+		sz: number,
+	): boolean {
+		return moonBool(
+			world_history_set_transform_trs(
+				this.inner,
+				world.inner,
+				entity.inner,
+				px,
+				py,
+				pz,
+				qx,
+				qy,
+				qz,
+				qw,
+				sx,
+				sy,
+				sz,
+			),
+		);
+	}
+
+	setChildOf(world: World, entity: EntityId, parent: EntityId): boolean {
+		return moonBool(
+			world_history_set_child_of(
+				this.inner,
+				world.inner,
+				entity.inner,
+				parent.inner,
+			),
+		);
 	}
 }
 

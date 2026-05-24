@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Undo / Redo - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/undo-redo.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Undo / Redo</h1>
+          <p class="lead">Undo/Redo は <code>World</code> の上に置く optional な tracked transaction layer として実装します。低レベル ECS mutation API は履歴を持たず、従来の hot path を維持します。</p>
+
+          <h2>Model</h2>
+          <ul>
+            <li><code>World</code> は storage と primitive mutation API であり、履歴は所有しません。</li>
+            <li><code>WorldHistory</code> は editor / authoring 向けの明示的な tracked method で可逆変更を記録します。</li>
+            <li>履歴は world 全体 snapshot ではなく、entity/component 単位の最小 delta を保存します。</li>
+            <li>destroy の Undo は同じ <code>EntityId(index, generation)</code> を復元します。</li>
+          </ul>
+
+          <h2>Tracked Transactions</h2>
+          <p>呼び出し側は tracked method を単発で使うことも、<code>begin_transaction</code> と <code>commit_transaction</code> で複数変更をまとめることもできます。同じ transaction 内で同じ component を何度も書いた場合、Undo は最初の値、Redo は最後の値に戻るように圧縮されます。</p>
+          <pre><code class="language-moonbit">let history = WorldHistory::new()
+let entity = history.create_entity(world)
+ignore(history.begin_transaction("Move"))
+ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0))
+ignore(history.commit_transaction())
+ignore(history.undo(world))
+ignore(history.redo(world))</code></pre>
+
+          <h2>Enabled State</h2>
+          <ul>
+            <li>履歴が有効な場合、tracked method は undo/redo delta を記録します。</li>
+            <li>無効な場合、tracked method は <code>World</code> に即委譲し、何も記録しません。</li>
+            <li>履歴を無効化すると undo stack、redo stack、open transaction は clear されます。再度有効化した時点の world state が新しい baseline です。</li>
+            <li><code>World</code> の直接呼び出し、<code>CommandBuffer</code>、query mutable view、batch spawn API は意図的に untracked です。</li>
+          </ul>
+
+          <h2>Derived State</h2>
+          <p><code>GlobalTransform</code> と <code>Camera</code> の component row は packed blob store への ref を持ちます。履歴は component の存在を fresh blob ref で戻し、derived payload は Undo/Redo 後に transform/camera system で再計算します。Renderer が所有する GPU resource と resource registration は v1 の履歴対象外です。</p>
+
+          <h2>Performance</h2>
+          <p>Undo/Redo の主なコストは変更前後の component bytes コピーと history record allocation です。runtime system や animation は untracked API を使い、drag のような editor gesture は transaction で 1 record にまとめます。</p>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

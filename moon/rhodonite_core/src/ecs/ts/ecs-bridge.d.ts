@@ -11,6 +11,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonComponentTypeId = { index: number };
 	export type MoonEntityLocation = { archetype_index: number; row: number };
 	export type MoonWorld = object;
+	export type MoonWorldHistory = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
 	export type MoonPreparedQuery = object;
@@ -195,6 +196,89 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		count: number,
 		f: (index: number, entity: MoonEntityId, row: MoonSpawnBatchRow) => void,
 	): MoonEntityId[];
+	export function world_history_new(): MoonWorldHistory;
+	export function world_history_enabled(history: MoonWorldHistory): MoonBool;
+	export function world_history_set_enabled(
+		history: MoonWorldHistory,
+		enabled: boolean,
+	): void;
+	export function world_history_clear(history: MoonWorldHistory): void;
+	export function world_history_begin_transaction(
+		history: MoonWorldHistory,
+		label: string,
+	): MoonBool;
+	export function world_history_commit_transaction(
+		history: MoonWorldHistory,
+	): MoonBool;
+	export function world_history_cancel_transaction(
+		history: MoonWorldHistory,
+	): MoonBool;
+	export function world_history_can_undo(history: MoonWorldHistory): MoonBool;
+	export function world_history_can_redo(history: MoonWorldHistory): MoonBool;
+	export function world_history_undo(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonBool;
+	export function world_history_redo(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonBool;
+	export function world_history_create_entity(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonEntityId;
+	export function world_history_destroy_entity(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+	): MoonBool;
+	export function world_history_add_component(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+	): MoonBool;
+	export function world_history_add_component_bytes(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+		bytes: Uint8Array | number[],
+	): MoonBool;
+	export function world_history_set_component_bytes(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+		bytes: Uint8Array | number[],
+	): MoonBool;
+	export function world_history_remove_component(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		component: MoonComponentTypeId,
+	): MoonBool;
+	export function world_history_set_transform_trs(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		px: number,
+		py: number,
+		pz: number,
+		qx: number,
+		qy: number,
+		qz: number,
+		qw: number,
+		sx: number,
+		sy: number,
+		sz: number,
+	): MoonBool;
+	export function world_history_set_child_of(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		parent: MoonEntityId,
+	): MoonBool;
 	export function spawn_batch_row_entity(row: MoonSpawnBatchRow): MoonEntityId;
 	export function spawn_batch_row_write_view(
 		row: MoonSpawnBatchRow,

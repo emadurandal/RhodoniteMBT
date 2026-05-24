@@ -440,6 +440,182 @@ pub fn world_spawn_batch(
 }
 
 ///|
+/// Implements `world_history_new`.
+pub fn world_history_new() -> @ecs.WorldHistory {
+  @ecs.WorldHistory::new()
+}
+
+///|
+/// Implements `world_history_enabled`.
+pub fn world_history_enabled(history : @ecs.WorldHistory) -> Bool {
+  history.enabled()
+}
+
+///|
+/// Implements `world_history_set_enabled`.
+pub fn world_history_set_enabled(
+  history : @ecs.WorldHistory,
+  enabled : Bool,
+) -> Unit {
+  history.set_enabled(enabled)
+}
+
+///|
+/// Implements `world_history_clear`.
+pub fn world_history_clear(history : @ecs.WorldHistory) -> Unit {
+  history.clear()
+}
+
+///|
+/// Implements `world_history_begin_transaction`.
+pub fn world_history_begin_transaction(
+  history : @ecs.WorldHistory,
+  label : String,
+) -> Bool {
+  history.begin_transaction(label)
+}
+
+///|
+/// Implements `world_history_commit_transaction`.
+pub fn world_history_commit_transaction(history : @ecs.WorldHistory) -> Bool {
+  history.commit_transaction()
+}
+
+///|
+/// Implements `world_history_cancel_transaction`.
+pub fn world_history_cancel_transaction(history : @ecs.WorldHistory) -> Bool {
+  history.cancel_transaction()
+}
+
+///|
+/// Implements `world_history_can_undo`.
+pub fn world_history_can_undo(history : @ecs.WorldHistory) -> Bool {
+  history.can_undo()
+}
+
+///|
+/// Implements `world_history_can_redo`.
+pub fn world_history_can_redo(history : @ecs.WorldHistory) -> Bool {
+  history.can_redo()
+}
+
+///|
+/// Implements `world_history_undo`.
+pub fn world_history_undo(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> Bool {
+  history.undo(world)
+}
+
+///|
+/// Implements `world_history_redo`.
+pub fn world_history_redo(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> Bool {
+  history.redo(world)
+}
+
+///|
+/// Implements `world_history_create_entity`.
+pub fn world_history_create_entity(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> @ecs.EntityId {
+  history.create_entity(world)
+}
+
+///|
+/// Implements `world_history_destroy_entity`.
+pub fn world_history_destroy_entity(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+) -> Bool {
+  history.destroy_entity(world, entity)
+}
+
+///|
+/// Implements `world_history_add_component`.
+pub fn world_history_add_component(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+) -> Bool {
+  history.add_component(world, entity, component)
+}
+
+///|
+/// Implements `world_history_add_component_bytes`.
+pub fn world_history_add_component_bytes(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  history.add_component_bytes(world, entity, component, bytes)
+}
+
+///|
+/// Implements `world_history_set_component_bytes`.
+pub fn world_history_set_component_bytes(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  history.set_component_bytes(world, entity, component, bytes)
+}
+
+///|
+/// Implements `world_history_remove_component`.
+pub fn world_history_remove_component(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  component : @ecs.ComponentTypeId,
+) -> Bool {
+  history.remove_component(world, entity, component)
+}
+
+///|
+/// Implements `world_history_set_transform_trs`.
+pub fn world_history_set_transform_trs(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  px : Float,
+  py : Float,
+  pz : Float,
+  qx : Double,
+  qy : Double,
+  qz : Double,
+  qw : Double,
+  sx : Float,
+  sy : Float,
+  sz : Float,
+) -> Bool {
+  history.set_transform_trs(
+    world, entity, px, py, pz, qx, qy, qz, qw, sx, sy, sz,
+  )
+}
+
+///|
+/// Implements `world_history_set_child_of`.
+pub fn world_history_set_child_of(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  parent : @ecs.EntityId,
+) -> Bool {
+  history.set_child_of(world, entity, parent)
+}
+
+///|
 /// Implements `spawn_batch_row_entity`.
 pub fn spawn_batch_row_entity(row : @ecs.SpawnBatchRow) -> @ecs.EntityId {
   row.entity()
