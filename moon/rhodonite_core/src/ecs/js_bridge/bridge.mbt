@@ -538,6 +538,12 @@ pub fn world_history_redo_bytes(history : @ecs.WorldHistory) -> Int {
 }
 
 ///|
+/// Implements `world_history_last_diagnostic`.
+pub fn world_history_last_diagnostic(history : @ecs.WorldHistory) -> String {
+  history.last_diagnostic()
+}
+
+///|
 /// Implements `world_history_undo_label`.
 pub fn world_history_undo_label(history : @ecs.WorldHistory) -> String? {
   history.undo_label()

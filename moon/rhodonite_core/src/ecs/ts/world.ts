@@ -68,6 +68,7 @@ import {
 	world_history_create_entity,
 	world_history_destroy_entity,
 	world_history_enabled,
+	world_history_last_diagnostic,
 	world_history_max_undo_bytes,
 	world_history_max_undo_records,
 	world_history_new,
@@ -523,6 +524,10 @@ export class WorldHistory {
 
 	redoBytes(): number {
 		return world_history_redo_bytes(this.inner);
+	}
+
+	lastDiagnostic(): string {
+		return world_history_last_diagnostic(this.inner);
 	}
 
 	undoLabel(): string | null {

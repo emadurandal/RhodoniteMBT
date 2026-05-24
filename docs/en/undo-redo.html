@@ -85,6 +85,9 @@ ignore(history.commit_transaction())</code></pre>
           <h2>Apply Validation</h2>
           <p>Before <code>undo</code> or <code>redo</code> applies a record, <code>WorldHistory</code> validates that the current world can accept every delta in record order. If validation fails, the method returns <code>false</code> without mutating the world or moving records between the undo and redo stacks. This protects history from stale records after untracked edits, while valid dependent records such as create-then-add-component transactions still replay normally.</p>
 
+          <h2>Diagnostics</h2>
+          <p><code>last_diagnostic</code> reports a stable reason code for the most recent history operation. Normal success resets it to <code>none</code>; failures such as <code>empty_undo_stack</code>, <code>validation_failed</code>, and <code>operation_failed</code> leave a reason for editor UI and tests. Successful operations can also report non-retention outcomes, such as <code>record_dropped_byte_limit</code> when a record exceeds <code>max_undo_bytes</code>.</p>
+
           <h2>Labels</h2>
           <p>Transaction labels are UI metadata. <code>undo_label</code> and <code>redo_label</code> return the label for the next available undo or redo record, so editor UI can present commands such as <code>Undo Move Entity</code>. Labels do not affect world state, transaction ordering, or delta application.</p>
 

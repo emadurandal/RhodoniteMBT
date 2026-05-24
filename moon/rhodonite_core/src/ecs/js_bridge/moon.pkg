@@ -71,6 +71,7 @@ options(
         "world_history_redo_len",
         "world_history_undo_bytes",
         "world_history_redo_bytes",
+        "world_history_last_diagnostic",
         "world_history_undo_label",
         "world_history_redo_label",
         "world_history_begin_transaction",
