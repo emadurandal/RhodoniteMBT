@@ -276,3 +276,111 @@ test "WorldHistory max_undo_records zero clears and keeps future changes unrecor
     None => abort("expected delegated zero-limit value")
   }
 }
+
+///|
+test "WorldHistory restores destroyed GlobalTransform presence for recompute" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (4.0 : Float),
+      (5.0 : Float),
+      (6.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  let _ = world.drain_global_transform_blob_write_views()
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(!world.is_alive(entity))
+  assert_true(history.undo(world))
+  assert_true(world.is_alive(entity))
+  assert_true(world.has_component(entity, world.transform_component()))
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(entity) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (4.0 : Float))
+      assert_eq(m.at(1, 3), (5.0 : Float))
+      assert_eq(m.at(2, 3), (6.0 : Float))
+    }
+    None => abort("expected recomputed GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory restores removed GlobalTransform as fresh recomputable blob" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (9.0 : Float),
+      (2.0 : Float),
+      (-3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  let _ = world.drain_global_transform_blob_write_views()
+  let global_transform = world.global_transform_component()
+  assert_true(history.remove_component(world, entity, global_transform))
+  assert_true(!world.has_component(entity, global_transform))
+  assert_true(history.undo(world))
+  assert_true(world.has_component(entity, global_transform))
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(entity) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (9.0 : Float))
+      assert_eq(m.at(1, 3), (2.0 : Float))
+      assert_eq(m.at(2, 3), (-3.0 : Float))
+    }
+    None => abort("expected recomputed GlobalTransform after remove undo")
+  }
+}
+
+///|
+test "WorldHistory restores destroyed Camera presence with readable blob row" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let _ = world.drain_camera_blob_write_views()
+  assert_true(history.destroy_entity(world, camera))
+  assert_true(!world.is_alive(camera))
+  assert_true(history.undo(world))
+  assert_true(world.is_alive(camera))
+  assert_true(world.has_component(camera, world.camera_component()))
+  match world.camera_gpu_row(camera) {
+    Some(bytes) => assert_eq(bytes.length(), @comp.camera_gpu_byte_stride())
+    None => abort("expected restored Camera GPU row")
+  }
+  let writes = world.drain_camera_blob_write_views()
+  assert_true(writes.length() > 0)
+}
