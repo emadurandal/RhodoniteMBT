@@ -166,6 +166,24 @@ pub fn set_renderable(
 }
 
 ///|
+/// Adds or updates Renderable through the history layer.
+pub fn set_renderable_tracked(
+  history : @ecs.WorldHistory,
+  scene : Scene,
+  entity : @ecs.EntityId,
+  desc : RenderableDesc,
+) -> Bool {
+  let world = scene.world()
+  let component = scene.renderable_component_id
+  let bytes = renderable_component_bytes(desc)
+  if world.has_component(entity, component) {
+    history.set_component_bytes(world, entity, component, bytes)
+  } else {
+    history.add_component_bytes(world, entity, component, bytes)
+  }
+}
+
+///|
 /// Adds the Renderable component to an entity.
 pub fn add_renderable(
   scene : Scene,
@@ -178,4 +196,30 @@ pub fn add_renderable(
     scene.renderable_component_id,
     renderable_component_bytes(desc),
   )
+}
+
+///|
+/// Adds Renderable through the history layer.
+pub fn add_renderable_tracked(
+  history : @ecs.WorldHistory,
+  scene : Scene,
+  entity : @ecs.EntityId,
+  desc : RenderableDesc,
+) -> Bool {
+  history.add_component_bytes(
+    scene.world(),
+    entity,
+    scene.renderable_component_id,
+    renderable_component_bytes(desc),
+  )
+}
+
+///|
+/// Removes Renderable through the history layer.
+pub fn remove_renderable_tracked(
+  history : @ecs.WorldHistory,
+  scene : Scene,
+  entity : @ecs.EntityId,
+) -> Bool {
+  history.remove_component(scene.world(), entity, scene.renderable_component_id)
 }

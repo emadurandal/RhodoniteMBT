@@ -168,3 +168,398 @@ test "WorldHistory rejects undo and redo while a transaction is open" {
   assert_true(!history.redo(world))
   assert_true(history.cancel_transaction())
 }
+
+///|
+test "WorldHistory exposes default record limit and stack lengths" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLengths", 4)
+  let entity = world.create_entity()
+  assert_eq(history.max_undo_records(), 100)
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  assert_true(history.undo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  assert_true(history.redo(world))
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+}
+
+///|
+test "WorldHistory trims old undo records to max_undo_records" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLimit", 4)
+  let entity = world.create_entity()
+  history.set_max_undo_records(2)
+  assert_eq(history.max_undo_records(), 2)
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 2)
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after first limited undo")
+  }
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(2, 0, 0, 0))
+    None => abort("expected value after second limited undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory trims existing stacks when max_undo_records is lowered" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLowerLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  history.set_max_undo_records(1)
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected value after lowered-limit undo")
+  }
+  assert_true(!history.can_undo())
+}
+
+///|
+test "WorldHistory max_undo_records zero clears and keeps future changes unrecorded" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryZeroLimit", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 1)
+  history.set_max_undo_records(0)
+  assert_eq(history.max_undo_records(), 0)
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  assert_true(!history.begin_transaction("disabled-by-limit"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(!history.can_undo())
+  match world.component_bytes(entity, component) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected delegated zero-limit value")
+  }
+}
+
+///|
+test "WorldHistory exposes undo and redo labels for UI state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLabels", 4)
+  let entity = world.create_entity()
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction("Move Entity"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some("Move Entity"))
+  assert_true(history.redo_label() is None)
+  assert_true(history.begin_transaction("Rename Entity"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some("Rename Entity"))
+  assert_true(history.undo(world))
+  assert_true(history.undo_label() is Some("Move Entity"))
+  assert_true(history.redo_label() is Some("Rename Entity"))
+  assert_true(history.redo(world))
+  assert_true(history.undo_label() is Some("Rename Entity"))
+  assert_true(history.redo_label() is None)
+}
+
+///|
+test "WorldHistory clears labels with history state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryLabelClears", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction(""))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.undo_label() is Some(""))
+  history.clear()
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is Some("set_component_bytes"))
+  history.set_enabled(false)
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+  history.set_enabled(true)
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(4, 0, 0, 0)),
+  )
+  assert_true(history.undo_label() is Some("set_component_bytes"))
+  history.set_max_undo_records(0)
+  assert_true(history.undo_label() is None)
+  assert_true(history.redo_label() is None)
+}
+
+///|
+test "WorldHistory restores destroyed GlobalTransform presence for recompute" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (4.0 : Float),
+      (5.0 : Float),
+      (6.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  let _ = world.drain_global_transform_blob_write_views()
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(!world.is_alive(entity))
+  assert_true(history.undo(world))
+  assert_true(world.is_alive(entity))
+  assert_true(world.has_component(entity, world.transform_component()))
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(entity) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (4.0 : Float))
+      assert_eq(m.at(1, 3), (5.0 : Float))
+      assert_eq(m.at(2, 3), (6.0 : Float))
+    }
+    None => abort("expected recomputed GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory restores removed GlobalTransform as fresh recomputable blob" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (9.0 : Float),
+      (2.0 : Float),
+      (-3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  let _ = world.drain_global_transform_blob_write_views()
+  let global_transform = world.global_transform_component()
+  assert_true(history.remove_component(world, entity, global_transform))
+  assert_true(!world.has_component(entity, global_transform))
+  assert_true(history.undo(world))
+  assert_true(world.has_component(entity, global_transform))
+  world.update_global_transforms_from_transforms()
+  match world.get_global_transform(entity) {
+    Some(m) => {
+      assert_eq(m.at(0, 3), (9.0 : Float))
+      assert_eq(m.at(1, 3), (2.0 : Float))
+      assert_eq(m.at(2, 3), (-3.0 : Float))
+    }
+    None => abort("expected recomputed GlobalTransform after remove undo")
+  }
+}
+
+///|
+test "WorldHistory restores destroyed Camera presence with readable blob row" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let _ = world.drain_camera_blob_write_views()
+  assert_true(history.destroy_entity(world, camera))
+  assert_true(!world.is_alive(camera))
+  assert_true(history.undo(world))
+  assert_true(world.is_alive(camera))
+  assert_true(world.has_component(camera, world.camera_component()))
+  match world.camera_gpu_row(camera) {
+    Some(bytes) => assert_eq(bytes.length(), @comp.camera_gpu_byte_stride())
+    None => abort("expected restored Camera GPU row")
+  }
+  let writes = world.drain_camera_blob_write_views()
+  assert_true(writes.length() > 0)
+}
+
+///|
+test "WorldHistory tracks Camera matrix add undo and redo" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let after = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected tracked Camera row")
+  }
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(camera, world.camera_component()))
+  assert_true(history.redo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(after))
+}
+
+///|
+test "WorldHistory tracks Camera matrix row changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let before = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected original Camera row")
+  }
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.25 : Float),
+      (500.0 : Float),
+      (1.5 : Float),
+      (0.0 : Float),
+      (2.0 : Float),
+    ),
+  )
+  let after = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected changed Camera row")
+  }
+  assert_true(before != after)
+  assert_true(history.undo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(before))
+  assert_true(history.redo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(after))
+}
+
+///|
+test "WorldHistory Camera tracking disabled and zero limit delegate" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  history.set_enabled(false)
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(!history.can_undo())
+  history.set_enabled(true)
+  history.set_max_undo_records(0)
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.2 : Float),
+      (20.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(!history.can_undo())
+}

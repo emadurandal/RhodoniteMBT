@@ -45,6 +45,7 @@ ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.
 ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
+          <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。generic な Camera component byte write は row が blob ref だけを持つため untracked のままです。</p>
 
           <h2>Enabled State</h2>
           <ul>
@@ -54,8 +55,24 @@ ignore(history.redo(world))</code></pre>
             <li><code>World</code> の直接呼び出し、<code>CommandBuffer</code>、query mutable view、batch spawn API は意図的に untracked です。</li>
           </ul>
 
-          <h2>Derived State</h2>
-          <p><code>GlobalTransform</code> と <code>Camera</code> の component row は packed blob store への ref を持ちます。履歴は component の存在を fresh blob ref で戻し、derived payload は Undo/Redo 後に transform/camera system で再計算します。Renderer が所有する GPU resource と resource registration は v1 の履歴対象外です。</p>
+          <h2>History Limits</h2>
+          <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
+
+          <h2>Labels</h2>
+          <p>transaction label は UI metadata です。<code>undo_label</code> と <code>redo_label</code> は次に実行可能な undo / redo record の label を返すため、editor UI は <code>Undo Move Entity</code> のような command 表示を作れます。label は world state、transaction ordering、delta application には影響しません。</p>
+
+          <h2>Restoration Policy</h2>
+          <p>履歴は安定した ECS identity と authoring data を復元します。GPU-facing な derived data は有効な component presence として戻し、通常の system で再生成します。</p>
+          <table>
+            <thead><tr><th>State</th><th>Undo/Redo behavior</th></tr></thead>
+            <tbody>
+              <tr><td><code>EntityId(index, generation)</code></td><td>destroy の Undo は同じ id と generation を復元します。</td></tr>
+              <tr><td><code>Transform3D</code>、<code>ChildOf</code>、user CPU component</td><td>component bytes と relationship を history record から復元します。</td></tr>
+              <tr><td><code>GlobalTransform</code></td><td>component presence を fresh packed-blob ref で復元し、matrix payload は transform system で再計算します。</td></tr>
+              <tr><td><code>Camera</code></td><td>component presence と readable な Camera blob row を復元し、GPU-facing view/projection payload は camera sync system で再生成します。</td></tr>
+              <tr><td>Renderer mesh/material/GPU resources</td><td>v1 の履歴対象外です。resource registration と lifetime は Renderer または asset layer が管理します。</td></tr>
+            </tbody>
+          </table>
 
           <h2>Performance</h2>
           <p>Undo/Redo の主なコストは変更前後の component bytes コピーと history record allocation です。runtime system や animation は untracked API を使い、drag のような editor gesture は transaction で 1 record にまとめます。</p>

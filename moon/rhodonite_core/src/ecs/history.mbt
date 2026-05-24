@@ -28,6 +28,7 @@ priv enum WorldDelta {
     FixedArray[Byte],
     FixedArray[Byte]
   )
+  CameraChanged(EntityId, FixedArray[Byte]?, FixedArray[Byte])
 }
 
 ///|
@@ -41,12 +42,51 @@ priv struct WorldHistoryRecord {
 /// Optional tracked transaction layer for reversible [`World`] mutations.
 pub struct WorldHistory {
   priv mut enabled : Bool
+  priv mut max_undo_records : Int
   priv mut open : Bool
   priv mut applying : Bool
   priv mut current_label : String
   priv mut current_deltas : Array[WorldDelta]
   priv undo_stack : Array[WorldHistoryRecord]
   priv redo_stack : Array[WorldHistoryRecord]
+}
+
+///|
+/// Default maximum number of committed undo records retained by a new history.
+fn default_max_undo_records() -> Int {
+  100
+}
+
+///|
+/// Drops the oldest records until the stack fits `limit`.
+fn trim_history_stack_to_limit(
+  records : Array[WorldHistoryRecord],
+  limit : Int,
+) -> Unit {
+  if limit <= 0 {
+    records.clear()
+    return
+  }
+  while records.length() > limit {
+    let last = records.length() - 1
+    for i = 0; i < last; i = i + 1 {
+      records[i] = records[i + 1]
+    }
+    let _ = records.pop()
+  }
+}
+
+///|
+/// Reports whether new records should be created.
+fn WorldHistory::recording_enabled(self : WorldHistory) -> Bool {
+  self.enabled && self.max_undo_records > 0
+}
+
+///|
+/// Trims undo and redo stacks to the configured record limit.
+fn WorldHistory::trim_stacks_to_limit(self : WorldHistory) -> Unit {
+  trim_history_stack_to_limit(self.undo_stack, self.max_undo_records)
+  trim_history_stack_to_limit(self.redo_stack, self.max_undo_records)
 }
 
 ///|
@@ -215,6 +255,20 @@ fn World::restore_entity_snapshot(
 }
 
 ///|
+/// Ensures the entity has Camera and writes the captured GPU row bytes.
+fn World::restore_camera_history_row(
+  self : World,
+  entity : EntityId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  let camera = self.camera_component()
+  if !self.has_component(entity, camera) && !self.add_component(entity, camera) {
+    return false
+  }
+  self.write_camera_gpu_row_bytes(entity, bytes)
+}
+
+///|
 /// Builds a zero-byte array used as the missing side of component changes.
 fn empty_component_bytes() -> FixedArray[Byte] {
   FixedArray::make(0, (0 : Byte))
@@ -300,6 +354,44 @@ fn WorldHistory::push_component_delta(
 }
 
 ///|
+/// Pushes a Camera row delta, merging repeated matrix writes inside the transaction.
+fn WorldHistory::push_camera_delta(
+  self : WorldHistory,
+  entity : EntityId,
+  before : FixedArray[Byte]?,
+  after : FixedArray[Byte],
+) -> Unit {
+  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
+    match self.current_deltas[i] {
+      CameraChanged(e, old_before, _) =>
+        if e == entity {
+          match old_before {
+            Some(old) =>
+              if old == after {
+                remove_delta_at(self.current_deltas, i)
+              } else {
+                self.current_deltas[i] = CameraChanged(
+                  entity, old_before, after,
+                )
+              }
+            None =>
+              self.current_deltas[i] = CameraChanged(entity, old_before, after)
+          }
+          return
+        }
+      _ => ()
+    }
+  }
+  match before {
+    Some(old) =>
+      if old != after {
+        self.current_deltas.push(CameraChanged(entity, before, after))
+      }
+    None => self.current_deltas.push(CameraChanged(entity, before, after))
+  }
+}
+
+///|
 /// Records a delta into the active transaction.
 fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
   match delta {
@@ -319,6 +411,8 @@ fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
       )
     ComponentChanged(entity, component, before, after) =>
       self.push_component_delta(entity, component, before, after)
+    CameraChanged(entity, before, after) =>
+      self.push_camera_delta(entity, before, after)
     _ => self.current_deltas.push(delta)
   }
 }
@@ -336,6 +430,7 @@ fn WorldHistory::clear_current(self : WorldHistory) -> Unit {
 pub fn WorldHistory::new() -> WorldHistory {
   {
     enabled: true,
+    max_undo_records: default_max_undo_records(),
     open: false,
     applying: false,
     current_label: "",
@@ -349,6 +444,29 @@ pub fn WorldHistory::new() -> WorldHistory {
 /// Implements `WorldHistory::enabled`.
 pub fn WorldHistory::enabled(self : WorldHistory) -> Bool {
   self.enabled
+}
+
+///|
+/// Returns the maximum number of undo records retained by this history.
+pub fn WorldHistory::max_undo_records(self : WorldHistory) -> Int {
+  self.max_undo_records
+}
+
+///|
+/// Sets the maximum number of undo records; zero clears history and disables recording.
+pub fn WorldHistory::set_max_undo_records(
+  self : WorldHistory,
+  limit : Int,
+) -> Unit {
+  if limit < 0 {
+    abort("WorldHistory::set_max_undo_records: limit must be non-negative")
+  }
+  self.max_undo_records = limit
+  if limit == 0 {
+    self.clear()
+  } else {
+    self.trim_stacks_to_limit()
+  }
 }
 
 ///|
@@ -370,12 +488,42 @@ pub fn WorldHistory::clear(self : WorldHistory) -> Unit {
 }
 
 ///|
+/// Returns the number of committed undo records currently retained.
+pub fn WorldHistory::undo_len(self : WorldHistory) -> Int {
+  self.undo_stack.length()
+}
+
+///|
+/// Returns the number of committed redo records currently retained.
+pub fn WorldHistory::redo_len(self : WorldHistory) -> Int {
+  self.redo_stack.length()
+}
+
+///|
+/// Returns the label for the next undoable record, when undo is currently available.
+pub fn WorldHistory::undo_label(self : WorldHistory) -> String? {
+  if !self.can_undo() {
+    return None
+  }
+  Some(self.undo_stack[self.undo_stack.length() - 1].label)
+}
+
+///|
+/// Returns the label for the next redoable record, when redo is currently available.
+pub fn WorldHistory::redo_label(self : WorldHistory) -> String? {
+  if !self.can_redo() {
+    return None
+  }
+  Some(self.redo_stack[self.redo_stack.length() - 1].label)
+}
+
+///|
 /// Begins a named transaction if tracking is enabled and no transaction is open.
 pub fn WorldHistory::begin_transaction(
   self : WorldHistory,
   label : String,
 ) -> Bool {
-  if !self.enabled || self.open || self.applying {
+  if !self.recording_enabled() || self.open || self.applying {
     return false
   }
   self.open = true
@@ -387,7 +535,7 @@ pub fn WorldHistory::begin_transaction(
 ///|
 /// Commits the active transaction and clears redo history.
 pub fn WorldHistory::commit_transaction(self : WorldHistory) -> Bool {
-  if !self.enabled || !self.open || self.applying {
+  if !self.recording_enabled() || !self.open || self.applying {
     return false
   }
   if self.current_deltas.length() > 0 {
@@ -395,6 +543,7 @@ pub fn WorldHistory::commit_transaction(self : WorldHistory) -> Bool {
       label: self.current_label,
       deltas: self.current_deltas,
     })
+    self.trim_stacks_to_limit()
     self.redo_stack.clear()
   }
   self.clear_current()
@@ -427,8 +576,7 @@ pub fn WorldHistory::can_redo(self : WorldHistory) -> Bool {
 /// Begins an automatic single-operation transaction when needed.
 fn WorldHistory::begin_auto(self : WorldHistory, label : String) -> Bool {
   if !self.open {
-    ignore(self.begin_transaction(label))
-    true
+    self.begin_transaction(label)
   } else {
     false
   }
@@ -457,7 +605,7 @@ fn WorldHistory::record_entity_created(
   self : WorldHistory,
   entity : EntityId,
 ) -> Unit {
-  if self.enabled && self.open && !self.applying {
+  if self.recording_enabled() && self.open && !self.applying {
     self.push_delta(EntityCreated(entity))
   }
 }
@@ -468,7 +616,7 @@ fn WorldHistory::record_entity_destroyed(
   self : WorldHistory,
   snapshot : EntitySnapshot,
 ) -> Unit {
-  if self.enabled && self.open && !self.applying {
+  if self.recording_enabled() && self.open && !self.applying {
     self.push_delta(EntityDestroyed(snapshot))
   }
 }
@@ -479,7 +627,7 @@ pub fn WorldHistory::create_entity(
   self : WorldHistory,
   world : World,
 ) -> EntityId {
-  if !self.enabled || self.applying {
+  if !self.recording_enabled() || self.applying {
     return world.create_entity()
   }
   let auto = self.begin_auto("create_entity")
@@ -496,7 +644,7 @@ pub fn WorldHistory::destroy_entity(
   world : World,
   entity : EntityId,
 ) -> Bool {
-  if !self.enabled || self.applying {
+  if !self.recording_enabled() || self.applying {
     return world.destroy_entity(entity)
   }
   let snapshot = match world.entity_snapshot(entity) {
@@ -520,7 +668,7 @@ pub fn WorldHistory::add_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
-  if !self.enabled || self.applying {
+  if !self.recording_enabled() || self.applying {
     return world.add_component(entity, component)
   }
   if world.has_component(entity, component) {
@@ -547,7 +695,7 @@ pub fn WorldHistory::add_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
-  if !self.enabled || self.applying {
+  if !self.recording_enabled() || self.applying {
     return world.add_component_bytes(entity, component, bytes)
   }
   if world.has_component(entity, component) {
@@ -574,7 +722,7 @@ pub fn WorldHistory::set_component_bytes(
   component : ComponentTypeId,
   bytes : FixedArray[Byte],
 ) -> Bool {
-  if !self.enabled ||
+  if !self.recording_enabled() ||
     self.applying ||
     world.history_blob_ref_component(component) {
     return world.set_component_bytes(entity, component, bytes)
@@ -604,7 +752,7 @@ pub fn WorldHistory::remove_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Bool {
-  if !self.enabled || self.applying {
+  if !self.recording_enabled() || self.applying {
     return world.remove_component(entity, component)
   }
   let before = match world.component_bytes(entity, component) {
@@ -669,6 +817,48 @@ pub fn WorldHistory::set_child_of(
 }
 
 ///|
+/// Sets builtin Camera matrices through the history layer.
+pub fn WorldHistory::set_camera_matrices(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+  view : @m44.Matrix44F,
+  proj : @m44.Matrix44F,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    return world.set_camera_matrices(
+      entity, view, proj, near, far, aspect, projection_kind, flags,
+    )
+  }
+  let camera = world.camera_component()
+  let before = if world.has_component(entity, camera) {
+    match world.camera_gpu_row(entity) {
+      Some(bytes) => Some(bytes)
+      None => return false
+    }
+  } else {
+    None
+  }
+  let auto = self.begin_auto("set_camera_matrices")
+  let ok = world.set_camera_matrices(
+    entity, view, proj, near, far, aspect, projection_kind, flags,
+  )
+  if ok {
+    match world.camera_gpu_row(entity) {
+      Some(after) => self.push_delta(CameraChanged(entity, before, after))
+      None => ()
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Applies one delta in redo order.
 fn WorldHistory::apply_delta(
   self : WorldHistory,
@@ -690,6 +880,8 @@ fn WorldHistory::apply_delta(
       world.remove_component(entity, component)
     ComponentChanged(entity, component, _, after) =>
       world.set_component_bytes(entity, component, after)
+    CameraChanged(entity, _, after) =>
+      world.restore_camera_history_row(entity, after)
   }
 }
 
@@ -714,6 +906,11 @@ fn WorldHistory::apply_delta_inverse(
       }
     ComponentChanged(entity, component, before, _) =>
       world.set_component_bytes(entity, component, before)
+    CameraChanged(entity, before, _) =>
+      match before {
+        Some(bytes) => world.restore_camera_history_row(entity, bytes)
+        None => world.remove_component(entity, world.camera_component())
+      }
   }
 }
 
@@ -738,6 +935,7 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
   self.applying = false
   if ok {
     self.redo_stack.push(record)
+    self.trim_stacks_to_limit()
   } else {
     self.clear()
   }
@@ -765,6 +963,7 @@ pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
   self.applying = false
   if ok {
     self.undo_stack.push(record)
+    self.trim_stacks_to_limit()
   } else {
     self.clear()
   }

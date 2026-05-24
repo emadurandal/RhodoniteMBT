@@ -67,14 +67,21 @@ import {
 	world_history_create_entity,
 	world_history_destroy_entity,
 	world_history_enabled,
+	world_history_max_undo_records,
 	world_history_new,
 	world_history_redo,
+	world_history_redo_label,
+	world_history_redo_len,
 	world_history_remove_component,
 	world_history_set_child_of,
+	world_history_set_camera_matrices_col_major,
 	world_history_set_component_bytes,
 	world_history_set_enabled,
+	world_history_set_max_undo_records,
 	world_history_set_transform_trs,
 	world_history_undo,
+	world_history_undo_label,
+	world_history_undo_len,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -464,8 +471,32 @@ export class WorldHistory {
 		world_history_set_enabled(this.inner, enabled);
 	}
 
+	maxUndoRecords(): number {
+		return world_history_max_undo_records(this.inner);
+	}
+
+	setMaxUndoRecords(limit: number): void {
+		world_history_set_max_undo_records(this.inner, limit);
+	}
+
 	clear(): void {
 		world_history_clear(this.inner);
+	}
+
+	undoLen(): number {
+		return world_history_undo_len(this.inner);
+	}
+
+	redoLen(): number {
+		return world_history_redo_len(this.inner);
+	}
+
+	undoLabel(): string | null {
+		return world_history_undo_label(this.inner) ?? null;
+	}
+
+	redoLabel(): string | null {
+		return world_history_redo_label(this.inner) ?? null;
 	}
 
 	beginTransaction(label: string): boolean {
@@ -610,6 +641,33 @@ export class WorldHistory {
 				world.inner,
 				entity.inner,
 				parent.inner,
+			),
+		);
+	}
+
+	setCameraMatrices(
+		world: World,
+		entity: EntityId,
+		viewColMajor: ArrayLike<number>,
+		projColMajor: ArrayLike<number>,
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): boolean {
+		return moonBool(
+			world_history_set_camera_matrices_col_major(
+				this.inner,
+				world.inner,
+				entity.inner,
+				Array.from(viewColMajor),
+				Array.from(projColMajor),
+				near,
+				far,
+				aspect,
+				projectionKind,
+				flags,
 			),
 		);
 	}

@@ -57,6 +57,8 @@ flowchart TB
           </ul>
 
           <h2>Resource Registration</h2>
+          <p><code>Renderable</code> は mesh/material handle 値を ECS に保存しますが、その handle は Renderer-owned table を指します。Undo/Redo は Renderable component bytes を復元できますが、mesh、material、instance buffer、その他 GPU resource は再作成しません。renderable の履歴を保持する application は、resource handle が history record より長く生きることを保証するか、Renderer の上位に asset/resource history を追加する必要があります。</p>
+          <p>editor operation では <code>WorldHistory</code> と一緒に <code>add_renderable_tracked</code>、<code>set_renderable_tracked</code>、<code>remove_renderable_tracked</code> を使います。raw な <code>add_renderable</code> と <code>set_renderable</code> は direct ECS mutation のままです。</p>
           <table>
             <thead><tr><th>API</th><th>Purpose</th></tr></thead>
             <tbody>

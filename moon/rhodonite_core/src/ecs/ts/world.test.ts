@@ -202,6 +202,68 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(row ?? new Uint8Array(), 20)).toBeCloseTo(1);
 	});
 
+	it("tracks builtin camera matrices through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(
+			history.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.1,
+				50,
+				1,
+				1,
+				0,
+			),
+		).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		let writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+		expect(history.redo(world)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(writes.length).toBeGreaterThan(0);
+
+		expect(
+			history.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+		expect(history.undo(world)).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+		expect(history.redo(world)).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+	});
+
 	it("exposes builtin orbit camera component ids", () => {
 		const world = World.new();
 
@@ -244,6 +306,79 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.enabled()).toBe(false);
 		expect(history.addComponentBytes(world, entity, cpu, new Uint8Array([9, 9, 9, 9]))).toBe(true);
 		expect(world.hasComponent(entity, cpu)).toBe(true);
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("limits WorldHistory undo records and exposes stack lengths", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryLimit", 4);
+		const entity = world.createEntity();
+
+		expect(history.maxUndoRecords()).toBe(100);
+		history.setMaxUndoRecords(2);
+		expect(history.maxUndoRecords()).toBe(2);
+		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(2);
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
+		expect(history.undoLen()).toBe(1);
+		expect(history.redoLen()).toBe(1);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("exposes WorldHistory undo and redo labels", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryLabels", 4);
+		const entity = world.createEntity();
+
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.beginTransaction("Move Entity")).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.undoLabel()).toBeNull();
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLabel()).toBe("Move Entity");
+		expect(history.redoLabel()).toBeNull();
+
+		expect(history.beginTransaction("")).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLabel()).toBe("");
+		expect(history.undo(world)).toBe(true);
+		expect(history.undoLabel()).toBe("Move Entity");
+		expect(history.redoLabel()).toBe("");
+		history.clear();
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+	});
+
+	it("treats zero max undo records as unrecorded tracked changes", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryZeroLimit", 4);
+		const entity = world.createEntity();
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		history.setMaxUndoRecords(0);
+		expect(history.maxUndoRecords()).toBe(0);
+		expect(history.undoLen()).toBe(0);
+		expect(history.beginTransaction("no-records")).toBe(false);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
 	});
 });
