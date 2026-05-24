@@ -353,6 +353,7 @@ pub fn WorldHistory::run_system_phase(Self, SystemRunner, World, SystemContext, 
 pub fn WorldHistory::set_camera_matrices(Self, World, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn WorldHistory::set_child_of(Self, World, EntityId, EntityId) -> Bool
 pub fn WorldHistory::set_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
+pub fn WorldHistory::set_component_bytes_many(Self, World, ComponentTypeId, Array[EntityId], Array[FixedArray[Byte]]) -> Bool
 pub fn WorldHistory::set_enabled(Self, Bool) -> Unit
 pub fn WorldHistory::set_max_undo_records(Self, Int) -> Unit
 pub fn WorldHistory::set_raw_mutation_guard_enabled(Self, Bool) -> Unit

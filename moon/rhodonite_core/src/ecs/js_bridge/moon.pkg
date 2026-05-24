@@ -82,6 +82,7 @@ options(
         "world_history_add_component",
         "world_history_add_component_bytes",
         "world_history_set_component_bytes",
+        "world_history_set_component_bytes_many",
         "world_history_remove_component",
         "world_history_set_transform_trs",
         "world_history_set_child_of",

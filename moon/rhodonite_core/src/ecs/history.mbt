@@ -343,6 +343,354 @@ fn World::restore_camera_history_row(
 }
 
 ///|
+/// Predicted entity state used to validate an undo/redo record before applying it.
+priv struct HistoryValidationEntityState {
+  entity : EntityId
+  alive : Bool
+  reserved : Bool
+  components : Array[ComponentTypeId]
+}
+
+///|
+/// Order-aware validation state for simulating one history record.
+priv struct HistoryValidationState {
+  world : World
+  states : Array[HistoryValidationEntityState]
+}
+
+///|
+/// Returns whether the component is registered in the current world.
+fn World::history_component_registered(
+  self : World,
+  component : ComponentTypeId,
+) -> Bool {
+  self.registry.get(component) is Some(_)
+}
+
+///|
+/// Returns whether `bytes` can be written as this component's CPU payload.
+fn World::history_component_stride_matches(
+  self : World,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  match self.registry.get(component) {
+    Some(rc) => bytes.length() == rc.cpu_stride
+    None => false
+  }
+}
+
+///|
+/// Copies the currently owned component list for validation.
+fn World::history_entity_components(
+  self : World,
+  entity : EntityId,
+) -> Array[ComponentTypeId]? {
+  if !self.is_alive(entity) {
+    return None
+  }
+  match self.locations[entity.index] {
+    Some(loc) =>
+      Some(
+        copy_component_array(self.archetypes[loc.archetype_index].components),
+      )
+    None => None
+  }
+}
+
+///|
+/// Returns whether an entity slot is occupied, regardless of generation.
+fn World::history_entity_slot_blocked(self : World, entity : EntityId) -> Bool {
+  entity.index >= 0 &&
+  entity.index < self.alive.length() &&
+  (self.alive[entity.index] || self.reserved[entity.index])
+}
+
+///|
+/// Creates validation state anchored to the current world.
+fn HistoryValidationState::new(world : World) -> HistoryValidationState {
+  { world, states: [] }
+}
+
+///|
+/// Finds a cached predicted entity state.
+fn HistoryValidationState::find_state_index(
+  self : HistoryValidationState,
+  entity : EntityId,
+) -> Int {
+  for i = 0; i < self.states.length(); i = i + 1 {
+    if self.states[i].entity == entity {
+      return i
+    }
+  }
+  -1
+}
+
+///|
+/// Ensures an entity has a predicted state initialized from the current world.
+fn HistoryValidationState::ensure_state_index(
+  self : HistoryValidationState,
+  entity : EntityId,
+) -> Int {
+  let existing = self.find_state_index(entity)
+  if existing >= 0 {
+    return existing
+  }
+  let components = match self.world.history_entity_components(entity) {
+    Some(components) => components
+    None => []
+  }
+  let alive = self.world.is_alive(entity)
+  self.states.push({
+    entity,
+    alive,
+    reserved: !alive && self.world.history_entity_slot_blocked(entity),
+    components,
+  })
+  self.states.length() - 1
+}
+
+///|
+/// Replaces one predicted entity state.
+fn HistoryValidationState::replace_state(
+  self : HistoryValidationState,
+  index : Int,
+  alive : Bool,
+  reserved : Bool,
+  components : Array[ComponentTypeId],
+) -> Unit {
+  let entity = self.states[index].entity
+  self.states[index] = { entity, alive, reserved, components }
+}
+
+///|
+/// Returns the predicted component list with `component` appended.
+fn history_components_with_added(
+  components : Array[ComponentTypeId],
+  component : ComponentTypeId,
+) -> Array[ComponentTypeId] {
+  let out = copy_component_array(components)
+  out.push(component)
+  out
+}
+
+///|
+/// Returns the predicted component list without `component`.
+fn history_components_with_removed(
+  components : Array[ComponentTypeId],
+  component : ComponentTypeId,
+) -> Array[ComponentTypeId] {
+  let out : Array[ComponentTypeId] = []
+  for i = 0; i < components.length(); i = i + 1 {
+    if components[i] != component {
+      out.push(components[i])
+    }
+  }
+  out
+}
+
+///|
+/// Validates that a snapshot can be restored, then predicts its entity state.
+fn HistoryValidationState::validate_restore_snapshot(
+  self : HistoryValidationState,
+  snapshot : EntitySnapshot,
+) -> Bool {
+  if snapshot.entity.index < 0 {
+    return false
+  }
+  let index = self.ensure_state_index(snapshot.entity)
+  let state = self.states[index]
+  if state.alive || state.reserved {
+    return false
+  }
+  let components : Array[ComponentTypeId] = []
+  for i = 0; i < snapshot.components.length(); i = i + 1 {
+    let component = snapshot.components[i].component
+    if !self.world.history_component_stride_matches(
+        component,
+        snapshot.components[i].bytes,
+      ) {
+      return false
+    }
+    components.push(component)
+  }
+  if component_array_has_duplicates(components) {
+    return false
+  }
+  self.replace_state(index, true, false, components)
+  true
+}
+
+///|
+/// Validates restoration of an entity created by history without generation rewinding.
+fn HistoryValidationState::validate_restore_created_entity(
+  self : HistoryValidationState,
+  entity : EntityId,
+) -> Bool {
+  if entity.index < 0 {
+    return false
+  }
+  if entity.index < self.world.generations.length() &&
+    self.world.generations[entity.index] != entity.generation {
+    return false
+  }
+  self.validate_restore_snapshot({ entity, components: [] })
+}
+
+///|
+/// Validates that an entity can be removed, then predicts it as dead.
+fn HistoryValidationState::validate_destroy_entity(
+  self : HistoryValidationState,
+  entity : EntityId,
+) -> Bool {
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  if !state.alive {
+    return false
+  }
+  self.replace_state(index, false, false, [])
+  true
+}
+
+///|
+/// Validates that a component can be added, then predicts the ownership change.
+fn HistoryValidationState::validate_add_component(
+  self : HistoryValidationState,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  if !self.world.history_component_stride_matches(component, bytes) {
+    return false
+  }
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  if !state.alive || component_array_contains(state.components, component) {
+    return false
+  }
+  self.replace_state(
+    index,
+    true,
+    false,
+    history_components_with_added(state.components, component),
+  )
+  true
+}
+
+///|
+/// Validates that a component can be removed, then predicts the ownership change.
+fn HistoryValidationState::validate_remove_component(
+  self : HistoryValidationState,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  if !state.alive || !component_array_contains(state.components, component) {
+    return false
+  }
+  self.replace_state(
+    index,
+    true,
+    false,
+    history_components_with_removed(state.components, component),
+  )
+  true
+}
+
+///|
+/// Validates that a component payload can be overwritten.
+fn HistoryValidationState::validate_set_component(
+  self : HistoryValidationState,
+  entity : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  if !self.world.history_component_stride_matches(component, bytes) {
+    return false
+  }
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  state.alive && component_array_contains(state.components, component)
+}
+
+///|
+/// Validates that a Camera GPU row can be restored, then predicts Camera ownership.
+fn HistoryValidationState::validate_restore_camera(
+  self : HistoryValidationState,
+  entity : EntityId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  if bytes.length() != @comp.camera_gpu_byte_stride() {
+    return false
+  }
+  let camera = self.world.camera_component()
+  if !self.world.history_component_registered(camera) {
+    return false
+  }
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  if !state.alive {
+    return false
+  }
+  if component_array_contains(state.components, camera) {
+    true
+  } else {
+    self.replace_state(
+      index,
+      true,
+      false,
+      history_components_with_added(state.components, camera),
+    )
+    true
+  }
+}
+
+///|
+/// Validates one redo delta and updates predicted state.
+fn HistoryValidationState::validate_delta(
+  self : HistoryValidationState,
+  delta : WorldDelta,
+) -> Bool {
+  match delta {
+    EntityCreated(entity) => self.validate_restore_created_entity(entity)
+    EntityDestroyed(snapshot) => self.validate_destroy_entity(snapshot.entity)
+    ComponentAdded(entity, component, bytes) =>
+      self.validate_add_component(entity, component, bytes)
+    ComponentRemoved(entity, component, _) =>
+      self.validate_remove_component(entity, component)
+    ComponentChanged(entity, component, _, after) =>
+      self.validate_set_component(entity, component, after)
+    CameraChanged(entity, _, after) =>
+      self.validate_restore_camera(entity, after)
+  }
+}
+
+///|
+/// Validates one undo delta and updates predicted state.
+fn HistoryValidationState::validate_delta_inverse(
+  self : HistoryValidationState,
+  delta : WorldDelta,
+) -> Bool {
+  match delta {
+    EntityCreated(entity) => self.validate_destroy_entity(entity)
+    EntityDestroyed(snapshot) => self.validate_restore_snapshot(snapshot)
+    ComponentAdded(entity, component, _) =>
+      self.validate_remove_component(entity, component)
+    ComponentRemoved(entity, component, before) =>
+      self.validate_add_component(entity, component, before)
+    ComponentChanged(entity, component, before, _) =>
+      self.validate_set_component(entity, component, before)
+    CameraChanged(entity, before, _) =>
+      match before {
+        Some(bytes) => self.validate_restore_camera(entity, bytes)
+        None =>
+          self.validate_remove_component(entity, self.world.camera_component())
+      }
+  }
+}
+
+///|
 /// Builds a zero-byte array used as the missing side of component changes.
 fn empty_component_bytes() -> FixedArray[Byte] {
   FixedArray::make(0, (0 : Byte))
@@ -900,6 +1248,76 @@ pub fn WorldHistory::set_component_bytes(
 }
 
 ///|
+/// Sets one component payload for many entities as one atomic history operation.
+pub fn WorldHistory::set_component_bytes_many(
+  self : WorldHistory,
+  world : World,
+  component : ComponentTypeId,
+  entities : Array[EntityId],
+  bytes_list : Array[FixedArray[Byte]],
+) -> Bool {
+  if entities.length() != bytes_list.length() {
+    abort(
+      "WorldHistory::set_component_bytes_many: entities and bytes_list length mismatch",
+    )
+  }
+  if !self.recording_enabled() ||
+    self.applying ||
+    world.history_blob_ref_component(component) {
+    let mut ok = true
+    for i = 0; i < entities.length(); i = i + 1 {
+      if !world.set_component_bytes(entities[i], component, bytes_list[i]) {
+        ok = false
+      }
+    }
+    return ok
+  }
+  let before_list : Array[FixedArray[Byte]] = []
+  for i = 0; i < entities.length(); i = i + 1 {
+    let before = match world.component_bytes(entities[i], component) {
+      Some(bytes) => bytes
+      None => return false
+    }
+    if before.length() != bytes_list[i].length() {
+      return false
+    }
+    before_list.push(before)
+  }
+  let auto = self.begin_auto("set_component_bytes_many")
+  self.begin_tracked_world_mutation(world)
+  let mut ok = true
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !world.set_component_bytes(entities[i], component, bytes_list[i]) {
+      ok = false
+    }
+  }
+  self.end_tracked_world_mutation(world)
+  if ok {
+    let after_list : Array[FixedArray[Byte]] = []
+    for i = 0; i < entities.length(); i = i + 1 {
+      match world.component_bytes(entities[i], component) {
+        Some(after) => after_list.push(after)
+        None => ok = false
+      }
+    }
+    if ok {
+      for i = 0; i < entities.length(); i = i + 1 {
+        self.push_delta(
+          ComponentChanged(
+            entities[i],
+            component,
+            before_list[i],
+            after_list[i],
+          ),
+        )
+      }
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Removes a component through the history layer.
 pub fn WorldHistory::remove_component(
   self : WorldHistory,
@@ -1100,9 +1518,47 @@ fn WorldHistory::apply_delta_inverse(
 }
 
 ///|
+/// Validates the next undo record without mutating world state or history stacks.
+fn WorldHistory::validate_record_for_undo(
+  self : WorldHistory,
+  world : World,
+  record : WorldHistoryRecord,
+) -> Bool {
+  ignore(self)
+  let state = HistoryValidationState::new(world)
+  for i = record.deltas.length() - 1; i >= 0; i = i - 1 {
+    if !state.validate_delta_inverse(record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Validates the next redo record without mutating world state or history stacks.
+fn WorldHistory::validate_record_for_redo(
+  self : WorldHistory,
+  world : World,
+  record : WorldHistoryRecord,
+) -> Bool {
+  ignore(self)
+  let state = HistoryValidationState::new(world)
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    if !state.validate_delta(record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// Undoes the most recent committed transaction.
 pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
   if !self.can_undo() {
+    return false
+  }
+  let next = self.undo_stack[self.undo_stack.length() - 1]
+  if !self.validate_record_for_undo(world, next) {
     return false
   }
   let record = match self.undo_stack.pop() {
@@ -1133,6 +1589,10 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
 /// Redoes the most recently undone transaction.
 pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
   if !self.can_redo() {
+    return false
+  }
+  let next = self.redo_stack[self.redo_stack.length() - 1]
+  if !self.validate_record_for_redo(world, next) {
     return false
   }
   let record = match self.redo_stack.pop() {

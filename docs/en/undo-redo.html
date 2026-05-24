@@ -47,6 +47,9 @@ ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes; generic Camera component byte writes remain untracked because the row only stores a blob reference.</p>
 
+          <h2>Bulk Component Updates</h2>
+          <p>Use <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update the same component on many entities. It validates every target first; if any entity is missing the component or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes this as <code>WorldHistory.setComponentBytesMany(world, component, entities, bytesList)</code>.</p>
+
           <h2>Enabled State</h2>
           <ul>
             <li>When history is enabled, tracked methods record undo/redo deltas.</li>
@@ -77,6 +80,9 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> keeps up to 100 committed undo records by default. <code>set_max_undo_records</code> changes that limit; when the stack exceeds the limit, the oldest records are discarded first. Passing <code>0</code> clears undo/redo state and makes future tracked calls delegate without retaining records. Use <code>undo_len</code> and <code>redo_len</code> to inspect the current retained record counts.</p>
+
+          <h2>Apply Validation</h2>
+          <p>Before <code>undo</code> or <code>redo</code> applies a record, <code>WorldHistory</code> validates that the current world can accept every delta in record order. If validation fails, the method returns <code>false</code> without mutating the world or moving records between the undo and redo stacks. This protects history from stale records after untracked edits, while valid dependent records such as create-then-add-component transactions still replay normally.</p>
 
           <h2>Labels</h2>
           <p>Transaction labels are UI metadata. <code>undo_label</code> and <code>redo_label</code> return the label for the next available undo or redo record, so editor UI can present commands such as <code>Undo Move Entity</code>. Labels do not affect world state, transaction ordering, or delta application.</p>

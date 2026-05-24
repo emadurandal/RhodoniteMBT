@@ -79,6 +79,7 @@ import {
 	world_history_set_child_of,
 	world_history_set_camera_matrices_col_major,
 	world_history_set_component_bytes,
+	world_history_set_component_bytes_many,
 	world_history_set_enabled,
 	world_history_set_max_undo_records,
 	world_history_set_raw_mutation_guard_enabled,
@@ -601,6 +602,23 @@ export class WorldHistory {
 				entity.inner,
 				component.inner,
 				bytesInput(bytes),
+			),
+		);
+	}
+
+	setComponentBytesMany(
+		world: World,
+		component: ComponentTypeId,
+		entities: EntityId[],
+		bytesList: Array<Uint8Array | ArrayLike<number>>,
+	): boolean {
+		return moonBool(
+			world_history_set_component_bytes_many(
+				this.inner,
+				world.inner,
+				component.inner,
+				entities.map((entity) => entity.inner),
+				bytesList.map((bytes) => bytesInput(bytes)),
 			),
 		);
 	}

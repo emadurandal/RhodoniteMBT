@@ -47,6 +47,9 @@ ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。generic な Camera component byte write は row が blob ref だけを持つため untracked のままです。</p>
 
+          <h2>Bulk Component Updates</h2>
+          <p>selection や query から得た複数 entity の同一 component をまとめて更新する場合は <code>WorldHistory::set_component_bytes_many</code> を使います。全 target を先に検証し、component を持たない entity や payload size の不一致が 1 件でもあれば何も変更せず <code>false</code> を返します。TypeScript wrapper では <code>WorldHistory.setComponentBytesMany(world, component, entities, bytesList)</code> として公開します。</p>
+
           <h2>Enabled State</h2>
           <ul>
             <li>履歴が有効な場合、tracked method は undo/redo delta を記録します。</li>
@@ -77,6 +80,9 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
+
+          <h2>Apply Validation</h2>
+          <p><code>undo</code> または <code>redo</code> が record を適用する前に、<code>WorldHistory</code> は現在の world が record 内の全 delta を順序通り受け入れられるか検証します。検証に失敗した場合、method は world を変更せず、undo/redo stack 間で record を移動せずに <code>false</code> を返します。これにより untracked edit 後の stale record を保護しつつ、create 後に component を追加するような依存関係を持つ valid transaction は通常通り replay できます。</p>
 
           <h2>Labels</h2>
           <p>transaction label は UI metadata です。<code>undo_label</code> と <code>redo_label</code> は次に実行可能な undo / redo record の label を返すため、editor UI は <code>Undo Move Entity</code> のような command 表示を作れます。label は world state、transaction ordering、delta application には影響しません。</p>

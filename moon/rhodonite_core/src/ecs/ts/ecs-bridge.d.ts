@@ -284,6 +284,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		component: MoonComponentTypeId,
 		bytes: Uint8Array | number[],
 	): MoonBool;
+	export function world_history_set_component_bytes_many(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		component: MoonComponentTypeId,
+		entities: MoonEntityId[],
+		bytesList: Array<Uint8Array | number[]>,
+	): MoonBool;
 	export function world_history_remove_component(
 		history: MoonWorldHistory,
 		world: MoonWorld,

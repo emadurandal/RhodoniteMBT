@@ -638,6 +638,18 @@ pub fn world_history_set_component_bytes(
 }
 
 ///|
+/// Implements `world_history_set_component_bytes_many`.
+pub fn world_history_set_component_bytes_many(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  component : @ecs.ComponentTypeId,
+  entities : Array[@ecs.EntityId],
+  bytes_list : Array[FixedArray[Byte]],
+) -> Bool {
+  history.set_component_bytes_many(world, component, entities, bytes_list)
+}
+
+///|
 /// Implements `world_history_remove_component`.
 pub fn world_history_remove_component(
   history : @ecs.WorldHistory,
