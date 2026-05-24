@@ -8,6 +8,7 @@ pub fn World::set_transform(
   entity : EntityId,
   t : @comp.Transform3D,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_transform")
   let id = self.transform_component_id
   self.assert_system_component_write(id, "World::set_transform")
   let bytes = t.to_component_bytes()
@@ -38,6 +39,7 @@ pub fn World::set_transform_trs(
   sy : Float,
   sz : Float,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::set_transform_trs")
   let id = self.transform_component_id
   self.assert_system_component_write(id, "World::set_transform_trs")
   let bytes = @comp.transform3d_trs_bytes(
@@ -64,6 +66,7 @@ pub fn World::spawn_transform_global_batch(
   count : Int,
   write : (Int, EntityId, MutArrayView[Byte], MutArrayView[Byte]) -> Unit,
 ) -> Array[EntityId] {
+  self.assert_not_history_raw_mutation("World::spawn_transform_global_batch")
   self.assert_not_querying("World::spawn_transform_global_batch")
   self.assert_system_structural_write("World::spawn_transform_global_batch")
   let tf = self.transform_component_id
@@ -179,6 +182,7 @@ pub fn World::update_transform3d_positions(
   self : World,
   f : (EntityId) -> (Float, Float, Float),
 ) -> Unit {
+  self.assert_not_history_raw_mutation("World::update_transform3d_positions")
   let tf = self.transform_component_id
   self.assert_system_component_write(tf, "World::update_transform3d_positions")
   RawQuery::new([tf]).for_each_archetype(self, arch => {
@@ -212,6 +216,7 @@ pub fn World::update_transform3d_positions(
   self : World,
   f : (EntityId) -> (Float, Float, Float),
 ) -> Unit {
+  self.assert_not_history_raw_mutation("World::update_transform3d_positions")
   let tf = self.transform_component_id
   self.assert_system_component_write(tf, "World::update_transform3d_positions")
   for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {

@@ -58,6 +58,7 @@ import {
 	world_write_global_transforms_dense_range_views,
 	world_history_add_component,
 	world_history_add_component_bytes,
+	world_history_begin_guarded_transaction,
 	world_history_begin_transaction,
 	world_history_can_redo,
 	world_history_can_undo,
@@ -69,6 +70,7 @@ import {
 	world_history_enabled,
 	world_history_max_undo_records,
 	world_history_new,
+	world_history_raw_mutation_guard_enabled,
 	world_history_redo,
 	world_history_redo_label,
 	world_history_redo_len,
@@ -78,6 +80,7 @@ import {
 	world_history_set_component_bytes,
 	world_history_set_enabled,
 	world_history_set_max_undo_records,
+	world_history_set_raw_mutation_guard_enabled,
 	world_history_set_transform_trs,
 	world_history_undo,
 	world_history_undo_label,
@@ -471,6 +474,14 @@ export class WorldHistory {
 		world_history_set_enabled(this.inner, enabled);
 	}
 
+	rawMutationGuardEnabled(): boolean {
+		return moonBool(world_history_raw_mutation_guard_enabled(this.inner));
+	}
+
+	setRawMutationGuardEnabled(enabled: boolean): void {
+		world_history_set_raw_mutation_guard_enabled(this.inner, enabled);
+	}
+
 	maxUndoRecords(): number {
 		return world_history_max_undo_records(this.inner);
 	}
@@ -501,6 +512,12 @@ export class WorldHistory {
 
 	beginTransaction(label: string): boolean {
 		return moonBool(world_history_begin_transaction(this.inner, label));
+	}
+
+	beginGuardedTransaction(world: World, label: string): boolean {
+		return moonBool(
+			world_history_begin_guarded_transaction(this.inner, world.inner, label),
+		);
 	}
 
 	commitTransaction(): boolean {

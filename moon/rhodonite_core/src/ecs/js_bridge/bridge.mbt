@@ -461,6 +461,23 @@ pub fn world_history_set_enabled(
 }
 
 ///|
+/// Implements `world_history_raw_mutation_guard_enabled`.
+pub fn world_history_raw_mutation_guard_enabled(
+  history : @ecs.WorldHistory,
+) -> Bool {
+  history.raw_mutation_guard_enabled()
+}
+
+///|
+/// Implements `world_history_set_raw_mutation_guard_enabled`.
+pub fn world_history_set_raw_mutation_guard_enabled(
+  history : @ecs.WorldHistory,
+  enabled : Bool,
+) -> Unit {
+  history.set_raw_mutation_guard_enabled(enabled)
+}
+
+///|
 /// Implements `world_history_max_undo_records`.
 pub fn world_history_max_undo_records(history : @ecs.WorldHistory) -> Int {
   history.max_undo_records()
@@ -512,6 +529,16 @@ pub fn world_history_begin_transaction(
   label : String,
 ) -> Bool {
   history.begin_transaction(label)
+}
+
+///|
+/// Implements `world_history_begin_guarded_transaction`.
+pub fn world_history_begin_guarded_transaction(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  label : String,
+) -> Bool {
+  history.begin_guarded_transaction(world, label)
 }
 
 ///|

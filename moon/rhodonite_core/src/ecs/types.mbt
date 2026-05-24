@@ -311,6 +311,10 @@ pub struct World {
   priv mut system_access_reads : Array[ComponentTypeId]
   priv mut system_access_writes : Array[ComponentTypeId]
   priv mut system_access_structural_write : Bool
+  /// Raw ECS mutation guard depth armed by WorldHistory guarded transactions.
+  priv mut history_raw_mutation_guard_depth : Int
+  /// Tracked mutation bypass depth used by WorldHistory while applying recorded changes.
+  priv mut history_tracked_mutation_depth : Int
   priv transform_component_id : ComponentTypeId
   priv global_transform_component_id : ComponentTypeId
   priv global_transform_default_format : @comp.GlobalTransformGpuFormat

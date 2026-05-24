@@ -321,7 +321,9 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.undoLen()).toBe(0);
 		expect(history.redoLen()).toBe(0);
 
-		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
@@ -380,5 +382,54 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
+	});
+
+	it("guards raw World mutations during guarded WorldHistory transactions", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryRawGuard", 4);
+		const entity = world.createEntity();
+
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.rawMutationGuardEnabled()).toBe(false);
+		history.setRawMutationGuardEnabled(true);
+		expect(history.rawMutationGuardEnabled()).toBe(true);
+		expect(history.beginGuardedTransaction(world, "guarded edit")).toBe(true);
+		expect(() =>
+			world.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0])),
+		).toThrow();
+		expect(
+			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(
+			world.setComponentBytes(entity, cpu, new Uint8Array([3, 0, 0, 0])),
+		).toBe(true);
+
+		expect(history.beginGuardedTransaction(world, "guarded cancel")).toBe(true);
+		expect(() => world.removeComponent(entity, cpu)).toThrow();
+		expect(history.cancelTransaction()).toBe(true);
+		expect(world.removeComponent(entity, cpu)).toBe(true);
+
+		const queryWorld = World.new();
+		const queryHistory = WorldHistory.new();
+		const queryCpu = queryWorld.registerCpuComponent("TsHistoryRawGuardQuery", 4);
+		const queryEntity = queryWorld.createEntity();
+		expect(
+			queryWorld.addComponentBytes(
+				queryEntity,
+				queryCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		queryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			queryHistory.beginGuardedTransaction(queryWorld, "guarded query"),
+		).toBe(true);
+		expect(() =>
+			RawQuery.new([queryCpu]).forEachArchetype(queryWorld, (archetype) => {
+				archetype.writeColumn(queryCpu);
+			}),
+		).toThrow();
 	});
 });

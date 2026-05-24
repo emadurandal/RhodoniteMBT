@@ -454,6 +454,7 @@ pub fn QueryRow::write(
   component : ComponentTypeId,
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Unit {
+  self.world.assert_not_history_raw_mutation("QueryRow::write")
   self.world.assert_system_component_write(component, "QueryRow::write")
   f(self.component_mut_view(component, "QueryRow::write"))
 }
@@ -476,6 +477,7 @@ pub fn RawQueryRow::write_view(
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
   let row = self.as_query_row()
+  row.world.assert_not_history_raw_mutation("RawQueryRow::write_view")
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
   row.component_mut_view(component, "RawQueryRow::write_view")
 }
@@ -499,6 +501,7 @@ pub fn QueryRow::write_transform3d(
   f : (@comp.Transform3DMutRow) -> Unit,
 ) -> Unit {
   let component = self.world.transform_component_id
+  self.world.assert_not_history_raw_mutation("QueryRow::write_transform3d")
   self.world.assert_system_component_write(
     component, "QueryRow::write_transform3d",
   )
@@ -524,6 +527,7 @@ pub fn QueryRow::read_child_of(self : QueryRow) -> EntityId {
 /// Implements `QueryRow::write_child_of`.
 pub fn QueryRow::write_child_of(self : QueryRow, parent : EntityId) -> Unit {
   let component = self.world.child_of_component_id
+  self.world.assert_not_history_raw_mutation("QueryRow::write_child_of")
   self.world.assert_system_component_write(
     component, "QueryRow::write_child_of",
   )
@@ -540,6 +544,7 @@ pub fn QueryRow::write_global_transform(
   f : (@comp.GlobalTransformGpuMutRow) -> Unit,
 ) -> Unit {
   let component = self.world.global_transform_component_id
+  self.world.assert_not_history_raw_mutation("QueryRow::write_global_transform")
   self.world.assert_system_component_write(
     component, "QueryRow::write_global_transform",
   )
@@ -664,6 +669,7 @@ pub fn RawQueryArchetype::write_column(
   self : RawQueryArchetype,
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
+  self.world.assert_not_history_raw_mutation("RawQueryArchetype::write_column")
   self.world.assert_system_component_write(
     component, "RawQueryArchetype::write_column",
   )

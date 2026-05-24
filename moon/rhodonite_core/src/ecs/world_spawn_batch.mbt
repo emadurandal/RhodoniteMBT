@@ -44,6 +44,7 @@ pub fn World::reserve_batch_capacity(
   components : Array[ComponentTypeId],
   additional_rows : Int,
 ) -> Bool {
+  self.assert_not_history_raw_mutation("World::reserve_batch_capacity")
   self.assert_not_querying("World::reserve_batch_capacity")
   self.assert_system_structural_write("World::reserve_batch_capacity")
   if additional_rows < 0 {
@@ -83,6 +84,7 @@ pub fn World::spawn_batch(
   count : Int,
   write : (Int, EntityId, SpawnBatchRow) -> Unit,
 ) -> Array[EntityId] {
+  self.assert_not_history_raw_mutation("World::spawn_batch")
   self.assert_not_querying("World::spawn_batch")
   self.assert_system_structural_write("World::spawn_batch")
   if count < 0 {
@@ -160,6 +162,7 @@ pub fn SpawnBatchRow::write_view(
   self : SpawnBatchRow,
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
+  self.world.assert_not_history_raw_mutation("SpawnBatchRow::write_view")
   self.world.assert_system_component_write(
     component, "SpawnBatchRow::write_view",
   )

@@ -202,6 +202,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		history: MoonWorldHistory,
 		enabled: boolean,
 	): void;
+	export function world_history_raw_mutation_guard_enabled(
+		history: MoonWorldHistory,
+	): MoonBool;
+	export function world_history_set_raw_mutation_guard_enabled(
+		history: MoonWorldHistory,
+		enabled: boolean,
+	): void;
 	export function world_history_max_undo_records(
 		history: MoonWorldHistory,
 	): number;
@@ -220,6 +227,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	): string | undefined;
 	export function world_history_begin_transaction(
 		history: MoonWorldHistory,
+		label: string,
+	): MoonBool;
+	export function world_history_begin_guarded_transaction(
+		history: MoonWorldHistory,
+		world: MoonWorld,
 		label: string,
 	): MoonBool;
 	export function world_history_commit_transaction(
