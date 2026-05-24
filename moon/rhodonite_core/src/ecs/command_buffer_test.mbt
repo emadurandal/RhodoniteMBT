@@ -296,3 +296,63 @@ test "WorldHistory groups multiple tracked system phases in one open transaction
   assert_true(history.undo(world))
   assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
 }
+
+///|
+test "WorldHistory releases temporary command-buffer guard inside normal transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandTemporaryGuardA", 4)
+  let e = world.create_entity()
+  let phase = PhaseKey::new("history-command-temporary-guard")
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-guard", phase, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+    }),
+  )
+  assert_true(history.begin_transaction("Command Guard"))
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase,
+      "ignored",
+    ),
+  )
+  assert_true(world.set_component_bytes(e, qa, bytes4(3, 0, 0, 0)))
+  assert_true(history.set_component_bytes(world, e, qa, bytes4(4, 0, 0, 0)))
+  assert_true(history.commit_transaction())
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory keeps command-buffer guard inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandStickyGuardA", 4)
+  let e = world.create_entity()
+  let phase = PhaseKey::new("history-command-sticky-guard")
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("history-command-sticky", phase, [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+    }),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "Command Sticky Guard"))
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase,
+      "ignored",
+    ),
+  )
+  assert_true(history.set_component_bytes(world, e, qa, bytes4(3, 0, 0, 0)))
+  assert_true(history.commit_transaction())
+}

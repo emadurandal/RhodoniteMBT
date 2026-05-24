@@ -129,15 +129,16 @@ fn WorldHistory::ensure_guarded_world(
 fn WorldHistory::force_guarded_world(
   self : WorldHistory,
   world : World,
-) -> Unit {
+) -> Bool {
   if !self.recording_enabled() || !self.open || self.applying {
-    return
+    return false
   }
   match self.guarded_world {
-    Some(_) => ()
+    Some(_) => false
     None => {
       world.begin_history_raw_mutation_guard()
       self.guarded_world = Some(world)
+      true
     }
   }
 }
@@ -1033,8 +1034,11 @@ pub fn WorldHistory::run_system_phase(
     return runner.run_phase(world, ctx, phase)
   }
   let auto = self.begin_auto(label)
-  self.force_guarded_world(world)
+  let forced_guard = self.force_guarded_world(world)
   let ok = runner.run_phase_tracked(world, ctx, phase, self)
+  if forced_guard && !self.raw_mutation_guard_enabled {
+    self.release_guard()
+  }
   self.finish_auto(auto, true)
   ok
 }
