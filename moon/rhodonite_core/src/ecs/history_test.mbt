@@ -449,3 +449,117 @@ test "WorldHistory restores destroyed Camera presence with readable blob row" {
   let writes = world.drain_camera_blob_write_views()
   assert_true(writes.length() > 0)
 }
+
+///|
+test "WorldHistory tracks Camera matrix add undo and redo" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let after = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected tracked Camera row")
+  }
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(camera, world.camera_component()))
+  assert_true(history.redo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(after))
+}
+
+///|
+test "WorldHistory tracks Camera matrix row changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let before = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected original Camera row")
+  }
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.25 : Float),
+      (500.0 : Float),
+      (1.5 : Float),
+      (0.0 : Float),
+      (2.0 : Float),
+    ),
+  )
+  let after = match world.camera_gpu_row(camera) {
+    Some(bytes) => bytes
+    None => abort("expected changed Camera row")
+  }
+  assert_true(before != after)
+  assert_true(history.undo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(before))
+  assert_true(history.redo(world))
+  assert_true(world.camera_gpu_row(camera) == Some(after))
+}
+
+///|
+test "WorldHistory Camera tracking disabled and zero limit delegate" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  history.set_enabled(false)
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(!history.can_undo())
+  history.set_enabled(true)
+  history.set_max_undo_records(0)
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.2 : Float),
+      (20.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(!history.can_undo())
+}

@@ -655,6 +655,33 @@ pub fn world_history_set_child_of(
 }
 
 ///|
+/// Implements `world_history_set_camera_matrices_col_major`.
+pub fn world_history_set_camera_matrices_col_major(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  view_col_major : FixedArray[Float],
+  proj_col_major : FixedArray[Float],
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Bool {
+  history.set_camera_matrices(
+    world,
+    entity,
+    matrix44f_from_col_major_array(view_col_major),
+    matrix44f_from_col_major_array(proj_col_major),
+    near,
+    far,
+    aspect,
+    projection_kind,
+    flags,
+  )
+}
+
+///|
 /// Implements `spawn_batch_row_entity`.
 pub fn spawn_batch_row_entity(row : @ecs.SpawnBatchRow) -> @ecs.EntityId {
   row.entity()

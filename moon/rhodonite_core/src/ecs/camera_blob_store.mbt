@@ -55,6 +55,23 @@ fn CameraBlobStore::write_matrices(
 }
 
 ///|
+/// Writes one captured Camera GPU row back into the packed blob.
+fn CameraBlobStore::write_row_bytes(
+  self : CameraBlobStore,
+  word_offset : Int,
+  bytes : FixedArray[Byte],
+) -> Unit {
+  if bytes.length() != @comp.camera_gpu_byte_stride() {
+    abort("CameraBlobStore::write_row_bytes: length mismatch")
+  }
+  self.store.write_words(word_offset, @comp.camera_gpu_word_count(), fn(row) {
+    for i = 0; i < bytes.length(); i = i + 1 {
+      row[i] = bytes[i]
+    }
+  })
+}
+
+///|
 /// Implements `CameraBlobStore::read_row`.
 fn CameraBlobStore::read_row(
   self : CameraBlobStore,

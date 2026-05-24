@@ -347,6 +347,7 @@ pub fn WorldHistory::redo(Self, World) -> Bool
 pub fn WorldHistory::redo_label(Self) -> String?
 pub fn WorldHistory::redo_len(Self) -> Int
 pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
+pub fn WorldHistory::set_camera_matrices(Self, World, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn WorldHistory::set_child_of(Self, World, EntityId, EntityId) -> Bool
 pub fn WorldHistory::set_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool
 pub fn WorldHistory::set_enabled(Self, Bool) -> Unit

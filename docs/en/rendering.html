@@ -58,6 +58,7 @@ flowchart TB
 
           <h2>Resource Registration</h2>
           <p><code>Renderable</code> stores mesh/material handle values in ECS, but the handles point into Renderer-owned tables. Undo/redo can restore the Renderable component bytes; it does not recreate meshes, materials, instance buffers, or other GPU resources. Applications that keep renderable history must ensure those resource handles outlive the history records, or add a higher-level asset/resource history above Renderer.</p>
+          <p>For editor operations, use <code>add_renderable_tracked</code>, <code>set_renderable_tracked</code>, and <code>remove_renderable_tracked</code> with <code>WorldHistory</code>. The raw <code>add_renderable</code> and <code>set_renderable</code> helpers remain direct ECS mutations.</p>
           <table>
             <thead><tr><th>API</th><th>Purpose</th></tr></thead>
             <tbody>

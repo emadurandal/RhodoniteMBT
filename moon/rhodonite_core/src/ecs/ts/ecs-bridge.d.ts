@@ -294,6 +294,18 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		entity: MoonEntityId,
 		parent: MoonEntityId,
 	): MoonBool;
+	export function world_history_set_camera_matrices_col_major(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		viewColMajor: number[],
+		projColMajor: number[],
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): MoonBool;
 	export function spawn_batch_row_entity(row: MoonSpawnBatchRow): MoonEntityId;
 	export function spawn_batch_row_write_view(
 		row: MoonSpawnBatchRow,

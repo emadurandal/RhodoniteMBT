@@ -28,6 +28,7 @@ priv enum WorldDelta {
     FixedArray[Byte],
     FixedArray[Byte]
   )
+  CameraChanged(EntityId, FixedArray[Byte]?, FixedArray[Byte])
 }
 
 ///|
@@ -251,6 +252,20 @@ fn World::restore_entity_snapshot(
     self.restore_component_snapshot(arch, row, snapshot.components[i])
   }
   true
+}
+
+///|
+/// Ensures the entity has Camera and writes the captured GPU row bytes.
+fn World::restore_camera_history_row(
+  self : World,
+  entity : EntityId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  let camera = self.camera_component()
+  if !self.has_component(entity, camera) && !self.add_component(entity, camera) {
+    return false
+  }
+  self.write_camera_gpu_row_bytes(entity, bytes)
 }
 
 ///|
@@ -762,6 +777,48 @@ pub fn WorldHistory::set_child_of(
 }
 
 ///|
+/// Sets builtin Camera matrices through the history layer.
+pub fn WorldHistory::set_camera_matrices(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+  view : @m44.Matrix44F,
+  proj : @m44.Matrix44F,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    return world.set_camera_matrices(
+      entity, view, proj, near, far, aspect, projection_kind, flags,
+    )
+  }
+  let camera = world.camera_component()
+  let before = if world.has_component(entity, camera) {
+    match world.camera_gpu_row(entity) {
+      Some(bytes) => Some(bytes)
+      None => return false
+    }
+  } else {
+    None
+  }
+  let auto = self.begin_auto("set_camera_matrices")
+  let ok = world.set_camera_matrices(
+    entity, view, proj, near, far, aspect, projection_kind, flags,
+  )
+  if ok {
+    match world.camera_gpu_row(entity) {
+      Some(after) => self.push_delta(CameraChanged(entity, before, after))
+      None => ()
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Applies one delta in redo order.
 fn WorldHistory::apply_delta(
   self : WorldHistory,
@@ -783,6 +840,8 @@ fn WorldHistory::apply_delta(
       world.remove_component(entity, component)
     ComponentChanged(entity, component, _, after) =>
       world.set_component_bytes(entity, component, after)
+    CameraChanged(entity, _, after) =>
+      world.restore_camera_history_row(entity, after)
   }
 }
 
@@ -807,6 +866,11 @@ fn WorldHistory::apply_delta_inverse(
       }
     ComponentChanged(entity, component, before, _) =>
       world.set_component_bytes(entity, component, before)
+    CameraChanged(entity, before, _) =>
+      match before {
+        Some(bytes) => world.restore_camera_history_row(entity, bytes)
+        None => world.remove_component(entity, world.camera_component())
+      }
   }
 }
 

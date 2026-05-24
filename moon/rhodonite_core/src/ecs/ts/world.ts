@@ -74,6 +74,7 @@ import {
 	world_history_redo_len,
 	world_history_remove_component,
 	world_history_set_child_of,
+	world_history_set_camera_matrices_col_major,
 	world_history_set_component_bytes,
 	world_history_set_enabled,
 	world_history_set_max_undo_records,
@@ -640,6 +641,33 @@ export class WorldHistory {
 				world.inner,
 				entity.inner,
 				parent.inner,
+			),
+		);
+	}
+
+	setCameraMatrices(
+		world: World,
+		entity: EntityId,
+		viewColMajor: ArrayLike<number>,
+		projColMajor: ArrayLike<number>,
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): boolean {
+		return moonBool(
+			world_history_set_camera_matrices_col_major(
+				this.inner,
+				world.inner,
+				entity.inner,
+				Array.from(viewColMajor),
+				Array.from(projColMajor),
+				near,
+				far,
+				aspect,
+				projectionKind,
+				flags,
 			),
 		);
 	}

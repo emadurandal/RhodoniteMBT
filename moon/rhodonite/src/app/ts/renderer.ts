@@ -17,6 +17,7 @@ import {
 	type ComponentTypeId,
 	type EntityId,
 	type World,
+	type WorldHistory,
 } from "../../../../rhodonite_core/src/ecs/ts/index.ts";
 import type { Scene } from "./app-runtime.ts";
 
@@ -472,6 +473,46 @@ export function setRenderable(
 	return world.hasComponent(entity, component)
 		? world.setComponentBytes(entity, component, bytes)
 		: world.addComponentBytes(entity, component, bytes);
+}
+
+export function addRenderableTracked(
+	history: WorldHistory,
+	scene: Scene<World, EntityId>,
+	entity: EntityId,
+	desc: RenderableDesc,
+): boolean {
+	return history.addComponentBytes(
+		scene.world(),
+		entity,
+		sceneRenderableComponent(scene),
+		renderableComponentBytes(desc),
+	);
+}
+
+export function setRenderableTracked(
+	history: WorldHistory,
+	scene: Scene<World, EntityId>,
+	entity: EntityId,
+	desc: RenderableDesc,
+): boolean {
+	const world = scene.world();
+	const component = sceneRenderableComponent(scene);
+	const bytes = renderableComponentBytes(desc);
+	return world.hasComponent(entity, component)
+		? history.setComponentBytes(world, entity, component, bytes)
+		: history.addComponentBytes(world, entity, component, bytes);
+}
+
+export function removeRenderableTracked(
+	history: WorldHistory,
+	scene: Scene<World, EntityId>,
+	entity: EntityId,
+): boolean {
+	return history.removeComponent(
+		scene.world(),
+		entity,
+		sceneRenderableComponent(scene),
+	);
 }
 
 export class Renderer {

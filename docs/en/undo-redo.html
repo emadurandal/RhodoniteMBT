@@ -45,6 +45,7 @@ ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.
 ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
+          <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes; generic Camera component byte writes remain untracked because the row only stores a blob reference.</p>
 
           <h2>Enabled State</h2>
           <ul>

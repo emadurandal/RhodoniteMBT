@@ -202,6 +202,68 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(row ?? new Uint8Array(), 20)).toBeCloseTo(1);
 	});
 
+	it("tracks builtin camera matrices through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(
+			history.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.1,
+				50,
+				1,
+				1,
+				0,
+			),
+		).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		let writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+		expect(history.redo(world)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(writes.length).toBeGreaterThan(0);
+
+		expect(
+			history.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+		expect(history.undo(world)).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+		expect(history.redo(world)).toBe(true);
+		writes = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+	});
+
 	it("exposes builtin orbit camera component ids", () => {
 		const world = World.new();
 

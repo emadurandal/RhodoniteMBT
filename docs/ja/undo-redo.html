@@ -45,6 +45,7 @@ ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.
 ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
+          <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。generic な Camera component byte write は row が blob ref だけを持つため untracked のままです。</p>
 
           <h2>Enabled State</h2>
           <ul>

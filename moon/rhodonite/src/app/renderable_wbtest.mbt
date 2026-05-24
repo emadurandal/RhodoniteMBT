@@ -105,3 +105,54 @@ test "WorldHistory undoes and redoes Renderable add remove and set bytes" {
   assert_true(history.undo(world))
   assert_true(world.component_bytes(entity, component) == Some(second))
 }
+
+///|
+test "tracked Renderable helpers use WorldHistory component records" {
+  let scene = Scene::new("renderable-tracked-helpers")
+  let world = scene.world()
+  let history = @ecs.WorldHistory::new()
+  let component = scene.renderable_component_id
+  let entity = world.create_entity()
+  let first = renderable_component_bytes(
+    RenderableDesc::new(MeshHandle::{ index: 10 }, MaterialHandle::{ index: 20 }),
+  )
+  let second = renderable_component_bytes(
+    RenderableDesc::new(
+      MeshHandle::{ index: 30 },
+      MaterialHandle::{ index: 40 },
+      flags=renderable_flags_none(),
+    ),
+  )
+  assert_true(
+    add_renderable_tracked(
+      history,
+      scene,
+      entity,
+      RenderableDesc::new(MeshHandle::{ index: 10 }, MaterialHandle::{
+        index: 20,
+      }),
+    ),
+  )
+  assert_true(world.component_bytes(entity, component) == Some(first))
+  assert_true(
+    set_renderable_tracked(
+      history,
+      scene,
+      entity,
+      RenderableDesc::new(
+        MeshHandle::{ index: 30 },
+        MaterialHandle::{ index: 40 },
+        flags=renderable_flags_none(),
+      ),
+    ),
+  )
+  assert_true(world.component_bytes(entity, component) == Some(second))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, component) == Some(first))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(entity, component) == Some(second))
+  assert_true(remove_renderable_tracked(history, scene, entity))
+  assert_true(!world.has_component(entity, component))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, component) == Some(second))
+}

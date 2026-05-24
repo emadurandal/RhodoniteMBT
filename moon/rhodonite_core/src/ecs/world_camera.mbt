@@ -134,6 +134,24 @@ pub fn World::camera_gpu_row(
 }
 
 ///|
+/// Writes a captured Camera GPU row into the entity's current Camera blob slot.
+fn World::write_camera_gpu_row_bytes(
+  self : World,
+  entity : EntityId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  let id = self.camera_component_id
+  self.assert_system_component_write(id, "World::write_camera_gpu_row_bytes")
+  match self.camera_ref_unchecked(entity) {
+    Some(camera_ref) => {
+      self.camera_blob.write_row_bytes(camera_ref.word_offset, bytes)
+      true
+    }
+    None => false
+  }
+}
+
+///|
 /// Implements `World::camera_blob_word_capacity`.
 pub fn World::camera_blob_word_capacity(self : World) -> Int {
   self.camera_blob.word_capacity()
