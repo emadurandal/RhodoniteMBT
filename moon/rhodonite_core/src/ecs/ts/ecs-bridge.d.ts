@@ -589,6 +589,23 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		phase: MoonPhaseKey,
 	): MoonSystem;
+	export function orbit_camera_transform_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		orbitComponent: MoonComponentTypeId,
+		homeComponent: MoonComponentTypeId,
+	): MoonSystem;
+	export function camera_blob_sync_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		lensComponent: MoonComponentTypeId,
+	): MoonSystem;
+	export function orbit_camera_blob_sync_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		orbitComponent: MoonComponentTypeId,
+		lensComponent: MoonComponentTypeId,
+	): MoonSystem;
 
 	export function system_runner_new(): MoonSystemRunner;
 	export function system_runner_len(runner: MoonSystemRunner): number;

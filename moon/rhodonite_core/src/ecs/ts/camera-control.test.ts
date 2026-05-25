@@ -3,6 +3,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	PhaseKey,
+	SystemContext,
+	SystemRunner,
 	World,
 	WorldHistory,
 	addCameraLensOrthographic,
@@ -11,6 +14,9 @@ import {
 	addOrbitCameraControllerWithPose,
 	addOrbitCameraControllerWithPoseTracked,
 	createOrbitCameraController,
+	createCameraBlobSyncCommandSystem,
+	createOrbitCameraBlobSyncCommandSystem,
+	createOrbitCameraTransformCommandSystem,
 	createOrbitOrthographicCameraDescFromYzPosition,
 	readOrbitCameraControllerComponent,
 	registerCameraHomeTransformComponent,
@@ -32,6 +38,13 @@ import {
 	updateOrbitCameraControllerComponentFromMouseFrameTracked,
 	updateOrbitCameraControllerFromMouseFrame,
 } from "./index.ts";
+
+const IDENTITY_MAT4 = new Float32Array([
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1,
+]);
 
 describe("OrbitCameraController TypeScript wrapper", () => {
 	it("allows wheel dolly to zoom in to the default lower clamp", () => {
@@ -300,5 +313,148 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(
 			yawAfter,
 		);
+	});
+
+	it("runs camera-control command systems through SystemRunner", () => {
+		const world = World.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
+		expect(
+			setupOrbitOrthographicCamera(
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(0, 0, 16, 0.1, 50, 1, 2),
+			),
+		).toBe(true);
+		world.drainCameraBlobWriteViews();
+		expect(
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
+				leftDown: false,
+				leftPressed: false,
+				middleDown: false,
+				middlePressed: false,
+				pointerDeltaX: 0,
+				pointerDeltaY: 0,
+				wheelDeltaY: 1000,
+			}),
+		).toBe(true);
+
+		const updatePhase = PhaseKey.new("test/ts-command-update");
+		const updateRunner = SystemRunner.new();
+		updateRunner.addSystem(
+			createOrbitCameraTransformCommandSystem(world, updatePhase, orbit, home),
+		);
+		expect(
+			updateRunner.runPhase(world, SystemContext.new(0.016, 1), updatePhase),
+		).toBe(true);
+
+		const renderPhase = PhaseKey.new("test/ts-command-render");
+		const renderRunner = SystemRunner.new();
+		renderRunner.addSystem(
+			createOrbitCameraBlobSyncCommandSystem(world, renderPhase, orbit, lens),
+		);
+		expect(
+			renderRunner.runPhase(world, SystemContext.new(0.016, 2), renderPhase),
+		).toBe(true);
+		const writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.bytes().getF32(0)).toBeCloseTo(0.25);
+	});
+
+	it("runs camera blob command system through command buffer", () => {
+		const world = World.new();
+		const camera = world.createEntity();
+		const lens = world.cameraLensComponent();
+		expect(world.setGlobalTransform(camera, IDENTITY_MAT4)).toBe(true);
+		expect(
+			world.setCameraMatrices(
+				camera,
+				IDENTITY_MAT4,
+				IDENTITY_MAT4,
+				0.1,
+				50,
+				1,
+				1,
+				0,
+			),
+		).toBe(true);
+		world.drainCameraBlobWriteViews();
+		expect(addCameraLensOrthographic(world, camera, lens, 0.1, 50, 1, 2, 0)).toBe(true);
+		const phase = PhaseKey.new("test/ts-camera-command-render");
+		const runner = SystemRunner.new();
+		runner.addSystem(createCameraBlobSyncCommandSystem(world, phase, lens));
+		expect(runner.runPhase(world, SystemContext.new(0.016, 1), phase)).toBe(true);
+		expect(world.drainCameraBlobWriteViews()).toHaveLength(1);
+	});
+
+	it("tracks camera-control command systems through WorldHistory.runSystemPhase", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
+		expect(
+			setupOrbitOrthographicCamera(
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(0, 0, 16, 0.1, 50, 1, 2),
+			),
+		).toBe(true);
+		world.drainCameraBlobWriteViews();
+		expect(
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
+				leftDown: true,
+				leftPressed: false,
+				middleDown: false,
+				middlePressed: false,
+				pointerDeltaX: 10,
+				pointerDeltaY: 0,
+				wheelDeltaY: 0,
+			}),
+		).toBe(true);
+		const before = world.componentBytesCopy(camera, world.transformComponent());
+		expect(before).not.toBeNull();
+
+		const updatePhase = PhaseKey.new("test/ts-history-command-update");
+		const updateRunner = SystemRunner.new();
+		updateRunner.addSystem(
+			createOrbitCameraTransformCommandSystem(world, updatePhase, orbit, home),
+		);
+		const renderPhase = PhaseKey.new("test/ts-history-command-render");
+		const renderRunner = SystemRunner.new();
+		renderRunner.addSystem(
+			createOrbitCameraBlobSyncCommandSystem(world, renderPhase, orbit, lens),
+		);
+
+		expect(history.beginTransaction("camera command systems")).toBe(true);
+		expect(
+			history.runSystemPhase(
+				updateRunner,
+				world,
+				SystemContext.new(0.016, 1),
+				updatePhase,
+				"Orbit Transform Command",
+			),
+		).toBe(true);
+		expect(
+			history.runSystemPhase(
+				renderRunner,
+				world,
+				SystemContext.new(0.016, 2),
+				renderPhase,
+				"Orbit Blob Command",
+			),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		const after = world.componentBytesCopy(camera, world.transformComponent());
+		expect(after).not.toEqual(before);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(camera, world.transformComponent())).toEqual(before);
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(camera, world.transformComponent())).toEqual(after);
 	});
 });

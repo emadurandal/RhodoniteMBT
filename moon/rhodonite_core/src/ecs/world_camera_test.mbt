@@ -255,6 +255,116 @@ test "orbit camera blob sync applies orthographic dolly scale" {
 }
 
 ///|
+test "camera-control command systems update through SystemRunner" {
+  let world = World::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera(
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.0,
+        (0.0 : Float),
+        (16.0 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (2.0 : Float),
+      ),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame(
+      world,
+      camera,
+      false,
+      false,
+      false,
+      false,
+      (0.0 : Float),
+      (0.0 : Float),
+      (1000.0 : Float),
+    ),
+  )
+  let update_phase = PhaseKey::new("test/command_update")
+  let update_runner = SystemRunner::new()
+  update_runner.add_system(
+    orbit_camera_transform_command_system(world, update_phase, orbit, home),
+  )
+  assert_true(
+    update_runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase,
+    ),
+  )
+  let render_phase = PhaseKey::new("test/command_render_extract")
+  let render_runner = SystemRunner::new()
+  render_runner.add_system(
+    orbit_camera_blob_sync_command_system(world, render_phase, orbit, lens),
+  )
+  assert_true(
+    render_runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 2),
+      render_phase,
+    ),
+  )
+  match world.camera_gpu_row(camera) {
+    Some(bytes) => {
+      let view_proj = @comp.camera_view_proj_from_gpu_bytes(bytes)
+      assert_eq(view_proj.at(0, 0), (0.25 : Float))
+      assert_eq(view_proj.at(1, 1), (0.25 : Float))
+    }
+    None => abort("expected command Camera row")
+  }
+}
+
+///|
+test "camera blob sync command system writes through command buffer" {
+  let world = World::new()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/camera_command_render_extract")
+  let runner = SystemRunner::new()
+  runner.add_system(camera_blob_sync_command_system(world, phase, lens))
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
 test "setup orbit orthographic camera initializes transform components and camera blob" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()
@@ -432,4 +542,151 @@ test "tracked orbit camera edit helpers group drag sync and reset sync" {
   assert_true(history.undo(world))
   let (yaw_restored, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
   assert_eq(yaw_restored, yaw_after)
+}
+
+///|
+test "WorldHistory tracks camera-control command systems through system phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera(
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.0,
+        (0.0 : Float),
+        (16.0 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (2.0 : Float),
+      ),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame(
+      world,
+      camera,
+      true,
+      false,
+      false,
+      false,
+      (10.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let before = match world.get_global_transform(camera) {
+    Some(matrix) => matrix
+    None => abort("expected GlobalTransform")
+  }
+  let update_phase = PhaseKey::new("test/history_command_update")
+  let render_phase = PhaseKey::new("test/history_command_render")
+  let update_runner = SystemRunner::new()
+  update_runner.add_system(
+    orbit_camera_transform_command_system(world, update_phase, orbit, home),
+  )
+  let render_runner = SystemRunner::new()
+  render_runner.add_system(
+    orbit_camera_blob_sync_command_system(world, render_phase, orbit, lens),
+  )
+  assert_true(history.begin_transaction("camera command systems"))
+  assert_true(
+    history.run_system_phase(
+      update_runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase,
+      "Orbit Transform Command",
+    ),
+  )
+  assert_true(
+    history.run_system_phase(
+      render_runner,
+      world,
+      SystemContext::new((0.016 : Float), 2),
+      render_phase,
+      "Orbit Blob Command",
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  let after = match world.get_global_transform(camera) {
+    Some(matrix) => matrix
+    None => abort("expected updated GlobalTransform")
+  }
+  assert_true(after != before)
+  assert_true(history.undo(world))
+  match world.get_global_transform(camera) {
+    Some(matrix) => assert_eq(matrix, before)
+    None => abort("expected undone GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  match world.get_global_transform(camera) {
+    Some(matrix) => assert_eq(matrix, after)
+    None => abort("expected redone GlobalTransform")
+  }
+  assert_true(world.drain_camera_blob_write_views().length() > 0)
+}
+
+///|
+test "camera-control command systems run in guarded history phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera(
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.0,
+        (0.0 : Float),
+        (16.0 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (2.0 : Float),
+      ),
+    ),
+  )
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame(
+      world,
+      camera,
+      true,
+      false,
+      false,
+      false,
+      (10.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/guarded_camera_command_update")
+  let runner = SystemRunner::new()
+  runner.add_system(
+    orbit_camera_transform_command_system(world, phase, orbit, home),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded camera command"),
+  )
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      phase,
+      "Guarded Camera Command",
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
 }

@@ -747,6 +747,14 @@ fn copy_view_to_mut_view(
 }
 
 ///|
+/// Copies one read-only byte view into an owned FixedArray.
+fn fixed_array_from_view(src : ArrayView[Byte]) -> FixedArray[Byte] {
+  let out = FixedArray::make(src.length(), (0 : Byte))
+  copy_view_to_mut_view(src, out.mut_view(start=0, end=out.length()))
+  out
+}
+
+///|
 /// Stores the entity's current local Transform3D row as its camera reset home.
 pub fn set_camera_home_from_current_transform(
   world : World,
@@ -1578,6 +1586,85 @@ pub fn orbit_camera_transform_system(
 }
 
 ///|
+/// Builds a command-buffer system that queues orbit controller transform writes.
+pub fn orbit_camera_transform_command_system(
+  world : World,
+  phase : PhaseKey,
+  orbit_component : ComponentTypeId,
+  home_component : ComponentTypeId,
+) -> System {
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  System::new(
+    "rhodonite/orbit_camera_transform_command",
+    phase,
+    [home_component],
+    [tf, gt, orbit_component],
+    fn(world, _ctx, commands) {
+      Query::new([tf, gt, orbit_component, home_component]).for_each(world, row => {
+        let entity = row.entity()
+        let mut reset_requested = false
+        row.read(orbit_component, orbit_row => {
+          let (_, _, _, _, _, _, requested) = orbit_camera_pose_from_controller_view(
+            orbit_row,
+          )
+          reset_requested = requested
+        })
+        if reset_requested {
+          let mut home_bytes = FixedArray::make(0, (0 : Byte))
+          row.read(home_component, home_row => {
+            home_bytes = fixed_array_from_view(home_row)
+          })
+          let mut orbit_bytes = FixedArray::make(0, (0 : Byte))
+          row.read(orbit_component, orbit_row => {
+            orbit_bytes = fixed_array_from_view(orbit_row)
+            reset_orbit_camera_controller_view(
+              orbit_bytes.mut_view(start=0, end=orbit_bytes.length()),
+            )
+          })
+          commands.set_component_bytes(entity, tf, home_bytes)
+          commands.set_component_bytes(entity, orbit_component, orbit_bytes)
+          commands.set_global_transform(
+            entity,
+            @comp.Transform3D::local_matrix_from_component_view(home_bytes[:]),
+          )
+        } else {
+          let mut yaw = (0.0 : Float)
+          let mut pitch = (0.0 : Float)
+          let mut pan_x = (0.0 : Float)
+          let mut pan_y = (0.0 : Float)
+          let mut distance = (16.0 : Float)
+          row.read(orbit_component, orbit_row => {
+            let (cy, cp, cpx, cpy, _dolly, cdistance, _requested) = orbit_camera_pose_from_controller_view(
+              orbit_row,
+            )
+            yaw = cy
+            pitch = cp
+            pan_x = cpx
+            pan_y = cpy
+            distance = cdistance
+          })
+          let tf_bytes = FixedArray::make(
+            @comp.transform3d_gpu_layout().stride,
+            (0 : Byte),
+          )
+          let local_matrix = write_orbit_transform_row(
+            tf_bytes.mut_view(start=0, end=tf_bytes.length()),
+            yaw,
+            pitch,
+            pan_x,
+            pan_y,
+            distance,
+          )
+          commands.set_component_bytes(entity, tf, tf_bytes)
+          commands.set_global_transform(entity, local_matrix)
+        }
+      })
+    },
+  )
+}
+
+///|
 /// Builds a system that writes Camera blob rows from GlobalTransform and CameraLens.
 pub fn camera_blob_sync_system(
   world : World,
@@ -1606,6 +1693,44 @@ pub fn camera_blob_sync_system(
                     world.set_camera_matrices(
                       entity, view, proj, near, far, aspect, projection_kind, flags,
                     ),
+                  )
+                })
+              None => ()
+            }
+          None => ()
+        }
+      })
+    },
+  )
+}
+
+///|
+/// Builds a command-buffer system that queues Camera blob writes from GlobalTransform and CameraLens.
+pub fn camera_blob_sync_command_system(
+  world : World,
+  phase : PhaseKey,
+  lens_component : ComponentTypeId,
+) -> System {
+  let gt = world.global_transform_component()
+  let camera = world.camera_component()
+  System::new(
+    "rhodonite/camera_blob_sync_command",
+    phase,
+    [gt, lens_component],
+    [camera],
+    fn(world, _ctx, commands) {
+      Query::new([gt, camera, lens_component]).for_each(world, row => {
+        let entity = row.entity()
+        match world.get_global_transform(entity) {
+          Some(global) =>
+            match global.inverse() {
+              Some(view) =>
+                row.read(lens_component, lens_row => {
+                  let (proj, near, far, aspect, projection_kind, flags) = camera_lens_projection_from_view(
+                    lens_row,
+                  )
+                  commands.set_camera_matrices(
+                    entity, view, proj, near, far, aspect, projection_kind, flags,
                   )
                 })
               None => ()
@@ -1660,6 +1785,59 @@ pub fn orbit_camera_blob_sync_system(
                           entity, view, proj, near, far, aspect, projection_kind,
                           flags,
                         ),
+                      )
+                    })
+                  })
+                None => ()
+              }
+            None => ()
+          }
+        },
+      )
+    },
+  )
+}
+
+///|
+/// Builds a command-buffer system that queues orbit Camera blob writes.
+pub fn orbit_camera_blob_sync_command_system(
+  world : World,
+  phase : PhaseKey,
+  orbit_component : ComponentTypeId,
+  lens_component : ComponentTypeId,
+) -> System {
+  let gt = world.global_transform_component()
+  let camera = world.camera_component()
+  System::new(
+    "rhodonite/orbit_camera_blob_sync_command",
+    phase,
+    [gt, lens_component, orbit_component],
+    [camera],
+    fn(world, _ctx, commands) {
+      Query::new([gt, camera, lens_component, orbit_component]).for_each(
+        world,
+        row => {
+          let entity = row.entity()
+          match world.get_global_transform(entity) {
+            Some(global) =>
+              match global.inverse() {
+                Some(view) =>
+                  row.read(orbit_component, orbit_row => {
+                    let (
+                      _yaw,
+                      _pitch,
+                      _pan_x,
+                      _pan_y,
+                      dolly,
+                      _distance,
+                      _requested,
+                    ) = orbit_camera_pose_from_controller_view(orbit_row)
+                    row.read(lens_component, lens_row => {
+                      let (proj, near, far, aspect, projection_kind, flags) = camera_lens_projection_from_view_with_ortho_scale(
+                        lens_row, dolly,
+                      )
+                      commands.set_camera_matrices(
+                        entity, view, proj, near, far, aspect, projection_kind, flags,
                       )
                     })
                   })

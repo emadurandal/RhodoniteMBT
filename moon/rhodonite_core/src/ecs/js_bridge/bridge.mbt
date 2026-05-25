@@ -1317,6 +1317,42 @@ pub fn transform_propagation_system(
 }
 
 ///|
+/// Implements `orbit_camera_transform_command_system`.
+pub fn orbit_camera_transform_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  home_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.orbit_camera_transform_command_system(
+    world, phase, orbit_component, home_component,
+  )
+}
+
+///|
+/// Implements `camera_blob_sync_command_system`.
+pub fn camera_blob_sync_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  lens_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.camera_blob_sync_command_system(world, phase, lens_component)
+}
+
+///|
+/// Implements `orbit_camera_blob_sync_command_system`.
+pub fn orbit_camera_blob_sync_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  lens_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.orbit_camera_blob_sync_command_system(
+    world, phase, orbit_component, lens_component,
+  )
+}
+
+///|
 /// Implements `system_runner_new`.
 pub fn system_runner_new() -> @ecs.SystemRunner {
   @ecs.SystemRunner::new()

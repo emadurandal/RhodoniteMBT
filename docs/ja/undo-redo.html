@@ -71,6 +71,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Tracked Command Buffers</h2>
           <p>editor system が <code>CommandBuffer</code> に mutation を queue する場合は <code>WorldHistory::run_system_phase</code> を使います。これは <code>SystemRunner::run_phase</code> と同じように phase を実行しつつ、queued command を tracked history method 経由で apply し、指定した label の record に保存します。Command buffer では blob-backed builtin helper を <code>set_global_transform</code>、<code>set_global_transform_format</code>、<code>set_camera_matrices</code> として queue できます。tracked phase では対応する <code>WorldHistory</code> helper 経由で dispatch します。</p>
+          <p>camera-control には editor flow 向けの command-system variant として <code>orbit_camera_transform_command_system</code>、<code>camera_blob_sync_command_system</code>、<code>orbit_camera_blob_sync_command_system</code> があります。これらを <code>WorldHistory::run_system_phase</code> で実行すると、queued された Transform3D、GlobalTransform、Camera blob write が記録されます。履歴が不要な runtime path では raw camera-control system を使います。</p>
           <p>TypeScript wrapper では同じ経路を <code>WorldHistory.runSystemPhase(runner, world, ctx, phase, label)</code> として公開します。<code>SystemRunner</code>、<code>System</code>、<code>SystemContext</code>、<code>CommandBuffer</code> は <code>@rhodonite/core/ecs</code> から利用できます。TypeScript system では builtin command を <code>commands.setGlobalTransform</code>、<code>commands.setGlobalTransformFormat</code>、<code>commands.setCameraMatrices</code> として queue できます。</p>
           <pre><code class="language-moonbit">ignore(history.run_system_phase(
   runner,
@@ -89,7 +90,7 @@ ignore(history.commit_transaction())</code></pre>
               <tr><td><code>World</code> raw mutator</td><td>untracked です。guarded transaction 中は raw mutation が abort します。</td><td>runtime system、simulation、低レベル storage edit。</td></tr>
               <tr><td><code>WorldHistory</code> direct method と tracked camera-control helper</td><td>entity create/destroy、component add/set/remove、bulk add/set、spawn batch、Transform3D TRS、ChildOf、GlobalTransform matrix/format、Camera matrices、orbit camera-control setup/edit/sync helper を tracked に記録します。</td><td>editor/importer の authoring operation。</td></tr>
               <tr><td>Tracked query callback</td><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code>、<code>RawQueryArchetype::write_column_tracked</code> は component byte delta を記録します。raw query write は untracked のままで、guard 対象です。</td><td>selection edit や query 由来の authoring loop。</td></tr>
-              <tr><td><code>CommandBuffer</code></td><td>raw <code>SystemRunner::run_phase</code> は untracked に apply します。<code>WorldHistory::run_system_phase</code> は対応 command を tracked history API 経由で dispatch します。</td><td>iteration 中に変更を queue する editor system。</td></tr>
+              <tr><td><code>CommandBuffer</code> と command-system variant</td><td>raw <code>SystemRunner::run_phase</code> は untracked に apply します。<code>WorldHistory::run_system_phase</code> は camera-control command system を含む対応 command を tracked history API 経由で dispatch します。</td><td>iteration 中に変更を queue する editor system。</td></tr>
               <tr><td>GPU/blob upload and drain helper</td><td>意図的に untracked です。</td><td>derived render data upload、resize event、readback plumbing。</td></tr>
             </tbody>
           </table>
