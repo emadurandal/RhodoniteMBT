@@ -10,6 +10,7 @@ import type {
 	MoonRawQueryArchetype,
 	MoonRawQueryRow,
 	MoonWorld,
+	MoonWorldHistory,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	prepared_query_for_each,
@@ -21,6 +22,7 @@ import {
 	query_row_has,
 	query_row_read,
 	query_row_write,
+	query_row_write_tracked,
 	raw_prepared_query_for_each,
 	raw_prepared_query_for_each_archetype,
 	raw_query_archetype_component_stride,
@@ -37,6 +39,7 @@ import {
 	raw_query_row_has,
 	raw_query_row_read_view,
 	raw_query_row_write_view,
+	raw_query_row_write_tracked,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
 import { ByteView, byteView, moonBool } from "./views.ts";
@@ -155,6 +158,18 @@ export class QueryRow {
 	write(component: ComponentTypeId, f: (bytes: ByteView) => void): void {
 		query_row_write(this.inner, component.inner, (bytes) => f(byteView(bytes)));
 	}
+
+	writeTracked(
+		history: { readonly inner: MoonWorldHistory },
+		component: ComponentTypeId,
+		f: (bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			query_row_write_tracked(this.inner, history.inner, component.inner, (bytes) =>
+				f(byteView(bytes)),
+			),
+		);
+	}
 }
 
 export class RawQueryRow {
@@ -178,6 +193,18 @@ export class RawQueryRow {
 
 	writeView(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_row_write_view(this.inner, component.inner));
+	}
+
+	writeTracked(
+		history: { readonly inner: MoonWorldHistory },
+		component: ComponentTypeId,
+		f: (bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			raw_query_row_write_tracked(this.inner, history.inner, component.inner, (bytes) =>
+				f(byteView(bytes)),
+			),
+		);
 	}
 }
 

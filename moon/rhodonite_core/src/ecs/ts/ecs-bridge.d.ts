@@ -430,6 +430,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		component: MoonComponentTypeId,
 		f: (bytes: MoonByteView) => void,
 	): void;
+	export function query_row_write_tracked(
+		row: MoonQueryRow,
+		history: MoonWorldHistory,
+		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
 	export function raw_query_row_read_view(
 		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
@@ -438,6 +444,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+	export function raw_query_row_write_tracked(
+		row: MoonRawQueryRow,
+		history: MoonWorldHistory,
+		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
 	export function raw_query_archetype_length(
 		archetype: MoonRawQueryArchetype,
 	): number;

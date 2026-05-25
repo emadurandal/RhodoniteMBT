@@ -183,6 +183,7 @@ pub fn QueryRow::read_transform3d(Self) -> @components.Transform3DRow
 pub fn QueryRow::write(Self, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Unit
 pub fn QueryRow::write_child_of(Self, EntityId) -> Unit
 pub fn QueryRow::write_global_transform(Self, (@components.GlobalTransformGpuMutRow) -> Unit) -> Unit
+pub fn QueryRow::write_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
 pub fn QueryRow::write_transform3d(Self, (@components.Transform3DMutRow) -> Unit) -> Unit
 
 pub struct RawPreparedQuery {
@@ -216,6 +217,7 @@ pub struct RawQueryRow {
 pub fn RawQueryRow::entity(Self) -> EntityId
 pub fn RawQueryRow::has(Self, ComponentTypeId) -> Bool
 pub fn RawQueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn RawQueryRow::write_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {

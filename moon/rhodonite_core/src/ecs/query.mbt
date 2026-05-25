@@ -460,6 +460,57 @@ pub fn QueryRow::write(
 }
 
 ///|
+/// Runs `f` with a mutable payload view and records one component change through `history`.
+///
+/// When history recording is disabled, this delegates to `QueryRow::write` without copying
+/// before/after bytes.
+pub fn QueryRow::write_tracked(
+  self : QueryRow,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  ignore(self.component_payload_index(component, "QueryRow::write_tracked"))
+  if !history.recording_enabled() ||
+    history.applying ||
+    self.world.history_blob_ref_component(component) {
+    self.write(component, f)
+    let reason = if !history.recording_enabled() {
+      "recording_disabled"
+    } else if history.applying {
+      "applying"
+    } else {
+      history_diagnostic_none()
+    }
+    history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  let before = match self.world.component_bytes(self.entity, component) {
+    Some(bytes) => bytes
+    None => {
+      history.set_diagnostic("operation_failed")
+      return false
+    }
+  }
+  let auto = history.begin_auto("query_row_write")
+  history.begin_tracked_world_mutation(self.world)
+  self.world.assert_system_component_write(component, "QueryRow::write_tracked")
+  f(self.component_mut_view(component, "QueryRow::write_tracked"))
+  history.end_tracked_world_mutation(self.world)
+  let ok = match self.world.component_bytes(self.entity, component) {
+    Some(after) => {
+      history.push_delta(
+        ComponentChanged(self.entity, component, before, after),
+      )
+      true
+    }
+    None => false
+  }
+  history.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Implements `RawQueryRow::read_view`.
 pub fn RawQueryRow::read_view(
   self : RawQueryRow,
@@ -480,6 +531,17 @@ pub fn RawQueryRow::write_view(
   row.world.assert_not_history_raw_mutation("RawQueryRow::write_view")
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
   row.component_mut_view(component, "RawQueryRow::write_view")
+}
+
+///|
+/// Runs `f` with a mutable payload view and records one component change through `history`.
+pub fn RawQueryRow::write_tracked(
+  self : RawQueryRow,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  self.as_query_row().write_tracked(history, component, f)
 }
 
 ///|

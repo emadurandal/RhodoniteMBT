@@ -90,6 +90,88 @@ test "QueryRow closure access uses component ids" {
 }
 
 ///|
+test "QueryRow write_tracked records undo and redo component bytes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryRowTracked", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  Query::new([cpu]).for_each(world, row => {
+    if !row.write_tracked(history, cpu, bytes => bytes[0] = (7 : Byte)) {
+      abort("expected tracked query row write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo_label() is Some("query_row_write"))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(7, 0, 0, 0))
+    None => abort("expected tracked query bytes")
+  }
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
+    None => abort("expected undone query bytes")
+  }
+  assert_true(history.redo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(7, 0, 0, 0))
+    None => abort("expected redone query bytes")
+  }
+}
+
+///|
+test "RawQueryRow write_tracked records undo and disabled writes delegate" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("RawQueryRowTracked", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each(world, row => {
+    if !row.write_tracked(history, cpu, bytes => bytes[0] = (5 : Byte)) {
+      abort("expected tracked raw query row write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  history.set_max_undo_records(0)
+  RawQuery::new([cpu]).for_each(world, row => {
+    if !row.write_tracked(history, cpu, bytes => bytes[0] = (9 : Byte)) {
+      abort("expected delegated raw query row write")
+    }
+  })
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(9, 0, 0, 0))
+    None => abort("expected delegated raw query bytes")
+  }
+}
+
+///|
+test "QueryRow write_tracked works inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryRowTrackedGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded query write"))
+  Query::new([cpu]).for_each(world, row => {
+    if !row.write_tracked(history, cpu, bytes => bytes[0] = (3 : Byte)) {
+      abort("expected guarded tracked query row write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo_label() is Some("guarded query write"))
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
+    None => abort("expected guarded query undo bytes")
+  }
+}
+
+///|
 test "RawQuery for_each_archetype exposes contiguous CPU columns" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchA", 4)

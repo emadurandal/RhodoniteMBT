@@ -87,6 +87,67 @@ describe("ECS TypeScript wrapper", () => {
 		expect(copy?.[12]).toBe(7);
 	});
 
+	it("tracks query row writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedPosition", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		Query.new([cpu]).forEach(world, (row) => {
+			expect(
+				row.writeTracked(history, cpu, (bytes) => {
+					bytes.setF32(0, 12);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("query_row_write");
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(12);
+		expect(history.undo(world)).toBe(true);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(1);
+		expect(history.redo(world)).toBe(true);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(12);
+	});
+
+	it("tracks raw query row callback writes and delegates when history is disabled", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedRawPosition", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEach(world, (row) => {
+			expect(row.writeTracked(history, cpu, (bytes) => bytes.setF32(0, 4))).toBe(
+				true,
+			);
+		});
+		expect(history.undoLen()).toBe(1);
+		expect(history.undo(world)).toBe(true);
+
+		history.setMaxUndoRecords(0);
+		RawQuery.new([cpu]).forEach(world, (row) => {
+			expect(row.writeTracked(history, cpu, (bytes) => bytes.setF32(0, 8))).toBe(
+				true,
+			);
+		});
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(8);
+	});
+
 	it("exposes archetype column views for hot CPU loops", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("Velocity", 16);
@@ -761,5 +822,46 @@ describe("ECS TypeScript wrapper", () => {
 				archetype.writeColumn(queryCpu);
 			}),
 		).toThrow();
+		const trackedQueryWorld = World.new();
+		const trackedQueryHistory = WorldHistory.new();
+		const trackedQueryCpu = trackedQueryWorld.registerCpuComponent(
+			"TsHistoryTrackedQuery",
+			4,
+		);
+		const trackedQueryEntity = trackedQueryWorld.createEntity();
+		expect(
+			trackedQueryWorld.addComponentBytes(
+				trackedQueryEntity,
+				trackedQueryCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedQueryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedQueryHistory.beginGuardedTransaction(
+				trackedQueryWorld,
+				"guarded tracked query",
+			),
+		).toBe(true);
+		Query.new([trackedQueryCpu]).forEach(trackedQueryWorld, (row) => {
+			expect(
+				row.writeTracked(
+					trackedQueryHistory,
+					trackedQueryCpu,
+					(bytes) => bytes.setF32(0, 6),
+				),
+			).toBe(true);
+		});
+		expect(trackedQueryHistory.commitTransaction()).toBe(true);
+		expect(trackedQueryHistory.undo(trackedQueryWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedQueryWorld.componentBytesCopy(
+					trackedQueryEntity,
+					trackedQueryCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
 	});
 });
