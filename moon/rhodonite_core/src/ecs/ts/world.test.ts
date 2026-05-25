@@ -1990,6 +1990,78 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.canUndo()).toBe(false);
 	});
 
+	it("cancelTransactionReverting rolls back tracked transaction mutations", () => {
+		const cancelWorld = World.new();
+		const cancelHistory = WorldHistory.new();
+		const cancelCpu = cancelWorld.registerCpuComponent("TsHistoryCancelCpu", 4);
+		const cancelEntity = cancelWorld.createEntity();
+		expect(
+			cancelWorld.addComponentBytes(
+				cancelEntity,
+				cancelCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(cancelHistory.beginTransaction("discard only")).toBe(true);
+		expect(
+			cancelHistory.setComponentBytes(
+				cancelWorld,
+				cancelEntity,
+				cancelCpu,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(cancelHistory.cancelTransaction()).toBe(true);
+		expect(cancelHistory.undoLen()).toBe(0);
+		expect(cancelWorld.componentBytesCopy(cancelEntity, cancelCpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
+		);
+
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryRevertCpu", 4);
+		const marker = world.registerCpuComponent("TsHistoryRevertMarker", 4);
+		const entity = world.createEntity();
+		const addEntity = world.createEntity();
+		const victim = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(victim, cpu, new Uint8Array([7, 0, 0, 0]))).toBe(true);
+		expect(history.beginTransaction("revert tracked steps")).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				entity,
+				cpu,
+				new Uint8Array([3, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			history.addComponentBytes(
+				world,
+				addEntity,
+				marker,
+				new Uint8Array([9, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(history.destroyEntity(world, victim)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([3, 0, 0, 0]),
+		);
+		expect(world.hasComponent(addEntity, marker)).toBe(true);
+		expect(world.isAlive(victim)).toBe(false);
+
+		expect(history.cancelTransactionReverting(world)).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+		expect(world.hasComponent(addEntity, marker)).toBe(false);
+		expect(world.isAlive(victim)).toBe(true);
+		expect(world.componentBytesCopy(victim, cpu)).toEqual(
+			new Uint8Array([7, 0, 0, 0]),
+		);
+	});
+
 	it("guards raw World mutations during guarded WorldHistory transactions", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
