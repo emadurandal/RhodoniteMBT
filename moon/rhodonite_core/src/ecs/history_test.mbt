@@ -958,6 +958,93 @@ test "WorldHistory exposes payload-free undo and redo summaries" {
 }
 
 ///|
+test "WorldHistory reports serialization eligibility without exposing payloads" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let stable = world.register_cpu_component_with_identity(
+    "HistorySerializableStable",
+    4,
+    "com.example.HistorySerializableStable",
+    Some("1"),
+    Some("sha256:history-serializable-stable"),
+  )
+  let legacy = world.register_cpu_component("HistorySerializableLegacy", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, stable, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(entity, legacy, bytes4(2, 0, 0, 0)))
+  assert_true(
+    history.set_transform_trs(
+      world,
+      entity,
+      (1.0 : Float),
+      (2.0 : Float),
+      (3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(history.begin_transaction("Destroy Mixed Serializable Entity"))
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(history.commit_transaction())
+  let diagnostic = history.last_diagnostic()
+  let report = history.undo_serialization_report(world)
+  assert_true(!report.serializable)
+  assert_eq(report.record_count, 2)
+  assert_eq(report.records[0].label, "Destroy Mixed Serializable Entity")
+  assert_true(!report.records[0].serializable)
+  assert_eq(report.records[0].reason, "missing_stable_component_identity")
+  assert_eq(report.records[0].deltas[0].kind, "entity_destroyed")
+  assert_true(!report.records[0].deltas[0].serializable)
+  assert_eq(
+    report.records[0].deltas[0].reason,
+    "missing_stable_component_identity",
+  )
+  assert_eq(report.records[0].deltas[0].components.length(), 3)
+  let mut saw_stable = false
+  let mut saw_legacy = false
+  let mut saw_transform = false
+  for i = 0; i < report.records[0].deltas[0].components.length(); i = i + 1 {
+    let component_report = report.records[0].deltas[0].components[i]
+    if component_report.component == stable {
+      saw_stable = true
+      assert_true(component_report.serializable)
+      assert_true(
+        component_report.stable_key ==
+        Some("com.example.HistorySerializableStable"),
+      )
+    } else if component_report.component == legacy {
+      saw_legacy = true
+      assert_true(!component_report.serializable)
+      assert_eq(component_report.reason, "missing_stable_component_identity")
+    } else if component_report.component == world.transform_component() {
+      saw_transform = true
+      assert_true(component_report.serializable)
+      assert_true(component_report.stable_key == Some("Transform3D"))
+    }
+  }
+  assert_true(saw_stable)
+  assert_true(saw_legacy)
+  assert_true(saw_transform)
+  assert_true(report.records[1].serializable)
+  assert_eq(report.records[1].deltas[0].kind, "component_added")
+  assert_true(
+    report.records[1].deltas[0].components[0].stable_key == Some("Transform3D"),
+  )
+  assert_eq(history.undo_len(), 2)
+  assert_eq(history.redo_len(), 0)
+  assert_eq(history.last_diagnostic(), diagnostic)
+  assert_true(history.undo(world))
+  let redo_report = history.redo_serialization_report(world)
+  assert_true(!redo_report.serializable)
+  assert_eq(redo_report.records[0].label, "Destroy Mixed Serializable Entity")
+}
+
+///|
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()

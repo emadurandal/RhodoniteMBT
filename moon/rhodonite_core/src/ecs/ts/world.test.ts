@@ -891,6 +891,90 @@ describe("ECS TypeScript wrapper", () => {
 		expect(redoSummaries[0]?.deltas[0]?.kind).toBe("entity_destroyed");
 	});
 
+	it("reports history serialization eligibility without exposing payloads", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistorySerializableStable",
+			4,
+			{
+				stableKey: "com.example.TsHistorySerializableStable",
+				schemaVersion: "1",
+				schemaHash: "sha256:ts-history-serializable-stable",
+			},
+		);
+		const legacy = world.registerCpuComponent("TsHistorySerializableLegacy", 4);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			world.addComponentBytes(entity, legacy, new Uint8Array([2, 0, 0, 0])),
+		).toBe(true);
+
+		expect(history.beginTransaction("TS serialization eligibility")).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([3, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				entity,
+				legacy,
+				new Uint8Array([4, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+
+		const diagnostic = history.lastDiagnostic();
+		const report = history.undoSerializationReport(world);
+		expect(report.serializable).toBe(false);
+		expect(report.recordCount).toBe(1);
+		expect(report.records[0]).toMatchObject({
+			label: "TS serialization eligibility",
+			serializable: false,
+			reason: "missing_stable_component_identity",
+			deltaCount: 2,
+			payloadBytes: 16,
+		});
+		expect(report.records[0]?.deltas[0]).toMatchObject({
+			kind: "component_changed",
+			serializable: true,
+			reason: "none",
+			payloadBytes: 8,
+		});
+		expect(report.records[0]?.deltas[0]?.components[0]).toMatchObject({
+			serializable: true,
+			reason: "none",
+			stableKey: "com.example.TsHistorySerializableStable",
+		});
+		expect(report.records[0]?.deltas[1]).toMatchObject({
+			kind: "component_changed",
+			serializable: false,
+			reason: "missing_stable_component_identity",
+			payloadBytes: 8,
+		});
+		expect(report.records[0]?.deltas[1]?.components[0]).toMatchObject({
+			serializable: false,
+			reason: "missing_stable_component_identity",
+			stableKey: null,
+		});
+		expect(report.records[0]?.deltas[1]?.component?.index()).toBe(legacy.index());
+		expect(history.lastDiagnostic()).toBe(diagnostic);
+		expect(history.undoLen()).toBe(1);
+		expect(history.redoLen()).toBe(0);
+
+		expect(history.undo(world)).toBe(true);
+		const redoReport = history.redoSerializationReport(world);
+		expect(redoReport.serializable).toBe(false);
+		expect(redoReport.records[0]?.label).toBe("TS serialization eligibility");
+	});
+
 	it("audits direct WorldHistory mutation coverage", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

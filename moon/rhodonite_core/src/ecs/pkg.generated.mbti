@@ -401,6 +401,7 @@ pub fn WorldHistory::redo(Self, World) -> Bool
 pub fn WorldHistory::redo_bytes(Self) -> Int
 pub fn WorldHistory::redo_label(Self) -> String?
 pub fn WorldHistory::redo_len(Self) -> Int
+pub fn WorldHistory::redo_serialization_report(Self, World) -> WorldHistorySerializationReport
 pub fn WorldHistory::redo_summary(Self) -> Array[WorldHistoryRecordSummary]
 pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
 pub fn WorldHistory::run_system_phase(Self, SystemRunner, World, SystemContext, PhaseKey, String) -> Bool
@@ -420,6 +421,7 @@ pub fn WorldHistory::undo(Self, World) -> Bool
 pub fn WorldHistory::undo_bytes(Self) -> Int
 pub fn WorldHistory::undo_label(Self) -> String?
 pub fn WorldHistory::undo_len(Self) -> Int
+pub fn WorldHistory::undo_serialization_report(Self, World) -> WorldHistorySerializationReport
 pub fn WorldHistory::undo_summary(Self) -> Array[WorldHistoryRecordSummary]
 
 pub(all) struct WorldHistoryDeltaSummary {
@@ -437,6 +439,39 @@ pub(all) struct WorldHistoryRecordSummary {
   delta_count : Int
   payload_bytes : Int
   deltas : Array[WorldHistoryDeltaSummary]
+}
+
+pub(all) struct WorldHistorySerializationComponentReport {
+  component : ComponentTypeId
+  serializable : Bool
+  reason : String
+  stable_key : String?
+}
+
+pub(all) struct WorldHistorySerializationDeltaReport {
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_count : Int
+  serializable : Bool
+  reason : String
+  payload_bytes : Int
+  components : Array[WorldHistorySerializationComponentReport]
+}
+
+pub(all) struct WorldHistorySerializationRecordReport {
+  label : String
+  serializable : Bool
+  reason : String
+  delta_count : Int
+  payload_bytes : Int
+  deltas : Array[WorldHistorySerializationDeltaReport]
+}
+
+pub(all) struct WorldHistorySerializationReport {
+  serializable : Bool
+  record_count : Int
+  records : Array[WorldHistorySerializationRecordReport]
 }
 
 // Type aliases

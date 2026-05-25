@@ -104,6 +104,35 @@ test "WorldHistory redo apply failure rolls back and keeps stacks" {
 }
 
 ///|
+test "WorldHistory serialization report marks unknown components" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let unknown = ComponentTypeId::new(9999)
+  history.undo_stack.push({
+    label: "unknown component report",
+    deltas: [ComponentAdded(entity, unknown, history_wb_bytes4(1, 0, 0, 0))],
+  })
+  let diagnostic = history.last_diagnostic()
+  let report = history.undo_serialization_report(world)
+  assert_true(!report.serializable)
+  assert_eq(report.record_count, 1)
+  assert_true(!report.records[0].serializable)
+  assert_eq(report.records[0].reason, "unknown_component")
+  assert_true(!report.records[0].deltas[0].serializable)
+  assert_eq(report.records[0].deltas[0].reason, "unknown_component")
+  assert_eq(report.records[0].deltas[0].components.length(), 1)
+  assert_true(!report.records[0].deltas[0].components[0].serializable)
+  assert_eq(
+    report.records[0].deltas[0].components[0].reason,
+    "unknown_component",
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  assert_eq(history.last_diagnostic(), diagnostic)
+}
+
+///|
 test "WorldHistory compresses repeated CameraChanged deltas inside transaction" {
   let world = World::new()
   let history = WorldHistory::new()

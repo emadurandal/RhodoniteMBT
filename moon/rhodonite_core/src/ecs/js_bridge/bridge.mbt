@@ -637,6 +637,192 @@ pub fn world_history_redo_summary(
 }
 
 ///|
+/// Implements `world_history_undo_serialization_report`.
+pub fn world_history_undo_serialization_report(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> @ecs.WorldHistorySerializationReport {
+  history.undo_serialization_report(world)
+}
+
+///|
+/// Implements `world_history_redo_serialization_report`.
+pub fn world_history_redo_serialization_report(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> @ecs.WorldHistorySerializationReport {
+  history.redo_serialization_report(world)
+}
+
+///|
+/// Implements `world_history_serialization_report_serializable`.
+pub fn world_history_serialization_report_serializable(
+  report : @ecs.WorldHistorySerializationReport,
+) -> Bool {
+  report.serializable
+}
+
+///|
+/// Implements `world_history_serialization_report_record_count`.
+pub fn world_history_serialization_report_record_count(
+  report : @ecs.WorldHistorySerializationReport,
+) -> Int {
+  report.record_count
+}
+
+///|
+/// Implements `world_history_serialization_report_records`.
+pub fn world_history_serialization_report_records(
+  report : @ecs.WorldHistorySerializationReport,
+) -> Array[@ecs.WorldHistorySerializationRecordReport] {
+  report.records
+}
+
+///|
+/// Implements `world_history_serialization_record_report_label`.
+pub fn world_history_serialization_record_report_label(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> String {
+  report.label
+}
+
+///|
+/// Implements `world_history_serialization_record_report_serializable`.
+pub fn world_history_serialization_record_report_serializable(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> Bool {
+  report.serializable
+}
+
+///|
+/// Implements `world_history_serialization_record_report_reason`.
+pub fn world_history_serialization_record_report_reason(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> String {
+  report.reason
+}
+
+///|
+/// Implements `world_history_serialization_record_report_delta_count`.
+pub fn world_history_serialization_record_report_delta_count(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> Int {
+  report.delta_count
+}
+
+///|
+/// Implements `world_history_serialization_record_report_payload_bytes`.
+pub fn world_history_serialization_record_report_payload_bytes(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> Int {
+  report.payload_bytes
+}
+
+///|
+/// Implements `world_history_serialization_record_report_deltas`.
+pub fn world_history_serialization_record_report_deltas(
+  report : @ecs.WorldHistorySerializationRecordReport,
+) -> Array[@ecs.WorldHistorySerializationDeltaReport] {
+  report.deltas
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_kind`.
+pub fn world_history_serialization_delta_report_kind(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> String {
+  report.kind
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_entity`.
+pub fn world_history_serialization_delta_report_entity(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> @ecs.EntityId? {
+  report.entity
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_component`.
+pub fn world_history_serialization_delta_report_component(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> @ecs.ComponentTypeId? {
+  report.component
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_component_count`.
+pub fn world_history_serialization_delta_report_component_count(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> Int {
+  report.component_count
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_serializable`.
+pub fn world_history_serialization_delta_report_serializable(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> Bool {
+  report.serializable
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_reason`.
+pub fn world_history_serialization_delta_report_reason(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> String {
+  report.reason
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_payload_bytes`.
+pub fn world_history_serialization_delta_report_payload_bytes(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> Int {
+  report.payload_bytes
+}
+
+///|
+/// Implements `world_history_serialization_delta_report_components`.
+pub fn world_history_serialization_delta_report_components(
+  report : @ecs.WorldHistorySerializationDeltaReport,
+) -> Array[@ecs.WorldHistorySerializationComponentReport] {
+  report.components
+}
+
+///|
+/// Implements `world_history_serialization_component_report_component`.
+pub fn world_history_serialization_component_report_component(
+  report : @ecs.WorldHistorySerializationComponentReport,
+) -> @ecs.ComponentTypeId {
+  report.component
+}
+
+///|
+/// Implements `world_history_serialization_component_report_serializable`.
+pub fn world_history_serialization_component_report_serializable(
+  report : @ecs.WorldHistorySerializationComponentReport,
+) -> Bool {
+  report.serializable
+}
+
+///|
+/// Implements `world_history_serialization_component_report_reason`.
+pub fn world_history_serialization_component_report_reason(
+  report : @ecs.WorldHistorySerializationComponentReport,
+) -> String {
+  report.reason
+}
+
+///|
+/// Implements `world_history_serialization_component_report_stable_key`.
+pub fn world_history_serialization_component_report_stable_key(
+  report : @ecs.WorldHistorySerializationComponentReport,
+) -> String? {
+  report.stable_key
+}
+
+///|
 /// Implements `world_history_record_summary_label`.
 pub fn world_history_record_summary_label(
   summary : @ecs.WorldHistoryRecordSummary,

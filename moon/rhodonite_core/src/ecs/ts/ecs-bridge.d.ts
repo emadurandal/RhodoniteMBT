@@ -14,6 +14,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonWorldHistory = object;
 	export type MoonWorldHistoryRecordSummary = object;
 	export type MoonWorldHistoryDeltaSummary = object;
+	export type MoonWorldHistorySerializationReport = object;
+	export type MoonWorldHistorySerializationRecordReport = object;
+	export type MoonWorldHistorySerializationDeltaReport = object;
+	export type MoonWorldHistorySerializationComponentReport = object;
 	export type MoonPhaseKey = object;
 	export type MoonSystemContext = object;
 	export type MoonSystem = object;
@@ -277,6 +281,77 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_redo_summary(
 		history: MoonWorldHistory,
 	): MoonWorldHistoryRecordSummary[];
+	export function world_history_undo_serialization_report(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonWorldHistorySerializationReport;
+	export function world_history_redo_serialization_report(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonWorldHistorySerializationReport;
+	export function world_history_serialization_report_serializable(
+		report: MoonWorldHistorySerializationReport,
+	): MoonBool;
+	export function world_history_serialization_report_record_count(
+		report: MoonWorldHistorySerializationReport,
+	): number;
+	export function world_history_serialization_report_records(
+		report: MoonWorldHistorySerializationReport,
+	): MoonWorldHistorySerializationRecordReport[];
+	export function world_history_serialization_record_report_label(
+		report: MoonWorldHistorySerializationRecordReport,
+	): string;
+	export function world_history_serialization_record_report_serializable(
+		report: MoonWorldHistorySerializationRecordReport,
+	): MoonBool;
+	export function world_history_serialization_record_report_reason(
+		report: MoonWorldHistorySerializationRecordReport,
+	): string;
+	export function world_history_serialization_record_report_delta_count(
+		report: MoonWorldHistorySerializationRecordReport,
+	): number;
+	export function world_history_serialization_record_report_payload_bytes(
+		report: MoonWorldHistorySerializationRecordReport,
+	): number;
+	export function world_history_serialization_record_report_deltas(
+		report: MoonWorldHistorySerializationRecordReport,
+	): MoonWorldHistorySerializationDeltaReport[];
+	export function world_history_serialization_delta_report_kind(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): string;
+	export function world_history_serialization_delta_report_entity(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): MoonEntityId | undefined;
+	export function world_history_serialization_delta_report_component(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): MoonComponentTypeId | undefined;
+	export function world_history_serialization_delta_report_component_count(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): number;
+	export function world_history_serialization_delta_report_serializable(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): MoonBool;
+	export function world_history_serialization_delta_report_reason(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): string;
+	export function world_history_serialization_delta_report_payload_bytes(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): number;
+	export function world_history_serialization_delta_report_components(
+		report: MoonWorldHistorySerializationDeltaReport,
+	): MoonWorldHistorySerializationComponentReport[];
+	export function world_history_serialization_component_report_component(
+		report: MoonWorldHistorySerializationComponentReport,
+	): MoonComponentTypeId;
+	export function world_history_serialization_component_report_serializable(
+		report: MoonWorldHistorySerializationComponentReport,
+	): MoonBool;
+	export function world_history_serialization_component_report_reason(
+		report: MoonWorldHistorySerializationComponentReport,
+	): string;
+	export function world_history_serialization_component_report_stable_key(
+		report: MoonWorldHistorySerializationComponentReport,
+	): string | undefined;
 	export function world_history_record_summary_label(
 		summary: MoonWorldHistoryRecordSummary,
 	): string;
