@@ -4,9 +4,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	World,
+	WorldHistory,
 	addCameraLensOrthographic,
+	addCameraLensOrthographicTracked,
 	addOrbitCameraControllerWithDistance,
 	addOrbitCameraControllerWithPose,
+	addOrbitCameraControllerWithPoseTracked,
 	createOrbitCameraController,
 	createOrbitOrthographicCameraDescFromYzPosition,
 	readOrbitCameraControllerComponent,
@@ -14,12 +17,19 @@ import {
 	registerCameraLensComponent,
 	registerOrbitCameraControllerComponent,
 	requestOrbitCameraReset,
+	requestOrbitCameraResetTracked,
 	setCameraHomeFromCurrentTransform,
+	setCameraHomeFromCurrentTransformTracked,
 	setCameraLensOrthographic,
+	setCameraLensOrthographicTracked,
 	setupOrbitOrthographicCamera,
+	setupOrbitOrthographicCameraTracked,
 	syncOrbitCameraBlobComponent,
+	syncOrbitCameraBlobComponentTracked,
 	syncOrbitCameraTransformComponent,
+	syncOrbitCameraTransformComponentTracked,
 	updateOrbitCameraControllerComponentFromMouseFrame,
+	updateOrbitCameraControllerComponentFromMouseFrameTracked,
 	updateOrbitCameraControllerFromMouseFrame,
 } from "./index.ts";
 
@@ -142,5 +152,153 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		syncOrbitCameraTransformComponent(world, camera, orbit, home);
 
 		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(0);
+	});
+
+	it("tracks orbit orthographic camera setup as one undoable operation", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
+
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(true);
+
+		expect(history.undoLen()).toBe(1);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(true);
+		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(true);
+		expect(world.hasComponent(camera, orbit)).toBe(true);
+		expect(world.hasComponent(camera, home)).toBe(true);
+		expect(world.hasComponent(camera, lens)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+
+		expect(history.undo(world)).toBe(true);
+		expect(history.redoLen()).toBe(1);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
+		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(false);
+		expect(world.hasComponent(camera, orbit)).toBe(false);
+		expect(world.hasComponent(camera, home)).toBe(false);
+		expect(world.hasComponent(camera, lens)).toBe(false);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+
+		expect(history.redo(world)).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(world.hasComponent(camera, orbit)).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		expect(world.drainCameraBlobWriteViews().length).toBeGreaterThan(0);
+	});
+
+	it("tracks camera-control component edits and sync helpers", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		const lens = world.cameraLensComponent();
+
+		expect(world.setTransformTrs(camera, 0, 0, 16, 0, 0, 0, 1, 1, 1, 1)).toBe(true);
+		expect(world.addComponent(camera, world.globalTransformComponent())).toBe(true);
+		expect(
+			addOrbitCameraControllerWithPoseTracked(
+				history,
+				world,
+				camera,
+				orbit,
+				0,
+				0,
+				0,
+				0,
+				1,
+				16,
+			),
+		).toBe(true);
+		expect(setCameraHomeFromCurrentTransformTracked(history, world, camera, home)).toBe(true);
+		expect(
+			addCameraLensOrthographicTracked(
+				history,
+				world,
+				camera,
+				lens,
+				0.1,
+				50,
+				1,
+				3.8,
+				0,
+			),
+		).toBe(true);
+		history.clear();
+
+		const yawBefore = readOrbitCameraControllerComponent(world, camera, orbit).yaw;
+		expect(history.beginTransaction("camera drag")).toBe(true);
+		expect(
+			updateOrbitCameraControllerComponentFromMouseFrameTracked(
+				history,
+				world,
+				camera,
+				{
+					leftDown: true,
+					leftPressed: false,
+					middleDown: false,
+					middlePressed: false,
+					pointerDeltaX: 10,
+					pointerDeltaY: 0,
+					wheelDeltaY: 0,
+				},
+			),
+		).toBe(true);
+		expect(
+			setCameraLensOrthographicTracked(
+				history,
+				world,
+				camera,
+				lens,
+				0.1,
+				50,
+				1,
+				4.5,
+				0,
+			),
+		).toBe(true);
+		syncOrbitCameraTransformComponentTracked(history, world, camera, orbit, home);
+		syncOrbitCameraBlobComponentTracked(history, world, camera, orbit, lens);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLen()).toBe(1);
+
+		const yawAfter = readOrbitCameraControllerComponent(world, camera, orbit).yaw;
+		expect(yawAfter).not.toBeCloseTo(yawBefore);
+		expect(history.undo(world)).toBe(true);
+		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(
+			yawBefore,
+		);
+		expect(history.redo(world)).toBe(true);
+		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(
+			yawAfter,
+		);
+
+		history.clear();
+		expect(history.beginTransaction("camera reset")).toBe(true);
+		expect(requestOrbitCameraResetTracked(history, world, camera, orbit)).toBe(true);
+		syncOrbitCameraTransformComponentTracked(history, world, camera, orbit, home);
+		expect(history.commitTransaction()).toBe(true);
+		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(0);
+		expect(history.undo(world)).toBe(true);
+		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(
+			yawAfter,
+		);
 	});
 });

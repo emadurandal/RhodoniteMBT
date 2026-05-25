@@ -407,6 +407,114 @@ pub fn add_orbit_camera_controller_with_pose(
 }
 
 ///|
+/// Adds or sets one component row through WorldHistory depending on current presence.
+fn set_or_add_camera_control_component_bytes_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  if world.has_component(camera, component) {
+    history.set_component_bytes(world, camera, component, bytes)
+  } else {
+    history.add_component_bytes(world, camera, component, bytes)
+  }
+}
+
+///|
+/// Adds an orbit camera controller component through WorldHistory.
+pub fn add_orbit_camera_controller_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+  yaw : Double,
+  pitch : Double,
+) -> Bool {
+  add_orbit_camera_controller_with_distance_tracked(
+    history,
+    world,
+    camera,
+    component,
+    yaw,
+    pitch,
+    (16.0 : Float),
+  )
+}
+
+///|
+/// Adds an orbit camera controller component with an explicit orbit distance through WorldHistory.
+pub fn add_orbit_camera_controller_with_distance_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+  yaw : Double,
+  pitch : Double,
+  distance : Float,
+) -> Bool {
+  history.add_component_bytes(
+    world,
+    camera,
+    component,
+    orbit_camera_controller_bytes(
+      Float::from_double(yaw),
+      Float::from_double(pitch),
+      (0.006 : Float),
+      (-1.25 : Float),
+      (1.25 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.01 : Float),
+      (1.0 : Float),
+      (0.001 : Float),
+      (0.01 : Float),
+      (4.0 : Float),
+      distance,
+      false,
+    ),
+  )
+}
+
+///|
+/// Adds an orbit camera controller component with an explicit pose through WorldHistory.
+pub fn add_orbit_camera_controller_with_pose_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+  yaw : Double,
+  pitch : Double,
+  pan_x : Float,
+  pan_y : Float,
+  dolly : Float,
+  distance : Float,
+) -> Bool {
+  history.add_component_bytes(
+    world,
+    camera,
+    component,
+    orbit_camera_controller_bytes(
+      Float::from_double(yaw),
+      Float::from_double(pitch),
+      (0.006 : Float),
+      (-1.25 : Float),
+      (1.25 : Float),
+      pan_x,
+      pan_y,
+      (0.01 : Float),
+      dolly,
+      (0.001 : Float),
+      (0.01 : Float),
+      (4.0 : Float),
+      distance,
+      false,
+    ),
+  )
+}
+
+///|
 /// Reads the current orbit camera controller transform fields.
 pub fn orbit_camera_transform(
   world : World,
@@ -520,6 +628,78 @@ pub fn update_orbit_camera_controller_from_mouse_frame(
 }
 
 ///|
+/// Updates an orbit camera controller from mouse values through WorldHistory.
+pub fn update_orbit_camera_controller_from_mouse_frame_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  left_down : Bool,
+  left_pressed : Bool,
+  middle_down : Bool,
+  middle_pressed : Bool,
+  pointer_delta_x : Float,
+  pointer_delta_y : Float,
+  wheel_delta_y : Float,
+) -> Bool {
+  let component = world.orbit_camera_controller_component()
+  match world.component_bytes(camera, component) {
+    Some(bytes) => {
+      let yaw = fixed_f32(bytes, orbit_yaw_offset)
+      let pitch = fixed_f32(bytes, orbit_pitch_offset)
+      let sensitivity = fixed_f32(bytes, orbit_sensitivity_offset)
+      let min_pitch = fixed_f32(bytes, orbit_min_pitch_offset)
+      let max_pitch = fixed_f32(bytes, orbit_max_pitch_offset)
+      let pan_x = fixed_f32(bytes, orbit_pan_x_offset)
+      let pan_y = fixed_f32(bytes, orbit_pan_y_offset)
+      let pan_sensitivity = fixed_f32(bytes, orbit_pan_sensitivity_offset)
+      let dolly = fixed_f32(bytes, orbit_dolly_offset)
+      let dolly_sensitivity = fixed_f32(bytes, orbit_dolly_sensitivity_offset)
+      let min_dolly = fixed_f32(bytes, orbit_min_dolly_offset)
+      let max_dolly = fixed_f32(bytes, orbit_max_dolly_offset)
+      let mut next_yaw = yaw
+      let mut next_pitch = pitch
+      let mut next_pan_x = pan_x
+      let mut next_pan_y = pan_y
+      let mut next_dolly = dolly
+      let mut changed = false
+      if left_down && !left_pressed {
+        next_yaw = yaw + pointer_delta_x * sensitivity
+        next_pitch = clamp_float(
+          pitch + pointer_delta_y * sensitivity,
+          min_pitch,
+          max_pitch,
+        )
+        changed = true
+      }
+      if middle_down && !middle_pressed {
+        next_pan_x = pan_x + pointer_delta_x * pan_sensitivity * dolly
+        next_pan_y = pan_y - pointer_delta_y * pan_sensitivity * dolly
+        changed = true
+      }
+      if wheel_delta_y != (0.0 : Float) {
+        next_dolly = clamp_float(
+          dolly + wheel_delta_y * dolly_sensitivity * dolly,
+          min_dolly,
+          max_dolly,
+        )
+        changed = true
+      }
+      if changed {
+        @writes.put_f32_le(bytes, orbit_yaw_offset, next_yaw.to_double())
+        @writes.put_f32_le(bytes, orbit_pitch_offset, next_pitch.to_double())
+        @writes.put_f32_le(bytes, orbit_pan_x_offset, next_pan_x.to_double())
+        @writes.put_f32_le(bytes, orbit_pan_y_offset, next_pan_y.to_double())
+        @writes.put_f32_le(bytes, orbit_dolly_offset, next_dolly.to_double())
+        history.set_component_bytes(world, camera, component, bytes)
+      } else {
+        false
+      }
+    }
+    None => false
+  }
+}
+
+///|
 /// Marks an orbit camera controller for reset during the next orbit transform system run.
 pub fn request_orbit_camera_reset(
   world : World,
@@ -530,6 +710,23 @@ pub fn request_orbit_camera_reset(
     Some(bytes) => {
       @writes.put_f32_le(bytes, orbit_reset_requested_offset, 1.0)
       world.set_component_bytes(camera, component, bytes)
+    }
+    None => false
+  }
+}
+
+///|
+/// Marks an orbit camera controller for reset through WorldHistory.
+pub fn request_orbit_camera_reset_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  component : ComponentTypeId,
+) -> Bool {
+  match world.component_bytes(camera, component) {
+    Some(bytes) => {
+      @writes.put_f32_le(bytes, orbit_reset_requested_offset, 1.0)
+      history.set_component_bytes(world, camera, component, bytes)
     }
     None => false
   }
@@ -569,17 +766,32 @@ pub fn set_camera_home_from_current_transform(
 }
 
 ///|
-/// Adds a perspective lens component to a camera entity.
-pub fn add_camera_lens_perspective(
+/// Stores the current local Transform3D row as camera reset home through WorldHistory.
+pub fn set_camera_home_from_current_transform_tracked(
+  history : WorldHistory,
   world : World,
   camera : EntityId,
-  lens_component : ComponentTypeId,
+  home_component : ComponentTypeId,
+) -> Bool {
+  let tf = world.transform_component()
+  match world.component_bytes(camera, tf) {
+    Some(bytes) =>
+      set_or_add_camera_control_component_bytes_tracked(
+        history, world, camera, home_component, bytes,
+      )
+    None => false
+  }
+}
+
+///|
+/// Builds a perspective CameraLens component row.
+fn camera_lens_perspective_bytes(
   near : Float,
   far : Float,
   aspect : Float,
   fov_y_rad : Float,
   flags : Float,
-) -> Bool {
+) -> FixedArray[Byte] {
   let bytes = FixedArray::make(camera_lens_stride, (0 : Byte))
   @writes.put_f32_le(
     bytes,
@@ -592,21 +804,18 @@ pub fn add_camera_lens_perspective(
   @writes.put_f32_le(bytes, lens_fov_y_rad_offset, fov_y_rad.to_double())
   @writes.put_f32_le(bytes, lens_ortho_half_height_offset, 1.0)
   @writes.put_f32_le(bytes, lens_flags_offset, flags.to_double())
-  world.add_component_bytes(camera, lens_component, bytes)
+  bytes
 }
 
 ///|
-/// Adds an orthographic lens component to a camera entity.
-pub fn add_camera_lens_orthographic(
-  world : World,
-  camera : EntityId,
-  lens_component : ComponentTypeId,
+/// Builds an orthographic CameraLens component row.
+fn camera_lens_orthographic_bytes(
   near : Float,
   far : Float,
   aspect : Float,
   ortho_half_height : Float,
   flags : Float,
-) -> Bool {
+) -> FixedArray[Byte] {
   let bytes = FixedArray::make(camera_lens_stride, (0 : Byte))
   @writes.put_f32_le(
     bytes,
@@ -623,7 +832,131 @@ pub fn add_camera_lens_orthographic(
     ortho_half_height.to_double(),
   )
   @writes.put_f32_le(bytes, lens_flags_offset, flags.to_double())
-  world.add_component_bytes(camera, lens_component, bytes)
+  bytes
+}
+
+///|
+/// Adds a perspective lens component to a camera entity.
+pub fn add_camera_lens_perspective(
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  fov_y_rad : Float,
+  flags : Float,
+) -> Bool {
+  world.add_component_bytes(
+    camera,
+    lens_component,
+    camera_lens_perspective_bytes(near, far, aspect, fov_y_rad, flags),
+  )
+}
+
+///|
+/// Adds a perspective lens component through WorldHistory.
+pub fn add_camera_lens_perspective_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  fov_y_rad : Float,
+  flags : Float,
+) -> Bool {
+  history.add_component_bytes(
+    world,
+    camera,
+    lens_component,
+    camera_lens_perspective_bytes(near, far, aspect, fov_y_rad, flags),
+  )
+}
+
+///|
+/// Sets or adds a perspective lens component through WorldHistory.
+pub fn set_camera_lens_perspective_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  fov_y_rad : Float,
+  flags : Float,
+) -> Bool {
+  set_or_add_camera_control_component_bytes_tracked(
+    history,
+    world,
+    camera,
+    lens_component,
+    camera_lens_perspective_bytes(near, far, aspect, fov_y_rad, flags),
+  )
+}
+
+///|
+/// Adds an orthographic lens component to a camera entity.
+pub fn add_camera_lens_orthographic(
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  ortho_half_height : Float,
+  flags : Float,
+) -> Bool {
+  world.add_component_bytes(
+    camera,
+    lens_component,
+    camera_lens_orthographic_bytes(near, far, aspect, ortho_half_height, flags),
+  )
+}
+
+///|
+/// Adds an orthographic lens component through WorldHistory.
+pub fn add_camera_lens_orthographic_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  ortho_half_height : Float,
+  flags : Float,
+) -> Bool {
+  history.add_component_bytes(
+    world,
+    camera,
+    lens_component,
+    camera_lens_orthographic_bytes(near, far, aspect, ortho_half_height, flags),
+  )
+}
+
+///|
+/// Sets or adds an orthographic lens component through WorldHistory.
+pub fn set_camera_lens_orthographic_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  lens_component : ComponentTypeId,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  ortho_half_height : Float,
+  flags : Float,
+) -> Bool {
+  set_or_add_camera_control_component_bytes_tracked(
+    history,
+    world,
+    camera,
+    lens_component,
+    camera_lens_orthographic_bytes(near, far, aspect, ortho_half_height, flags),
+  )
 }
 
 ///|
@@ -740,6 +1073,111 @@ pub fn setup_orbit_orthographic_camera(
     camera_projection_orthographic(),
     desc.flags,
   )
+}
+
+///|
+/// Finishes a tracked camera-control transaction opened by a helper.
+fn finish_camera_control_tracked_transaction(
+  history : WorldHistory,
+  opened : Bool,
+  ok : Bool,
+) -> Bool {
+  if !opened {
+    return ok
+  }
+  if ok {
+    history.commit_transaction()
+  } else {
+    ignore(history.cancel_transaction())
+    false
+  }
+}
+
+///|
+/// Sets up an orbit orthographic camera through WorldHistory as one operation when possible.
+pub fn setup_orbit_orthographic_camera_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  desc : OrbitOrthographicCameraDesc,
+) -> Bool {
+  let opened = history.begin_transaction("setup_orbit_orthographic_camera")
+  let (px, py, pz, qx, qy, qz, qw) = orbit_camera_desc_trs(desc)
+  let local_matrix = @comp.Transform3D::local_matrix_from_component_view(
+    @comp.transform3d_trs_bytes(
+      px,
+      py,
+      pz,
+      qx,
+      qy,
+      qz,
+      qw,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    )[:],
+  )
+  let view = match local_matrix.inverse() {
+    Some(view) => view
+    None =>
+      return finish_camera_control_tracked_transaction(history, opened, false)
+  }
+  let ok = history.set_transform_trs(
+      world,
+      camera,
+      px,
+      py,
+      pz,
+      qx,
+      qy,
+      qz,
+      qw,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ) &&
+    history.set_global_transform(world, camera, local_matrix) &&
+    add_orbit_camera_controller_with_pose_tracked(
+      history,
+      world,
+      camera,
+      world.orbit_camera_controller_component(),
+      desc.yaw,
+      desc.pitch,
+      desc.pan_x,
+      desc.pan_y,
+      desc.dolly,
+      desc.distance,
+    ) &&
+    set_camera_home_from_current_transform_tracked(
+      history,
+      world,
+      camera,
+      world.camera_home_transform_component(),
+    ) &&
+    add_camera_lens_orthographic_tracked(
+      history,
+      world,
+      camera,
+      world.camera_lens_component(),
+      desc.near,
+      desc.far,
+      desc.aspect,
+      desc.ortho_half_height,
+      desc.flags,
+    ) &&
+    history.set_camera_matrices(
+      world,
+      camera,
+      view,
+      orbit_orthographic_camera_desc_projection(desc),
+      desc.near,
+      desc.far,
+      desc.aspect,
+      camera_projection_orthographic(),
+      desc.flags,
+    )
+  finish_camera_control_tracked_transaction(history, opened, ok)
 }
 
 ///|
@@ -941,6 +1379,134 @@ fn write_orbit_transform_row(
     tf_row, px, py, pz, qx, qy, qz, qw, 1.0, 1.0, 1.0,
   )
   @comp.Transform3D::local_matrix_from_component_view(tf_row[:])
+}
+
+///|
+/// Writes the Camera blob for one orbit camera through WorldHistory.
+pub fn sync_orbit_camera_blob_component_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  orbit_component : ComponentTypeId,
+  lens_component : ComponentTypeId,
+) -> Bool {
+  let global = match world.get_global_transform(camera) {
+    Some(global) => global
+    None => return false
+  }
+  let view = match global.inverse() {
+    Some(view) => view
+    None => return false
+  }
+  let orbit_row = match world.component_bytes(camera, orbit_component) {
+    Some(bytes) => bytes
+    None => return false
+  }
+  let lens_row = match world.component_bytes(camera, lens_component) {
+    Some(bytes) => bytes
+    None => return false
+  }
+  let (_yaw, _pitch, _pan_x, _pan_y, dolly, _distance, _requested) = orbit_camera_pose_from_controller_view(
+    orbit_row[:],
+  )
+  let (proj, near, far, aspect, projection_kind, flags) = camera_lens_projection_from_view_with_ortho_scale(
+    lens_row[:],
+    dolly,
+  )
+  history.set_camera_matrices(
+    world, camera, view, proj, near, far, aspect, projection_kind, flags,
+  )
+}
+
+///|
+/// Writes Transform3D and GlobalTransform from orbit state through WorldHistory.
+pub fn sync_orbit_camera_transform_component_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  orbit_component : ComponentTypeId,
+  home_component : ComponentTypeId,
+) -> Bool {
+  let opened = history.begin_transaction(
+    "sync_orbit_camera_transform_component",
+  )
+  let orbit_row = match world.component_bytes(camera, orbit_component) {
+    Some(bytes) => bytes
+    None =>
+      return finish_camera_control_tracked_transaction(history, opened, false)
+  }
+  let (yaw, pitch, pan_x, pan_y, _dolly, distance, reset_requested) = orbit_camera_pose_from_controller_view(
+    orbit_row[:],
+  )
+  let ok = if reset_requested {
+    let home_row = match world.component_bytes(camera, home_component) {
+      Some(bytes) => bytes
+      None =>
+        return finish_camera_control_tracked_transaction(history, opened, false)
+    }
+    let next_orbit = orbit_row
+    reset_orbit_camera_controller_view(
+      next_orbit.mut_view(start=0, end=next_orbit.length()),
+    )
+    history.set_component_bytes(
+      world,
+      camera,
+      world.transform_component(),
+      home_row,
+    ) &&
+    history.set_component_bytes(world, camera, orbit_component, next_orbit) &&
+    history.set_global_transform(
+      world,
+      camera,
+      @comp.Transform3D::local_matrix_from_component_view(home_row[:]),
+    )
+  } else {
+    let (qx0, qy0, qz0, qw0) = quat_y(-yaw.to_double())
+    let (qx1, qy1, qz1, qw1) = quat_x(-pitch.to_double())
+    let (qx, qy, qz, qw) = quat_mul(qx0, qy0, qz0, qw0, qx1, qy1, qz1, qw1)
+    let (dx, dy, dz) = quat_rotate_vec3(
+      qx,
+      qy,
+      qz,
+      qw,
+      -pan_x.to_double(),
+      -pan_y.to_double(),
+      0.0,
+    )
+    let px = Float::from_double(dx)
+    let py = Float::from_double(dy)
+    let pz = Float::from_double(dz) + distance
+    let local_matrix = @comp.Transform3D::local_matrix_from_component_view(
+      @comp.transform3d_trs_bytes(
+        px,
+        py,
+        pz,
+        qx,
+        qy,
+        qz,
+        qw,
+        (1.0 : Float),
+        (1.0 : Float),
+        (1.0 : Float),
+      )[:],
+    )
+    history.set_transform_trs(
+      world,
+      camera,
+      px,
+      py,
+      pz,
+      qx,
+      qy,
+      qz,
+      qw,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ) &&
+    history.set_global_transform(world, camera, local_matrix)
+  }
+  finish_camera_control_tracked_transaction(history, opened, ok)
 }
 
 ///|

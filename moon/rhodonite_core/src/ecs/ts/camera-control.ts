@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ComponentTypeId, EntityId } from "./types.ts";
-import type { World } from "./world.ts";
+import type { World, WorldHistory } from "./world.ts";
 
 export const ORBIT_CAMERA_CONTROLLER_STRIDE = 80;
 export const CAMERA_HOME_TRANSFORM_STRIDE = 48;
@@ -235,6 +235,83 @@ export function addOrbitCameraControllerWithPose(
 	);
 }
 
+function setOrAddComponentBytesTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+	bytes: Uint8Array,
+): boolean {
+	if (world.hasComponent(camera, component)) {
+		return history.setComponentBytes(world, camera, component, bytes);
+	}
+	return history.addComponentBytes(world, camera, component, bytes);
+}
+
+export function addOrbitCameraControllerTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+	yaw: number,
+	pitch: number,
+): boolean {
+	return addOrbitCameraControllerWithDistanceTracked(
+		history,
+		world,
+		camera,
+		component,
+		yaw,
+		pitch,
+		16,
+	);
+}
+
+export function addOrbitCameraControllerWithDistanceTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+	yaw: number,
+	pitch: number,
+	distance: number,
+): boolean {
+	return history.addComponentBytes(
+		world,
+		camera,
+		component,
+		orbitCameraControllerBytes(
+			createOrbitCameraController(pitch, yaw),
+			distance,
+			false,
+		),
+	);
+}
+
+export function addOrbitCameraControllerWithPoseTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+	yaw: number,
+	pitch: number,
+	panX: number,
+	panY: number,
+	dolly: number,
+	distance: number,
+): boolean {
+	const controller = createOrbitCameraController(pitch, yaw);
+	controller.panX = panX;
+	controller.panY = panY;
+	controller.dolly = dolly;
+	return history.addComponentBytes(
+		world,
+		camera,
+		component,
+		orbitCameraControllerBytes(controller, distance, false),
+	);
+}
+
 export function setCameraHomeFromCurrentTransform(
 	world: World,
 	camera: EntityId,
@@ -248,6 +325,25 @@ export function setCameraHomeFromCurrentTransform(
 		return world.setComponentBytes(camera, homeComponent, bytes);
 	}
 	return world.addComponentBytes(camera, homeComponent, bytes);
+}
+
+export function setCameraHomeFromCurrentTransformTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	homeComponent: ComponentTypeId,
+): boolean {
+	const bytes = world.componentBytesCopy(camera, world.transformComponent());
+	if (bytes === null) {
+		return false;
+	}
+	return setOrAddComponentBytesTracked(
+		history,
+		world,
+		camera,
+		homeComponent,
+		bytes,
+	);
 }
 
 export function createOrbitOrthographicCameraDesc(
@@ -350,6 +446,33 @@ export function addCameraLensPerspective(
 	);
 }
 
+export function addCameraLensPerspectiveTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	lensComponent: ComponentTypeId,
+	near: number,
+	far: number,
+	aspect: number,
+	fovYRad: number,
+	flags: number,
+): boolean {
+	return history.addComponentBytes(
+		world,
+		camera,
+		lensComponent,
+		cameraLensBytes(
+			CAMERA_PROJECTION_PERSPECTIVE,
+			near,
+			far,
+			aspect,
+			fovYRad,
+			1,
+			flags,
+		),
+	);
+}
+
 export function addCameraLensOrthographic(
 	world: World,
 	camera: EntityId,
@@ -361,6 +484,33 @@ export function addCameraLensOrthographic(
 	flags: number,
 ): boolean {
 	return world.addComponentBytes(
+		camera,
+		lensComponent,
+		cameraLensBytes(
+			CAMERA_PROJECTION_ORTHOGRAPHIC,
+			near,
+			far,
+			aspect,
+			1,
+			orthoHalfHeight,
+			flags,
+		),
+	);
+}
+
+export function addCameraLensOrthographicTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	lensComponent: ComponentTypeId,
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags: number,
+): boolean {
+	return history.addComponentBytes(
+		world,
 		camera,
 		lensComponent,
 		cameraLensBytes(
@@ -400,6 +550,35 @@ export function setCameraLensPerspective(
 	return world.addComponentBytes(camera, lensComponent, bytes);
 }
 
+export function setCameraLensPerspectiveTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	lensComponent: ComponentTypeId,
+	near: number,
+	far: number,
+	aspect: number,
+	fovYRad: number,
+	flags: number,
+): boolean {
+	const bytes = cameraLensBytes(
+		CAMERA_PROJECTION_PERSPECTIVE,
+		near,
+		far,
+		aspect,
+		fovYRad,
+		1,
+		flags,
+	);
+	return setOrAddComponentBytesTracked(
+		history,
+		world,
+		camera,
+		lensComponent,
+		bytes,
+	);
+}
+
 export function setCameraLensOrthographic(
 	world: World,
 	camera: EntityId,
@@ -423,6 +602,35 @@ export function setCameraLensOrthographic(
 		return world.setComponentBytes(camera, lensComponent, bytes);
 	}
 	return world.addComponentBytes(camera, lensComponent, bytes);
+}
+
+export function setCameraLensOrthographicTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	lensComponent: ComponentTypeId,
+	near: number,
+	far: number,
+	aspect: number,
+	orthoHalfHeight: number,
+	flags: number,
+): boolean {
+	const bytes = cameraLensBytes(
+		CAMERA_PROJECTION_ORTHOGRAPHIC,
+		near,
+		far,
+		aspect,
+		1,
+		orthoHalfHeight,
+		flags,
+	);
+	return setOrAddComponentBytesTracked(
+		history,
+		world,
+		camera,
+		lensComponent,
+		bytes,
+	);
 }
 
 function readOrbitCameraControllerFromBytes(bytes: Uint8Array): OrbitCameraController {
@@ -504,6 +712,31 @@ export function updateOrbitCameraControllerComponentFromMouseFrame(
 	return world.setComponentBytes(camera, component, bytes);
 }
 
+export function updateOrbitCameraControllerComponentFromMouseFrameTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	frame: OrbitCameraInputFrame,
+): boolean {
+	const component = world.orbitCameraControllerComponent();
+	const bytes = componentBytesOrThrow(
+		world,
+		camera,
+		component,
+		"updateOrbitCameraControllerComponentFromMouseFrameTracked",
+	);
+	const controller = readOrbitCameraControllerFromBytes(bytes);
+	if (!updateOrbitCameraControllerFromMouseFrame(controller, frame)) {
+		return false;
+	}
+	writeF32(bytes, ORBIT_YAW_OFFSET, controller.yaw);
+	writeF32(bytes, ORBIT_PITCH_OFFSET, controller.pitch);
+	writeF32(bytes, ORBIT_PAN_X_OFFSET, controller.panX);
+	writeF32(bytes, ORBIT_PAN_Y_OFFSET, controller.panY);
+	writeF32(bytes, ORBIT_DOLLY_OFFSET, controller.dolly);
+	return history.setComponentBytes(world, camera, component, bytes);
+}
+
 export function requestOrbitCameraReset(
 	world: World,
 	camera: EntityId,
@@ -515,6 +748,20 @@ export function requestOrbitCameraReset(
 	}
 	writeF32(bytes, ORBIT_RESET_REQUESTED_OFFSET, 1);
 	return world.setComponentBytes(camera, component, bytes);
+}
+
+export function requestOrbitCameraResetTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	component: ComponentTypeId,
+): boolean {
+	const bytes = world.componentBytesCopy(camera, component);
+	if (bytes === null) {
+		return false;
+	}
+	writeF32(bytes, ORBIT_RESET_REQUESTED_OFFSET, 1);
+	return history.setComponentBytes(world, camera, component, bytes);
 }
 
 function quatMul(
@@ -781,6 +1028,98 @@ export function setupOrbitOrthographicCamera(
 	);
 }
 
+function finishTrackedCameraControlTransaction(
+	history: WorldHistory,
+	opened: boolean,
+	ok: boolean,
+): boolean {
+	if (!opened) {
+		return ok;
+	}
+	if (ok) {
+		return history.commitTransaction();
+	}
+	history.cancelTransaction();
+	return false;
+}
+
+export function setupOrbitOrthographicCameraTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	desc: OrbitOrthographicCameraDesc,
+): boolean {
+	const opened = history.beginTransaction("setupOrbitOrthographicCamera");
+	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
+	const local = localMatrixFromTrs(px, py, pz, qx, qy, qz, qw, 1, 1, 1);
+	const view = mat4Inverse(local);
+	if (view === null) {
+		return finishTrackedCameraControlTransaction(history, opened, false);
+	}
+	const ok =
+		history.setTransformTrs(
+			world,
+			camera,
+			px,
+			py,
+			pz,
+			qx,
+			qy,
+			qz,
+			qw,
+			1,
+			1,
+			1,
+		) &&
+		history.setGlobalTransform(world, camera, local) &&
+		addOrbitCameraControllerWithPoseTracked(
+			history,
+			world,
+			camera,
+			world.orbitCameraControllerComponent(),
+			desc.yaw,
+			desc.pitch,
+			desc.panX,
+			desc.panY,
+			desc.dolly,
+			desc.distance,
+		) &&
+		setCameraHomeFromCurrentTransformTracked(
+			history,
+			world,
+			camera,
+			world.cameraHomeTransformComponent(),
+		) &&
+		addCameraLensOrthographicTracked(
+			history,
+			world,
+			camera,
+			world.cameraLensComponent(),
+			desc.near,
+			desc.far,
+			desc.aspect,
+			desc.orthoHalfHeight,
+			desc.flags,
+		) &&
+		history.setCameraMatrices(
+			world,
+			camera,
+			view,
+			orthographicProjection(
+				desc.aspect,
+				desc.orthoHalfHeight * desc.dolly,
+				desc.near,
+				desc.far,
+			),
+			desc.near,
+			desc.far,
+			desc.aspect,
+			CAMERA_PROJECTION_ORTHOGRAPHIC,
+			desc.flags,
+		);
+	return finishTrackedCameraControlTransaction(history, opened, ok);
+}
+
 function perspectiveProjection(
 	aspect: number,
 	fovYRad: number,
@@ -842,6 +1181,56 @@ export function syncOrbitCameraBlobComponent(
 			: orthographicProjection(aspect, orthoHalfHeight * pose.dolly, near, far);
 	if (
 		!world.setCameraMatrices(
+			camera,
+			view,
+			proj,
+			near,
+			far,
+			aspect,
+			projectionKind,
+			flags,
+		)
+	) {
+		throw new Error("Failed to update Camera matrices.");
+	}
+}
+
+export function syncOrbitCameraBlobComponentTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	orbitComponent: ComponentTypeId,
+	lensComponent: ComponentTypeId,
+): void {
+	const pose = readOrbitCameraPoseComponent(world, camera, orbitComponent);
+	const lensBytes = componentBytesOrThrow(
+		world,
+		camera,
+		lensComponent,
+		"syncOrbitCameraBlobComponentTracked",
+	);
+	const q = quatMul(quatY(-pose.yaw), quatX(-pose.pitch));
+	const [dx, dy, dz] = quatRotateVec3(q, -pose.panX, -pose.panY, 0);
+	const view = mat4Inverse(
+		localMatrixFromTrs(dx, dy, dz + pose.distance, q[0], q[1], q[2], q[3], 1, 1, 1),
+	);
+	if (view === null) {
+		throw new Error("Failed to invert Camera GlobalTransform.");
+	}
+	const projectionKind = readF32(lensBytes, LENS_PROJECTION_KIND_OFFSET);
+	const near = readF32(lensBytes, LENS_NEAR_OFFSET);
+	const far = readF32(lensBytes, LENS_FAR_OFFSET);
+	const aspect = readF32(lensBytes, LENS_ASPECT_OFFSET);
+	const fovYRad = readF32(lensBytes, LENS_FOV_Y_RAD_OFFSET);
+	const orthoHalfHeight = readF32(lensBytes, LENS_ORTHO_HALF_HEIGHT_OFFSET);
+	const flags = readF32(lensBytes, LENS_FLAGS_OFFSET);
+	const proj =
+		projectionKind === CAMERA_PROJECTION_PERSPECTIVE
+			? perspectiveProjection(aspect, fovYRad, near, far)
+			: orthographicProjection(aspect, orthoHalfHeight * pose.dolly, near, far);
+	if (
+		!history.setCameraMatrices(
+			world,
 			camera,
 			view,
 			proj,
@@ -932,6 +1321,90 @@ export function syncOrbitCameraTransformComponent(
 		)
 	) {
 		throw new Error("Failed to update camera GlobalTransform.");
+	}
+}
+
+export function syncOrbitCameraTransformComponentTracked(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	orbitComponent: ComponentTypeId,
+	homeComponent: ComponentTypeId,
+): void {
+	const opened = history.beginTransaction("syncOrbitCameraTransformComponent");
+	const pose = readOrbitCameraPoseComponent(world, camera, orbitComponent);
+	let ok = true;
+	if (pose.resetRequested) {
+		const homeBytes = componentBytesOrThrow(
+			world,
+			camera,
+			homeComponent,
+			"syncOrbitCameraTransformComponentTracked",
+		);
+		const orbitBytes = componentBytesOrThrow(
+			world,
+			camera,
+			orbitComponent,
+			"syncOrbitCameraTransformComponentTracked",
+		);
+		ok = history.setComponentBytes(
+			world,
+			camera,
+			world.transformComponent(),
+			homeBytes,
+		);
+		writeF32(orbitBytes, ORBIT_YAW_OFFSET, readF32(orbitBytes, ORBIT_RESET_YAW_OFFSET));
+		writeF32(
+			orbitBytes,
+			ORBIT_PITCH_OFFSET,
+			readF32(orbitBytes, ORBIT_RESET_PITCH_OFFSET),
+		);
+		writeF32(orbitBytes, ORBIT_PAN_X_OFFSET, readF32(orbitBytes, ORBIT_RESET_PAN_X_OFFSET));
+		writeF32(orbitBytes, ORBIT_PAN_Y_OFFSET, readF32(orbitBytes, ORBIT_RESET_PAN_Y_OFFSET));
+		writeF32(orbitBytes, ORBIT_DOLLY_OFFSET, readF32(orbitBytes, ORBIT_RESET_DOLLY_OFFSET));
+		writeF32(
+			orbitBytes,
+			ORBIT_DISTANCE_OFFSET,
+			readF32(orbitBytes, ORBIT_RESET_DISTANCE_OFFSET),
+		);
+		writeF32(orbitBytes, ORBIT_RESET_REQUESTED_OFFSET, 0);
+		ok =
+			ok &&
+			history.setComponentBytes(world, camera, orbitComponent, orbitBytes) &&
+			history.setGlobalTransform(
+				world,
+				camera,
+				localMatrixFromTransformBytes(homeBytes),
+			);
+	} else {
+		const q = quatMul(quatY(-pose.yaw), quatX(-pose.pitch));
+		const [dx, dy, dz] = quatRotateVec3(q, -pose.panX, -pose.panY, 0);
+		const px = dx;
+		const py = dy;
+		const pz = dz + pose.distance;
+		ok =
+			history.setTransformTrs(
+				world,
+				camera,
+				px,
+				py,
+				pz,
+				q[0],
+				q[1],
+				q[2],
+				q[3],
+				1,
+				1,
+				1,
+			) &&
+			history.setGlobalTransform(
+				world,
+				camera,
+				localMatrixFromTrs(px, py, pz, q[0], q[1], q[2], q[3], 1, 1, 1),
+			);
+	}
+	if (!finishTrackedCameraControlTransaction(history, opened, ok)) {
+		throw new Error("Failed to update camera Transform3D.");
 	}
 }
 

@@ -296,3 +296,140 @@ test "setup orbit orthographic camera initializes transform components and camer
     None => abort("expected camera gpu row")
   }
 }
+
+///|
+test "tracked setup orbit orthographic camera undoes and redoes as one operation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.38,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.has_component(camera, world.transform_component()))
+  assert_true(world.has_component(camera, world.global_transform_component()))
+  assert_true(world.has_component(camera, orbit))
+  assert_true(world.has_component(camera, home))
+  assert_true(world.has_component(camera, lens))
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(history.undo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(!world.has_component(camera, world.global_transform_component()))
+  assert_true(!world.has_component(camera, orbit))
+  assert_true(!world.has_component(camera, home))
+  assert_true(!world.has_component(camera, lens))
+  assert_true(!world.has_component(camera, world.camera_component()))
+  assert_true(history.redo(world))
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  assert_true(world.has_component(camera, orbit))
+  assert_true(world.has_component(camera, world.camera_component()))
+  assert_true(world.drain_camera_blob_write_views().length() > 0)
+}
+
+///|
+test "tracked orbit camera edit helpers group drag sync and reset sync" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera(
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.0,
+        (0.0 : Float),
+        (16.0 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  let (yaw_before, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_true(history.begin_transaction("camera drag"))
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame_tracked(
+      history,
+      world,
+      camera,
+      true,
+      false,
+      false,
+      false,
+      (10.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(
+    set_camera_lens_orthographic_tracked(
+      history,
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (50.0 : Float),
+      (1.0 : Float),
+      (4.5 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(
+    sync_orbit_camera_transform_component_tracked(
+      history, world, camera, orbit, home,
+    ),
+  )
+  assert_true(
+    sync_orbit_camera_blob_component_tracked(
+      history, world, camera, orbit, lens,
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  let (yaw_after, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_true(yaw_after != yaw_before)
+  assert_true(history.undo(world))
+  let (yaw_undone, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_eq(yaw_undone, yaw_before)
+  assert_true(history.redo(world))
+  let (yaw_redone, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_eq(yaw_redone, yaw_after)
+  history.clear()
+  assert_true(history.begin_transaction("camera reset"))
+  assert_true(request_orbit_camera_reset_tracked(history, world, camera, orbit))
+  assert_true(
+    sync_orbit_camera_transform_component_tracked(
+      history, world, camera, orbit, home,
+    ),
+  )
+  assert_true(history.commit_transaction())
+  let (yaw_reset, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_eq(yaw_reset, (0.0 : Float))
+  assert_true(history.undo(world))
+  let (yaw_restored, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
+  assert_eq(yaw_restored, yaw_after)
+}

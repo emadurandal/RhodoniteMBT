@@ -110,6 +110,7 @@ sequenceDiagram
             <li><code>orbit_camera_transform_system</code> は controller から <code>Transform3D</code> と parentless <code>GlobalTransform</code> を更新する。</li>
             <li><code>camera_blob_sync_system</code> と <code>orbit_camera_blob_sync_system</code> は <code>GlobalTransform + CameraLens</code> から builtin Camera blob を更新する。</li>
           </ul>
+          <p>runtime update では raw camera-control helper と system を使います。Undo / Redo に参加する editor/authoring 変更では、<code>WorldHistory</code> と一緒に MoonBit の <code>*_tracked</code> helper または TypeScript の <code>*Tracked</code> wrapper を使います。drag gesture のような一連の操作は 1 つの transaction にまとめられます。</p>
 
           <h2>TypeScript Wrapper</h2>
           <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、system scheduling、camera-control bytes、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>

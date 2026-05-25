@@ -87,6 +87,7 @@ flowchart LR
 
           <h2>Camera Control</h2>
           <p>Camera control is split into input source, controller component, transform, lens, and Camera blob sync. <code>World::new</code> registers <code>OrbitCameraController</code>, <code>CameraHomeTransform</code>, and <code>CameraLens</code> as builtin camera-control components; callers retrieve their ids with <code>World::orbit_camera_controller_component</code>, <code>World::camera_home_transform_component</code>, and <code>World::camera_lens_component</code>. The transform systems update <code>Transform3D</code> / <code>GlobalTransform</code>; blob sync systems write the builtin Camera blob from <code>GlobalTransform + CameraLens</code>.</p>
+          <p>Use raw camera-control helpers and systems for runtime updates. For editor/authoring changes that must participate in Undo / Redo, use the <code>*_tracked</code> MoonBit helpers or the TypeScript <code>*Tracked</code> wrappers with <code>WorldHistory</code>; gesture-sized operations can be grouped in one transaction.</p>
 
           <h2>TypeScript Wrapper</h2>
           <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, <code>ChildOf</code> parent links, query APIs, spawn batch, system scheduling, camera-control byte layouts, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
