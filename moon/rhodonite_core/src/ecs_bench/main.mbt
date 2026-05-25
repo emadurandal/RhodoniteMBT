@@ -500,6 +500,20 @@ fn bench_history_archetype_column_tracked_enabled(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_history_archetype_column_raw_noop`.
+fn bench_history_archetype_column_raw_noop(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let _ = arch.write_column(component)
+    checksum = checksum + arch.length()
+  })
+  report("history_archetype_column_raw_noop", count, started, checksum)
+}
+
+///|
 /// Implements `bench_history_archetype_column_tracked_noop`.
 fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
   let (world, component, _) = make_component_world(count)
@@ -520,6 +534,30 @@ fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
     started,
     checksum + history.undo_len() + history.undo_bytes(),
   )
+}
+
+///|
+/// Implements `bench_history_archetype_column_raw_sparse`.
+fn bench_history_archetype_column_raw_sparse(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(component)
+    let col = arch.write_column(component)
+    for row = 0; row < arch.length(); row = row + 1 {
+      if row % 16 == 0 {
+        let idx = arch.entity(row).gpu_index()
+        write_bench_bytes4_to_view(
+          col.mut_view(start=row * stride, end=row * stride + stride),
+          idx + 151,
+        )
+        checksum = checksum + idx
+      }
+    }
+  })
+  report("history_archetype_column_raw_sparse", count, started, checksum)
 }
 
 ///|
@@ -652,7 +690,9 @@ fn run_history_suite(count : Int) -> Unit {
   bench_history_query_row_tracked_enabled(count)
   bench_history_archetype_column_tracked_disabled(count)
   bench_history_archetype_column_tracked_enabled(count)
+  bench_history_archetype_column_raw_noop(count)
   bench_history_archetype_column_tracked_noop(count)
+  bench_history_archetype_column_raw_sparse(count)
   bench_history_archetype_column_tracked_sparse(count)
   bench_history_command_raw_phase(count)
   bench_history_command_tracked_phase(count)
