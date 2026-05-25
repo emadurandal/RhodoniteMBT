@@ -576,6 +576,29 @@ pub fn World::component_info(
 }
 
 ///|
+/// Resolves a component registered with the given stable serialization key.
+pub fn World::component_by_stable_key(
+  self : World,
+  stable_key : String,
+) -> ComponentTypeId? {
+  self.registry.component_by_stable_key(stable_key)
+}
+
+///|
+/// Checks whether a component matches the given stable identity metadata.
+pub fn World::component_matches_identity(
+  self : World,
+  component : ComponentTypeId,
+  stable_key : String,
+  schema_version : String?,
+  schema_hash : String?,
+) -> Bool {
+  self.registry.component_matches_identity(
+    component, stable_key, schema_version, schema_hash,
+  )
+}
+
+///|
 /// Returns the CPU SoA stride for a registered component, or `None` for an unknown id.
 pub fn World::component_cpu_stride(
   self : World,

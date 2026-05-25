@@ -63,7 +63,7 @@
           </table>
 
           <h2>Payloads</h2>
-          <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. If the schema changed, import should reject those deltas rather than reinterpret bytes.</p>
+          <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. Import validation resolves the registered component by <code>component_by_stable_key</code> and uses <code>component_matches_identity</code>; specified schema version/hash fields must match, while unspecified schema fields are treated as wildcards. If the schema changed, import should reject those deltas rather than reinterpret bytes.</p>
           <p>Blob-backed builtins must not persist CPU ref bytes as the source of truth. <code>GlobalTransform</code> should persist its logical matrix row and format metadata. <code>Camera</code> should persist the logical camera GPU row payload and camera metadata needed by the runtime helper. On import, the world allocates fresh blob rows and writes those payloads, producing valid CPU ref components for the current session.</p>
 
           <h2>Replay Validation</h2>

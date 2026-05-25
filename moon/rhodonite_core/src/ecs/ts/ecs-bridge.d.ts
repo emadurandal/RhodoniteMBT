@@ -89,6 +89,17 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		component: MoonComponentTypeId,
 	): MoonRegisteredComponent | undefined;
+	export function world_component_by_stable_key(
+		world: MoonWorld,
+		stableKey: string,
+	): MoonComponentTypeId | undefined;
+	export function world_component_matches_identity(
+		world: MoonWorld,
+		component: MoonComponentTypeId,
+		stableKey: string,
+		schemaVersion: string | undefined,
+		schemaHash: string | undefined,
+	): MoonBool;
 	export function world_component_info_name(info: MoonRegisteredComponent): string;
 	export function world_component_info_cpu_stride(info: MoonRegisteredComponent): number;
 	export function world_component_info_stable_key(

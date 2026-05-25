@@ -78,6 +78,55 @@ fn ComponentRegistry::get(
 }
 
 ///|
+/// Resolves a component registered with the given stable key.
+fn ComponentRegistry::component_by_stable_key(
+  self : ComponentRegistry,
+  stable_key : String,
+) -> ComponentTypeId? {
+  for i = 0; i < self.components.length(); i = i + 1 {
+    match self.components[i].stable_key {
+      Some(existing) =>
+        if existing == stable_key {
+          return Some(self.components[i].id)
+        }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+/// Returns true when an optional schema field matches, treating an expected `None` as wildcard.
+fn optional_schema_field_matches(actual : String?, expected : String?) -> Bool {
+  match expected {
+    Some(value) => actual == Some(value)
+    None => true
+  }
+}
+
+///|
+/// Checks whether a component matches stable identity metadata requested by an import path.
+fn ComponentRegistry::component_matches_identity(
+  self : ComponentRegistry,
+  component : ComponentTypeId,
+  stable_key : String,
+  schema_version : String?,
+  schema_hash : String?,
+) -> Bool {
+  match self.get(component) {
+    Some(info) =>
+      match info.stable_key {
+        Some(existing) =>
+          existing == stable_key &&
+          optional_schema_field_matches(info.schema_version, schema_version) &&
+          optional_schema_field_matches(info.schema_hash, schema_hash)
+        None => false
+      }
+    None => false
+  }
+}
+
+///|
 /// Implements `ComponentRegistry::stride`.
 fn ComponentRegistry::stride(
   self : ComponentRegistry,

@@ -24,9 +24,11 @@ import {
 	world_camera_home_transform_component,
 	world_camera_lens_component,
 	world_child_of_component,
+	world_component_by_stable_key,
 	world_component_bytes_copy,
 	world_component_cpu_stride,
 	world_component_info,
+	world_component_matches_identity,
 	world_create_entity,
 	world_destroy_entity,
 	world_drain_global_transform_blob_write_views,
@@ -283,6 +285,28 @@ export class World {
 	componentInfo(component: ComponentTypeId): RegisteredComponent | null {
 		const info = world_component_info(this.inner, component.inner);
 		return info === undefined || info === null ? null : new RegisteredComponent(info);
+	}
+
+	componentByStableKey(stableKey: string): ComponentTypeId | null {
+		const component = world_component_by_stable_key(this.inner, stableKey);
+		return component === undefined || component === null
+			? null
+			: new ComponentTypeId(component);
+	}
+
+	componentMatchesIdentity(
+		component: ComponentTypeId,
+		identity: CpuComponentIdentity,
+	): boolean {
+		return moonBool(
+			world_component_matches_identity(
+				this.inner,
+				component.inner,
+				identity.stableKey,
+				identity.schemaVersion,
+				identity.schemaHash,
+			),
+		);
 	}
 
 	hasComponent(entity: EntityId, component: ComponentTypeId): boolean {
