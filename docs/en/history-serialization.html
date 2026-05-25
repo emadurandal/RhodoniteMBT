@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>History Serialization - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">History Serialization</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/history-serialization.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>History Serialization</h1>
+          <p class="lead">This document defines the intended persistence boundary for future <code>WorldHistory</code> export/import work. The current implementation keeps undo/redo records in memory only.</p>
+
+          <h2>Status</h2>
+          <ul>
+            <li><code>WorldHistory</code> does not currently expose a serialized history API.</li>
+            <li>Future persistence must use an explicit history format with a <code>format_version</code>; MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
+            <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
+          </ul>
+
+          <h2>Record Shape</h2>
+          <p>A future history archive should store undo and redo stacks as ordered records. Each record should contain a label, record-level metadata, and ordered deltas. The order of deltas is semantic because dependent transactions such as create-then-add-component must replay in the same sequence.</p>
+          <table>
+            <thead><tr><th>Field</th><th>Policy</th></tr></thead>
+            <tbody>
+              <tr><td><code>format_version</code></td><td>Required. Readers reject unsupported major versions instead of guessing.</td></tr>
+              <tr><td><code>library_version</code></td><td>Diagnostic metadata only; compatibility is decided by <code>format_version</code> and schema keys.</td></tr>
+              <tr><td><code>records</code></td><td>Stores committed undo and redo records in stack order.</td></tr>
+              <tr><td><code>label</code></td><td>Optional UI metadata. It must not affect replay semantics.</td></tr>
+              <tr><td><code>deltas</code></td><td>Ordered logical deltas with explicit variant tags and typed payload fields.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Identity</h2>
+          <p>Entity identity must be stored as <code>index + generation</code>, matching the runtime restoration policy where undoing a destroy restores the same <code>EntityId</code>. Component identity needs a stronger rule: <code>ComponentTypeId.index</code> is session-local and must not be the only persisted key.</p>
+          <table>
+            <thead><tr><th>Identity</th><th>Serialization policy</th></tr></thead>
+            <tbody>
+              <tr><td>Entity</td><td>Persist <code>index</code> and <code>generation</code>. Import validates that the target world can reserve or restore those ids.</td></tr>
+              <tr><td>Built-in component</td><td>Persist a stable builtin name such as <code>Transform3D</code>, <code>ChildOf</code>, <code>GlobalTransform</code>, or <code>Camera</code>.</td></tr>
+              <tr><td>User CPU component</td><td>Require an application-provided stable key plus schema version or hash. Replay is rejected when the registered component does not match.</td></tr>
+              <tr><td>Component index</td><td>May be cached as a local hint, but cannot be authoritative across sessions.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Payloads</h2>
+          <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. If the schema changed, import should reject those deltas rather than reinterpret bytes.</p>
+          <p>Blob-backed builtins must not persist CPU ref bytes as the source of truth. <code>GlobalTransform</code> should persist its logical matrix row and format metadata. <code>Camera</code> should persist the logical camera GPU row payload and camera metadata needed by the runtime helper. On import, the world allocates fresh blob rows and writes those payloads, producing valid CPU ref components for the current session.</p>
+
+          <h2>Replay Validation</h2>
+          <p>Import and replay should apply the same defensive posture as runtime undo/redo: validate each record before applying it, reject stale or schema-mismatched deltas, and leave stacks unchanged when validation fails. Byte budgets and record count limits remain runtime retention policy; they do not define archive compatibility.</p>
+
+          <h2>Out Of Scope For V1</h2>
+          <ul>
+            <li>Renderer mesh/material objects, GPU buffers, and device resources.</li>
+            <li>Asset lifetime and external resource handles referenced by ECS component bytes.</li>
+            <li>Collaborative editing merge, conflict resolution, or operation transforms.</li>
+            <li>Cross-engine-version replay beyond the explicit <code>format_version</code> compatibility policy.</li>
+            <li>Serialization of open transactions. Only committed undo/redo records are candidates for persistence.</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
