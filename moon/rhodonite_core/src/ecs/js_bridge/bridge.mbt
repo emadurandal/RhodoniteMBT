@@ -765,6 +765,21 @@ pub fn world_history_set_global_transform_col_major(
 }
 
 ///|
+/// Implements `world_history_set_global_transform_format`.
+pub fn world_history_set_global_transform_format(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  format_code : UInt,
+) -> Bool {
+  history.set_global_transform_format(
+    world,
+    entity,
+    @comp.global_transform_format_from_code(format_code),
+  )
+}
+
+///|
 /// Implements `world_history_set_child_of`.
 pub fn world_history_set_child_of(
   history : @ecs.WorldHistory,

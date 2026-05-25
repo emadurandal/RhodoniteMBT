@@ -87,6 +87,7 @@ import {
 	world_history_set_component_bytes_many,
 	world_history_set_enabled,
 	world_history_set_global_transform_col_major,
+	world_history_set_global_transform_format,
 	world_history_set_max_undo_bytes,
 	world_history_set_max_undo_records,
 	world_history_set_raw_mutation_guard_enabled,
@@ -761,6 +762,21 @@ export class WorldHistory {
 				world.inner,
 				entity.inner,
 				Array.from(matrixColMajor),
+			),
+		);
+	}
+
+	setGlobalTransformFormat(
+		world: World,
+		entity: EntityId,
+		formatCode: 0 | 1,
+	): boolean {
+		return moonBool(
+			world_history_set_global_transform_format(
+				this.inner,
+				world.inner,
+				entity.inner,
+				formatCode,
 			),
 		);
 	}
