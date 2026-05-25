@@ -392,6 +392,8 @@ pub fn WorldHistory::create_entities(Self, World, Int) -> Array[EntityId]
 pub fn WorldHistory::create_entity(Self, World) -> EntityId
 pub fn WorldHistory::destroy_entity(Self, World, EntityId) -> Bool
 pub fn WorldHistory::enabled(Self) -> Bool
+pub fn WorldHistory::export_redo_stack(Self, World) -> WorldHistoryExport?
+pub fn WorldHistory::export_undo_stack(Self, World) -> WorldHistoryExport?
 pub fn WorldHistory::last_diagnostic(Self) -> String
 pub fn WorldHistory::max_undo_bytes(Self) -> Int
 pub fn WorldHistory::max_undo_records(Self) -> Int
@@ -432,6 +434,45 @@ pub(all) struct WorldHistoryDeltaSummary {
   payload_bytes : Int
   before_present : Bool
   after_present : Bool
+}
+
+pub(all) struct WorldHistoryExport {
+  format_version : Int
+  record_count : Int
+  records : Array[WorldHistoryExportRecord]
+}
+
+pub(all) struct WorldHistoryExportComponentIdentity {
+  local_component : ComponentTypeId
+  key : String
+  builtin : Bool
+  schema_version : String?
+  schema_hash : String?
+}
+
+pub(all) struct WorldHistoryExportComponentSnapshot {
+  component : WorldHistoryExportComponentIdentity
+  bytes : FixedArray[Byte]
+}
+
+pub(all) struct WorldHistoryExportDelta {
+  kind : String
+  entity : EntityId?
+  component : WorldHistoryExportComponentIdentity?
+  before : WorldHistoryExportPayload?
+  after : WorldHistoryExportPayload?
+  components : Array[WorldHistoryExportComponentSnapshot]
+}
+
+pub(all) struct WorldHistoryExportPayload {
+  global_transform_format : Int?
+  bytes : FixedArray[Byte]
+}
+
+pub(all) struct WorldHistoryExportRecord {
+  label : String
+  delta_count : Int
+  deltas : Array[WorldHistoryExportDelta]
 }
 
 pub(all) struct WorldHistoryRecordSummary {

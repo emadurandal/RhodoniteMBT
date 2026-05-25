@@ -18,6 +18,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonWorldHistorySerializationRecordReport = object;
 	export type MoonWorldHistorySerializationDeltaReport = object;
 	export type MoonWorldHistorySerializationComponentReport = object;
+	export type MoonWorldHistoryExport = object;
+	export type MoonWorldHistoryExportRecord = object;
+	export type MoonWorldHistoryExportDelta = object;
+	export type MoonWorldHistoryExportComponentIdentity = object;
+	export type MoonWorldHistoryExportPayload = object;
+	export type MoonWorldHistoryExportComponentSnapshot = object;
 	export type MoonPhaseKey = object;
 	export type MoonSystemContext = object;
 	export type MoonSystem = object;
@@ -289,6 +295,14 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		history: MoonWorldHistory,
 		world: MoonWorld,
 	): MoonWorldHistorySerializationReport;
+	export function world_history_export_undo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonWorldHistoryExport | undefined;
+	export function world_history_export_redo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonWorldHistoryExport | undefined;
 	export function world_history_serialization_report_serializable(
 		report: MoonWorldHistorySerializationReport,
 	): MoonBool;
@@ -352,6 +366,69 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_serialization_component_report_stable_key(
 		report: MoonWorldHistorySerializationComponentReport,
 	): string | undefined;
+	export function world_history_export_format_version(
+		exported: MoonWorldHistoryExport,
+	): number;
+	export function world_history_export_record_count(
+		exported: MoonWorldHistoryExport,
+	): number;
+	export function world_history_export_records(
+		exported: MoonWorldHistoryExport,
+	): MoonWorldHistoryExportRecord[];
+	export function world_history_export_record_label(
+		record: MoonWorldHistoryExportRecord,
+	): string;
+	export function world_history_export_record_delta_count(
+		record: MoonWorldHistoryExportRecord,
+	): number;
+	export function world_history_export_record_deltas(
+		record: MoonWorldHistoryExportRecord,
+	): MoonWorldHistoryExportDelta[];
+	export function world_history_export_delta_kind(
+		delta: MoonWorldHistoryExportDelta,
+	): string;
+	export function world_history_export_delta_entity(
+		delta: MoonWorldHistoryExportDelta,
+	): MoonEntityId | undefined;
+	export function world_history_export_delta_component(
+		delta: MoonWorldHistoryExportDelta,
+	): MoonWorldHistoryExportComponentIdentity | undefined;
+	export function world_history_export_delta_before(
+		delta: MoonWorldHistoryExportDelta,
+	): MoonWorldHistoryExportPayload | undefined;
+	export function world_history_export_delta_after(
+		delta: MoonWorldHistoryExportDelta,
+	): MoonWorldHistoryExportPayload | undefined;
+	export function world_history_export_delta_components(
+		delta: MoonWorldHistoryExportDelta,
+	): MoonWorldHistoryExportComponentSnapshot[];
+	export function world_history_export_component_identity_local_component(
+		identity: MoonWorldHistoryExportComponentIdentity,
+	): MoonComponentTypeId;
+	export function world_history_export_component_identity_key(
+		identity: MoonWorldHistoryExportComponentIdentity,
+	): string;
+	export function world_history_export_component_identity_builtin(
+		identity: MoonWorldHistoryExportComponentIdentity,
+	): MoonBool;
+	export function world_history_export_component_identity_schema_version(
+		identity: MoonWorldHistoryExportComponentIdentity,
+	): string | undefined;
+	export function world_history_export_component_identity_schema_hash(
+		identity: MoonWorldHistoryExportComponentIdentity,
+	): string | undefined;
+	export function world_history_export_payload_global_transform_format(
+		payload: MoonWorldHistoryExportPayload,
+	): number | undefined;
+	export function world_history_export_payload_bytes(
+		payload: MoonWorldHistoryExportPayload,
+	): MoonByteBacking;
+	export function world_history_export_component_snapshot_component(
+		snapshot: MoonWorldHistoryExportComponentSnapshot,
+	): MoonWorldHistoryExportComponentIdentity;
+	export function world_history_export_component_snapshot_bytes(
+		snapshot: MoonWorldHistoryExportComponentSnapshot,
+	): MoonByteBacking;
 	export function world_history_record_summary_label(
 		summary: MoonWorldHistoryRecordSummary,
 	): string;

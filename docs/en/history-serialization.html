@@ -27,13 +27,16 @@
       <main class="content">
         <article class="doc">
           <h1>History Serialization</h1>
-          <p class="lead">This document defines the intended persistence boundary for future <code>WorldHistory</code> export/import work. The current implementation keeps undo/redo records in memory only.</p>
+          <p class="lead">This document defines the persistence boundary for <code>WorldHistory</code> export/import work. The current implementation exposes a draft in-memory export shape; import and durable file encoding are not implemented yet.</p>
 
           <h2>Status</h2>
           <ul>
-            <li><code>WorldHistory</code> does not currently expose a serialized history API.</li>
+            <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return a draft in-memory archive when all retained records are eligible for serialization.</li>
+            <li>The TypeScript wrapper exposes <code>WorldHistory.exportUndoStack(world)</code> and <code>WorldHistory.exportRedoStack(world)</code>, returning <code>HistoryExport | null</code>. Payload bytes are copied to <code>Uint8Array</code>.</li>
+            <li>Export uses <code>format_version = 1</code>. It is a library object model, not yet a JSON/binary file format.</li>
+            <li>Import is not implemented. Exported records are read-only data for tooling, tests, and the next import design step.</li>
             <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
-            <li>Future persistence must use an explicit history format with a <code>format_version</code>; MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
+            <li>MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
           </ul>
 
@@ -65,6 +68,21 @@
           <h2>Payloads</h2>
           <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. Import validation resolves the registered component by <code>component_by_stable_key</code> and uses <code>component_matches_identity</code>; specified schema version/hash fields must match, while unspecified schema fields are treated as wildcards. If the schema changed, import should reject those deltas rather than reinterpret bytes.</p>
           <p>Blob-backed builtins must not persist CPU ref bytes as the source of truth. <code>GlobalTransform</code> should persist its logical matrix row and format metadata. <code>Camera</code> should persist the logical camera GPU row payload and camera metadata needed by the runtime helper. On import, the world allocates fresh blob rows and writes those payloads, producing valid CPU ref components for the current session.</p>
+
+          <h2>Export MVP</h2>
+          <p>The current export API returns retained records in stack order with the next undo or redo operation first. It first runs the same eligibility checks as <code>undo_serialization_report</code> / <code>redo_serialization_report</code>; if any record is not serializable, export returns <code>None</code> / <code>null</code> and does not mutate history diagnostics or stacks.</p>
+          <table>
+            <thead><tr><th>Delta</th><th>Exported payload</th></tr></thead>
+            <tbody>
+              <tr><td><code>entity_created</code></td><td>Entity id only.</td></tr>
+              <tr><td><code>entity_destroyed</code></td><td>Entity id plus stable component identities and copied component bytes.</td></tr>
+              <tr><td><code>component_added</code></td><td>Stable component identity and <code>after</code> bytes.</td></tr>
+              <tr><td><code>component_removed</code></td><td>Stable component identity and <code>before</code> bytes.</td></tr>
+              <tr><td><code>component_changed</code></td><td>Stable component identity plus <code>before</code> and <code>after</code> bytes.</td></tr>
+              <tr><td><code>global_transform_changed</code></td><td>Stable builtin identity, logical row bytes, and <code>global_transform_format</code> code.</td></tr>
+              <tr><td><code>camera_changed</code></td><td>Stable builtin identity and logical camera row bytes. There is no GlobalTransform format field.</td></tr>
+            </tbody>
+          </table>
 
           <h2>Replay Validation</h2>
           <p>Import and replay should apply the same defensive posture as runtime undo/redo: validate each record before applying it, reject stale or schema-mismatched deltas, and leave stacks unchanged when validation fails. Byte budgets and record count limits remain runtime retention policy; they do not define archive compatibility.</p>

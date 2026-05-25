@@ -655,6 +655,24 @@ pub fn world_history_redo_serialization_report(
 }
 
 ///|
+/// Implements `world_history_export_undo_stack`.
+pub fn world_history_export_undo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> @ecs.WorldHistoryExport? {
+  history.export_undo_stack(world)
+}
+
+///|
+/// Implements `world_history_export_redo_stack`.
+pub fn world_history_export_redo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> @ecs.WorldHistoryExport? {
+  history.export_redo_stack(world)
+}
+
+///|
 /// Implements `world_history_serialization_report_serializable`.
 pub fn world_history_serialization_report_serializable(
   report : @ecs.WorldHistorySerializationReport,
@@ -820,6 +838,174 @@ pub fn world_history_serialization_component_report_stable_key(
   report : @ecs.WorldHistorySerializationComponentReport,
 ) -> String? {
   report.stable_key
+}
+
+///|
+/// Implements `world_history_export_format_version`.
+pub fn world_history_export_format_version(
+  exported : @ecs.WorldHistoryExport,
+) -> Int {
+  exported.format_version
+}
+
+///|
+/// Implements `world_history_export_record_count`.
+pub fn world_history_export_record_count(
+  exported : @ecs.WorldHistoryExport,
+) -> Int {
+  exported.record_count
+}
+
+///|
+/// Implements `world_history_export_records`.
+pub fn world_history_export_records(
+  exported : @ecs.WorldHistoryExport,
+) -> Array[@ecs.WorldHistoryExportRecord] {
+  exported.records
+}
+
+///|
+/// Implements `world_history_export_record_label`.
+pub fn world_history_export_record_label(
+  record : @ecs.WorldHistoryExportRecord,
+) -> String {
+  record.label
+}
+
+///|
+/// Implements `world_history_export_record_delta_count`.
+pub fn world_history_export_record_delta_count(
+  record : @ecs.WorldHistoryExportRecord,
+) -> Int {
+  record.delta_count
+}
+
+///|
+/// Implements `world_history_export_record_deltas`.
+pub fn world_history_export_record_deltas(
+  record : @ecs.WorldHistoryExportRecord,
+) -> Array[@ecs.WorldHistoryExportDelta] {
+  record.deltas
+}
+
+///|
+/// Implements `world_history_export_delta_kind`.
+pub fn world_history_export_delta_kind(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> String {
+  delta.kind
+}
+
+///|
+/// Implements `world_history_export_delta_entity`.
+pub fn world_history_export_delta_entity(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> @ecs.EntityId? {
+  delta.entity
+}
+
+///|
+/// Implements `world_history_export_delta_component`.
+pub fn world_history_export_delta_component(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> @ecs.WorldHistoryExportComponentIdentity? {
+  delta.component
+}
+
+///|
+/// Implements `world_history_export_delta_before`.
+pub fn world_history_export_delta_before(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> @ecs.WorldHistoryExportPayload? {
+  delta.before
+}
+
+///|
+/// Implements `world_history_export_delta_after`.
+pub fn world_history_export_delta_after(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> @ecs.WorldHistoryExportPayload? {
+  delta.after
+}
+
+///|
+/// Implements `world_history_export_delta_components`.
+pub fn world_history_export_delta_components(
+  delta : @ecs.WorldHistoryExportDelta,
+) -> Array[@ecs.WorldHistoryExportComponentSnapshot] {
+  delta.components
+}
+
+///|
+/// Implements `world_history_export_component_identity_local_component`.
+pub fn world_history_export_component_identity_local_component(
+  identity : @ecs.WorldHistoryExportComponentIdentity,
+) -> @ecs.ComponentTypeId {
+  identity.local_component
+}
+
+///|
+/// Implements `world_history_export_component_identity_key`.
+pub fn world_history_export_component_identity_key(
+  identity : @ecs.WorldHistoryExportComponentIdentity,
+) -> String {
+  identity.key
+}
+
+///|
+/// Implements `world_history_export_component_identity_builtin`.
+pub fn world_history_export_component_identity_builtin(
+  identity : @ecs.WorldHistoryExportComponentIdentity,
+) -> Bool {
+  identity.builtin
+}
+
+///|
+/// Implements `world_history_export_component_identity_schema_version`.
+pub fn world_history_export_component_identity_schema_version(
+  identity : @ecs.WorldHistoryExportComponentIdentity,
+) -> String? {
+  identity.schema_version
+}
+
+///|
+/// Implements `world_history_export_component_identity_schema_hash`.
+pub fn world_history_export_component_identity_schema_hash(
+  identity : @ecs.WorldHistoryExportComponentIdentity,
+) -> String? {
+  identity.schema_hash
+}
+
+///|
+/// Implements `world_history_export_payload_global_transform_format`.
+pub fn world_history_export_payload_global_transform_format(
+  payload : @ecs.WorldHistoryExportPayload,
+) -> Int? {
+  payload.global_transform_format
+}
+
+///|
+/// Implements `world_history_export_payload_bytes`.
+pub fn world_history_export_payload_bytes(
+  payload : @ecs.WorldHistoryExportPayload,
+) -> FixedArray[Byte] {
+  payload.bytes
+}
+
+///|
+/// Implements `world_history_export_component_snapshot_component`.
+pub fn world_history_export_component_snapshot_component(
+  snapshot : @ecs.WorldHistoryExportComponentSnapshot,
+) -> @ecs.WorldHistoryExportComponentIdentity {
+  snapshot.component
+}
+
+///|
+/// Implements `world_history_export_component_snapshot_bytes`.
+pub fn world_history_export_component_snapshot_bytes(
+  snapshot : @ecs.WorldHistoryExportComponentSnapshot,
+) -> FixedArray[Byte] {
+  snapshot.bytes
 }
 
 ///|

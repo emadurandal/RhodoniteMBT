@@ -1045,6 +1045,215 @@ test "WorldHistory reports serialization eligibility without exposing payloads" 
 }
 
 ///|
+test "WorldHistory exports stable component byte changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryExportStable",
+    4,
+    "com.example.HistoryExportStable",
+    Some("2"),
+    Some("sha256:history-export-stable"),
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  let diagnostic = history.last_diagnostic()
+  let archive = match history.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable undo stack")
+  }
+  assert_eq(archive.format_version, 1)
+  assert_eq(archive.record_count, 1)
+  assert_eq(archive.records[0].label, "set_component_bytes")
+  assert_eq(archive.records[0].delta_count, 1)
+  let delta = archive.records[0].deltas[0]
+  assert_eq(delta.kind, "component_changed")
+  assert_true(delta.entity == Some(entity))
+  match delta.component {
+    Some(identity) => {
+      assert_true(identity.local_component == component)
+      assert_eq(identity.key, "com.example.HistoryExportStable")
+      assert_true(!identity.builtin)
+      assert_true(identity.schema_version == Some("2"))
+      assert_true(identity.schema_hash == Some("sha256:history-export-stable"))
+    }
+    None => abort("expected exported component identity")
+  }
+  match delta.before {
+    Some(payload) => {
+      assert_true(payload.global_transform_format is None)
+      assert_true(payload.bytes == bytes4(1, 0, 0, 0))
+    }
+    None => abort("expected exported before bytes")
+  }
+  match delta.after {
+    Some(payload) => {
+      assert_true(payload.global_transform_format is None)
+      assert_true(payload.bytes == bytes4(2, 0, 0, 0))
+    }
+    None => abort("expected exported after bytes")
+  }
+  assert_eq(history.last_diagnostic(), diagnostic)
+  assert_true(history.undo(world))
+  let redo_archive = match history.export_redo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable redo stack")
+  }
+  assert_eq(redo_archive.records[0].label, "set_component_bytes")
+  assert_eq(redo_archive.records[0].deltas[0].kind, "component_changed")
+}
+
+///|
+test "WorldHistory export returns None for legacy component identity" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryExportLegacy", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  let diagnostic = history.last_diagnostic()
+  assert_true(history.export_undo_stack(world) is None)
+  assert_eq(history.last_diagnostic(), diagnostic)
+}
+
+///|
+test "WorldHistory export includes entity destroyed component snapshots" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryExportDestroyStable",
+    4,
+    "com.example.HistoryExportDestroyStable",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(7, 0, 0, 0)))
+  assert_true(
+    history.set_transform_trs(
+      world,
+      entity,
+      (1.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(history.begin_transaction("Export Destroy Stable Entity"))
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(history.commit_transaction())
+  let archive = match history.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable destroy stack")
+  }
+  assert_eq(archive.records[0].label, "Export Destroy Stable Entity")
+  let delta = archive.records[0].deltas[0]
+  assert_eq(delta.kind, "entity_destroyed")
+  assert_true(delta.entity == Some(entity))
+  let mut saw_stable = false
+  let mut saw_transform = false
+  for i = 0; i < delta.components.length(); i = i + 1 {
+    let snapshot = delta.components[i]
+    if snapshot.component.local_component == component {
+      saw_stable = true
+      assert_eq(
+        snapshot.component.key,
+        "com.example.HistoryExportDestroyStable",
+      )
+      assert_true(snapshot.bytes == bytes4(7, 0, 0, 0))
+    } else if snapshot.component.key == "Transform3D" {
+      saw_transform = true
+      assert_true(snapshot.component.builtin)
+    }
+  }
+  assert_true(saw_stable)
+  assert_true(saw_transform)
+}
+
+///|
+test "WorldHistory export includes GlobalTransform and Camera payloads" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let before = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let after = @m44.Matrix44::translation(
+    (2.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, before))
+  assert_true(history.set_global_transform(world, entity, after))
+  let camera = world.create_entity()
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let archive = match history.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable builtin blob stack")
+  }
+  assert_eq(archive.record_count, 2)
+  assert_eq(archive.records[0].deltas[0].kind, "camera_changed")
+  match archive.records[0].deltas[0].component {
+    Some(identity) => {
+      assert_eq(identity.key, "Camera")
+      assert_true(identity.builtin)
+    }
+    None => abort("expected exported Camera identity")
+  }
+  match archive.records[0].deltas[0].after {
+    Some(payload) => {
+      assert_true(payload.global_transform_format is None)
+      assert_true(payload.bytes.length() > 0)
+    }
+    None => abort("expected exported Camera after payload")
+  }
+  assert_eq(archive.records[1].deltas[0].kind, "global_transform_changed")
+  match archive.records[1].deltas[0].component {
+    Some(identity) => {
+      assert_eq(identity.key, "GlobalTransform")
+      assert_true(identity.builtin)
+    }
+    None => abort("expected exported GlobalTransform identity")
+  }
+  match archive.records[1].deltas[0].after {
+    Some(payload) => {
+      assert_true(payload.global_transform_format == Some(1))
+      assert_true(payload.bytes.length() > 0)
+    }
+    None => abort("expected exported GlobalTransform after payload")
+  }
+}
+
+///|
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()

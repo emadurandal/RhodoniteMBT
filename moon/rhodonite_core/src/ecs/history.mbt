@@ -113,6 +113,57 @@ pub(all) struct WorldHistorySerializationReport {
 }
 
 ///|
+/// Stable component identity stored beside exported history payload bytes.
+pub(all) struct WorldHistoryExportComponentIdentity {
+  local_component : ComponentTypeId
+  key : String
+  builtin : Bool
+  schema_version : String?
+  schema_hash : String?
+}
+
+///|
+/// Byte payload for an exported history delta.
+pub(all) struct WorldHistoryExportPayload {
+  global_transform_format : Int?
+  bytes : FixedArray[Byte]
+}
+
+///|
+/// Component bytes captured for an exported entity-destroyed delta.
+pub(all) struct WorldHistoryExportComponentSnapshot {
+  component : WorldHistoryExportComponentIdentity
+  bytes : FixedArray[Byte]
+}
+
+///|
+/// One exported reversible delta with stable component identity metadata.
+pub(all) struct WorldHistoryExportDelta {
+  kind : String
+  entity : EntityId?
+  component : WorldHistoryExportComponentIdentity?
+  before : WorldHistoryExportPayload?
+  after : WorldHistoryExportPayload?
+  components : Array[WorldHistoryExportComponentSnapshot]
+}
+
+///|
+/// One exported committed history record.
+pub(all) struct WorldHistoryExportRecord {
+  label : String
+  delta_count : Int
+  deltas : Array[WorldHistoryExportDelta]
+}
+
+///|
+/// In-memory draft export of one history stack.
+pub(all) struct WorldHistoryExport {
+  format_version : Int
+  record_count : Int
+  records : Array[WorldHistoryExportRecord]
+}
+
+///|
 /// Whether applying stack limits dropped at least one retained record.
 priv struct HistoryTrimResult {
   record_limit : Bool
@@ -173,6 +224,12 @@ fn history_serialization_reason_missing_stable_component_identity() -> String {
 }
 
 ///|
+/// Current draft in-memory history export format version.
+fn world_history_export_format_version() -> Int {
+  1
+}
+
+///|
 /// Converts a stack-trim result to the public diagnostic code.
 fn history_trim_result_diagnostic(result : HistoryTrimResult) -> String {
   if result.record_limit && result.byte_limit {
@@ -194,6 +251,27 @@ fn entity_snapshot_payload_bytes(snapshot : EntitySnapshot) -> Int {
     total = total + snapshot.components[i].bytes.length()
   }
   total
+}
+
+///|
+/// Copies retained payload bytes so export objects do not alias history internals.
+fn world_history_copy_bytes(bytes : FixedArray[Byte]) -> FixedArray[Byte] {
+  let out = FixedArray::make(bytes.length(), (0 : Byte))
+  for i = 0; i < bytes.length(); i = i + 1 {
+    out[i] = bytes[i]
+  }
+  out
+}
+
+///|
+/// Converts a GlobalTransform GPU row format to the export wire code.
+fn world_history_global_transform_export_format_code(
+  format : @comp.GlobalTransformGpuFormat,
+) -> Int {
+  match @comp.global_transform_format_code(format) {
+    1U => 1
+    _ => 0
+  }
 }
 
 ///|
@@ -639,6 +717,240 @@ fn world_history_stack_serialization_report_next_first(
     record_count: stack.length(),
     records,
   }
+}
+
+///|
+/// Resolves stable component identity metadata for exported history payloads.
+fn world_history_export_component_identity(
+  world : World,
+  component : ComponentTypeId,
+) -> WorldHistoryExportComponentIdentity? {
+  match world_history_builtin_component_stable_key(world, component) {
+    Some(key) =>
+      Some({
+        local_component: component,
+        key,
+        builtin: true,
+        schema_version: None,
+        schema_hash: None,
+      })
+    None =>
+      match world.component_info(component) {
+        Some(info) =>
+          match info.stable_key {
+            Some(key) =>
+              Some({
+                local_component: component,
+                key,
+                builtin: false,
+                schema_version: info.schema_version,
+                schema_hash: info.schema_hash,
+              })
+            None => None
+          }
+        None => None
+      }
+  }
+}
+
+///|
+/// Builds an exported payload with a defensive copy of retained bytes.
+fn world_history_export_payload(
+  bytes : FixedArray[Byte],
+  global_transform_format : Int?,
+) -> WorldHistoryExportPayload {
+  { global_transform_format, bytes: world_history_copy_bytes(bytes) }
+}
+
+///|
+/// Builds an exported GlobalTransform row payload with its format code.
+fn world_history_export_global_transform_payload(
+  row : GlobalTransformHistoryRow,
+) -> WorldHistoryExportPayload {
+  world_history_export_payload(
+    row.bytes,
+    Some(world_history_global_transform_export_format_code(row.format)),
+  )
+}
+
+///|
+/// Builds an exported component snapshot for an entity-destroyed delta.
+fn world_history_export_component_snapshot(
+  world : World,
+  snapshot : ComponentSnapshot,
+) -> WorldHistoryExportComponentSnapshot? {
+  match world_history_export_component_identity(world, snapshot.component) {
+    Some(component) =>
+      Some({ component, bytes: world_history_copy_bytes(snapshot.bytes) })
+    None => None
+  }
+}
+
+///|
+/// Builds the exported snapshot list for an entity-destroyed delta.
+fn world_history_export_component_snapshots(
+  world : World,
+  snapshots : Array[ComponentSnapshot],
+) -> Array[WorldHistoryExportComponentSnapshot]? {
+  let components : Array[WorldHistoryExportComponentSnapshot] = []
+  for i = 0; i < snapshots.length(); i = i + 1 {
+    match world_history_export_component_snapshot(world, snapshots[i]) {
+      Some(snapshot) => components.push(snapshot)
+      None => return None
+    }
+  }
+  Some(components)
+}
+
+///|
+/// Builds an exported delta after serialization eligibility has passed.
+fn world_history_export_delta(
+  world : World,
+  delta : WorldDelta,
+) -> WorldHistoryExportDelta? {
+  match delta {
+    EntityCreated(entity) =>
+      Some({
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: None,
+        before: None,
+        after: None,
+        components: [],
+      })
+    EntityDestroyed(snapshot) =>
+      match
+        world_history_export_component_snapshots(world, snapshot.components) {
+        Some(components) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(snapshot.entity),
+            component: None,
+            before: None,
+            after: None,
+            components,
+          })
+        None => None
+      }
+    ComponentAdded(entity, component, after_bytes) =>
+      match world_history_export_component_identity(world, component) {
+        Some(identity) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(entity),
+            component: Some(identity),
+            before: None,
+            after: Some(world_history_export_payload(after_bytes, None)),
+            components: [],
+          })
+        None => None
+      }
+    ComponentRemoved(entity, component, before_bytes) =>
+      match world_history_export_component_identity(world, component) {
+        Some(identity) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(entity),
+            component: Some(identity),
+            before: Some(world_history_export_payload(before_bytes, None)),
+            after: None,
+            components: [],
+          })
+        None => None
+      }
+    ComponentChanged(entity, component, before_bytes, after_bytes) =>
+      match world_history_export_component_identity(world, component) {
+        Some(identity) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(entity),
+            component: Some(identity),
+            before: Some(world_history_export_payload(before_bytes, None)),
+            after: Some(world_history_export_payload(after_bytes, None)),
+            components: [],
+          })
+        None => None
+      }
+    GlobalTransformChanged(entity, before_row, after_row) =>
+      match
+        world_history_export_component_identity(
+          world,
+          world.global_transform_component(),
+        ) {
+        Some(identity) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(entity),
+            component: Some(identity),
+            before: match before_row {
+              Some(row) =>
+                Some(world_history_export_global_transform_payload(row))
+              None => None
+            },
+            after: Some(
+              world_history_export_global_transform_payload(after_row),
+            ),
+            components: [],
+          })
+        None => None
+      }
+    CameraChanged(entity, before_bytes, after_bytes) =>
+      match
+        world_history_export_component_identity(world, world.camera_component()) {
+        Some(identity) =>
+          Some({
+            kind: world_delta_summary_kind(delta),
+            entity: Some(entity),
+            component: Some(identity),
+            before: match before_bytes {
+              Some(bytes) => Some(world_history_export_payload(bytes, None))
+              None => None
+            },
+            after: Some(world_history_export_payload(after_bytes, None)),
+            components: [],
+          })
+        None => None
+      }
+  }
+}
+
+///|
+/// Builds an exported history record after serialization eligibility has passed.
+fn world_history_export_record(
+  world : World,
+  record : WorldHistoryRecord,
+) -> WorldHistoryExportRecord? {
+  let deltas : Array[WorldHistoryExportDelta] = []
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    match world_history_export_delta(world, record.deltas[i]) {
+      Some(delta) => deltas.push(delta)
+      None => return None
+    }
+  }
+  Some({ label: record.label, delta_count: record.deltas.length(), deltas })
+}
+
+///|
+/// Builds an in-memory draft export for a history stack, next operation first.
+fn world_history_stack_export_next_first(
+  world : World,
+  stack : Array[WorldHistoryRecord],
+) -> WorldHistoryExport? {
+  if !world_history_stack_serialization_report_next_first(world, stack).serializable {
+    return None
+  }
+  let records : Array[WorldHistoryExportRecord] = []
+  for i = stack.length() - 1; i >= 0; i = i - 1 {
+    match world_history_export_record(world, stack[i]) {
+      Some(record) => records.push(record)
+      None => return None
+    }
+  }
+  Some({
+    format_version: world_history_export_format_version(),
+    record_count: stack.length(),
+    records,
+  })
 }
 
 ///|
@@ -1901,6 +2213,24 @@ pub fn WorldHistory::redo_serialization_report(
   world : World,
 ) -> WorldHistorySerializationReport {
   world_history_stack_serialization_report_next_first(world, self.redo_stack)
+}
+
+///|
+/// Exports retained undo records as a draft in-memory archive, or `None` when not eligible.
+pub fn WorldHistory::export_undo_stack(
+  self : WorldHistory,
+  world : World,
+) -> WorldHistoryExport? {
+  world_history_stack_export_next_first(world, self.undo_stack)
+}
+
+///|
+/// Exports retained redo records as a draft in-memory archive, or `None` when not eligible.
+pub fn WorldHistory::export_redo_stack(
+  self : WorldHistory,
+  world : World,
+) -> WorldHistoryExport? {
+  world_history_stack_export_next_first(world, self.redo_stack)
 }
 
 ///|
