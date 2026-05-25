@@ -16,6 +16,13 @@ priv struct EntitySnapshot {
 }
 
 ///|
+/// One packed GlobalTransform GPU row captured for history replay.
+priv struct GlobalTransformHistoryRow {
+  format : @comp.GlobalTransformGpuFormat
+  bytes : FixedArray[Byte]
+}
+
+///|
 /// Minimal reversible ECS mutation recorded by [`WorldHistory`].
 priv enum WorldDelta {
   EntityCreated(EntityId)
@@ -27,6 +34,11 @@ priv enum WorldDelta {
     ComponentTypeId,
     FixedArray[Byte],
     FixedArray[Byte]
+  )
+  GlobalTransformChanged(
+    EntityId,
+    GlobalTransformHistoryRow?,
+    GlobalTransformHistoryRow
   )
   CameraChanged(EntityId, FixedArray[Byte]?, FixedArray[Byte])
 }
@@ -113,6 +125,11 @@ fn world_delta_payload_bytes(delta : WorldDelta) -> Int {
     ComponentAdded(_, _, bytes) => bytes.length()
     ComponentRemoved(_, _, bytes) => bytes.length()
     ComponentChanged(_, _, before, after) => before.length() + after.length()
+    GlobalTransformChanged(_, before, after) =>
+      match before {
+        Some(row) => row.bytes.length() + after.bytes.length()
+        None => after.bytes.length()
+      }
     CameraChanged(_, before, after) =>
       match before {
         Some(bytes) => bytes.length() + after.length()
@@ -393,6 +410,78 @@ fn World::history_blob_ref_component(
 ) -> Bool {
   component == self.global_transform_component_id ||
   component == self.camera_component_id
+}
+
+///|
+/// Returns whether a GlobalTransform history row matches its declared format.
+fn global_transform_history_row_valid(row : GlobalTransformHistoryRow) -> Bool {
+  row.bytes.length() == @comp.global_transform_word_count(row.format) * 4
+}
+
+///|
+/// Returns whether two GlobalTransform history rows carry the same format and bytes.
+fn global_transform_history_row_equal(
+  a : GlobalTransformHistoryRow,
+  b : GlobalTransformHistoryRow,
+) -> Bool {
+  a.format == b.format && a.bytes == b.bytes
+}
+
+///|
+/// Captures the current GlobalTransform blob row for one entity.
+fn World::global_transform_history_row(
+  self : World,
+  entity : EntityId,
+) -> GlobalTransformHistoryRow? {
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) =>
+      match
+        self.global_transform_blob.read_row_bytes(
+          gt_ref.format,
+          gt_ref.word_offset,
+        ) {
+        Some(bytes) => Some({ format: gt_ref.format, bytes })
+        None => None
+      }
+    None => None
+  }
+}
+
+///|
+/// Restores a GlobalTransform blob row, allocating a fresh blob slot.
+fn World::restore_global_transform_history_row(
+  self : World,
+  entity : EntityId,
+  row : GlobalTransformHistoryRow,
+) -> Bool {
+  if !self.is_alive(entity) || !global_transform_history_row_valid(row) {
+    return false
+  }
+  let component = self.global_transform_component()
+  let had_component = self.has_component(entity, component)
+  if had_component {
+    self.release_global_transform_ref(entity)
+  }
+  let gt_ref = self.alloc_global_transform_ref(
+    row.format,
+    @m44.Matrix44F::identity(),
+  )
+  if !self.global_transform_blob.write_row_bytes(
+      row.format,
+      gt_ref.word_offset,
+      row.bytes,
+    ) {
+    return false
+  }
+  let ref_bytes = @comp.global_transform_ref_bytes(
+    gt_ref.format,
+    gt_ref.word_offset,
+  )
+  if had_component {
+    self.set_component_bytes(entity, component, ref_bytes)
+  } else {
+    self.add_component_bytes(entity, component, ref_bytes)
+  }
 }
 
 ///|
@@ -869,6 +958,38 @@ fn HistoryValidationState::validate_restore_camera(
 }
 
 ///|
+/// Validates that a GlobalTransform row can be restored, then predicts ownership.
+fn HistoryValidationState::validate_restore_global_transform(
+  self : HistoryValidationState,
+  entity : EntityId,
+  row : GlobalTransformHistoryRow,
+) -> Bool {
+  if !global_transform_history_row_valid(row) {
+    return false
+  }
+  let global_transform = self.world.global_transform_component()
+  if !self.world.history_component_registered(global_transform) {
+    return false
+  }
+  let index = self.ensure_state_index(entity)
+  let state = self.states[index]
+  if !state.alive {
+    return false
+  }
+  if component_array_contains(state.components, global_transform) {
+    true
+  } else {
+    self.replace_state(
+      index,
+      true,
+      false,
+      history_components_with_added(state.components, global_transform),
+    )
+    true
+  }
+}
+
+///|
 /// Validates one redo delta and updates predicted state.
 fn HistoryValidationState::validate_delta(
   self : HistoryValidationState,
@@ -883,6 +1004,8 @@ fn HistoryValidationState::validate_delta(
       self.validate_remove_component(entity, component)
     ComponentChanged(entity, component, _, after) =>
       self.validate_set_component(entity, component, after)
+    GlobalTransformChanged(entity, _, after) =>
+      self.validate_restore_global_transform(entity, after)
     CameraChanged(entity, _, after) =>
       self.validate_restore_camera(entity, after)
   }
@@ -903,6 +1026,15 @@ fn HistoryValidationState::validate_delta_inverse(
       self.validate_add_component(entity, component, before)
     ComponentChanged(entity, component, before, _) =>
       self.validate_set_component(entity, component, before)
+    GlobalTransformChanged(entity, before, _) =>
+      match before {
+        Some(row) => self.validate_restore_global_transform(entity, row)
+        None =>
+          self.validate_remove_component(
+            entity,
+            self.world.global_transform_component(),
+          )
+      }
     CameraChanged(entity, before, _) =>
       match before {
         Some(bytes) => self.validate_restore_camera(entity, bytes)
@@ -1036,6 +1168,47 @@ fn WorldHistory::push_camera_delta(
 }
 
 ///|
+/// Pushes a GlobalTransform row delta, merging repeated writes inside the transaction.
+fn WorldHistory::push_global_transform_delta(
+  self : WorldHistory,
+  entity : EntityId,
+  before : GlobalTransformHistoryRow?,
+  after : GlobalTransformHistoryRow,
+) -> Unit {
+  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
+    match self.current_deltas[i] {
+      GlobalTransformChanged(e, old_before, _) =>
+        if e == entity {
+          match old_before {
+            Some(old) =>
+              if global_transform_history_row_equal(old, after) {
+                remove_delta_at(self.current_deltas, i)
+              } else {
+                self.current_deltas[i] = GlobalTransformChanged(
+                  entity, old_before, after,
+                )
+              }
+            None =>
+              self.current_deltas[i] = GlobalTransformChanged(
+                entity, old_before, after,
+              )
+          }
+          return
+        }
+      _ => ()
+    }
+  }
+  match before {
+    Some(old) =>
+      if !global_transform_history_row_equal(old, after) {
+        self.current_deltas.push(GlobalTransformChanged(entity, before, after))
+      }
+    None =>
+      self.current_deltas.push(GlobalTransformChanged(entity, before, after))
+  }
+}
+
+///|
 /// Records a delta into the active transaction.
 fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
   match delta {
@@ -1055,6 +1228,8 @@ fn WorldHistory::push_delta(self : WorldHistory, delta : WorldDelta) -> Unit {
       )
     ComponentChanged(entity, component, before, after) =>
       self.push_component_delta(entity, component, before, after)
+    GlobalTransformChanged(entity, before, after) =>
+      self.push_global_transform_delta(entity, before, after)
     CameraChanged(entity, before, after) =>
       self.push_camera_delta(entity, before, after)
     _ => self.current_deltas.push(delta)
@@ -1977,6 +2152,53 @@ pub fn WorldHistory::set_child_of(
 }
 
 ///|
+/// Sets builtin GlobalTransform through the history layer.
+pub fn WorldHistory::set_global_transform(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+  matrix : @m44.Matrix44F,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    let ok = world.set_global_transform(entity, matrix)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
+  }
+  let global_transform = world.global_transform_component()
+  let before = if world.has_component(entity, global_transform) {
+    match world.global_transform_history_row(entity) {
+      Some(row) => Some(row)
+      None => {
+        self.set_diagnostic("operation_failed")
+        return false
+      }
+    }
+  } else {
+    None
+  }
+  let auto = self.begin_auto("set_global_transform")
+  self.begin_tracked_world_mutation(world)
+  let ok = world.set_global_transform(entity, matrix)
+  self.end_tracked_world_mutation(world)
+  if ok {
+    match world.global_transform_history_row(entity) {
+      Some(after) =>
+        self.push_delta(GlobalTransformChanged(entity, before, after))
+      None => ()
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Sets builtin Camera matrices through the history layer.
 pub fn WorldHistory::set_camera_matrices(
   self : WorldHistory,
@@ -2086,6 +2308,8 @@ fn WorldHistory::apply_delta(
       world.remove_component(entity, component)
     ComponentChanged(entity, component, _, after) =>
       world.set_component_bytes(entity, component, after)
+    GlobalTransformChanged(entity, _, after) =>
+      world.restore_global_transform_history_row(entity, after)
     CameraChanged(entity, _, after) =>
       world.restore_camera_history_row(entity, after)
   }
@@ -2112,6 +2336,12 @@ fn WorldHistory::apply_delta_inverse(
       }
     ComponentChanged(entity, component, before, _) =>
       world.set_component_bytes(entity, component, before)
+    GlobalTransformChanged(entity, before, _) =>
+      match before {
+        Some(row) => world.restore_global_transform_history_row(entity, row)
+        None =>
+          world.remove_component(entity, world.global_transform_component())
+      }
     CameraChanged(entity, before, _) =>
       match before {
         Some(bytes) => world.restore_camera_history_row(entity, bytes)

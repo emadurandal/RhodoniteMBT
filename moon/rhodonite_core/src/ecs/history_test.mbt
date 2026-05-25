@@ -1020,6 +1020,185 @@ test "WorldHistory restores removed GlobalTransform as fresh recomputable blob" 
 }
 
 ///|
+test "WorldHistory tracks GlobalTransform add undo and redo" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let matrix = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(history.set_global_transform(world, entity, matrix))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, matrix)
+    None => abort("expected tracked GlobalTransform")
+  }
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(entity, world.global_transform_component()))
+  assert_true(history.redo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, matrix)
+    None => abort("expected restored GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory tracks GlobalTransform row changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let before = @m44.Matrix44::translation(
+    (4.0 : Float),
+    (5.0 : Float),
+    (6.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let after = @m44.Matrix44::translation(
+    (-1.0 : Float),
+    (0.5 : Float),
+    (9.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, before))
+  assert_true(history.set_global_transform(world, entity, after))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, after)
+    None => abort("expected changed GlobalTransform")
+  }
+  assert_true(history.undo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, before)
+    None => abort("expected original GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, after)
+    None => abort("expected redone GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory tracks fp16 GlobalTransform rows" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let before = @m44.Matrix44::translation(
+    (7.0 : Float),
+    (0.25 : Float),
+    (-2.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let after = @m44.Matrix44::translation(
+    (8.0 : Float),
+    (0.5 : Float),
+    (-3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, before))
+  assert_true(history.set_global_transform(world, entity, after))
+  assert_true(history.undo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => {
+      assert_eq(read.at(0, 3), (7.0 : Float))
+      assert_eq(read.at(1, 3), (0.25 : Float))
+      assert_eq(read.at(2, 3), (-2.0 : Float))
+    }
+    None => abort("expected original fp16 GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => {
+      assert_eq(read.at(0, 3), (8.0 : Float))
+      assert_eq(read.at(1, 3), (0.5 : Float))
+      assert_eq(read.at(2, 3), (-3.0 : Float))
+    }
+    None => abort("expected redone fp16 GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory compresses repeated GlobalTransform changes in one transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let before = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let middle = @m44.Matrix44::translation(
+    (2.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let after = @m44.Matrix44::translation(
+    (3.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, before))
+  assert_true(history.begin_transaction("GlobalTransform Drag"))
+  assert_true(history.set_global_transform(world, entity, middle))
+  assert_true(history.set_global_transform(world, entity, after))
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 96)
+  assert_true(history.undo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, before)
+    None => abort("expected original GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, after)
+    None => abort("expected redone GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory GlobalTransform tracking disabled and zero limit delegate" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  history.set_enabled(false)
+  assert_true(
+    history.set_global_transform(world, entity, @m44.Matrix44F::identity()),
+  )
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  assert_true(!history.can_undo())
+  history.set_enabled(true)
+  history.set_max_undo_records(0)
+  let matrix = @m44.Matrix44::translation(
+    (5.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(history.set_global_transform(world, entity, matrix))
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, matrix)
+    None => abort("expected delegated GlobalTransform")
+  }
+}
+
+///|
 test "WorldHistory restores destroyed Camera presence with readable blob row" {
   let world = World::new()
   let history = WorldHistory::new()

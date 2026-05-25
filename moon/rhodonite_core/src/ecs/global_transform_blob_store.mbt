@@ -67,6 +67,36 @@ fn GlobalTransformBlobStore::read_matrix(
 }
 
 ///|
+/// Reads one packed GlobalTransform row as stored bytes.
+fn GlobalTransformBlobStore::read_row_bytes(
+  self : GlobalTransformBlobStore,
+  format : @comp.GlobalTransformGpuFormat,
+  word_offset : Int,
+) -> FixedArray[Byte]? {
+  self.store.read_words(word_offset, @comp.global_transform_word_count(format))
+}
+
+///|
+/// Writes one packed GlobalTransform row from stored bytes.
+fn GlobalTransformBlobStore::write_row_bytes(
+  self : GlobalTransformBlobStore,
+  format : @comp.GlobalTransformGpuFormat,
+  word_offset : Int,
+  bytes : FixedArray[Byte],
+) -> Bool {
+  let word_count = @comp.global_transform_word_count(format)
+  if bytes.length() != word_count * 4 {
+    return false
+  }
+  self.store.write_words(word_offset, word_count, row => {
+    for i = 0; i < bytes.length(); i = i + 1 {
+      row[i] = bytes[i]
+    }
+  })
+  true
+}
+
+///|
 /// Implements `GlobalTransformBlobStore::write_word_range_views`.
 fn GlobalTransformBlobStore::write_word_range_views(
   self : GlobalTransformBlobStore,

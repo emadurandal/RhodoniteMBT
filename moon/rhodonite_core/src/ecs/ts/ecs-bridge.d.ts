@@ -349,6 +349,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		entity: MoonEntityId,
 		parent: MoonEntityId,
 	): MoonBool;
+	export function world_history_set_global_transform_col_major(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		entity: MoonEntityId,
+		matrixColMajor: number[],
+	): MoonBool;
 	export function world_history_set_camera_matrices_col_major(
 		history: MoonWorldHistory,
 		world: MoonWorld,

@@ -27,6 +27,10 @@ function identityMat4ColMajor(): number[] {
 	return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 }
 
+function translationMat4ColMajor(tx: number, ty: number, tz: number): number[] {
+	return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1];
+}
+
 describe("ECS TypeScript wrapper", () => {
 	it("creates entities and invalidates stale handles", () => {
 		const world = World.new();
@@ -267,6 +271,75 @@ describe("ECS TypeScript wrapper", () => {
 		const writes = world.drainGlobalTransformBlobWriteViews();
 		expect(writes.length).toBeGreaterThan(0);
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);
+	});
+
+	it("tracks builtin global transform matrices through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const entity = world.createEntity();
+
+		expect(
+			history.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(1, 2, 3),
+			),
+		).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			true,
+		);
+		let writes = world.drainGlobalTransformBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(1);
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			false,
+		);
+		expect(history.redo(world)).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			true,
+		);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(writes.length).toBeGreaterThan(0);
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(1);
+
+		expect(
+			history.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(4);
+		expect(history.undo(world)).toBe(true);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(1);
+		expect(history.redo(world)).toBe(true);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(4);
+
+		history.setMaxUndoRecords(0);
+		expect(
+			history.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(7, 8, 9),
+			),
+		).toBe(true);
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
 	});
 
 	it("sets builtin ChildOf parent links", () => {
