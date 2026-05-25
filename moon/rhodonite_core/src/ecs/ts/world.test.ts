@@ -1042,6 +1042,57 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.exportRedoStack(world)).toBeNull();
 	});
 
+	it("imports history stacks from exported plain objects", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const importedUndo = WorldHistory.new();
+		const importedRedo = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryImportStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryImportStable",
+				schemaVersion: "1",
+			},
+		);
+		const entity = world.createEntity();
+
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		const plainUndoArchive = JSON.parse(JSON.stringify(undoArchive));
+		expect(importedUndo.importUndoStack(world, plainUndoArchive)).toBe(true);
+		expect(importedUndo.undoLen()).toBe(1);
+		expect(importedUndo.undo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		const redoArchive = importedUndo.exportRedoStack(world);
+		expect(redoArchive).not.toBeNull();
+		expect(importedRedo.importRedoStack(world, redoArchive ?? plainUndoArchive)).toBe(
+			true,
+		);
+		expect(importedRedo.redoLen()).toBe(1);
+		expect(importedRedo.redo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		const badFormat = { ...plainUndoArchive, formatVersion: 999 };
+		expect(importedUndo.importUndoStack(world, badFormat)).toBe(false);
+		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
+	});
+
 	it("audits direct WorldHistory mutation coverage", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

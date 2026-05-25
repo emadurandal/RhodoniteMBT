@@ -303,6 +303,16 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		history: MoonWorldHistory,
 		world: MoonWorld,
 	): MoonWorldHistoryExport | undefined;
+	export function world_history_import_undo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		exported: MoonWorldHistoryExport,
+	): MoonBool;
+	export function world_history_import_redo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		exported: MoonWorldHistoryExport,
+	): MoonBool;
 	export function world_history_serialization_report_serializable(
 		report: MoonWorldHistorySerializationReport,
 	): MoonBool;
@@ -429,6 +439,39 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_export_component_snapshot_bytes(
 		snapshot: MoonWorldHistoryExportComponentSnapshot,
 	): MoonByteBacking;
+	export function world_history_export_component_identity_new(
+		localComponent: MoonComponentTypeId,
+		key: string,
+		builtin: boolean,
+		schemaVersion: string | undefined,
+		schemaHash: string | undefined,
+	): MoonWorldHistoryExportComponentIdentity;
+	export function world_history_export_payload_new(
+		globalTransformFormat: number | undefined,
+		bytes: Uint8Array | number[],
+	): MoonWorldHistoryExportPayload;
+	export function world_history_export_component_snapshot_new(
+		component: MoonWorldHistoryExportComponentIdentity,
+		bytes: Uint8Array | number[],
+	): MoonWorldHistoryExportComponentSnapshot;
+	export function world_history_export_delta_new(
+		kind: string,
+		entity: MoonEntityId | undefined,
+		component: MoonWorldHistoryExportComponentIdentity | undefined,
+		before: MoonWorldHistoryExportPayload | undefined,
+		after: MoonWorldHistoryExportPayload | undefined,
+		components: MoonWorldHistoryExportComponentSnapshot[],
+	): MoonWorldHistoryExportDelta;
+	export function world_history_export_record_new(
+		label: string,
+		deltaCount: number,
+		deltas: MoonWorldHistoryExportDelta[],
+	): MoonWorldHistoryExportRecord;
+	export function world_history_export_new(
+		formatVersion: number,
+		recordCount: number,
+		records: MoonWorldHistoryExportRecord[],
+	): MoonWorldHistoryExport;
 	export function world_history_record_summary_label(
 		summary: MoonWorldHistoryRecordSummary,
 	): string;

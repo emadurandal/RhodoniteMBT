@@ -1254,6 +1254,239 @@ test "WorldHistory export includes GlobalTransform and Camera payloads" {
 }
 
 ///|
+test "WorldHistory imports stable component undo stack" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryImportStable",
+    4,
+    "com.example.HistoryImportStable",
+    Some("1"),
+    Some("sha256:history-import-stable"),
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    source.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable undo archive")
+  }
+  assert_true(imported.import_undo_stack(world, archive))
+  assert_eq(imported.undo_len(), 1)
+  assert_true(imported.undo(world))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(1, 0, 0, 0)),
+  )
+  assert_true(imported.redo(world))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(2, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory imports redo stack" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryImportRedoStable",
+    4,
+    "com.example.HistoryImportRedoStable",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    source.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(source.undo(world))
+  let archive = match source.export_redo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable redo archive")
+  }
+  assert_true(imported.import_redo_stack(world, archive))
+  assert_eq(imported.redo_len(), 1)
+  assert_true(imported.redo(world))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(2, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory imports entity destroyed snapshots" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryImportDestroyStable",
+    4,
+    "com.example.HistoryImportDestroyStable",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(7, 0, 0, 0)))
+  assert_true(source.destroy_entity(world, entity))
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable destroy archive")
+  }
+  assert_true(imported.import_undo_stack(world, archive))
+  assert_true(imported.undo(world))
+  assert_true(world.is_alive(entity))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(7, 0, 0, 0)),
+  )
+  assert_true(imported.redo(world))
+  assert_true(!world.is_alive(entity))
+}
+
+///|
+test "WorldHistory imports builtin blob payloads" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let entity = world.create_entity()
+  let before = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let after = @m44.Matrix44::translation(
+    (3.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, before))
+  assert_true(source.set_global_transform(world, entity, after))
+  let camera = world.create_entity()
+  assert_true(
+    source.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable builtin archive")
+  }
+  assert_true(imported.import_undo_stack(world, archive))
+  assert_eq(imported.undo_len(), 2)
+  assert_true(imported.undo(world))
+  assert_true(!world.has_component(camera, world.camera_component()))
+  assert_true(imported.undo(world))
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read.at(0, 3), (1.0 : Float))
+    None => abort("expected imported GlobalTransform undo")
+  }
+}
+
+///|
+test "WorldHistory import rejects invalid archive without mutating stacks" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryImportRejectStable",
+    4,
+    "com.example.HistoryImportRejectStable",
+    Some("1"),
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    source.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable archive")
+  }
+  assert_true(imported.import_undo_stack(world, archive))
+  let unsupported : WorldHistoryExport = {
+    format_version: 999,
+    record_count: archive.record_count,
+    records: archive.records,
+  }
+  assert_true(!imported.import_undo_stack(world, unsupported))
+  assert_eq(imported.last_diagnostic(), "import_unsupported_format")
+  assert_eq(imported.undo_len(), 1)
+  let bad_identity : WorldHistoryExportComponentIdentity = {
+    local_component: component,
+    key: "com.example.MissingHistoryImportRejectStable",
+    builtin: false,
+    schema_version: Some("1"),
+    schema_hash: (None : String?),
+  }
+  let no_snapshots : Array[WorldHistoryExportComponentSnapshot] = []
+  let bad_delta : WorldHistoryExportDelta = {
+    kind: "component_changed",
+    entity: Some(entity),
+    component: Some(bad_identity),
+    before: archive.records[0].deltas[0].before,
+    after: archive.records[0].deltas[0].after,
+    components: no_snapshots,
+  }
+  let bad_records : Array[WorldHistoryExportRecord] = [
+    { label: "bad", delta_count: 1, deltas: [bad_delta] },
+  ]
+  let bad_archive : WorldHistoryExport = {
+    format_version: 1,
+    record_count: 1,
+    records: bad_records,
+  }
+  assert_true(!imported.import_undo_stack(world, bad_archive))
+  assert_eq(imported.last_diagnostic(), "import_identity_mismatch")
+  assert_eq(imported.undo_len(), 1)
+}
+
+///|
+test "WorldHistory import validates full stack before replacing" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let component = world.register_cpu_component_with_identity(
+    "HistoryImportFullStackStable",
+    4,
+    "com.example.HistoryImportFullStackStable",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    source.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    source.set_component_bytes(world, entity, component, bytes4(3, 0, 0, 0)),
+  )
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable archive")
+  }
+  assert_true(world.remove_component(entity, component))
+  assert_true(!imported.import_undo_stack(world, archive))
+  assert_eq(imported.last_diagnostic(), "import_validation_failed")
+  assert_eq(imported.undo_len(), 0)
+  assert_true(!world.has_component(entity, component))
+}
+
+///|
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()

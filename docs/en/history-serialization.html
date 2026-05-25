@@ -27,14 +27,14 @@
       <main class="content">
         <article class="doc">
           <h1>History Serialization</h1>
-          <p class="lead">This document defines the persistence boundary for <code>WorldHistory</code> export/import work. The current implementation exposes a draft in-memory export shape; import and durable file encoding are not implemented yet.</p>
+          <p class="lead">This document defines the persistence boundary for <code>WorldHistory</code> export/import work. The current implementation exposes a draft in-memory archive shape; durable file encoding is not implemented yet.</p>
 
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return a draft in-memory archive when all retained records are eligible for serialization.</li>
-            <li>The TypeScript wrapper exposes <code>WorldHistory.exportUndoStack(world)</code> and <code>WorldHistory.exportRedoStack(world)</code>, returning <code>HistoryExport | null</code>. Payload bytes are copied to <code>Uint8Array</code>.</li>
-            <li>Export uses <code>format_version = 1</code>. It is a library object model, not yet a JSON/binary file format.</li>
-            <li>Import is not implemented. Exported records are read-only data for tooling, tests, and the next import design step.</li>
+            <li><code>WorldHistory::import_undo_stack(world, archive)</code> and <code>WorldHistory::import_redo_stack(world, archive)</code> validate and replace the target stack from that archive without mutating the world.</li>
+            <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, and <code>importRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
+            <li>Import/export use <code>format_version = 1</code>. This is a library object model, not yet a JSON/binary file format.</li>
             <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
             <li>MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
@@ -81,6 +81,19 @@
               <tr><td><code>component_changed</code></td><td>Stable component identity plus <code>before</code> and <code>after</code> bytes.</td></tr>
               <tr><td><code>global_transform_changed</code></td><td>Stable builtin identity, logical row bytes, and <code>global_transform_format</code> code.</td></tr>
               <tr><td><code>camera_changed</code></td><td>Stable builtin identity and logical camera row bytes. There is no GlobalTransform format field.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Import MVP</h2>
+          <p>Import consumes the same in-memory archive shape and replaces only the target stack. It does not append to existing records and does not clear the opposite stack. The target world must already be in the current state represented by the archive; import validates the full stack against that world before replacing anything.</p>
+          <table>
+            <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
+            <tbody>
+              <tr><td>Unsupported <code>format_version</code></td><td><code>import_unsupported_format</code></td></tr>
+              <tr><td>Invalid record or delta shape</td><td><code>import_invalid_archive</code></td></tr>
+              <tr><td>Missing or mismatched stable component identity</td><td><code>import_identity_mismatch</code></td></tr>
+              <tr><td>Invalid payload format, byte length, or row format</td><td><code>import_invalid_payload</code></td></tr>
+              <tr><td>The full imported stack cannot apply to the current world</td><td><code>import_validation_failed</code></td></tr>
             </tbody>
           </table>
 

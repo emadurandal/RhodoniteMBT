@@ -164,6 +164,28 @@ pub(all) struct WorldHistoryExport {
 }
 
 ///|
+/// Conversion result for one imported history delta.
+priv struct WorldHistoryImportDeltaResult {
+  delta : WorldDelta?
+  diagnostic : String
+}
+
+///|
+/// Conversion result for one imported history record.
+priv struct WorldHistoryImportRecordResult {
+  record : WorldHistoryRecord?
+  diagnostic : String
+}
+
+///|
+/// Conversion result for one imported history stack in next-operation-first order.
+priv struct WorldHistoryImportStackResult {
+  records : Array[WorldHistoryRecord]
+  diagnostic : String
+  ok : Bool
+}
+
+///|
 /// Whether applying stack limits dropped at least one retained record.
 priv struct HistoryTrimResult {
   record_limit : Bool
@@ -221,6 +243,36 @@ fn history_serialization_reason_unknown_component() -> String {
 /// Diagnostic reason used when a user component has no stable serialization key.
 fn history_serialization_reason_missing_stable_component_identity() -> String {
   "missing_stable_component_identity"
+}
+
+///|
+/// Diagnostic code used when a history archive declares an unsupported format.
+fn history_import_diagnostic_unsupported_format() -> String {
+  "import_unsupported_format"
+}
+
+///|
+/// Diagnostic code used when a history archive has an invalid shape.
+fn history_import_diagnostic_invalid_archive() -> String {
+  "import_invalid_archive"
+}
+
+///|
+/// Diagnostic code used when a history archive cannot resolve stable component identity.
+fn history_import_diagnostic_identity_mismatch() -> String {
+  "import_identity_mismatch"
+}
+
+///|
+/// Diagnostic code used when a history archive contains invalid payload bytes.
+fn history_import_diagnostic_invalid_payload() -> String {
+  "import_invalid_payload"
+}
+
+///|
+/// Diagnostic code used when imported records cannot apply to the current world state.
+fn history_import_diagnostic_validation_failed() -> String {
+  "import_validation_failed"
 }
 
 ///|
@@ -951,6 +1003,627 @@ fn world_history_stack_export_next_first(
     record_count: stack.length(),
     records,
   })
+}
+
+///|
+/// Resolves a builtin component stable key to the current world's component id.
+fn world_history_builtin_component_by_stable_key(
+  world : World,
+  key : String,
+) -> ComponentTypeId? {
+  if key == "Transform3D" {
+    Some(world.transform_component())
+  } else if key == "ChildOf" {
+    Some(world.child_of_component())
+  } else if key == "GlobalTransform" {
+    Some(world.global_transform_component())
+  } else if key == "Camera" {
+    Some(world.camera_component())
+  } else if key == "OrbitCameraController" {
+    Some(world.orbit_camera_controller_component())
+  } else if key == "CameraHomeTransform" {
+    Some(world.camera_home_transform_component())
+  } else if key == "CameraLens" {
+    Some(world.camera_lens_component())
+  } else {
+    None
+  }
+}
+
+///|
+/// Resolves an exported stable component identity against the current world.
+fn world_history_import_component_identity(
+  world : World,
+  identity : WorldHistoryExportComponentIdentity,
+) -> ComponentTypeId? {
+  if identity.builtin {
+    if identity.schema_version is Some(_) || identity.schema_hash is Some(_) {
+      return None
+    }
+    world_history_builtin_component_by_stable_key(world, identity.key)
+  } else {
+    match world.component_by_stable_key(identity.key) {
+      Some(component) =>
+        if world.component_matches_identity(
+            component,
+            identity.key,
+            identity.schema_version,
+            identity.schema_hash,
+          ) {
+          Some(component)
+        } else {
+          None
+        }
+      None => None
+    }
+  }
+}
+
+///|
+/// Returns whether an exported delta carries no entity-destroyed snapshots.
+fn world_history_export_delta_components_empty(
+  delta : WorldHistoryExportDelta,
+) -> Bool {
+  delta.components.length() == 0
+}
+
+///|
+/// Returns whether an exported delta omits an optional component identity.
+fn world_history_export_delta_component_absent(
+  delta : WorldHistoryExportDelta,
+) -> Bool {
+  delta.component is None
+}
+
+///|
+/// Returns whether an exported delta omits both before and after payloads.
+fn world_history_export_delta_payloads_absent(
+  delta : WorldHistoryExportDelta,
+) -> Bool {
+  delta.before is None && delta.after is None
+}
+
+///|
+/// Copies a non-GlobalTransform payload, rejecting format metadata.
+fn world_history_import_plain_payload(
+  payload : WorldHistoryExportPayload,
+) -> FixedArray[Byte]? {
+  match payload.global_transform_format {
+    Some(_) => None
+    None => Some(world_history_copy_bytes(payload.bytes))
+  }
+}
+
+///|
+/// Converts an exported GlobalTransform payload into a history row.
+fn world_history_import_global_transform_payload(
+  payload : WorldHistoryExportPayload,
+) -> GlobalTransformHistoryRow? {
+  let format = match payload.global_transform_format {
+    Some(0) => @comp.global_transform_format_from_code(0U)
+    Some(1) => @comp.global_transform_format_from_code(1U)
+    _ => return None
+  }
+  let row = { format, bytes: world_history_copy_bytes(payload.bytes) }
+  if global_transform_history_row_valid(row) {
+    Some(row)
+  } else {
+    None
+  }
+}
+
+///|
+/// Copies an exported Camera payload after validating its row shape.
+fn world_history_import_camera_payload(
+  payload : WorldHistoryExportPayload,
+) -> FixedArray[Byte]? {
+  match world_history_import_plain_payload(payload) {
+    Some(bytes) =>
+      if bytes.length() == @comp.camera_gpu_byte_stride() {
+        Some(bytes)
+      } else {
+        None
+      }
+    None => None
+  }
+}
+
+///|
+/// Builds a failed import delta result.
+fn world_history_import_delta_failure(
+  diagnostic : String,
+) -> WorldHistoryImportDeltaResult {
+  { delta: None, diagnostic }
+}
+
+///|
+/// Builds a successful import delta result.
+fn world_history_import_delta_success(
+  delta : WorldDelta,
+) -> WorldHistoryImportDeltaResult {
+  { delta: Some(delta), diagnostic: history_diagnostic_none() }
+}
+
+///|
+/// Converts exported entity-destroyed component snapshots into an entity snapshot.
+fn world_history_import_entity_snapshot(
+  world : World,
+  entity : EntityId,
+  components : Array[WorldHistoryExportComponentSnapshot],
+) -> WorldHistoryImportDeltaResult {
+  let snapshots : Array[ComponentSnapshot] = []
+  let component_ids : Array[ComponentTypeId] = []
+  for i = 0; i < components.length(); i = i + 1 {
+    let snapshot = components[i]
+    let component = match
+      world_history_import_component_identity(world, snapshot.component) {
+      Some(component) => component
+      None =>
+        return world_history_import_delta_failure(
+          history_import_diagnostic_identity_mismatch(),
+        )
+    }
+    let bytes = world_history_copy_bytes(snapshot.bytes)
+    if !world.history_component_stride_matches(component, bytes) {
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_payload(),
+      )
+    }
+    component_ids.push(component)
+    snapshots.push({ component, bytes })
+  }
+  if component_array_has_duplicates(component_ids) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  world_history_import_delta_success(
+    EntityDestroyed({ entity, components: snapshots }),
+  )
+}
+
+///|
+/// Resolves the required component identity on an exported delta.
+fn world_history_import_delta_component(
+  world : World,
+  delta : WorldHistoryExportDelta,
+) -> (ComponentTypeId?, String) {
+  match delta.component {
+    Some(identity) =>
+      match world_history_import_component_identity(world, identity) {
+        Some(component) => (Some(component), history_diagnostic_none())
+        None => (None, history_import_diagnostic_identity_mismatch())
+      }
+    None => (None, history_import_diagnostic_invalid_archive())
+  }
+}
+
+///|
+/// Imports a component-added delta.
+fn world_history_import_component_added_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+  entity : EntityId,
+) -> WorldHistoryImportDeltaResult {
+  if delta.before is Some(_) ||
+    !world_history_export_delta_components_empty(delta) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let component = match world_history_import_delta_component(world, delta) {
+    (Some(component), _) => component
+    (None, diagnostic) => return world_history_import_delta_failure(diagnostic)
+  }
+  if world.history_blob_ref_component(component) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let after = match delta.after {
+    Some(payload) =>
+      match world_history_import_plain_payload(payload) {
+        Some(bytes) => bytes
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  if !world.history_component_stride_matches(component, after) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_payload(),
+    )
+  }
+  world_history_import_delta_success(ComponentAdded(entity, component, after))
+}
+
+///|
+/// Imports a component-removed delta.
+fn world_history_import_component_removed_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+  entity : EntityId,
+) -> WorldHistoryImportDeltaResult {
+  if delta.after is Some(_) ||
+    !world_history_export_delta_components_empty(delta) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let component = match world_history_import_delta_component(world, delta) {
+    (Some(component), _) => component
+    (None, diagnostic) => return world_history_import_delta_failure(diagnostic)
+  }
+  if world.history_blob_ref_component(component) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let before = match delta.before {
+    Some(payload) =>
+      match world_history_import_plain_payload(payload) {
+        Some(bytes) => bytes
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  if !world.history_component_stride_matches(component, before) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_payload(),
+    )
+  }
+  world_history_import_delta_success(
+    ComponentRemoved(entity, component, before),
+  )
+}
+
+///|
+/// Imports a component-changed delta.
+fn world_history_import_component_changed_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+  entity : EntityId,
+) -> WorldHistoryImportDeltaResult {
+  if !world_history_export_delta_components_empty(delta) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let component = match world_history_import_delta_component(world, delta) {
+    (Some(component), _) => component
+    (None, diagnostic) => return world_history_import_delta_failure(diagnostic)
+  }
+  if world.history_blob_ref_component(component) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let before = match delta.before {
+    Some(payload) =>
+      match world_history_import_plain_payload(payload) {
+        Some(bytes) => bytes
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  let after = match delta.after {
+    Some(payload) =>
+      match world_history_import_plain_payload(payload) {
+        Some(bytes) => bytes
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  if !world.history_component_stride_matches(component, before) ||
+    !world.history_component_stride_matches(component, after) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_payload(),
+    )
+  }
+  world_history_import_delta_success(
+    ComponentChanged(entity, component, before, after),
+  )
+}
+
+///|
+/// Imports a GlobalTransform changed delta.
+fn world_history_import_global_transform_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+  entity : EntityId,
+) -> WorldHistoryImportDeltaResult {
+  if !world_history_export_delta_components_empty(delta) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let component = match world_history_import_delta_component(world, delta) {
+    (Some(component), _) => component
+    (None, diagnostic) => return world_history_import_delta_failure(diagnostic)
+  }
+  if component != world.global_transform_component() {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_identity_mismatch(),
+    )
+  }
+  let before = match delta.before {
+    Some(payload) =>
+      match world_history_import_global_transform_payload(payload) {
+        Some(row) => Some(row)
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None => None
+  }
+  let after = match delta.after {
+    Some(payload) =>
+      match world_history_import_global_transform_payload(payload) {
+        Some(row) => row
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  world_history_import_delta_success(
+    GlobalTransformChanged(entity, before, after),
+  )
+}
+
+///|
+/// Imports a Camera changed delta.
+fn world_history_import_camera_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+  entity : EntityId,
+) -> WorldHistoryImportDeltaResult {
+  if !world_history_export_delta_components_empty(delta) {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let component = match world_history_import_delta_component(world, delta) {
+    (Some(component), _) => component
+    (None, diagnostic) => return world_history_import_delta_failure(diagnostic)
+  }
+  if component != world.camera_component() {
+    return world_history_import_delta_failure(
+      history_import_diagnostic_identity_mismatch(),
+    )
+  }
+  let before = match delta.before {
+    Some(payload) =>
+      match world_history_import_camera_payload(payload) {
+        Some(bytes) => Some(bytes)
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None => None
+  }
+  let after = match delta.after {
+    Some(payload) =>
+      match world_history_import_camera_payload(payload) {
+        Some(bytes) => bytes
+        None =>
+          return world_history_import_delta_failure(
+            history_import_diagnostic_invalid_payload(),
+          )
+      }
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  world_history_import_delta_success(CameraChanged(entity, before, after))
+}
+
+///|
+/// Converts an exported delta into the internal reversible representation.
+fn world_history_import_delta(
+  world : World,
+  delta : WorldHistoryExportDelta,
+) -> WorldHistoryImportDeltaResult {
+  let entity = match delta.entity {
+    Some(entity) => entity
+    None =>
+      return world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+  match delta.kind {
+    "entity_created" =>
+      if world_history_export_delta_component_absent(delta) &&
+        world_history_export_delta_payloads_absent(delta) &&
+        world_history_export_delta_components_empty(delta) {
+        world_history_import_delta_success(EntityCreated(entity))
+      } else {
+        world_history_import_delta_failure(
+          history_import_diagnostic_invalid_archive(),
+        )
+      }
+    "entity_destroyed" =>
+      if world_history_export_delta_component_absent(delta) &&
+        world_history_export_delta_payloads_absent(delta) {
+        world_history_import_entity_snapshot(world, entity, delta.components)
+      } else {
+        world_history_import_delta_failure(
+          history_import_diagnostic_invalid_archive(),
+        )
+      }
+    "component_added" =>
+      world_history_import_component_added_delta(world, delta, entity)
+    "component_removed" =>
+      world_history_import_component_removed_delta(world, delta, entity)
+    "component_changed" =>
+      world_history_import_component_changed_delta(world, delta, entity)
+    "global_transform_changed" =>
+      world_history_import_global_transform_delta(world, delta, entity)
+    "camera_changed" => world_history_import_camera_delta(world, delta, entity)
+    _ =>
+      world_history_import_delta_failure(
+        history_import_diagnostic_invalid_archive(),
+      )
+  }
+}
+
+///|
+/// Builds a failed import record result.
+fn world_history_import_record_failure(
+  diagnostic : String,
+) -> WorldHistoryImportRecordResult {
+  { record: None, diagnostic }
+}
+
+///|
+/// Converts an exported record into the internal history record shape.
+fn world_history_import_record(
+  world : World,
+  record : WorldHistoryExportRecord,
+) -> WorldHistoryImportRecordResult {
+  if record.delta_count != record.deltas.length() {
+    return world_history_import_record_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let deltas : Array[WorldDelta] = []
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    match world_history_import_delta(world, record.deltas[i]) {
+      { delta: Some(delta), .. } => deltas.push(delta)
+      { diagnostic, .. } =>
+        return world_history_import_record_failure(diagnostic)
+    }
+  }
+  {
+    record: Some({ label: record.label, deltas }),
+    diagnostic: history_diagnostic_none(),
+  }
+}
+
+///|
+/// Builds a failed import stack result.
+fn world_history_import_stack_failure(
+  diagnostic : String,
+) -> WorldHistoryImportStackResult {
+  { records: [], diagnostic, ok: false }
+}
+
+///|
+/// Converts an exported stack into internal records in next-operation-first order.
+fn world_history_import_stack_records(
+  world : World,
+  archive : WorldHistoryExport,
+) -> WorldHistoryImportStackResult {
+  if archive.format_version != world_history_export_format_version() {
+    return world_history_import_stack_failure(
+      history_import_diagnostic_unsupported_format(),
+    )
+  }
+  if archive.record_count != archive.records.length() {
+    return world_history_import_stack_failure(
+      history_import_diagnostic_invalid_archive(),
+    )
+  }
+  let records : Array[WorldHistoryRecord] = []
+  for i = 0; i < archive.records.length(); i = i + 1 {
+    match world_history_import_record(world, archive.records[i]) {
+      { record: Some(record), .. } => records.push(record)
+      { diagnostic, .. } =>
+        return world_history_import_stack_failure(diagnostic)
+    }
+  }
+  { records, diagnostic: history_diagnostic_none(), ok: true }
+}
+
+///|
+/// Validates one imported undo record against an accumulated predicted state.
+fn HistoryValidationState::validate_imported_undo_record(
+  self : HistoryValidationState,
+  record : WorldHistoryRecord,
+) -> Bool {
+  for i = record.deltas.length() - 1; i >= 0; i = i - 1 {
+    if !self.validate_delta_inverse(record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Validates one imported redo record against an accumulated predicted state.
+fn HistoryValidationState::validate_imported_redo_record(
+  self : HistoryValidationState,
+  record : WorldHistoryRecord,
+) -> Bool {
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    if !self.validate_delta(record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Validates an imported stack from next-operation-first records.
+fn world_history_validate_imported_stack(
+  world : World,
+  records : Array[WorldHistoryRecord],
+  undo : Bool,
+) -> Bool {
+  let state = HistoryValidationState::new(world)
+  for i = 0; i < records.length(); i = i + 1 {
+    let ok = if undo {
+      state.validate_imported_undo_record(records[i])
+    } else {
+      state.validate_imported_redo_record(records[i])
+    }
+    if !ok {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Replaces a stack from next-operation-first records.
+fn replace_history_stack_from_next_first(
+  stack : Array[WorldHistoryRecord],
+  records : Array[WorldHistoryRecord],
+) -> Unit {
+  stack.clear()
+  for i = records.length() - 1; i >= 0; i = i - 1 {
+    stack.push(records[i])
+  }
 }
 
 ///|
@@ -2231,6 +2904,75 @@ pub fn WorldHistory::export_redo_stack(
   world : World,
 ) -> WorldHistoryExport? {
   world_history_stack_export_next_first(world, self.redo_stack)
+}
+
+///|
+/// Applies record and byte limits to one imported stack.
+fn WorldHistory::trim_imported_stack_to_limit(
+  self : WorldHistory,
+  stack : Array[WorldHistoryRecord],
+) -> HistoryTrimResult {
+  let record_trimmed = trim_history_stack_to_limit(stack, self.max_undo_records)
+  let byte_trimmed = trim_history_stack_to_byte_limit(
+    stack,
+    self.max_undo_bytes,
+  )
+  { record_limit: record_trimmed, byte_limit: byte_trimmed }
+}
+
+///|
+/// Imports one history stack from an in-memory archive, replacing the target stack.
+fn WorldHistory::import_stack(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+  undo : Bool,
+) -> Bool {
+  if self.open {
+    self.set_diagnostic("transaction_open")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
+    return false
+  }
+  let imported = world_history_import_stack_records(world, archive)
+  if !imported.ok {
+    self.set_diagnostic(imported.diagnostic)
+    return false
+  }
+  if !world_history_validate_imported_stack(world, imported.records, undo) {
+    self.set_diagnostic(history_import_diagnostic_validation_failed())
+    return false
+  }
+  if undo {
+    replace_history_stack_from_next_first(self.undo_stack, imported.records)
+    self.set_trim_diagnostic(self.trim_imported_stack_to_limit(self.undo_stack))
+  } else {
+    replace_history_stack_from_next_first(self.redo_stack, imported.records)
+    self.set_trim_diagnostic(self.trim_imported_stack_to_limit(self.redo_stack))
+  }
+  true
+}
+
+///|
+/// Imports undo records from a draft in-memory archive, replacing the undo stack.
+pub fn WorldHistory::import_undo_stack(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+) -> Bool {
+  self.import_stack(world, archive, true)
+}
+
+///|
+/// Imports redo records from a draft in-memory archive, replacing the redo stack.
+pub fn WorldHistory::import_redo_stack(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+) -> Bool {
+  self.import_stack(world, archive, false)
 }
 
 ///|

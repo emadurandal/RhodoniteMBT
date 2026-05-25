@@ -673,6 +673,26 @@ pub fn world_history_export_redo_stack(
 }
 
 ///|
+/// Implements `world_history_import_undo_stack`.
+pub fn world_history_import_undo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  exported : @ecs.WorldHistoryExport,
+) -> Bool {
+  history.import_undo_stack(world, exported)
+}
+
+///|
+/// Implements `world_history_import_redo_stack`.
+pub fn world_history_import_redo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  exported : @ecs.WorldHistoryExport,
+) -> Bool {
+  history.import_redo_stack(world, exported)
+}
+
+///|
 /// Implements `world_history_serialization_report_serializable`.
 pub fn world_history_serialization_report_serializable(
   report : @ecs.WorldHistorySerializationReport,
@@ -1006,6 +1026,69 @@ pub fn world_history_export_component_snapshot_bytes(
   snapshot : @ecs.WorldHistoryExportComponentSnapshot,
 ) -> FixedArray[Byte] {
   snapshot.bytes
+}
+
+///|
+/// Implements `world_history_export_component_identity_new`.
+pub fn world_history_export_component_identity_new(
+  local_component : @ecs.ComponentTypeId,
+  key : String,
+  builtin : Bool,
+  schema_version : String?,
+  schema_hash : String?,
+) -> @ecs.WorldHistoryExportComponentIdentity {
+  { local_component, key, builtin, schema_version, schema_hash }
+}
+
+///|
+/// Implements `world_history_export_payload_new`.
+pub fn world_history_export_payload_new(
+  global_transform_format : Int?,
+  bytes : FixedArray[Byte],
+) -> @ecs.WorldHistoryExportPayload {
+  { global_transform_format, bytes }
+}
+
+///|
+/// Implements `world_history_export_component_snapshot_new`.
+pub fn world_history_export_component_snapshot_new(
+  component : @ecs.WorldHistoryExportComponentIdentity,
+  bytes : FixedArray[Byte],
+) -> @ecs.WorldHistoryExportComponentSnapshot {
+  { component, bytes }
+}
+
+///|
+/// Implements `world_history_export_delta_new`.
+pub fn world_history_export_delta_new(
+  kind : String,
+  entity : @ecs.EntityId?,
+  component : @ecs.WorldHistoryExportComponentIdentity?,
+  before : @ecs.WorldHistoryExportPayload?,
+  after : @ecs.WorldHistoryExportPayload?,
+  components : Array[@ecs.WorldHistoryExportComponentSnapshot],
+) -> @ecs.WorldHistoryExportDelta {
+  { kind, entity, component, before, after, components }
+}
+
+///|
+/// Implements `world_history_export_record_new`.
+pub fn world_history_export_record_new(
+  label : String,
+  delta_count : Int,
+  deltas : Array[@ecs.WorldHistoryExportDelta],
+) -> @ecs.WorldHistoryExportRecord {
+  { label, delta_count, deltas }
+}
+
+///|
+/// Implements `world_history_export_new`.
+pub fn world_history_export_new(
+  format_version : Int,
+  record_count : Int,
+  records : Array[@ecs.WorldHistoryExportRecord],
+) -> @ecs.WorldHistoryExport {
+  { format_version, record_count, records }
 }
 
 ///|

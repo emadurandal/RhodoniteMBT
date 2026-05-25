@@ -27,14 +27,14 @@
       <main class="content">
         <article class="doc">
           <h1>履歴シリアライズ</h1>
-          <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は draft の in-memory export shape を公開していますが、import と永続 file encoding は未実装です。</p>
+          <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は draft の in-memory archive shape を公開していますが、永続 file encoding は未実装です。</p>
 
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に draft in-memory archive を返します。</li>
-            <li>TypeScript wrapper は <code>WorldHistory.exportUndoStack(world)</code> と <code>WorldHistory.exportRedoStack(world)</code> を公開し、<code>HistoryExport | null</code> を返します。payload bytes は <code>Uint8Array</code> に copy されます。</li>
-            <li>Export は <code>format_version = 1</code> を使います。これは library object model であり、JSON/binary file format ではまだありません。</li>
-            <li>Import は未実装です。export された record は tooling、test、次の import design step 向けの read-only data です。</li>
+            <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>
+            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
+            <li>Import/export は <code>format_version = 1</code> を使います。これは library object model であり、JSON/binary file format ではまだありません。</li>
             <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
             <li>MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
@@ -81,6 +81,19 @@
               <tr><td><code>component_changed</code></td><td>Stable component identity、<code>before</code> bytes、<code>after</code> bytes。</td></tr>
               <tr><td><code>global_transform_changed</code></td><td>Stable builtin identity、logical row bytes、<code>global_transform_format</code> code。</td></tr>
               <tr><td><code>camera_changed</code></td><td>Stable builtin identity と logical camera row bytes。GlobalTransform format field はありません。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Import MVP</h2>
+          <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。</p>
+          <table>
+            <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
+            <tbody>
+              <tr><td>未対応の <code>format_version</code></td><td><code>import_unsupported_format</code></td></tr>
+              <tr><td>record / delta shape が不正</td><td><code>import_invalid_archive</code></td></tr>
+              <tr><td>stable component identity が解決できない、または一致しない</td><td><code>import_identity_mismatch</code></td></tr>
+              <tr><td>payload format、byte length、row format が不正</td><td><code>import_invalid_payload</code></td></tr>
+              <tr><td>import stack 全体を current world に適用できない</td><td><code>import_validation_failed</code></td></tr>
             </tbody>
           </table>
 

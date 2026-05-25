@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+	MoonComponentTypeId,
+	MoonEntityId,
 	MoonGpuWriteCopy,
 	MoonGpuWriteView,
 	MoonSpawnBatchRow,
@@ -100,24 +102,32 @@ import {
 	world_history_export_component_identity_local_component,
 	world_history_export_component_identity_schema_hash,
 	world_history_export_component_identity_schema_version,
+	world_history_export_component_identity_new,
 	world_history_export_component_snapshot_bytes,
 	world_history_export_component_snapshot_component,
+	world_history_export_component_snapshot_new,
 	world_history_export_delta_after,
 	world_history_export_delta_before,
 	world_history_export_delta_component,
 	world_history_export_delta_components,
 	world_history_export_delta_entity,
 	world_history_export_delta_kind,
+	world_history_export_delta_new,
 	world_history_export_format_version,
+	world_history_export_new,
 	world_history_export_payload_bytes,
 	world_history_export_payload_global_transform_format,
+	world_history_export_payload_new,
 	world_history_export_record_count,
 	world_history_export_record_delta_count,
 	world_history_export_record_deltas,
 	world_history_export_record_label,
+	world_history_export_record_new,
 	world_history_export_records,
 	world_history_export_redo_stack,
 	world_history_export_undo_stack,
+	world_history_import_redo_stack,
+	world_history_import_undo_stack,
 	world_history_last_diagnostic,
 	world_history_max_undo_bytes,
 	world_history_max_undo_records,
@@ -923,6 +933,118 @@ function historyExportFromBridge(exported: MoonWorldHistoryExport): HistoryExpor
 	};
 }
 
+function historyEntityToBridge(entity: EntityId | null): MoonEntityId | undefined {
+	if (entity == null) {
+		return undefined;
+	}
+	const value = entity as EntityId & { inner?: MoonEntityId };
+	if (value.inner != null) {
+		return value.inner;
+	}
+	return entity as unknown as MoonEntityId;
+}
+
+function historyComponentToBridge(
+	component: ComponentTypeId,
+): MoonComponentTypeId {
+	const value = component as ComponentTypeId & { inner?: MoonComponentTypeId };
+	if (value.inner != null) {
+		return value.inner;
+	}
+	return component as unknown as MoonComponentTypeId;
+}
+
+function historyExportInputBytes(bytes: Uint8Array): Uint8Array {
+	if (bytes instanceof Uint8Array) {
+		return new Uint8Array(bytes);
+	}
+	if (Array.isArray(bytes)) {
+		return Uint8Array.from(bytes);
+	}
+	const value = bytes as unknown as Record<string, number>;
+	return Uint8Array.from(
+		Object.keys(value)
+			.filter((key) => /^\d+$/.test(key))
+			.sort((a, b) => Number(a) - Number(b))
+			.map((key) => value[key] ?? 0),
+	);
+}
+
+function historyExportComponentIdentityToBridge(
+	identity: HistoryExportComponentIdentity | null,
+): MoonWorldHistoryExportComponentIdentity | undefined {
+	if (identity == null) {
+		return undefined;
+	}
+	return world_history_export_component_identity_new(
+		historyComponentToBridge(identity.localComponent),
+		identity.key,
+		identity.builtin,
+		identity.schemaVersion ?? undefined,
+		identity.schemaHash ?? undefined,
+	);
+}
+
+function historyExportPayloadToBridge(
+	payload: HistoryExportPayload | null,
+): MoonWorldHistoryExportPayload | undefined {
+	if (payload == null) {
+		return undefined;
+	}
+	return world_history_export_payload_new(
+		payload.globalTransformFormat ?? undefined,
+		historyExportInputBytes(payload.bytes),
+	);
+}
+
+function historyExportComponentSnapshotToBridge(
+	snapshot: HistoryExportComponentSnapshot,
+): MoonWorldHistoryExportComponentSnapshot {
+	return world_history_export_component_snapshot_new(
+		world_history_export_component_identity_new(
+			historyComponentToBridge(snapshot.component.localComponent),
+			snapshot.component.key,
+			snapshot.component.builtin,
+			snapshot.component.schemaVersion ?? undefined,
+			snapshot.component.schemaHash ?? undefined,
+		),
+		historyExportInputBytes(snapshot.bytes),
+	);
+}
+
+function historyExportDeltaToBridge(
+	delta: HistoryExportDelta,
+): MoonWorldHistoryExportDelta {
+	return world_history_export_delta_new(
+		delta.kind,
+		historyEntityToBridge(delta.entity),
+		historyExportComponentIdentityToBridge(delta.component),
+		historyExportPayloadToBridge(delta.before),
+		historyExportPayloadToBridge(delta.after),
+		delta.components.map((snapshot) =>
+			historyExportComponentSnapshotToBridge(snapshot),
+		),
+	);
+}
+
+function historyExportRecordToBridge(
+	record: HistoryExportRecord,
+): MoonWorldHistoryExportRecord {
+	return world_history_export_record_new(
+		record.label,
+		record.deltaCount,
+		record.deltas.map((delta) => historyExportDeltaToBridge(delta)),
+	);
+}
+
+function historyExportToBridge(exported: HistoryExport): MoonWorldHistoryExport {
+	return world_history_export_new(
+		exported.formatVersion,
+		exported.recordCount,
+		exported.records.map((record) => historyExportRecordToBridge(record)),
+	);
+}
+
 export class WorldHistory {
 	readonly inner: MoonWorldHistory;
 
@@ -1018,6 +1140,26 @@ export class WorldHistory {
 	exportRedoStack(world: World): HistoryExport | null {
 		const exported = world_history_export_redo_stack(this.inner, world.inner);
 		return exported == null ? null : historyExportFromBridge(exported);
+	}
+
+	importUndoStack(world: World, archive: HistoryExport): boolean {
+		return moonBool(
+			world_history_import_undo_stack(
+				this.inner,
+				world.inner,
+				historyExportToBridge(archive),
+			),
+		);
+	}
+
+	importRedoStack(world: World, archive: HistoryExport): boolean {
+		return moonBool(
+			world_history_import_redo_stack(
+				this.inner,
+				world.inner,
+				historyExportToBridge(archive),
+			),
+		);
 	}
 
 	lastDiagnostic(): string {
