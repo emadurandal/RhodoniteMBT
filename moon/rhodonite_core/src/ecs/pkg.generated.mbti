@@ -210,6 +210,7 @@ pub fn RawQueryArchetype::has(Self, ComponentTypeId) -> Bool
 pub fn RawQueryArchetype::length(Self) -> Int
 pub fn RawQueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
 pub fn RawQueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
+pub fn RawQueryArchetype::write_column_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
 
 pub struct RawQueryRow {
   // private fields

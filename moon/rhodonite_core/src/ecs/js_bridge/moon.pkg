@@ -125,6 +125,7 @@ options(
         "raw_query_archetype_component_stride",
         "raw_query_archetype_read_column",
         "raw_query_archetype_write_column",
+        "raw_query_archetype_write_column_tracked",
         "phase_key_new",
         "phase_key_name",
         "system_context_new",

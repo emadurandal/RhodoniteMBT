@@ -175,6 +175,49 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(e1Bytes ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
+	it("tracks archetype column callback writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocity", 16);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpu, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnTracked(history, cpu, (column) => {
+					column.setF32(0, 10);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("raw_query_archetype_write_column");
+		expect(history.undoBytes()).toBe(32);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(10);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(history.undo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+		expect(history.redo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(10);
+
+		history.setMaxUndoRecords(0);
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnTracked(history, cpu, (column) => {
+					column.setF32(16, 20);
+				}),
+			).toBe(true);
+		});
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
+	});
+
 	it("reuses prepared row query plans", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("PreparedTsCpu", 16);
@@ -859,6 +902,51 @@ describe("ECS TypeScript wrapper", () => {
 				trackedQueryWorld.componentBytesCopy(
 					trackedQueryEntity,
 					trackedQueryCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
+
+		const trackedColumnWorld = World.new();
+		const trackedColumnHistory = WorldHistory.new();
+		const trackedColumnCpu = trackedColumnWorld.registerCpuComponent(
+			"TsHistoryTrackedColumn",
+			4,
+		);
+		const trackedColumnEntity = trackedColumnWorld.createEntity();
+		expect(
+			trackedColumnWorld.addComponentBytes(
+				trackedColumnEntity,
+				trackedColumnCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedColumnHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedColumnHistory.beginGuardedTransaction(
+				trackedColumnWorld,
+				"guarded tracked column",
+			),
+		).toBe(true);
+		RawQuery.new([trackedColumnCpu]).forEachArchetype(
+			trackedColumnWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnTracked(
+						trackedColumnHistory,
+						trackedColumnCpu,
+						(bytes) => bytes.setF32(0, 5),
+					),
+				).toBe(true);
+			},
+		);
+		expect(trackedColumnHistory.commitTransaction()).toBe(true);
+		expect(trackedColumnHistory.undo(trackedColumnWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedColumnWorld.componentBytesCopy(
+					trackedColumnEntity,
+					trackedColumnCpu,
 				) ?? new Uint8Array(),
 				0,
 			),

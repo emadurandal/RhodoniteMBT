@@ -1052,6 +1052,17 @@ pub fn raw_query_archetype_write_column(
 }
 
 ///|
+/// Implements `raw_query_archetype_write_column_tracked`.
+pub fn raw_query_archetype_write_column_tracked(
+  arch : @ecs.RawQueryArchetype,
+  history : @ecs.WorldHistory,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  arch.write_column_tracked(history, component, f)
+}
+
+///|
 /// Implements `phase_key_new`.
 pub fn phase_key_new(name : String) -> @ecs.PhaseKey {
   @ecs.PhaseKey::new(name)

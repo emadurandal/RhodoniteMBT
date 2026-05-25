@@ -473,6 +473,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+	export function raw_query_archetype_write_column_tracked(
+		archetype: MoonRawQueryArchetype,
+		history: MoonWorldHistory,
+		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
 
 	export function phase_key_new(name: string): MoonPhaseKey;
 	export function phase_key_name(phase: MoonPhaseKey): string;

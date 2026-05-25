@@ -744,3 +744,58 @@ pub fn RawQueryArchetype::write_column(
   let logical_end = arch.entities.length() * col.stride
   col.bytes.mut_view(start=0, end=logical_end)
 }
+
+///|
+/// Runs `f` with a mutable column view and records changed rows through `history`.
+///
+/// When history recording is disabled, this delegates to `RawQueryArchetype::write_column`
+/// without copying before/after bytes.
+pub fn RawQueryArchetype::write_column_tracked(
+  self : RawQueryArchetype,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::write_column_tracked",
+  )
+  if !history.recording_enabled() ||
+    history.applying ||
+    self.world.history_blob_ref_component(component) {
+    f(self.write_column(component))
+    let reason = if !history.recording_enabled() {
+      "recording_disabled"
+    } else if history.applying {
+      "applying"
+    } else {
+      history_diagnostic_none()
+    }
+    history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  let access = self.accesses[access_index]
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let row_count = arch.entities.length()
+  let logical_end = row_count * col.stride
+  let before_column = copy_fixed_range_to_fixed(col.bytes, 0, logical_end)
+  let auto = history.begin_auto("raw_query_archetype_write_column")
+  history.begin_tracked_world_mutation(self.world)
+  self.world.assert_system_component_write(
+    component, "RawQueryArchetype::write_column_tracked",
+  )
+  f(col.bytes.mut_view(start=0, end=logical_end))
+  history.end_tracked_world_mutation(self.world)
+  for row = 0; row < row_count; row = row + 1 {
+    let offset = row * col.stride
+    let before = copy_fixed_range_to_fixed(before_column, offset, col.stride)
+    let after = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
+    if before != after {
+      history.push_delta(
+        ComponentChanged(arch.entities[row], component, before, after),
+      )
+    }
+  }
+  history.finish_auto(auto, true)
+  true
+}

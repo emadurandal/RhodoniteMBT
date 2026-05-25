@@ -217,6 +217,115 @@ test "RawQuery for_each_archetype exposes contiguous CPU columns" {
 }
 
 ///|
+test "RawQueryArchetype write_column_tracked records changed rows only" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTracked", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, cpu, bytes4(2, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (9 : Byte)) {
+      abort("expected tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 8)
+  match world.component_bytes(e0, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(9, 0, 0, 0))
+    None => abort("expected tracked column e0 bytes")
+  }
+  match world.component_bytes(e1, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(2, 0, 0, 0))
+    None => abort("expected tracked column e1 bytes")
+  }
+  assert_true(history.undo(world))
+  match world.component_bytes(e0, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
+    None => abort("expected tracked column undone e0 bytes")
+  }
+  assert_true(history.redo(world))
+  match world.component_bytes(e0, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(9, 0, 0, 0))
+    None => abort("expected tracked column redone e0 bytes")
+  }
+}
+
+///|
+test "RawQueryArchetype write_column_tracked compresses inside transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedCompress", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction("column gesture"))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (2 : Byte)) {
+      abort("expected first tracked column write")
+    }
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (3 : Byte)) {
+      abort("expected second tracked column write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_bytes(), 8)
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
+    None => abort("expected compressed column undo bytes")
+  }
+  assert_true(history.redo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
+    None => abort("expected compressed column redo bytes")
+  }
+}
+
+///|
+test "RawQueryArchetype write_column_tracked delegates when history disabled" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedDisabled", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_max_undo_records(0)
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (6 : Byte)) {
+      abort("expected delegated tracked column write")
+    }
+  })
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(6, 0, 0, 0))
+    None => abort("expected delegated column bytes")
+  }
+}
+
+///|
+test "RawQueryArchetype write_column_tracked works inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded column"))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (4 : Byte)) {
+      abort("expected guarded tracked column write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, cpu) {
+    Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
+    None => abort("expected guarded tracked column undo bytes")
+  }
+}
+
+///|
 test "RawQueryArchetype column views expose logical rows after column capacity growth" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchCapacityA", 4)

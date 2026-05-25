@@ -31,7 +31,7 @@
 
           <h2>Query View Lifetime</h2>
           <p><code>QueryRow::read</code> / <code>write</code> and <code>RawQueryRow::read_view</code> / <code>write_view</code> return closure-scoped views. This keeps borrowed row or column views from escaping the callback boundary.</p>
-          <p><code>RawQueryArchetype::write_column</code> is an expert API that lends a mutable view of a whole archetype column. It relies on duplicate required-component rejection to avoid overlapping mutable views for the same component.</p>
+          <p><code>RawQueryArchetype::write_column</code> is an expert untracked API that lends a mutable view of a whole archetype column. It relies on duplicate required-component rejection to avoid overlapping mutable views for the same component. Use <code>RawQueryArchetype::write_column_tracked</code> when the same column-style write needs undo/redo tracking.</p>
 
           <h2>SystemRunner Access Declarations</h2>
           <ul>
