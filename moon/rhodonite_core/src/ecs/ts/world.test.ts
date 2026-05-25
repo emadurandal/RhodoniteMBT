@@ -1595,6 +1595,179 @@ describe("ECS TypeScript wrapper", () => {
 		]);
 	});
 
+	it("reports replay validation failures for inapplicable history imports", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const imported = WorldHistory.new();
+		const componentA = world.registerCpuComponentWithIdentity(
+			"TsHistoryReplayValidationA",
+			4,
+			{ stableKey: "com.example.TsHistoryReplayValidationA" },
+		);
+		const componentB = world.registerCpuComponentWithIdentity(
+			"TsHistoryReplayValidationB",
+			4,
+			{ stableKey: "com.example.TsHistoryReplayValidationB" },
+		);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, componentA, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			world.addComponentBytes(entity, componentB, new Uint8Array([3, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				componentA,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(source.beginTransaction("TS replay validation multi-set")).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				componentA,
+				new Uint8Array([5, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				componentB,
+				new Uint8Array([4, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(source.commitTransaction()).toBe(true);
+
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		if (undoArchive == null) {
+			throw new Error("expected undo archive");
+		}
+		expect(undoArchive.recordCount).toBe(2);
+		expect(undoArchive.records[0]?.deltaCount).toBe(2);
+		expect(imported.importUndoStack(world, undoArchive)).toBe(true);
+		expect(imported.undoLen()).toBe(2);
+		const diagnostic = imported.lastDiagnostic();
+
+		expect(world.removeComponent(entity, componentB)).toBe(true);
+		const report = imported.validateImportUndoStack(world, undoArchive);
+		expect(report).toMatchObject({
+			valid: false,
+			reason: "import_validation_failed",
+			recordCount: 2,
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_validation_failed",
+					deltaCount: 2,
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_validation_failed",
+						},
+						{
+							index: 1,
+							valid: false,
+							reason: "import_validation_failed",
+						},
+					],
+				},
+				{
+					index: 1,
+					valid: false,
+					reason: "import_validation_failed",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_validation_failed",
+						},
+					],
+				},
+			],
+		});
+		expect(imported.lastDiagnostic()).toBe(diagnostic);
+		expect(imported.undoLen()).toBe(2);
+		expect(imported.redoLen()).toBe(0);
+		expect(world.hasComponent(entity, componentB)).toBe(false);
+		expect(imported.importUndoStack(world, undoArchive)).toBe(false);
+		expect(imported.lastDiagnostic()).toBe("import_validation_failed");
+		expect(imported.undoLen()).toBe(2);
+		expect(imported.redoLen()).toBe(0);
+		expect(world.hasComponent(entity, componentB)).toBe(false);
+
+		const redoWorld = World.new();
+		const redoSource = WorldHistory.new();
+		const redoTarget = WorldHistory.new();
+		const redoComponent = redoWorld.registerCpuComponentWithIdentity(
+			"TsHistoryReplayValidationRedo",
+			4,
+			{ stableKey: "com.example.TsHistoryReplayValidationRedo" },
+		);
+		const redoEntity = redoWorld.createEntity();
+		expect(
+			redoWorld.addComponentBytes(
+				redoEntity,
+				redoComponent,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			redoSource.setComponentBytes(
+				redoWorld,
+				redoEntity,
+				redoComponent,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(redoSource.undo(redoWorld)).toBe(true);
+		const redoArchive = redoSource.exportRedoStack(redoWorld);
+		expect(redoArchive).not.toBeNull();
+		if (redoArchive == null) {
+			throw new Error("expected redo archive");
+		}
+		expect(redoTarget.importRedoStack(redoWorld, redoArchive)).toBe(true);
+		expect(redoTarget.redoLen()).toBe(1);
+		const redoDiagnostic = redoTarget.lastDiagnostic();
+
+		expect(redoWorld.removeComponent(redoEntity, redoComponent)).toBe(true);
+		const redoReport = redoTarget.validateImportRedoStack(redoWorld, redoArchive);
+		expect(redoReport).toMatchObject({
+			valid: false,
+			reason: "import_validation_failed",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_validation_failed",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_validation_failed",
+						},
+					],
+				},
+			],
+		});
+		expect(redoTarget.lastDiagnostic()).toBe(redoDiagnostic);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoWorld.hasComponent(redoEntity, redoComponent)).toBe(false);
+		expect(redoTarget.importRedoStack(redoWorld, redoArchive)).toBe(false);
+		expect(redoTarget.lastDiagnostic()).toBe("import_validation_failed");
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoWorld.hasComponent(redoEntity, redoComponent)).toBe(false);
+	});
+
 	it("encodes and decodes history archives as JSON", () => {
 		const world = World.new();
 		const source = WorldHistory.new();
