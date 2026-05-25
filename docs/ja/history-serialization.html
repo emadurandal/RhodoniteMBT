@@ -32,6 +32,7 @@
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory</code> は現時点で serialized history API を公開していません。</li>
+            <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
             <li>将来の永続化では <code>format_version</code> を持つ明示的な history format を使います。MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
           </ul>

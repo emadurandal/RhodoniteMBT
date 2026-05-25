@@ -559,6 +559,110 @@ pub fn world_history_redo_bytes(history : @ecs.WorldHistory) -> Int {
 }
 
 ///|
+/// Implements `world_history_undo_summary`.
+pub fn world_history_undo_summary(
+  history : @ecs.WorldHistory,
+) -> Array[@ecs.WorldHistoryRecordSummary] {
+  history.undo_summary()
+}
+
+///|
+/// Implements `world_history_redo_summary`.
+pub fn world_history_redo_summary(
+  history : @ecs.WorldHistory,
+) -> Array[@ecs.WorldHistoryRecordSummary] {
+  history.redo_summary()
+}
+
+///|
+/// Implements `world_history_record_summary_label`.
+pub fn world_history_record_summary_label(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> String {
+  summary.label
+}
+
+///|
+/// Implements `world_history_record_summary_delta_count`.
+pub fn world_history_record_summary_delta_count(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Int {
+  summary.delta_count
+}
+
+///|
+/// Implements `world_history_record_summary_payload_bytes`.
+pub fn world_history_record_summary_payload_bytes(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Int {
+  summary.payload_bytes
+}
+
+///|
+/// Implements `world_history_record_summary_deltas`.
+pub fn world_history_record_summary_deltas(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Array[@ecs.WorldHistoryDeltaSummary] {
+  summary.deltas
+}
+
+///|
+/// Implements `world_history_delta_summary_kind`.
+pub fn world_history_delta_summary_kind(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> String {
+  summary.kind
+}
+
+///|
+/// Implements `world_history_delta_summary_entity`.
+pub fn world_history_delta_summary_entity(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> @ecs.EntityId? {
+  summary.entity
+}
+
+///|
+/// Implements `world_history_delta_summary_component`.
+pub fn world_history_delta_summary_component(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> @ecs.ComponentTypeId? {
+  summary.component
+}
+
+///|
+/// Implements `world_history_delta_summary_component_count`.
+pub fn world_history_delta_summary_component_count(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Int {
+  summary.component_count
+}
+
+///|
+/// Implements `world_history_delta_summary_payload_bytes`.
+pub fn world_history_delta_summary_payload_bytes(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Int {
+  summary.payload_bytes
+}
+
+///|
+/// Implements `world_history_delta_summary_before_present`.
+pub fn world_history_delta_summary_before_present(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Bool {
+  summary.before_present
+}
+
+///|
+/// Implements `world_history_delta_summary_after_present`.
+pub fn world_history_delta_summary_after_present(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Bool {
+  summary.after_present
+}
+
+///|
 /// Implements `world_history_last_diagnostic`.
 pub fn world_history_last_diagnostic(history : @ecs.WorldHistory) -> String {
   history.last_diagnostic()

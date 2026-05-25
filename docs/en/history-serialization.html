@@ -32,6 +32,7 @@
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory</code> does not currently expose a serialized history API.</li>
+            <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
             <li>Future persistence must use an explicit history format with a <code>format_version</code>; MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
           </ul>

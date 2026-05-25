@@ -910,6 +910,54 @@ test "WorldHistory exposes undo and redo labels for UI state" {
 }
 
 ///|
+test "WorldHistory exposes payload-free undo and redo summaries" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistorySummary", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction("Change Component"))
+  assert_true(
+    history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_true(history.begin_transaction("Destroy Entity"))
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(history.commit_transaction())
+  let diagnostic = history.last_diagnostic()
+  let summaries = history.undo_summary()
+  assert_eq(summaries.length(), 2)
+  assert_eq(summaries[0].label, "Destroy Entity")
+  assert_eq(summaries[0].delta_count, 1)
+  assert_eq(summaries[0].payload_bytes, 4)
+  assert_eq(summaries[0].deltas[0].kind, "entity_destroyed")
+  assert_true(summaries[0].deltas[0].entity == Some(entity))
+  assert_true(summaries[0].deltas[0].component is None)
+  assert_eq(summaries[0].deltas[0].component_count, 1)
+  assert_eq(summaries[0].deltas[0].payload_bytes, 4)
+  assert_true(summaries[0].deltas[0].before_present)
+  assert_true(!summaries[0].deltas[0].after_present)
+  assert_eq(summaries[1].label, "Change Component")
+  assert_eq(summaries[1].delta_count, 1)
+  assert_eq(summaries[1].payload_bytes, 8)
+  assert_eq(summaries[1].deltas[0].kind, "component_changed")
+  assert_true(summaries[1].deltas[0].entity == Some(entity))
+  assert_true(summaries[1].deltas[0].component == Some(component))
+  assert_eq(summaries[1].deltas[0].component_count, 0)
+  assert_eq(summaries[1].deltas[0].payload_bytes, 8)
+  assert_true(summaries[1].deltas[0].before_present)
+  assert_true(summaries[1].deltas[0].after_present)
+  assert_eq(history.last_diagnostic(), diagnostic)
+  assert_eq(history.undo_len(), 2)
+  assert_eq(history.redo_len(), 0)
+  assert_true(history.undo(world))
+  let redo_summaries = history.redo_summary()
+  assert_eq(redo_summaries.length(), 1)
+  assert_eq(redo_summaries[0].label, "Destroy Entity")
+  assert_eq(redo_summaries[0].deltas[0].kind, "entity_destroyed")
+}
+
+///|
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()

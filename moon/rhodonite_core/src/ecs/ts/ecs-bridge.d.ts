@@ -12,6 +12,8 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonEntityLocation = { archetype_index: number; row: number };
 	export type MoonWorld = object;
 	export type MoonWorldHistory = object;
+	export type MoonWorldHistoryRecordSummary = object;
+	export type MoonWorldHistoryDeltaSummary = object;
 	export type MoonPhaseKey = object;
 	export type MoonSystemContext = object;
 	export type MoonSystem = object;
@@ -241,6 +243,45 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_redo_len(history: MoonWorldHistory): number;
 	export function world_history_undo_bytes(history: MoonWorldHistory): number;
 	export function world_history_redo_bytes(history: MoonWorldHistory): number;
+	export function world_history_undo_summary(
+		history: MoonWorldHistory,
+	): MoonWorldHistoryRecordSummary[];
+	export function world_history_redo_summary(
+		history: MoonWorldHistory,
+	): MoonWorldHistoryRecordSummary[];
+	export function world_history_record_summary_label(
+		summary: MoonWorldHistoryRecordSummary,
+	): string;
+	export function world_history_record_summary_delta_count(
+		summary: MoonWorldHistoryRecordSummary,
+	): number;
+	export function world_history_record_summary_payload_bytes(
+		summary: MoonWorldHistoryRecordSummary,
+	): number;
+	export function world_history_record_summary_deltas(
+		summary: MoonWorldHistoryRecordSummary,
+	): MoonWorldHistoryDeltaSummary[];
+	export function world_history_delta_summary_kind(
+		summary: MoonWorldHistoryDeltaSummary,
+	): string;
+	export function world_history_delta_summary_entity(
+		summary: MoonWorldHistoryDeltaSummary,
+	): MoonEntityId | undefined;
+	export function world_history_delta_summary_component(
+		summary: MoonWorldHistoryDeltaSummary,
+	): MoonComponentTypeId | undefined;
+	export function world_history_delta_summary_component_count(
+		summary: MoonWorldHistoryDeltaSummary,
+	): number;
+	export function world_history_delta_summary_payload_bytes(
+		summary: MoonWorldHistoryDeltaSummary,
+	): number;
+	export function world_history_delta_summary_before_present(
+		summary: MoonWorldHistoryDeltaSummary,
+	): MoonBool;
+	export function world_history_delta_summary_after_present(
+		summary: MoonWorldHistoryDeltaSummary,
+	): MoonBool;
 	export function world_history_last_diagnostic(
 		history: MoonWorldHistory,
 	): string;

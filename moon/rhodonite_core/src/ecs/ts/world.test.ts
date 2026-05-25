@@ -757,6 +757,66 @@ describe("ECS TypeScript wrapper", () => {
 		).toThrow();
 	});
 
+	it("exposes payload-free undo and redo summaries", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistorySummaryCpu", 4);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+
+		expect(history.beginTransaction("TS summary change")).toBe(true);
+		expect(
+			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.beginTransaction("TS summary destroy")).toBe(true);
+		expect(history.destroyEntity(world, entity)).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+
+		const diagnostic = history.lastDiagnostic();
+		const summaries = history.undoSummary();
+		expect(summaries).toHaveLength(2);
+		expect(summaries[0]).toMatchObject({
+			label: "TS summary destroy",
+			deltaCount: 1,
+			payloadBytes: 4,
+		});
+		expect(summaries[0]?.deltas[0]).toMatchObject({
+			kind: "entity_destroyed",
+			component: null,
+			componentCount: 1,
+			payloadBytes: 4,
+			beforePresent: true,
+			afterPresent: false,
+		});
+		expect(summaries[0]?.deltas[0]?.entity?.index()).toBe(entity.index());
+		expect(summaries[1]).toMatchObject({
+			label: "TS summary change",
+			deltaCount: 1,
+			payloadBytes: 8,
+		});
+		expect(summaries[1]?.deltas[0]).toMatchObject({
+			kind: "component_changed",
+			componentCount: 0,
+			payloadBytes: 8,
+			beforePresent: true,
+			afterPresent: true,
+		});
+		expect(summaries[1]?.deltas[0]?.entity?.index()).toBe(entity.index());
+		expect(summaries[1]?.deltas[0]?.component?.index()).toBe(cpu.index());
+		expect(history.lastDiagnostic()).toBe(diagnostic);
+		expect(history.undoLen()).toBe(2);
+		expect(history.redoLen()).toBe(0);
+
+		expect(history.undo(world)).toBe(true);
+		const redoSummaries = history.redoSummary();
+		expect(redoSummaries).toHaveLength(1);
+		expect(redoSummaries[0]?.label).toBe("TS summary destroy");
+		expect(redoSummaries[0]?.deltas[0]?.kind).toBe("entity_destroyed");
+	});
+
 	it("audits direct WorldHistory mutation coverage", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
