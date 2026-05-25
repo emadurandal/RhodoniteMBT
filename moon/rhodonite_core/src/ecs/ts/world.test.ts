@@ -87,6 +87,67 @@ describe("ECS TypeScript wrapper", () => {
 		expect(copy?.[12]).toBe(7);
 	});
 
+	it("tracks query row writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedPosition", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		Query.new([cpu]).forEach(world, (row) => {
+			expect(
+				row.writeTracked(history, cpu, (bytes) => {
+					bytes.setF32(0, 12);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("query_row_write");
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(12);
+		expect(history.undo(world)).toBe(true);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(1);
+		expect(history.redo(world)).toBe(true);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(12);
+	});
+
+	it("tracks raw query row callback writes and delegates when history is disabled", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedRawPosition", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEach(world, (row) => {
+			expect(row.writeTracked(history, cpu, (bytes) => bytes.setF32(0, 4))).toBe(
+				true,
+			);
+		});
+		expect(history.undoLen()).toBe(1);
+		expect(history.undo(world)).toBe(true);
+
+		history.setMaxUndoRecords(0);
+		RawQuery.new([cpu]).forEach(world, (row) => {
+			expect(row.writeTracked(history, cpu, (bytes) => bytes.setF32(0, 8))).toBe(
+				true,
+			);
+		});
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
+		expect(
+			getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0),
+		).toBeCloseTo(8);
+	});
+
 	it("exposes archetype column views for hot CPU loops", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("Velocity", 16);
@@ -112,6 +173,49 @@ describe("ECS TypeScript wrapper", () => {
 		const e1Bytes = world.componentBytesCopy(e1, cpu);
 		expect(getF32(e0Bytes ?? new Uint8Array(), 0)).toBeCloseTo(10);
 		expect(getF32(e1Bytes ?? new Uint8Array(), 0)).toBeCloseTo(20);
+	});
+
+	it("tracks archetype column callback writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocity", 16);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpu, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnTracked(history, cpu, (column) => {
+					column.setF32(0, 10);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("raw_query_archetype_write_column");
+		expect(history.undoBytes()).toBe(32);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(10);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(history.undo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+		expect(history.redo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(10);
+
+		history.setMaxUndoRecords(0);
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnTracked(history, cpu, (column) => {
+					column.setF32(16, 20);
+				}),
+			).toBe(true);
+		});
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
 	it("reuses prepared row query plans", () => {
@@ -761,5 +865,153 @@ describe("ECS TypeScript wrapper", () => {
 				archetype.writeColumn(queryCpu);
 			}),
 		).toThrow();
+		const trackedQueryWorld = World.new();
+		const trackedQueryHistory = WorldHistory.new();
+		const trackedQueryCpu = trackedQueryWorld.registerCpuComponent(
+			"TsHistoryTrackedQuery",
+			4,
+		);
+		const trackedQueryEntity = trackedQueryWorld.createEntity();
+		expect(
+			trackedQueryWorld.addComponentBytes(
+				trackedQueryEntity,
+				trackedQueryCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedQueryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedQueryHistory.beginGuardedTransaction(
+				trackedQueryWorld,
+				"guarded tracked query",
+			),
+		).toBe(true);
+		Query.new([trackedQueryCpu]).forEach(trackedQueryWorld, (row) => {
+			expect(
+				row.writeTracked(
+					trackedQueryHistory,
+					trackedQueryCpu,
+					(bytes) => bytes.setF32(0, 6),
+				),
+			).toBe(true);
+		});
+		expect(trackedQueryHistory.commitTransaction()).toBe(true);
+		expect(trackedQueryHistory.undo(trackedQueryWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedQueryWorld.componentBytesCopy(
+					trackedQueryEntity,
+					trackedQueryCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
+
+		const trackedColumnWorld = World.new();
+		const trackedColumnHistory = WorldHistory.new();
+		const trackedColumnCpu = trackedColumnWorld.registerCpuComponent(
+			"TsHistoryTrackedColumn",
+			4,
+		);
+		const trackedColumnEntity = trackedColumnWorld.createEntity();
+		expect(
+			trackedColumnWorld.addComponentBytes(
+				trackedColumnEntity,
+				trackedColumnCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedColumnHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedColumnHistory.beginGuardedTransaction(
+				trackedColumnWorld,
+				"guarded tracked column",
+			),
+		).toBe(true);
+		RawQuery.new([trackedColumnCpu]).forEachArchetype(
+			trackedColumnWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnTracked(
+						trackedColumnHistory,
+						trackedColumnCpu,
+						(bytes) => bytes.setF32(0, 5),
+					),
+				).toBe(true);
+			},
+		);
+		expect(trackedColumnHistory.commitTransaction()).toBe(true);
+		expect(trackedColumnHistory.undo(trackedColumnWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedColumnWorld.componentBytesCopy(
+					trackedColumnEntity,
+					trackedColumnCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
+
+		const blobQueryWorld = World.new();
+		const blobQueryHistory = WorldHistory.new();
+		const blobQueryEntity = blobQueryWorld.createEntity();
+		const blobQueryComponent = blobQueryWorld.globalTransformComponent();
+		expect(
+			blobQueryWorld.setGlobalTransform(blobQueryEntity, identityMat4ColMajor()),
+		).toBe(true);
+		blobQueryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			blobQueryHistory.beginGuardedTransaction(
+				blobQueryWorld,
+				"guarded blob query",
+			),
+		).toBe(true);
+		let sawBlobQuery = false;
+		Query.new([blobQueryComponent]).forEach(blobQueryWorld, (row) => {
+			expect(
+				row.writeTracked(blobQueryHistory, blobQueryComponent, (bytes) => {
+					sawBlobQuery = bytes.length > 0;
+				}),
+			).toBe(true);
+		});
+		expect(sawBlobQuery).toBe(true);
+		expect(blobQueryHistory.commitTransaction()).toBe(true);
+		expect(blobQueryHistory.lastDiagnostic()).toBe("transaction_empty");
+
+		const blobColumnWorld = World.new();
+		const blobColumnHistory = WorldHistory.new();
+		const blobColumnEntity = blobColumnWorld.createEntity();
+		const blobColumnComponent = blobColumnWorld.globalTransformComponent();
+		expect(
+			blobColumnWorld.setGlobalTransform(
+				blobColumnEntity,
+				identityMat4ColMajor(),
+			),
+		).toBe(true);
+		blobColumnHistory.setRawMutationGuardEnabled(true);
+		expect(
+			blobColumnHistory.beginGuardedTransaction(
+				blobColumnWorld,
+				"guarded blob column",
+			),
+		).toBe(true);
+		let sawBlobColumn = false;
+		RawQuery.new([blobColumnComponent]).forEachArchetype(
+			blobColumnWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnTracked(
+						blobColumnHistory,
+						blobColumnComponent,
+						(bytes) => {
+							sawBlobColumn = bytes.length > 0;
+						},
+					),
+				).toBe(true);
+			},
+		);
+		expect(sawBlobColumn).toBe(true);
+		expect(blobColumnHistory.commitTransaction()).toBe(true);
+		expect(blobColumnHistory.lastDiagnostic()).toBe("transaction_empty");
 	});
 });

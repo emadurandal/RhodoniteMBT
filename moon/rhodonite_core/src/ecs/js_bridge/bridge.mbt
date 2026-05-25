@@ -959,6 +959,17 @@ pub fn raw_query_row_write_view(
 }
 
 ///|
+/// Implements `raw_query_row_write_tracked`.
+pub fn raw_query_row_write_tracked(
+  row : @ecs.RawQueryRow,
+  history : @ecs.WorldHistory,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  row.write_tracked(history, component, f)
+}
+
+///|
 /// Implements `query_row_read`.
 pub fn query_row_read(
   row : @ecs.QueryRow,
@@ -976,6 +987,17 @@ pub fn query_row_write(
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Unit {
   row.write(component, f)
+}
+
+///|
+/// Implements `query_row_write_tracked`.
+pub fn query_row_write_tracked(
+  row : @ecs.QueryRow,
+  history : @ecs.WorldHistory,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  row.write_tracked(history, component, f)
 }
 
 ///|
@@ -1027,6 +1049,17 @@ pub fn raw_query_archetype_write_column(
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   arch.write_column(component)
+}
+
+///|
+/// Implements `raw_query_archetype_write_column_tracked`.
+pub fn raw_query_archetype_write_column_tracked(
+  arch : @ecs.RawQueryArchetype,
+  history : @ecs.WorldHistory,
+  component : @ecs.ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  arch.write_column_tracked(history, component, f)
 }
 
 ///|

@@ -460,6 +460,60 @@ pub fn QueryRow::write(
 }
 
 ///|
+/// Runs `f` with a mutable payload view and records one component change through `history`.
+///
+/// When history recording is disabled, this delegates to `QueryRow::write` without copying
+/// before/after bytes.
+pub fn QueryRow::write_tracked(
+  self : QueryRow,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  ignore(self.component_payload_index(component, "QueryRow::write_tracked"))
+  if !history.recording_enabled() || history.applying {
+    self.write(component, f)
+    let reason = if !history.recording_enabled() {
+      "recording_disabled"
+    } else {
+      "applying"
+    }
+    history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  if self.world.history_blob_ref_component(component) {
+    history.begin_tracked_world_mutation(self.world)
+    self.write(component, f)
+    history.end_tracked_world_mutation(self.world)
+    history.set_delegate_diagnostic(true, history_diagnostic_none())
+    return true
+  }
+  let before = match self.world.component_bytes(self.entity, component) {
+    Some(bytes) => bytes
+    None => {
+      history.set_diagnostic("operation_failed")
+      return false
+    }
+  }
+  let auto = history.begin_auto("query_row_write")
+  history.begin_tracked_world_mutation(self.world)
+  self.world.assert_system_component_write(component, "QueryRow::write_tracked")
+  f(self.component_mut_view(component, "QueryRow::write_tracked"))
+  history.end_tracked_world_mutation(self.world)
+  let ok = match self.world.component_bytes(self.entity, component) {
+    Some(after) => {
+      history.push_delta(
+        ComponentChanged(self.entity, component, before, after),
+      )
+      true
+    }
+    None => false
+  }
+  history.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Implements `RawQueryRow::read_view`.
 pub fn RawQueryRow::read_view(
   self : RawQueryRow,
@@ -480,6 +534,17 @@ pub fn RawQueryRow::write_view(
   row.world.assert_not_history_raw_mutation("RawQueryRow::write_view")
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
   row.component_mut_view(component, "RawQueryRow::write_view")
+}
+
+///|
+/// Runs `f` with a mutable payload view and records one component change through `history`.
+pub fn RawQueryRow::write_tracked(
+  self : RawQueryRow,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  self.as_query_row().write_tracked(history, component, f)
 }
 
 ///|
@@ -681,4 +746,62 @@ pub fn RawQueryArchetype::write_column(
   let col = arch.columns[access.column_index]
   let logical_end = arch.entities.length() * col.stride
   col.bytes.mut_view(start=0, end=logical_end)
+}
+
+///|
+/// Runs `f` with a mutable column view and records changed rows through `history`.
+///
+/// When history recording is disabled, this delegates to `RawQueryArchetype::write_column`
+/// without copying before/after bytes.
+pub fn RawQueryArchetype::write_column_tracked(
+  self : RawQueryArchetype,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::write_column_tracked",
+  )
+  if !history.recording_enabled() || history.applying {
+    f(self.write_column(component))
+    let reason = if !history.recording_enabled() {
+      "recording_disabled"
+    } else {
+      "applying"
+    }
+    history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  if self.world.history_blob_ref_component(component) {
+    history.begin_tracked_world_mutation(self.world)
+    f(self.write_column(component))
+    history.end_tracked_world_mutation(self.world)
+    history.set_delegate_diagnostic(true, history_diagnostic_none())
+    return true
+  }
+  let access = self.accesses[access_index]
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let row_count = arch.entities.length()
+  let logical_end = row_count * col.stride
+  let before_column = copy_fixed_range_to_fixed(col.bytes, 0, logical_end)
+  let auto = history.begin_auto("raw_query_archetype_write_column")
+  history.begin_tracked_world_mutation(self.world)
+  self.world.assert_system_component_write(
+    component, "RawQueryArchetype::write_column_tracked",
+  )
+  f(col.bytes.mut_view(start=0, end=logical_end))
+  history.end_tracked_world_mutation(self.world)
+  for row = 0; row < row_count; row = row + 1 {
+    let offset = row * col.stride
+    let before = copy_fixed_range_to_fixed(before_column, offset, col.stride)
+    let after = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
+    if before != after {
+      history.push_delta(
+        ComponentChanged(arch.entities[row], component, before, after),
+      )
+    }
+  }
+  history.finish_auto(auto, true)
+  true
 }
