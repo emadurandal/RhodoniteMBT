@@ -456,6 +456,41 @@ test "tracked setup orbit orthographic camera undoes and redoes as one operation
 }
 
 ///|
+test "tracked setup orbit orthographic camera rejects existing controller without partial state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(add_orbit_camera_controller(world, camera, orbit, 0.0, 0.0))
+  assert_true(
+    !setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.38,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.has_component(camera, orbit))
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(!world.has_component(camera, world.global_transform_component()))
+  assert_true(
+    !world.has_component(camera, world.camera_home_transform_component()),
+  )
+  assert_true(!world.has_component(camera, lens))
+  assert_true(!world.has_component(camera, world.camera_component()))
+}
+
+///|
 test "tracked orbit camera edit helpers group drag sync and reset sync" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -542,6 +577,47 @@ test "tracked orbit camera edit helpers group drag sync and reset sync" {
   assert_true(history.undo(world))
   let (yaw_restored, _, _, _, _, _) = orbit_camera_pose(world, camera, orbit)
   assert_eq(yaw_restored, yaw_after)
+}
+
+///|
+test "tracked orbit transform sync rejects reset without Transform3D before mutating" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let camera = world.create_entity()
+  assert_true(add_orbit_camera_controller(world, camera, orbit, 0.0, 0.0))
+  assert_true(
+    world.add_component_bytes(
+      camera,
+      home,
+      @comp.transform3d_trs_bytes(
+        (1.0 : Float),
+        (2.0 : Float),
+        (3.0 : Float),
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        (1.0 : Float),
+        (1.0 : Float),
+        (1.0 : Float),
+      ),
+    ),
+  )
+  assert_true(request_orbit_camera_reset(world, camera, orbit))
+  let before = match world.component_bytes(camera, orbit) {
+    Some(bytes) => bytes
+    None => abort("expected OrbitCameraController")
+  }
+  assert_true(
+    !sync_orbit_camera_transform_component_tracked(
+      history, world, camera, orbit, home,
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(world.component_bytes(camera, orbit) == Some(before))
 }
 
 ///|

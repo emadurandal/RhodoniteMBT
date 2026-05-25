@@ -216,6 +216,40 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.drainCameraBlobWriteViews().length).toBeGreaterThan(0);
 	});
 
+	it("rejects tracked camera setup without leaving partial state", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const lens = world.cameraLensComponent();
+		expect(addOrbitCameraControllerWithDistance(world, camera, orbit, 0, 0, 16)).toBe(true);
+
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(false);
+
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(camera, orbit)).toBe(true);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
+		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(false);
+		expect(world.hasComponent(camera, world.cameraHomeTransformComponent())).toBe(false);
+		expect(world.hasComponent(camera, lens)).toBe(false);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+	});
+
 	it("tracks camera-control component edits and sync helpers", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -313,6 +347,33 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(readOrbitCameraControllerComponent(world, camera, orbit).yaw).toBeCloseTo(
 			yawAfter,
 		);
+	});
+
+	it("rejects tracked reset sync without Transform3D before mutating", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const home = world.cameraHomeTransformComponent();
+		expect(world.setTransformTrs(camera, 1, 2, 3, 0, 0, 0, 1, 1, 1, 1)).toBe(true);
+		expect(addOrbitCameraControllerWithDistance(world, camera, orbit, 0, 0, 16)).toBe(true);
+		expect(setCameraHomeFromCurrentTransform(world, camera, home)).toBe(true);
+		expect(world.removeComponent(camera, world.transformComponent())).toBe(true);
+		expect(requestOrbitCameraReset(world, camera, orbit)).toBe(true);
+		const before = world.componentBytesCopy(camera, orbit);
+
+		expect(() =>
+			syncOrbitCameraTransformComponentTracked(
+				history,
+				world,
+				camera,
+				orbit,
+				home,
+			),
+		).toThrow("Failed to update camera Transform3D.");
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
+		expect(world.componentBytesCopy(camera, orbit)).toEqual(before);
 	});
 
 	it("runs camera-control command systems through SystemRunner", () => {

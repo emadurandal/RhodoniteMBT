@@ -1043,12 +1043,26 @@ function finishTrackedCameraControlTransaction(
 	return false;
 }
 
+function canSetupOrbitOrthographicCameraTracked(
+	world: World,
+	camera: EntityId,
+): boolean {
+	return (
+		world.isAlive(camera) &&
+		!world.hasComponent(camera, world.orbitCameraControllerComponent()) &&
+		!world.hasComponent(camera, world.cameraLensComponent())
+	);
+}
+
 export function setupOrbitOrthographicCameraTracked(
 	history: WorldHistory,
 	world: World,
 	camera: EntityId,
 	desc: OrbitOrthographicCameraDesc,
 ): boolean {
+	if (!canSetupOrbitOrthographicCameraTracked(world, camera)) {
+		return false;
+	}
 	const opened = history.beginTransaction("setupOrbitOrthographicCamera");
 	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
 	const local = localMatrixFromTrs(px, py, pz, qx, qy, qz, qw, 1, 1, 1);
@@ -1333,6 +1347,15 @@ export function syncOrbitCameraTransformComponentTracked(
 ): void {
 	const opened = history.beginTransaction("syncOrbitCameraTransformComponent");
 	const pose = readOrbitCameraPoseComponent(world, camera, orbitComponent);
+	if (
+		pose.resetRequested &&
+		!world.hasComponent(camera, world.transformComponent())
+	) {
+		if (opened) {
+			history.cancelTransaction();
+		}
+		throw new Error("Failed to update camera Transform3D.");
+	}
 	let ok = true;
 	if (pose.resetRequested) {
 		const homeBytes = componentBytesOrThrow(

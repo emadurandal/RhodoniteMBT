@@ -1494,6 +1494,42 @@ pub fn WorldHistory::cancel_transaction(self : WorldHistory) -> Bool {
 }
 
 ///|
+/// Cancels the active transaction and reverts deltas already applied in that transaction.
+fn WorldHistory::cancel_transaction_reverting(
+  self : WorldHistory,
+  world : World,
+) -> Bool {
+  if !self.open {
+    self.set_diagnostic("no_open_transaction")
+    return false
+  }
+  if self.applying {
+    self.set_diagnostic("applying")
+    return false
+  }
+  self.applying = true
+  world.begin_history_tracked_mutation()
+  let mut failed = false
+  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
+    if !self.apply_delta_inverse(world, self.current_deltas[i]) {
+      failed = true
+      break
+    }
+  }
+  world.end_history_tracked_mutation()
+  self.applying = false
+  if failed {
+    self.clear()
+    self.set_diagnostic("apply_failed")
+    false
+  } else {
+    self.clear_current()
+    self.clear_diagnostic()
+    true
+  }
+}
+
+///|
 /// Implements `WorldHistory::can_undo`.
 pub fn WorldHistory::can_undo(self : WorldHistory) -> Bool {
   self.enabled && !self.open && self.undo_stack.length() > 0
