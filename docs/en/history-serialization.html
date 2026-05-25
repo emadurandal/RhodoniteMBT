@@ -68,6 +68,7 @@
 
           <h2>Replay Validation</h2>
           <p>Import and replay should apply the same defensive posture as runtime undo/redo: validate each record before applying it, reject stale or schema-mismatched deltas, and leave stacks unchanged when validation fails. Byte budgets and record count limits remain runtime retention policy; they do not define archive compatibility.</p>
+          <p><code>undo_serialization_report</code> and <code>redo_serialization_report</code> are dry-run diagnostics for the retained in-memory stacks. They do not export payload bytes or define a file format. Each report includes every record and delta, marks whether it is serializable, and explains failures such as <code>missing_stable_component_identity</code> or <code>unknown_component</code> so editors can show which components need stable identity metadata before export is implemented.</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>

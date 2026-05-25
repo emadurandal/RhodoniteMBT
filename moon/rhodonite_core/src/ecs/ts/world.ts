@@ -8,6 +8,10 @@ import type {
 	MoonWorld,
 	MoonWorldHistoryDeltaSummary,
 	MoonWorldHistoryRecordSummary,
+	MoonWorldHistorySerializationComponentReport,
+	MoonWorldHistorySerializationDeltaReport,
+	MoonWorldHistorySerializationRecordReport,
+	MoonWorldHistorySerializationReport,
 	MoonWorldHistory,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -94,6 +98,7 @@ import {
 	world_history_redo_bytes,
 	world_history_redo_label,
 	world_history_redo_len,
+	world_history_redo_serialization_report,
 	world_history_redo_summary,
 	world_history_remove_component,
 	world_history_record_summary_delta_count,
@@ -101,6 +106,27 @@ import {
 	world_history_record_summary_label,
 	world_history_record_summary_payload_bytes,
 	world_history_run_system_phase,
+	world_history_serialization_component_report_component,
+	world_history_serialization_component_report_reason,
+	world_history_serialization_component_report_serializable,
+	world_history_serialization_component_report_stable_key,
+	world_history_serialization_delta_report_component,
+	world_history_serialization_delta_report_component_count,
+	world_history_serialization_delta_report_components,
+	world_history_serialization_delta_report_entity,
+	world_history_serialization_delta_report_kind,
+	world_history_serialization_delta_report_payload_bytes,
+	world_history_serialization_delta_report_reason,
+	world_history_serialization_delta_report_serializable,
+	world_history_serialization_record_report_delta_count,
+	world_history_serialization_record_report_deltas,
+	world_history_serialization_record_report_label,
+	world_history_serialization_record_report_payload_bytes,
+	world_history_serialization_record_report_reason,
+	world_history_serialization_record_report_serializable,
+	world_history_serialization_report_record_count,
+	world_history_serialization_report_records,
+	world_history_serialization_report_serializable,
 	world_history_set_child_of,
 	world_history_set_camera_matrices_col_major,
 	world_history_set_component_bytes,
@@ -117,6 +143,7 @@ import {
 	world_history_undo_bytes,
 	world_history_undo_label,
 	world_history_undo_len,
+	world_history_undo_serialization_report,
 	world_history_undo_summary,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -578,6 +605,44 @@ export type HistoryRecordSummary = {
 	readonly deltas: HistoryDeltaSummary[];
 };
 
+export type HistorySerializationReason =
+	| "none"
+	| "unknown_component"
+	| "missing_stable_component_identity";
+
+export type HistorySerializationComponentReport = {
+	readonly component: ComponentTypeId;
+	readonly serializable: boolean;
+	readonly reason: HistorySerializationReason;
+	readonly stableKey: string | null;
+};
+
+export type HistorySerializationDeltaReport = {
+	readonly kind: HistoryDeltaKind;
+	readonly entity: EntityId | null;
+	readonly component: ComponentTypeId | null;
+	readonly componentCount: number;
+	readonly serializable: boolean;
+	readonly reason: HistorySerializationReason;
+	readonly payloadBytes: number;
+	readonly components: HistorySerializationComponentReport[];
+};
+
+export type HistorySerializationRecordReport = {
+	readonly label: string;
+	readonly serializable: boolean;
+	readonly reason: HistorySerializationReason;
+	readonly deltaCount: number;
+	readonly payloadBytes: number;
+	readonly deltas: HistorySerializationDeltaReport[];
+};
+
+export type HistorySerializationReport = {
+	readonly serializable: boolean;
+	readonly recordCount: number;
+	readonly records: HistorySerializationRecordReport[];
+};
+
 function historySummaryEntity(
 	entity:
 		| ReturnType<typeof world_history_delta_summary_entity>
@@ -621,6 +686,85 @@ function historyRecordSummaryFromBridge(
 		payloadBytes: world_history_record_summary_payload_bytes(summary),
 		deltas: world_history_record_summary_deltas(summary).map((delta) =>
 			historyDeltaSummaryFromBridge(delta),
+		),
+	};
+}
+
+function historySerializationComponentReportFromBridge(
+	report: MoonWorldHistorySerializationComponentReport,
+): HistorySerializationComponentReport {
+	return {
+		component: new ComponentTypeId(
+			world_history_serialization_component_report_component(report),
+		),
+		serializable: moonBool(
+			world_history_serialization_component_report_serializable(report),
+		),
+		reason: world_history_serialization_component_report_reason(
+			report,
+		) as HistorySerializationReason,
+		stableKey:
+			world_history_serialization_component_report_stable_key(report) ?? null,
+	};
+}
+
+function historySerializationDeltaReportFromBridge(
+	report: MoonWorldHistorySerializationDeltaReport,
+): HistorySerializationDeltaReport {
+	return {
+		kind: world_history_serialization_delta_report_kind(
+			report,
+		) as HistoryDeltaKind,
+		entity: historySummaryEntity(
+			world_history_serialization_delta_report_entity(report),
+		),
+		component: historySummaryComponent(
+			world_history_serialization_delta_report_component(report),
+		),
+		componentCount:
+			world_history_serialization_delta_report_component_count(report),
+		serializable: moonBool(
+			world_history_serialization_delta_report_serializable(report),
+		),
+		reason: world_history_serialization_delta_report_reason(
+			report,
+		) as HistorySerializationReason,
+		payloadBytes: world_history_serialization_delta_report_payload_bytes(report),
+		components: world_history_serialization_delta_report_components(report).map(
+			(component) => historySerializationComponentReportFromBridge(component),
+		),
+	};
+}
+
+function historySerializationRecordReportFromBridge(
+	report: MoonWorldHistorySerializationRecordReport,
+): HistorySerializationRecordReport {
+	return {
+		label: world_history_serialization_record_report_label(report),
+		serializable: moonBool(
+			world_history_serialization_record_report_serializable(report),
+		),
+		reason: world_history_serialization_record_report_reason(
+			report,
+		) as HistorySerializationReason,
+		deltaCount: world_history_serialization_record_report_delta_count(report),
+		payloadBytes: world_history_serialization_record_report_payload_bytes(report),
+		deltas: world_history_serialization_record_report_deltas(report).map(
+			(delta) => historySerializationDeltaReportFromBridge(delta),
+		),
+	};
+}
+
+function historySerializationReportFromBridge(
+	report: MoonWorldHistorySerializationReport,
+): HistorySerializationReport {
+	return {
+		serializable: moonBool(
+			world_history_serialization_report_serializable(report),
+		),
+		recordCount: world_history_serialization_report_record_count(report),
+		records: world_history_serialization_report_records(report).map((record) =>
+			historySerializationRecordReportFromBridge(record),
 		),
 	};
 }
@@ -697,6 +841,18 @@ export class WorldHistory {
 	redoSummary(): HistoryRecordSummary[] {
 		return world_history_redo_summary(this.inner).map((summary) =>
 			historyRecordSummaryFromBridge(summary),
+		);
+	}
+
+	undoSerializationReport(world: World): HistorySerializationReport {
+		return historySerializationReportFromBridge(
+			world_history_undo_serialization_report(this.inner, world.inner),
+		);
+	}
+
+	redoSerializationReport(world: World): HistorySerializationReport {
+		return historySerializationReportFromBridge(
+			world_history_redo_serialization_report(this.inner, world.inner),
 		);
 	}
 

@@ -72,6 +72,47 @@ pub(all) struct WorldHistoryRecordSummary {
 }
 
 ///|
+/// Payload-free serialization eligibility report for one component dependency.
+pub(all) struct WorldHistorySerializationComponentReport {
+  component : ComponentTypeId
+  serializable : Bool
+  reason : String
+  stable_key : String?
+}
+
+///|
+/// Payload-free serialization eligibility report for one reversible delta.
+pub(all) struct WorldHistorySerializationDeltaReport {
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_count : Int
+  serializable : Bool
+  reason : String
+  payload_bytes : Int
+  components : Array[WorldHistorySerializationComponentReport]
+}
+
+///|
+/// Payload-free serialization eligibility report for one committed record.
+pub(all) struct WorldHistorySerializationRecordReport {
+  label : String
+  serializable : Bool
+  reason : String
+  delta_count : Int
+  payload_bytes : Int
+  deltas : Array[WorldHistorySerializationDeltaReport]
+}
+
+///|
+/// Payload-free serialization eligibility report for one history stack.
+pub(all) struct WorldHistorySerializationReport {
+  serializable : Bool
+  record_count : Int
+  records : Array[WorldHistorySerializationRecordReport]
+}
+
+///|
 /// Whether applying stack limits dropped at least one retained record.
 priv struct HistoryTrimResult {
   record_limit : Bool
@@ -111,6 +152,24 @@ fn default_max_undo_bytes() -> Int {
 /// Diagnostic code for normal history operation results.
 fn history_diagnostic_none() -> String {
   "none"
+}
+
+///|
+/// Diagnostic reason used when retained history can be serialized.
+fn history_serialization_reason_none() -> String {
+  "none"
+}
+
+///|
+/// Diagnostic reason used when a retained component id is not registered.
+fn history_serialization_reason_unknown_component() -> String {
+  "unknown_component"
+}
+
+///|
+/// Diagnostic reason used when a user component has no stable serialization key.
+fn history_serialization_reason_missing_stable_component_identity() -> String {
+  "missing_stable_component_identity"
 }
 
 ///|
@@ -299,6 +358,287 @@ fn world_history_stack_summary_next_first(
     summaries.push(world_history_record_summary(records[i]))
   }
   summaries
+}
+
+///|
+/// Returns the stable serialization name for builtin ECS components.
+fn world_history_builtin_component_stable_key(
+  world : World,
+  component : ComponentTypeId,
+) -> String? {
+  if component == world.transform_component() {
+    Some("Transform3D")
+  } else if component == world.child_of_component() {
+    Some("ChildOf")
+  } else if component == world.global_transform_component() {
+    Some("GlobalTransform")
+  } else if component == world.camera_component() {
+    Some("Camera")
+  } else if component == world.orbit_camera_controller_component() {
+    Some("OrbitCameraController")
+  } else if component == world.camera_home_transform_component() {
+    Some("CameraHomeTransform")
+  } else if component == world.camera_lens_component() {
+    Some("CameraLens")
+  } else {
+    None
+  }
+}
+
+///|
+/// Reports whether one component dependency is eligible for future history serialization.
+fn world_history_component_serialization_report(
+  world : World,
+  component : ComponentTypeId,
+) -> WorldHistorySerializationComponentReport {
+  match world_history_builtin_component_stable_key(world, component) {
+    Some(stable_key) =>
+      {
+        component,
+        serializable: true,
+        reason: history_serialization_reason_none(),
+        stable_key: Some(stable_key),
+      }
+    None =>
+      match world.component_info(component) {
+        Some(info) =>
+          match info.stable_key {
+            Some(stable_key) =>
+              {
+                component,
+                serializable: true,
+                reason: history_serialization_reason_none(),
+                stable_key: Some(stable_key),
+              }
+            None =>
+              {
+                component,
+                serializable: false,
+                reason: history_serialization_reason_missing_stable_component_identity(),
+                stable_key: None,
+              }
+          }
+        None =>
+          {
+            component,
+            serializable: false,
+            reason: history_serialization_reason_unknown_component(),
+            stable_key: None,
+          }
+      }
+  }
+}
+
+///|
+/// Returns the first non-serializable component report reason, or `none`.
+fn world_history_component_reports_reason(
+  components : Array[WorldHistorySerializationComponentReport],
+) -> String {
+  for i = 0; i < components.length(); i = i + 1 {
+    if !components[i].serializable {
+      return components[i].reason
+    }
+  }
+  history_serialization_reason_none()
+}
+
+///|
+/// Returns true when every component report is serializable.
+fn world_history_component_reports_serializable(
+  components : Array[WorldHistorySerializationComponentReport],
+) -> Bool {
+  for i = 0; i < components.length(); i = i + 1 {
+    if !components[i].serializable {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Builds a serialization report for a logical delta that does not depend on user component identity.
+fn world_history_serializable_delta_report(
+  delta : WorldDelta,
+  entity : EntityId?,
+  component : ComponentTypeId?,
+  component_count : Int,
+) -> WorldHistorySerializationDeltaReport {
+  {
+    kind: world_delta_summary_kind(delta),
+    entity,
+    component,
+    component_count,
+    serializable: true,
+    reason: history_serialization_reason_none(),
+    payload_bytes: world_delta_payload_bytes(delta),
+    components: [],
+  }
+}
+
+///|
+/// Builds a serialization report for a generic component delta.
+fn world_history_component_delta_serialization_report(
+  world : World,
+  delta : WorldDelta,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> WorldHistorySerializationDeltaReport {
+  let component_report = world_history_component_serialization_report(
+    world, component,
+  )
+  let components = [component_report]
+  let serializable = component_report.serializable
+  {
+    kind: world_delta_summary_kind(delta),
+    entity: Some(entity),
+    component: Some(component),
+    component_count: 0,
+    serializable,
+    reason: if serializable {
+      history_serialization_reason_none()
+    } else {
+      component_report.reason
+    },
+    payload_bytes: world_delta_payload_bytes(delta),
+    components,
+  }
+}
+
+///|
+/// Builds a serialization report for one delta.
+fn world_delta_serialization_report(
+  world : World,
+  delta : WorldDelta,
+) -> WorldHistorySerializationDeltaReport {
+  match delta {
+    EntityCreated(entity) =>
+      world_history_serializable_delta_report(delta, Some(entity), None, 0)
+    EntityDestroyed(snapshot) => {
+      let components : Array[WorldHistorySerializationComponentReport] = []
+      for i = 0; i < snapshot.components.length(); i = i + 1 {
+        components.push(
+          world_history_component_serialization_report(
+            world,
+            snapshot.components[i].component,
+          ),
+        )
+      }
+      let serializable = world_history_component_reports_serializable(
+        components,
+      )
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(snapshot.entity),
+        component: None,
+        component_count: snapshot.components.length(),
+        serializable,
+        reason: if serializable {
+          history_serialization_reason_none()
+        } else {
+          world_history_component_reports_reason(components)
+        },
+        payload_bytes: world_delta_payload_bytes(delta),
+        components,
+      }
+    }
+    ComponentAdded(entity, component, _) =>
+      world_history_component_delta_serialization_report(
+        world, delta, entity, component,
+      )
+    ComponentRemoved(entity, component, _) =>
+      world_history_component_delta_serialization_report(
+        world, delta, entity, component,
+      )
+    ComponentChanged(entity, component, _, _) =>
+      world_history_component_delta_serialization_report(
+        world, delta, entity, component,
+      )
+    GlobalTransformChanged(entity, _, _) =>
+      world_history_serializable_delta_report(delta, Some(entity), None, 0)
+    CameraChanged(entity, _, _) =>
+      world_history_serializable_delta_report(delta, Some(entity), None, 0)
+  }
+}
+
+///|
+/// Returns the first non-serializable delta report reason, or `none`.
+fn world_history_delta_reports_reason(
+  deltas : Array[WorldHistorySerializationDeltaReport],
+) -> String {
+  for i = 0; i < deltas.length(); i = i + 1 {
+    if !deltas[i].serializable {
+      return deltas[i].reason
+    }
+  }
+  history_serialization_reason_none()
+}
+
+///|
+/// Returns true when every delta report is serializable.
+fn world_history_delta_reports_serializable(
+  deltas : Array[WorldHistorySerializationDeltaReport],
+) -> Bool {
+  for i = 0; i < deltas.length(); i = i + 1 {
+    if !deltas[i].serializable {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Builds a serialization eligibility report for one history record.
+fn world_history_record_serialization_report(
+  world : World,
+  record : WorldHistoryRecord,
+) -> WorldHistorySerializationRecordReport {
+  let deltas : Array[WorldHistorySerializationDeltaReport] = []
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    deltas.push(world_delta_serialization_report(world, record.deltas[i]))
+  }
+  let serializable = world_history_delta_reports_serializable(deltas)
+  {
+    label: record.label,
+    serializable,
+    reason: if serializable {
+      history_serialization_reason_none()
+    } else {
+      world_history_delta_reports_reason(deltas)
+    },
+    delta_count: record.deltas.length(),
+    payload_bytes: world_history_record_payload_bytes(record),
+    deltas,
+  }
+}
+
+///|
+/// Returns true when every record report is serializable.
+fn world_history_record_reports_serializable(
+  records : Array[WorldHistorySerializationRecordReport],
+) -> Bool {
+  for i = 0; i < records.length(); i = i + 1 {
+    if !records[i].serializable {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Builds a serialization eligibility report for a stack, next operation first.
+fn world_history_stack_serialization_report_next_first(
+  world : World,
+  stack : Array[WorldHistoryRecord],
+) -> WorldHistorySerializationReport {
+  let records : Array[WorldHistorySerializationRecordReport] = []
+  for i = stack.length() - 1; i >= 0; i = i - 1 {
+    records.push(world_history_record_serialization_report(world, stack[i]))
+  }
+  {
+    serializable: world_history_record_reports_serializable(records),
+    record_count: stack.length(),
+    records,
+  }
 }
 
 ///|
@@ -1543,6 +1883,24 @@ pub fn WorldHistory::redo_summary(
   self : WorldHistory,
 ) -> Array[WorldHistoryRecordSummary] {
   world_history_stack_summary_next_first(self.redo_stack)
+}
+
+///|
+/// Reports whether retained undo records are eligible for future history serialization.
+pub fn WorldHistory::undo_serialization_report(
+  self : WorldHistory,
+  world : World,
+) -> WorldHistorySerializationReport {
+  world_history_stack_serialization_report_next_first(world, self.undo_stack)
+}
+
+///|
+/// Reports whether retained redo records are eligible for future history serialization.
+pub fn WorldHistory::redo_serialization_report(
+  self : WorldHistory,
+  world : World,
+) -> WorldHistorySerializationReport {
+  world_history_stack_serialization_report_next_first(world, self.redo_stack)
 }
 
 ///|

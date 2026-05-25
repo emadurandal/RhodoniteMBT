@@ -68,6 +68,7 @@
 
           <h2>Replay Validation</h2>
           <p>import と replay は runtime undo/redo と同じ防御方針を使います。record 適用前に検証し、stale delta や schema mismatch を reject し、検証失敗時は stack を動かしません。byte budget と record count limit は runtime retention policy であり、archive compatibility policy ではありません。</p>
+          <p><code>undo_serialization_report</code> と <code>redo_serialization_report</code> は retained in-memory stack 向けの dry-run diagnostic です。payload bytes は export せず、file format も定義しません。各 report は全 record / delta を含み、serialization 可能かどうかと、<code>missing_stable_component_identity</code> や <code>unknown_component</code> などの失敗理由を返します。editor は export 実装前でも stable identity metadata が必要な component を表示できます。</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>
