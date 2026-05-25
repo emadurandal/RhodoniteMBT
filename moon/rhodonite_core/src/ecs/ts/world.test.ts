@@ -2776,15 +2776,33 @@ describe("ECS TypeScript wrapper", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
 		const cpu = world.registerCpuComponent("TsHistoryRawGuard", 4);
+		const marker = world.registerCpuComponent("TsHistoryRawGuardMarker", 4);
 		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
 
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 		expect(history.rawMutationGuardEnabled()).toBe(false);
 		history.setRawMutationGuardEnabled(true);
 		expect(history.rawMutationGuardEnabled()).toBe(true);
 		expect(history.beginGuardedTransaction(world, "guarded edit")).toBe(true);
+		expect(() => world.createEntity()).toThrow();
+		expect(() => world.destroyEntity(camera)).toThrow();
+		expect(() => world.registerCpuComponent("TsHistoryRawGuardLate", 4)).toThrow();
+		expect(() => world.addComponent(entity, marker)).toThrow();
+		expect(() =>
+			world.addComponentBytes(entity, marker, new Uint8Array([8, 0, 0, 0])),
+		).toThrow();
 		expect(() =>
 			world.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0])),
+		).toThrow();
+		expect(() =>
+			world.setTransformTrs(entity, 1, 2, 3, 0, 0, 0, 1, 1, 1, 1),
+		).toThrow();
+		expect(() => world.setGlobalTransform(entity, identity)).toThrow();
+		expect(() => world.setGlobalTransformFormat(entity, 1)).toThrow();
+		expect(() =>
+			world.setCameraMatrices(camera, identity, identity, 0.1, 100, 1, 0, 0),
 		).toThrow();
 		expect(() =>
 			world.spawnBatch([cpu], 1, (_index, _entity, row) => {
