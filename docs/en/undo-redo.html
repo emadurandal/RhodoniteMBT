@@ -112,6 +112,25 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Diagnostics</h2>
           <p><code>last_diagnostic</code> reports a stable reason code for the most recent history operation. Normal success resets it to <code>none</code>; failures such as <code>empty_undo_stack</code>, <code>validation_failed</code>, <code>apply_failed_rolled_back</code>, and <code>operation_failed</code> leave a reason for editor UI and tests. Successful operations can also report non-retention outcomes, such as <code>record_dropped_byte_limit</code> when a record exceeds <code>max_undo_bytes</code>.</p>
+          <table>
+            <thead><tr><th>Code</th><th>Typical source</th><th>World / stack effect</th><th>Editor handling</th></tr></thead>
+            <tbody>
+              <tr><td><code>none</code></td><td>Normal success</td><td>Operation completed normally.</td><td>Clear history warnings.</td></tr>
+              <tr><td><code>recording_disabled</code></td><td>History disabled or <code>max_undo_records = 0</code></td><td>Tracked calls may change the world without retaining a record.</td><td>Warn only when the user expected undoability.</td></tr>
+              <tr><td><code>transaction_open</code></td><td>Nested transaction, undo/redo, or import while a transaction is open</td><td>No new stack change.</td><td>Commit or cancel first.</td></tr>
+              <tr><td><code>applying</code></td><td>History mutation attempted during undo/redo apply</td><td>Rejected.</td><td>Treat as an editor flow bug.</td></tr>
+              <tr><td><code>no_open_transaction</code></td><td>Commit or cancel without an open transaction</td><td>No stack change.</td><td>Treat as a tool-state mismatch.</td></tr>
+              <tr><td><code>transaction_empty</code></td><td>Commit with no recorded delta</td><td>No record retained.</td><td>Do not show an error.</td></tr>
+              <tr><td><code>empty_undo_stack</code>, <code>empty_redo_stack</code></td><td>Undo or redo without a matching record</td><td>No world or stack change.</td><td>Disable the command.</td></tr>
+              <tr><td><code>validation_failed</code></td><td>Undo/redo record is stale for the current world</td><td>No world or stack change.</td><td>Show stale-history feedback.</td></tr>
+              <tr><td><code>apply_failed_rolled_back</code></td><td>Apply failed after partial work and rollback succeeded</td><td>World restored; stacks unchanged.</td><td>Show failure; keep the record available.</td></tr>
+              <tr><td><code>apply_failed</code></td><td>Apply failed and rollback failed</td><td>History is cleared.</td><td>Show a stronger warning and refresh editor state.</td></tr>
+              <tr><td><code>operation_failed</code></td><td>A tracked helper's underlying world mutation failed</td><td>Failed delta is not retained.</td><td>Show operation-specific validation feedback.</td></tr>
+              <tr><td><code>record_dropped_byte_limit</code></td><td>A successful record exceeded <code>max_undo_bytes</code></td><td>World changed; record was not retained.</td><td>Warn that this operation is not undoable.</td></tr>
+              <tr><td><code>stack_trimmed_record_limit</code>, <code>stack_trimmed_byte_limit</code>, <code>stack_trimmed_limits</code></td><td>Retention limits trimmed older records</td><td>Newest operation succeeds; older history is dropped.</td><td>Optional non-blocking history-depth notice.</td></tr>
+              <tr><td><code>import_unsupported_format</code>, <code>import_invalid_archive</code>, <code>import_identity_mismatch</code>, <code>import_invalid_payload</code>, <code>import_validation_failed</code></td><td>History archive import</td><td>Failed import leaves world and existing stacks unchanged.</td><td>Show details from the import validation report.</td></tr>
+            </tbody>
+          </table>
           <p><code>undo_summary</code> and <code>redo_summary</code> expose payload-free record summaries for editor UI and debug panels; they are not archive records. The TypeScript wrapper mirrors these as <code>undoSummary()</code> and <code>redoSummary()</code>. Summaries are ordered with the next operation first and include labels, delta kinds, affected entity/component ids, component counts, before/after presence flags, and payload byte counts without exposing retained payload bytes. Builtin changes appear as <code>global_transform_changed</code> and <code>camera_changed</code>; <code>payloadBytes</code> is diagnostic metadata for memory estimates, not the payload itself.</p>
 
           <h2>Labels</h2>

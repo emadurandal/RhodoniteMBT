@@ -112,6 +112,25 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Diagnostics</h2>
           <p><code>last_diagnostic</code> は直近の history operation に対する stable reason code を返します。通常成功時は <code>none</code> に戻り、<code>empty_undo_stack</code>、<code>validation_failed</code>、<code>apply_failed_rolled_back</code>、<code>operation_failed</code> などの失敗時は editor UI や test が原因を確認できます。成功した操作でも、record が <code>max_undo_bytes</code> を超えて保持されなかった場合は <code>record_dropped_byte_limit</code> のような non-retention reason を返します。</p>
+          <table>
+            <thead><tr><th>Code</th><th>Typical source</th><th>World / stack effect</th><th>Editor handling</th></tr></thead>
+            <tbody>
+              <tr><td><code>none</code></td><td>通常成功</td><td>operation は通常通り完了しています。</td><td>history warning を消します。</td></tr>
+              <tr><td><code>recording_disabled</code></td><td>history disabled または <code>max_undo_records = 0</code></td><td>tracked call は world を変更しても record を保持しない場合があります。</td><td>undo 可能であるべき操作だった場合だけ警告します。</td></tr>
+              <tr><td><code>transaction_open</code></td><td>transaction 中の nested transaction、undo/redo、import</td><td>新しい stack 変更はありません。</td><td>先に commit または cancel します。</td></tr>
+              <tr><td><code>applying</code></td><td>undo/redo 適用中の history mutation</td><td>reject されます。</td><td>editor flow のバグとして扱います。</td></tr>
+              <tr><td><code>no_open_transaction</code></td><td>open transaction なしの commit / cancel</td><td>stack 変更はありません。</td><td>tool state の不一致として扱います。</td></tr>
+              <tr><td><code>transaction_empty</code></td><td>delta が記録されていない transaction の commit</td><td>record は保持されません。</td><td>error は表示しません。</td></tr>
+              <tr><td><code>empty_undo_stack</code>、<code>empty_redo_stack</code></td><td>対応する record がない undo / redo</td><td>world と stack は変更されません。</td><td>command を disabled にします。</td></tr>
+              <tr><td><code>validation_failed</code></td><td>undo/redo record が current world に対して stale</td><td>world と stack は変更されません。</td><td>stale history として表示します。</td></tr>
+              <tr><td><code>apply_failed_rolled_back</code></td><td>一部適用後に失敗し、rollback に成功</td><td>world は復元され、stack は変更されません。</td><td>失敗を表示し、record は残します。</td></tr>
+              <tr><td><code>apply_failed</code></td><td>適用失敗後の rollback も失敗</td><td>history は clear されます。</td><td>強い警告を出し、editor state を更新します。</td></tr>
+              <tr><td><code>operation_failed</code></td><td>tracked helper 内の world mutation が失敗</td><td>失敗した delta は保持されません。</td><td>operation 固有の validation feedback を出します。</td></tr>
+              <tr><td><code>record_dropped_byte_limit</code></td><td>成功した record が <code>max_undo_bytes</code> を超過</td><td>world は変更されますが record は保持されません。</td><td>この操作は undo できないと警告します。</td></tr>
+              <tr><td><code>stack_trimmed_record_limit</code>、<code>stack_trimmed_byte_limit</code>、<code>stack_trimmed_limits</code></td><td>retention limit により古い record を trim</td><td>最新操作は成功し、古い history が落ちます。</td><td>必要なら非ブロッキングな history depth notice を出します。</td></tr>
+              <tr><td><code>import_unsupported_format</code>、<code>import_invalid_archive</code>、<code>import_identity_mismatch</code>、<code>import_invalid_payload</code>、<code>import_validation_failed</code></td><td>history archive import</td><td>失敗した import は world と既存 stack を変更しません。</td><td>import validation report の詳細を表示します。</td></tr>
+            </tbody>
+          </table>
           <p><code>undo_summary</code> と <code>redo_summary</code> は editor UI や debug panel 用の payload-free record summary を返します。archive record ではありません。TypeScript wrapper では <code>undoSummary()</code> と <code>redoSummary()</code> として公開します。summary は次に実行される操作を先頭に並べ、label、delta kind、対象 entity/component id、component count、before/after presence flag、payload byte count を返しますが、保持している payload bytes 自体は公開しません。builtin change は <code>global_transform_changed</code> と <code>camera_changed</code> として現れます。<code>payloadBytes</code> は memory estimate 用の diagnostic metadata であり、payload 本体ではありません。</p>
 
           <h2>Labels</h2>

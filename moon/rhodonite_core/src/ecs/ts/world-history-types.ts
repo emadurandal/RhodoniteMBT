@@ -67,6 +67,29 @@ export type HistorySerializationReport = {
 	readonly records: HistorySerializationRecordReport[];
 };
 
+export type HistoryDiagnosticReason =
+	| "none"
+	| "recording_disabled"
+	| "transaction_open"
+	| "applying"
+	| "no_open_transaction"
+	| "transaction_empty"
+	| "empty_undo_stack"
+	| "empty_redo_stack"
+	| "validation_failed"
+	| "apply_failed_rolled_back"
+	| "apply_failed"
+	| "operation_failed"
+	| "record_dropped_byte_limit"
+	| "stack_trimmed_record_limit"
+	| "stack_trimmed_byte_limit"
+	| "stack_trimmed_limits"
+	| "import_unsupported_format"
+	| "import_invalid_archive"
+	| "import_identity_mismatch"
+	| "import_invalid_payload"
+	| "import_validation_failed";
+
 export type HistoryImportValidationReason =
 	| "none"
 	| "transaction_open"

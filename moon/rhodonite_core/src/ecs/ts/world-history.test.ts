@@ -24,6 +24,15 @@ import {
 	it,
 	translationMat4ColMajor,
 } from "./test-support/world-test-support.ts";
+import type { HistoryDiagnosticReason } from "./world-history-types.ts";
+
+function expectLastDiagnostic(
+	history: WorldHistory,
+	expected: HistoryDiagnosticReason,
+): void {
+	const diagnostic: HistoryDiagnosticReason = history.lastDiagnostic();
+	expect(diagnostic).toBe(expected);
+}
 
 describe("ECS TypeScript wrapper: history", () => {
 	it("exposes payload-free undo and redo summaries", () => {
@@ -767,6 +776,111 @@ describe("ECS TypeScript wrapper: history", () => {
 		expect(history.undoLabel()).toBe("set_component_bytes");
 		expect(history.undo(world)).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
+	});
+
+
+	it("exposes stable typed diagnostic reasons", () => {
+		const emptyHistory = WorldHistory.new();
+		const emptyWorld = World.new();
+		expectLastDiagnostic(emptyHistory, "none");
+		expect(emptyHistory.undo(emptyWorld)).toBe(false);
+		expectLastDiagnostic(emptyHistory, "empty_undo_stack");
+		expect(emptyHistory.redo(emptyWorld)).toBe(false);
+		expectLastDiagnostic(emptyHistory, "empty_redo_stack");
+		expect(emptyHistory.commitTransaction()).toBe(false);
+		expectLastDiagnostic(emptyHistory, "no_open_transaction");
+
+		const transactionHistory = WorldHistory.new();
+		expect(transactionHistory.beginTransaction("outer")).toBe(true);
+		expectLastDiagnostic(transactionHistory, "none");
+		expect(transactionHistory.beginTransaction("nested")).toBe(false);
+		expectLastDiagnostic(transactionHistory, "transaction_open");
+		expect(transactionHistory.cancelTransaction()).toBe(true);
+		expectLastDiagnostic(transactionHistory, "none");
+		expect(transactionHistory.beginTransaction("empty")).toBe(true);
+		expect(transactionHistory.commitTransaction()).toBe(true);
+		expectLastDiagnostic(transactionHistory, "transaction_empty");
+
+		const disabledHistory = WorldHistory.new();
+		disabledHistory.setMaxUndoRecords(0);
+		expect(disabledHistory.beginTransaction("disabled")).toBe(false);
+		expectLastDiagnostic(disabledHistory, "recording_disabled");
+
+		const recordLimitWorld = World.new();
+		const recordLimitHistory = WorldHistory.new();
+		const recordLimitCpu = recordLimitWorld.registerCpuComponent(
+			"TsHistoryDiagnosticRecordLimit",
+			4,
+		);
+		const recordLimitEntity = recordLimitWorld.createEntity();
+		expect(
+			recordLimitWorld.addComponentBytes(
+				recordLimitEntity,
+				recordLimitCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		recordLimitHistory.setMaxUndoRecords(1);
+		expect(
+			recordLimitHistory.setComponentBytes(
+				recordLimitWorld,
+				recordLimitEntity,
+				recordLimitCpu,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			recordLimitHistory.setComponentBytes(
+				recordLimitWorld,
+				recordLimitEntity,
+				recordLimitCpu,
+				new Uint8Array([3, 0, 0, 0]),
+			),
+		).toBe(true);
+		expectLastDiagnostic(recordLimitHistory, "stack_trimmed_record_limit");
+
+		const byteLimitWorld = World.new();
+		const byteLimitHistory = WorldHistory.new();
+		const byteLimitCpu = byteLimitWorld.registerCpuComponent(
+			"TsHistoryDiagnosticByteLimit",
+			4,
+		);
+		const byteLimitEntity = byteLimitWorld.createEntity();
+		expect(
+			byteLimitWorld.addComponentBytes(
+				byteLimitEntity,
+				byteLimitCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		byteLimitHistory.setMaxUndoBytes(8);
+		expect(
+			byteLimitHistory.setComponentBytes(
+				byteLimitWorld,
+				byteLimitEntity,
+				byteLimitCpu,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			byteLimitHistory.setComponentBytes(
+				byteLimitWorld,
+				byteLimitEntity,
+				byteLimitCpu,
+				new Uint8Array([3, 0, 0, 0]),
+			),
+		).toBe(true);
+		expectLastDiagnostic(byteLimitHistory, "stack_trimmed_byte_limit");
+		byteLimitHistory.setMaxUndoBytes(4);
+		expect(
+			byteLimitHistory.setComponentBytes(
+				byteLimitWorld,
+				byteLimitEntity,
+				byteLimitCpu,
+				new Uint8Array([4, 0, 0, 0]),
+			),
+		).toBe(true);
+		expectLastDiagnostic(byteLimitHistory, "record_dropped_byte_limit");
 	});
 
 
