@@ -216,6 +216,94 @@ test "WorldHistory compresses repeated component changes inside a transaction" {
 }
 
 ///|
+test "WorldHistory keeps component delta index valid after canceling an earlier delta" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryIndexCancel", 4)
+  let canceled = world.create_entity()
+  let kept = world.create_entity()
+  assert_true(world.add_component_bytes(kept, component, bytes4(1, 0, 0, 0)))
+  assert_true(history.begin_transaction("cancel-index"))
+  assert_true(
+    history.add_component_bytes(world, canceled, component, bytes4(9, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, kept, component, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.remove_component(world, canceled, component))
+  assert_true(
+    history.set_component_bytes(world, kept, component, bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  let summaries = history.undo_summary()
+  assert_eq(summaries.length(), 1)
+  assert_eq(summaries[0].delta_count, 1)
+  assert_eq(history.undo_bytes(), 8)
+  assert_true(!world.has_component(canceled, component))
+  assert_true(
+    world.component_bytes(kept, component) == Some(bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(canceled, component))
+  assert_true(
+    world.component_bytes(kept, component) == Some(bytes4(1, 0, 0, 0)),
+  )
+  assert_true(history.redo(world))
+  assert_true(!world.has_component(canceled, component))
+  assert_true(
+    world.component_bytes(kept, component) == Some(bytes4(3, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory records many distinct component changes in one transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryManyDistinct", 4)
+  let entities : Array[EntityId] = []
+  let count = 128
+  for i = 0; i < count; i = i + 1 {
+    let entity = world.create_entity()
+    assert_true(
+      world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)),
+    )
+    entities.push(entity)
+  }
+  assert_true(history.begin_transaction("many-distinct"))
+  for i = 0; i < entities.length(); i = i + 1 {
+    assert_true(
+      history.set_component_bytes(
+        world,
+        entities[i],
+        component,
+        bytes4((i + 2).to_byte(), 0, 0, 0),
+      ),
+    )
+  }
+  assert_true(history.commit_transaction())
+  let summaries = history.undo_summary()
+  assert_eq(summaries.length(), 1)
+  assert_eq(summaries[0].delta_count, count)
+  assert_eq(history.undo_bytes(), count * 8)
+  assert_true(history.undo(world))
+  assert_true(
+    world.component_bytes(entities[0], component) == Some(bytes4(1, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[count - 1], component) ==
+    Some(bytes4(1, 0, 0, 0)),
+  )
+  assert_true(history.redo(world))
+  assert_true(
+    world.component_bytes(entities[0], component) == Some(bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[count - 1], component) ==
+    Some(bytes4((count + 1).to_byte(), 0, 0, 0)),
+  )
+}
+
+///|
 test "WorldHistory undoes and redoes bulk component byte changes" {
   let world = World::new()
   let history = WorldHistory::new()
