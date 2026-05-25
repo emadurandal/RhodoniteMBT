@@ -101,6 +101,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 			addOrbitCameraControllerWithPose(world, camera, orbit, 0.25, 0.42, 1, -2, 1.5, 12),
 		).toBe(true);
 		expect(setCameraLensOrthographic(world, camera, lens, 0.1, 80, 16 / 9, 3.8, 0)).toBe(true);
+		expect(world.setGlobalTransform(camera, IDENTITY_MAT4)).toBe(true);
 
 		syncOrbitCameraBlobComponent(world, camera, orbit, lens);
 
@@ -109,6 +110,35 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(writes[0]?.byteOffset()).toBe(0);
 		expect(writes[0]?.bytes().length).toBe(72 * 4);
 		expect(writes[0]?.bytes().getF32(0)).not.toBeCloseTo(1);
+	});
+
+	it("syncs tracked orbit camera blob from current GlobalTransform", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = registerOrbitCameraControllerComponent(world);
+		const lens = registerCameraLensComponent(world);
+
+		expect(addOrbitCameraControllerWithDistance(world, camera, orbit, 0, 0, 16)).toBe(true);
+		expect(setCameraLensOrthographic(world, camera, lens, 0.1, 80, 1, 2, 0)).toBe(true);
+		expect(world.setGlobalTransform(camera, IDENTITY_MAT4)).toBe(true);
+		expect(
+			updateOrbitCameraControllerComponentFromMouseFrame(world, camera, {
+				leftDown: true,
+				leftPressed: false,
+				middleDown: false,
+				middlePressed: false,
+				pointerDeltaX: 100,
+				pointerDeltaY: 0,
+				wheelDeltaY: 0,
+			}),
+		).toBe(true);
+
+		syncOrbitCameraBlobComponentTracked(history, world, camera, orbit, lens);
+
+		const writes = world.drainCameraBlobWriteViews();
+		expect(writes).toHaveLength(1);
+		expect(writes[0]?.bytes().getF32(0)).toBeCloseTo(0.5);
 	});
 
 	it("sets up an orbit orthographic camera from a pitched Y/Z position", () => {

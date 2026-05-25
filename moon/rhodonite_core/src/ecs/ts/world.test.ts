@@ -275,6 +275,9 @@ describe("ECS TypeScript wrapper", () => {
 		expect(entity).toBeDefined();
 
 		world.updateGlobalTransformsFromTransforms();
+		expect(Array.from(world.getGlobalTransform(entity!) ?? [])).toEqual(
+			identityMat4ColMajor(),
+		);
 		const writes = world.drainGlobalTransformBlobWriteViews();
 		expect(writes.length).toBeGreaterThan(0);
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);

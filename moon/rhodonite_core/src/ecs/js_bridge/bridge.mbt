@@ -297,6 +297,18 @@ pub fn world_set_global_transform_col_major(
 }
 
 ///|
+/// Implements `world_get_global_transform_col_major`.
+pub fn world_get_global_transform_col_major(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+) -> FixedArray[Float]? {
+  match world.get_global_transform(entity) {
+    Some(matrix) => Some(matrix.data())
+    None => None
+  }
+}
+
+///|
 /// Implements `world_set_camera_matrices_col_major`.
 pub fn world_set_camera_matrices_col_major(
   world : @ecs.World,

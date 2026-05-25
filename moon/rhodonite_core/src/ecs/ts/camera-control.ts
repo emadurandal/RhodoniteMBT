@@ -1175,11 +1175,11 @@ export function syncOrbitCameraBlobComponent(
 		lensComponent,
 		"syncOrbitCameraBlobComponent",
 	);
-	const q = quatMul(quatY(-pose.yaw), quatX(-pose.pitch));
-	const [dx, dy, dz] = quatRotateVec3(q, -pose.panX, -pose.panY, 0);
-	const view = mat4Inverse(
-		localMatrixFromTrs(dx, dy, dz + pose.distance, q[0], q[1], q[2], q[3], 1, 1, 1),
-	);
+	const global = world.getGlobalTransform(camera);
+	if (global === null) {
+		throw new Error("Camera is missing GlobalTransform.");
+	}
+	const view = mat4Inverse(global);
 	if (view === null) {
 		throw new Error("Failed to invert Camera GlobalTransform.");
 	}
@@ -1224,11 +1224,11 @@ export function syncOrbitCameraBlobComponentTracked(
 		lensComponent,
 		"syncOrbitCameraBlobComponentTracked",
 	);
-	const q = quatMul(quatY(-pose.yaw), quatX(-pose.pitch));
-	const [dx, dy, dz] = quatRotateVec3(q, -pose.panX, -pose.panY, 0);
-	const view = mat4Inverse(
-		localMatrixFromTrs(dx, dy, dz + pose.distance, q[0], q[1], q[2], q[3], 1, 1, 1),
-	);
+	const global = world.getGlobalTransform(camera);
+	if (global === null) {
+		throw new Error("Camera is missing GlobalTransform.");
+	}
+	const view = mat4Inverse(global);
 	if (view === null) {
 		throw new Error("Failed to invert Camera GlobalTransform.");
 	}

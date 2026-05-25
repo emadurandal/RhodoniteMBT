@@ -43,6 +43,7 @@ import {
 	world_set_camera_matrices_col_major,
 	world_set_child_of,
 	world_set_component_bytes,
+	world_get_global_transform_col_major,
 	world_set_global_transform_col_major,
 	world_set_global_transform_format,
 	world_set_transform_trs,
@@ -365,6 +366,16 @@ export class World {
 				Array.from(matrixColMajor),
 			),
 		);
+	}
+
+	getGlobalTransform(entity: EntityId): Float32Array | null {
+		const data = world_get_global_transform_col_major(this.inner, entity.inner);
+		if (data === undefined || data === null) {
+			return null;
+		}
+		return data instanceof Float32Array
+			? new Float32Array(data)
+			: Float32Array.from(data);
 	}
 
 	setCameraMatrices(
