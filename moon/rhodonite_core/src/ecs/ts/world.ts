@@ -58,6 +58,7 @@ import {
 	world_write_global_transforms_dense_range_views,
 	world_history_add_component,
 	world_history_add_component_bytes,
+	world_history_add_component_bytes_many,
 	world_history_begin_guarded_transaction,
 	world_history_begin_transaction,
 	world_history_can_redo,
@@ -65,6 +66,7 @@ import {
 	world_history_cancel_transaction,
 	world_history_clear,
 	world_history_commit_transaction,
+	world_history_create_entities,
 	world_history_create_entity,
 	world_history_destroy_entity,
 	world_history_enabled,
@@ -576,6 +578,12 @@ export class WorldHistory {
 		return new EntityId(world_history_create_entity(this.inner, world.inner));
 	}
 
+	createEntities(world: World, count: number): EntityId[] {
+		return world_history_create_entities(this.inner, world.inner, count).map(
+			(entity) => new EntityId(entity),
+		);
+	}
+
 	destroyEntity(world: World, entity: EntityId): boolean {
 		return moonBool(
 			world_history_destroy_entity(this.inner, world.inner, entity.inner),
@@ -610,6 +618,23 @@ export class WorldHistory {
 				entity.inner,
 				component.inner,
 				bytesInput(bytes),
+			),
+		);
+	}
+
+	addComponentBytesMany(
+		world: World,
+		component: ComponentTypeId,
+		entities: EntityId[],
+		bytesList: Array<Uint8Array | ArrayLike<number>>,
+	): boolean {
+		return moonBool(
+			world_history_add_component_bytes_many(
+				this.inner,
+				world.inner,
+				component.inner,
+				entities.map((entity) => entity.inner),
+				bytesList.map((bytes) => bytesInput(bytes)),
 			),
 		);
 	}

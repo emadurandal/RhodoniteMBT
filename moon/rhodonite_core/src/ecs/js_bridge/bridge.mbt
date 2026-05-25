@@ -626,6 +626,16 @@ pub fn world_history_create_entity(
 }
 
 ///|
+/// Implements `world_history_create_entities`.
+pub fn world_history_create_entities(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  count : Int,
+) -> Array[@ecs.EntityId] {
+  history.create_entities(world, count)
+}
+
+///|
 /// Implements `world_history_destroy_entity`.
 pub fn world_history_destroy_entity(
   history : @ecs.WorldHistory,
@@ -656,6 +666,18 @@ pub fn world_history_add_component_bytes(
   bytes : FixedArray[Byte],
 ) -> Bool {
   history.add_component_bytes(world, entity, component, bytes)
+}
+
+///|
+/// Implements `world_history_add_component_bytes_many`.
+pub fn world_history_add_component_bytes_many(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  component : @ecs.ComponentTypeId,
+  entities : Array[@ecs.EntityId],
+  bytes_list : Array[FixedArray[Byte]],
+) -> Bool {
+  history.add_component_bytes_many(world, component, entities, bytes_list)
 }
 
 ///|

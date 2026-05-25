@@ -1454,6 +1454,47 @@ pub fn WorldHistory::create_entity(
 }
 
 ///|
+/// Creates many entities and records the creations as one history operation.
+pub fn WorldHistory::create_entities(
+  self : WorldHistory,
+  world : World,
+  count : Int,
+) -> Array[EntityId] {
+  if count < 0 {
+    abort("WorldHistory::create_entities: count must be non-negative")
+  }
+  let entities : Array[EntityId] = []
+  if count == 0 {
+    self.clear_diagnostic()
+    return entities
+  }
+  if !self.recording_enabled() || self.applying {
+    for i = 0; i < count; i = i + 1 {
+      entities.push(world.create_entity())
+    }
+    self.set_diagnostic(
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return entities
+  }
+  let auto = self.begin_auto("create_entities")
+  self.begin_tracked_world_mutation(world)
+  for i = 0; i < count; i = i + 1 {
+    entities.push(world.create_entity())
+  }
+  self.end_tracked_world_mutation(world)
+  for i = 0; i < entities.length(); i = i + 1 {
+    self.record_entity_created(entities[i])
+  }
+  self.finish_auto(auto, true)
+  entities
+}
+
+///|
 /// Destroys an entity and records a restorable snapshot.
 pub fn WorldHistory::destroy_entity(
   self : WorldHistory,
@@ -1568,6 +1609,19 @@ pub fn WorldHistory::add_component_bytes(
 }
 
 ///|
+/// Returns whether an entity id appears more than once.
+fn entity_array_has_duplicates(entities : Array[EntityId]) -> Bool {
+  for i = 0; i < entities.length(); i = i + 1 {
+    for j = i + 1; j < entities.length(); j = j + 1 {
+      if entities[i] == entities[j] {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
 /// Sets a component payload through the history layer.
 pub fn WorldHistory::set_component_bytes(
   self : WorldHistory,
@@ -1606,6 +1660,76 @@ pub fn WorldHistory::set_component_bytes(
       Some(after) =>
         self.push_delta(ComponentChanged(entity, component, before, after))
       None => ()
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
+/// Adds one component payload to many entities as one atomic history operation.
+pub fn WorldHistory::add_component_bytes_many(
+  self : WorldHistory,
+  world : World,
+  component : ComponentTypeId,
+  entities : Array[EntityId],
+  bytes_list : Array[FixedArray[Byte]],
+) -> Bool {
+  if entities.length() != bytes_list.length() {
+    abort(
+      "WorldHistory::add_component_bytes_many: entities and bytes_list length mismatch",
+    )
+  }
+  if !self.recording_enabled() || self.applying {
+    let mut ok = true
+    for i = 0; i < entities.length(); i = i + 1 {
+      if !world.add_component_bytes(entities[i], component, bytes_list[i]) {
+        ok = false
+      }
+    }
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
+  }
+  if entity_array_has_duplicates(entities) {
+    self.set_diagnostic("operation_failed")
+    return false
+  }
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !world.is_alive(entities[i]) ||
+      world.has_component(entities[i], component) ||
+      !world.history_component_stride_matches(component, bytes_list[i]) {
+      self.set_diagnostic("operation_failed")
+      return false
+    }
+  }
+  let auto = self.begin_auto("add_component_bytes_many")
+  self.begin_tracked_world_mutation(world)
+  let mut ok = true
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !world.add_component_bytes(entities[i], component, bytes_list[i]) {
+      ok = false
+    }
+  }
+  self.end_tracked_world_mutation(world)
+  if ok {
+    let after_list : Array[FixedArray[Byte]] = []
+    for i = 0; i < entities.length(); i = i + 1 {
+      match world.component_bytes(entities[i], component) {
+        Some(after) => after_list.push(after)
+        None => ok = false
+      }
+    }
+    if ok {
+      for i = 0; i < entities.length(); i = i + 1 {
+        self.push_delta(ComponentAdded(entities[i], component, after_list[i]))
+      }
     }
   }
   self.finish_auto(auto, ok)

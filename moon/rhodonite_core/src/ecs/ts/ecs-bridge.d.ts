@@ -271,6 +271,11 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		history: MoonWorldHistory,
 		world: MoonWorld,
 	): MoonEntityId;
+	export function world_history_create_entities(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		count: number,
+	): MoonEntityId[];
 	export function world_history_destroy_entity(
 		history: MoonWorldHistory,
 		world: MoonWorld,
@@ -288,6 +293,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		entity: MoonEntityId,
 		component: MoonComponentTypeId,
 		bytes: Uint8Array | number[],
+	): MoonBool;
+	export function world_history_add_component_bytes_many(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		component: MoonComponentTypeId,
+		entities: MoonEntityId[],
+		bytesList: Array<Uint8Array | number[]>,
 	): MoonBool;
 	export function world_history_set_component_bytes(
 		history: MoonWorldHistory,
