@@ -405,6 +405,42 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([5, 6, 7, 8]));
 	});
 
+	it("tracks batch entity creation and component adds through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryBatchAuthoringCpu", 4);
+		const entities = history.createEntities(world, 2);
+
+		expect(entities).toHaveLength(2);
+		expect(world.isAlive(entities[0])).toBe(true);
+		expect(world.isAlive(entities[1])).toBe(true);
+		expect(
+			history.addComponentBytesMany(
+				world,
+				cpu,
+				entities,
+				[new Uint8Array([1, 0, 0, 0]), new Uint8Array([2, 0, 0, 0])],
+			),
+		).toBe(true);
+		expect(history.undoLabel()).toBe("add_component_bytes_many");
+		expect(world.componentBytesCopy(entities[0], cpu)).toEqual(new Uint8Array([1, 0, 0, 0]));
+		expect(world.componentBytesCopy(entities[1], cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(entities[0], cpu)).toBe(false);
+		expect(world.hasComponent(entities[1], cpu)).toBe(false);
+		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(entities[0])).toBe(false);
+		expect(world.isAlive(entities[1])).toBe(false);
+
+		expect(history.redo(world)).toBe(true);
+		expect(world.isAlive(entities[0])).toBe(true);
+		expect(world.isAlive(entities[1])).toBe(true);
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entities[0], cpu)).toEqual(new Uint8Array([1, 0, 0, 0]));
+		expect(world.componentBytesCopy(entities[1], cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+	});
+
 	it("tracks bulk component byte changes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -443,12 +479,62 @@ describe("ECS TypeScript wrapper", () => {
 		).toBe(false);
 		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(world.componentBytesCopy(missing, cpu)).toBeNull();
+		expect(
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[e0, e0],
+				[new Uint8Array([7, 0, 0, 0]), new Uint8Array([8, 0, 0, 0])],
+			),
+		).toBe(false);
+		expect(history.lastDiagnostic()).toBe("operation_failed");
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(() =>
 			history.setComponentBytesMany(
 				world,
 				cpu,
 				[e0],
 				[new Uint8Array([7, 0, 0, 0]), new Uint8Array([8, 0, 0, 0])],
+			),
+		).toThrow();
+	});
+
+	it("rejects invalid bulk component adds through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryBulkAddInvalidCpu", 4);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+
+		expect(world.addComponentBytes(e1, cpu, new Uint8Array([9, 0, 0, 0]))).toBe(true);
+		expect(
+			history.addComponentBytesMany(
+				world,
+				cpu,
+				[e0, e1],
+				[new Uint8Array([1, 0, 0, 0]), new Uint8Array([2, 0, 0, 0])],
+			),
+		).toBe(false);
+		expect(history.lastDiagnostic()).toBe("operation_failed");
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(e0, cpu)).toBe(false);
+		expect(world.componentBytesCopy(e1, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
+
+		expect(
+			history.addComponentBytesMany(
+				world,
+				cpu,
+				[e0, e0],
+				[new Uint8Array([1, 0, 0, 0]), new Uint8Array([2, 0, 0, 0])],
+			),
+		).toBe(false);
+		expect(world.hasComponent(e0, cpu)).toBe(false);
+		expect(() =>
+			history.addComponentBytesMany(
+				world,
+				cpu,
+				[e0],
+				[new Uint8Array([1, 0, 0, 0]), new Uint8Array([2, 0, 0, 0])],
 			),
 		).toThrow();
 	});

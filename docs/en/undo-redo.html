@@ -47,8 +47,9 @@ ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes; generic Camera component byte writes remain untracked because the row only stores a blob reference.</p>
 
-          <h2>Bulk Component Updates</h2>
-          <p>Use <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update the same component on many entities. It validates every target first; if any entity is missing the component or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes this as <code>WorldHistory.setComponentBytesMany(world, component, entities, bytesList)</code>.</p>
+          <h2>Batch Authoring Helpers</h2>
+          <p>Use <code>WorldHistory::create_entities</code> when an editor or importer creates many entities as one undoable operation. Use <code>WorldHistory::add_component_bytes_many</code> for adding the same component type to many entities, and <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update an existing component on many entities.</p>
+          <p>The bulk component helpers validate every target first; if any entity is invalid, duplicated, already has the added component, is missing the changed component, or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes these as <code>WorldHistory.createEntities</code>, <code>WorldHistory.addComponentBytesMany</code>, and <code>WorldHistory.setComponentBytesMany</code>.</p>
 
           <h2>Enabled State</h2>
           <ul>

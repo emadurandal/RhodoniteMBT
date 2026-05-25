@@ -17,6 +17,29 @@ test "WorldHistory undoes and redoes entity creation with the same id" {
 }
 
 ///|
+test "WorldHistory undoes and redoes batch entity creation with the same ids" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entities = history.create_entities(world, 3)
+  assert_eq(entities.length(), 3)
+  assert_true(world.is_alive(entities[0]))
+  assert_true(world.is_alive(entities[1]))
+  assert_true(world.is_alive(entities[2]))
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(entities[0]))
+  assert_true(!world.is_alive(entities[1]))
+  assert_true(!world.is_alive(entities[2]))
+  assert_true(history.redo(world))
+  assert_true(world.is_alive(entities[0]))
+  assert_true(world.is_alive(entities[1]))
+  assert_true(world.is_alive(entities[2]))
+  assert_eq(entities[0].generation, 0)
+  assert_eq(entities[1].generation, 0)
+  assert_eq(entities[2].generation, 0)
+}
+
+///|
 test "WorldHistory restores destroyed entity id generation and component bytes" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -219,6 +242,65 @@ test "WorldHistory undoes and redoes bulk component byte changes" {
 }
 
 ///|
+test "WorldHistory undoes and redoes bulk component byte adds" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkAdd", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(
+    history.add_component_bytes_many(world, component, [e0, e1], [
+      bytes4(1, 0, 0, 0),
+      bytes4(2, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(e0, component))
+  assert_true(!world.has_component(e1, component))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, component) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory groups batch create and bulk add in one open transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBatchAuthoringGroup", 4)
+  assert_true(history.begin_transaction("batch author"))
+  let entities = history.create_entities(world, 2)
+  assert_true(
+    history.add_component_bytes_many(world, component, entities, [
+      bytes4(3, 0, 0, 0),
+      bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(
+    world.component_bytes(entities[0], component) == Some(bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[1], component) == Some(bytes4(4, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(entities[0]))
+  assert_true(!world.is_alive(entities[1]))
+  assert_true(history.redo(world))
+  assert_true(world.is_alive(entities[0]))
+  assert_true(world.is_alive(entities[1]))
+  assert_true(
+    world.component_bytes(entities[0], component) == Some(bytes4(3, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[1], component) == Some(bytes4(4, 0, 0, 0)),
+  )
+}
+
+///|
 test "WorldHistory bulk redo uses stored world bytes not caller buffers" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -296,6 +378,54 @@ test "WorldHistory bulk component byte changes are atomic on invalid target" {
 }
 
 ///|
+test "WorldHistory bulk component byte changes reject duplicate entities" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkSetDuplicate", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    !history.set_component_bytes_many(world, component, [entity, entity], [
+      bytes4(2, 0, 0, 0),
+      bytes4(3, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(1, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory bulk component byte adds are atomic on invalid target" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkAddAtomic", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, component, bytes4(9, 0, 0, 0)))
+  assert_true(
+    !history.add_component_bytes_many(world, component, [e0, e1], [
+      bytes4(1, 0, 0, 0),
+      bytes4(2, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_true(!world.has_component(e0, component))
+  assert_true(world.component_bytes(e1, component) == Some(bytes4(9, 0, 0, 0)))
+  assert_true(
+    !history.add_component_bytes_many(world, component, [e0, e0], [
+      bytes4(1, 0, 0, 0),
+      bytes4(2, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(!world.has_component(e0, component))
+}
+
+///|
 test "WorldHistory zero max undo records bulk changes without recording" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -314,6 +444,29 @@ test "WorldHistory zero max undo records bulk changes without recording" {
   assert_eq(history.undo_len(), 0)
   assert_true(world.component_bytes(e0, component) == Some(bytes4(3, 0, 0, 0)))
   assert_true(world.component_bytes(e1, component) == Some(bytes4(4, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory zero max undo records batch adds without recording" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkAddZeroLimit", 4)
+  history.set_max_undo_records(0)
+  let entities = history.create_entities(world, 2)
+  assert_eq(history.undo_len(), 0)
+  assert_true(
+    history.add_component_bytes_many(world, component, entities, [
+      bytes4(1, 0, 0, 0),
+      bytes4(2, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(
+    world.component_bytes(entities[0], component) == Some(bytes4(1, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[1], component) == Some(bytes4(2, 0, 0, 0)),
+  )
 }
 
 ///|

@@ -47,8 +47,9 @@ ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。generic な Camera component byte write は row が blob ref だけを持つため untracked のままです。</p>
 
-          <h2>Bulk Component Updates</h2>
-          <p>selection や query から得た複数 entity の同一 component をまとめて更新する場合は <code>WorldHistory::set_component_bytes_many</code> を使います。全 target を先に検証し、component を持たない entity や payload size の不一致が 1 件でもあれば何も変更せず <code>false</code> を返します。TypeScript wrapper では <code>WorldHistory.setComponentBytesMany(world, component, entities, bytesList)</code> として公開します。</p>
+          <h2>Batch Authoring Helpers</h2>
+          <p>editor や importer が複数 entity を 1 つの undoable operation として作る場合は <code>WorldHistory::create_entities</code> を使います。複数 entity に同じ component type を追加する場合は <code>WorldHistory::add_component_bytes_many</code>、selection や query 由来の既存 component 更新には <code>WorldHistory::set_component_bytes_many</code> を使います。</p>
+          <p>bulk component helper は全 target を先に検証します。invalid entity、重複 entity、追加対象 component を既に持つ entity、更新対象 component を持たない entity、payload size の不一致が 1 件でもあれば何も変更せず <code>false</code> を返します。TypeScript wrapper では <code>WorldHistory.createEntities</code>、<code>WorldHistory.addComponentBytesMany</code>、<code>WorldHistory.setComponentBytesMany</code> として公開します。</p>
 
           <h2>Enabled State</h2>
           <ul>
