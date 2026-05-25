@@ -158,6 +158,186 @@ test "WorldHistory tracks CommandBuffer component writes through system phase" {
 }
 
 ///|
+test "CommandBuffer applies queued builtin blob writes after system phase" {
+  let world = World::new()
+  let gt = world.global_transform_component()
+  let camera_component = world.camera_component()
+  let entity = world.create_entity()
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let _ = world.drain_global_transform_blob_write_views()
+  let _ = world.drain_camera_blob_write_views()
+  let matrix = @m44.Matrix44::translation(
+    (4.0 : Float),
+    (5.0 : Float),
+    (6.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new(
+      "command-buffer-builtin-blob",
+      update_phase(),
+      [],
+      [gt, camera_component],
+      (_w, _ctx, commands) => {
+        commands.set_global_transform(entity, matrix)
+        commands.set_global_transform_format(entity, Affine3x4F16)
+        commands.set_camera_matrices(
+          camera,
+          @m44.Matrix44F::identity(),
+          @m44.Matrix44F::identity(),
+          (0.25 : Float),
+          (50.0 : Float),
+          (1.5 : Float),
+          (0.0 : Float),
+          (2.0 : Float),
+        )
+      },
+    ),
+  )
+  assert_true(
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+    ),
+  )
+  match world.get_global_transform(entity) {
+    Some(read) => {
+      assert_eq(read.at(0, 3), (4.0 : Float))
+      assert_eq(read.at(1, 3), (5.0 : Float))
+      assert_eq(read.at(2, 3), (6.0 : Float))
+    }
+    None => abort("expected command GlobalTransform")
+  }
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F16)
+  match world.camera_gpu_row(camera) {
+    Some(bytes) =>
+      assert_eq(
+        @comp.get_gpu_f32_byte_view(bytes[0:bytes.length()], 268),
+        (0.25 : Float),
+      )
+    None => abort("expected command Camera row")
+  }
+}
+
+///|
+test "WorldHistory tracks CommandBuffer builtin blob writes through system phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let gt = world.global_transform_component()
+  let camera_component = world.camera_component()
+  let entity = world.create_entity()
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let _ = world.drain_global_transform_blob_write_views()
+  let _ = world.drain_camera_blob_write_views()
+  let matrix = @m44.Matrix44::translation(
+    (7.0 : Float),
+    (8.0 : Float),
+    (9.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new(
+      "history-command-builtin-blob",
+      update_phase(),
+      [],
+      [gt, camera_component],
+      (_w, _ctx, commands) => {
+        commands.set_global_transform(entity, matrix)
+        commands.set_global_transform_format(entity, Affine3x4F16)
+        commands.set_camera_matrices(
+          camera,
+          @m44.Matrix44F::identity(),
+          @m44.Matrix44F::identity(),
+          (0.3 : Float),
+          (60.0 : Float),
+          (2.0 : Float),
+          (0.0 : Float),
+          (3.0 : Float),
+        )
+      },
+    ),
+  )
+  assert_true(
+    history.run_system_phase(
+      runner,
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+      "Command Builtins",
+    ),
+  )
+  assert_true(history.undo_label() == Some("Command Builtins"))
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F16)
+  match world.camera_gpu_row(camera) {
+    Some(bytes) =>
+      assert_eq(
+        @comp.get_gpu_f32_byte_view(bytes[0:bytes.length()], 268),
+        (0.3 : Float),
+      )
+    None => abort("expected tracked Camera row")
+  }
+  assert_true(history.undo(world))
+  let refs_undo = world.extract_global_transform_refs([entity])
+  let (format_undo, _) = @comp.global_transform_ref_from_component_view(
+    refs_undo[0:8],
+  )
+  assert_true(format_undo == Affine3x4F32)
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, @m44.Matrix44F::identity())
+    None => abort("expected undone GlobalTransform")
+  }
+  match world.camera_gpu_row(camera) {
+    Some(bytes) =>
+      assert_eq(
+        @comp.get_gpu_f32_byte_view(bytes[0:bytes.length()], 268),
+        (0.1 : Float),
+      )
+    None => abort("expected undone Camera row")
+  }
+  assert_true(history.redo(world))
+  let refs_redo = world.extract_global_transform_refs([entity])
+  let (format_redo, _) = @comp.global_transform_ref_from_component_view(
+    refs_redo[0:8],
+  )
+  assert_true(format_redo == Affine3x4F16)
+}
+
+///|
 test "WorldHistory tracks CommandBuffer create with reserved entity id" {
   let world = World::new()
   let history = WorldHistory::new()

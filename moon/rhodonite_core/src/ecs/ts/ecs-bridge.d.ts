@@ -527,6 +527,27 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		component: MoonComponentTypeId,
 		bytes: Uint8Array | number[],
 	): void;
+	export function command_buffer_set_global_transform_col_major(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		matrixColMajor: number[],
+	): void;
+	export function command_buffer_set_global_transform_format(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		formatCode: number,
+	): void;
+	export function command_buffer_set_camera_matrices_col_major(
+		commands: MoonCommandBuffer,
+		entity: MoonEntityId,
+		viewColMajor: number[],
+		projColMajor: number[],
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): void;
 	export function command_buffer_remove_component(
 		commands: MoonCommandBuffer,
 		entity: MoonEntityId,

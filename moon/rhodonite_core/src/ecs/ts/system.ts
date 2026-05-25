@@ -16,7 +16,10 @@ import {
 	command_buffer_is_empty,
 	command_buffer_len,
 	command_buffer_remove_component,
+	command_buffer_set_camera_matrices_col_major,
 	command_buffer_set_component_bytes,
+	command_buffer_set_global_transform_col_major,
+	command_buffer_set_global_transform_format,
 	phase_key_name,
 	phase_key_new,
 	system_conflicts_with,
@@ -127,6 +130,45 @@ export class CommandBuffer {
 			entity.inner,
 			component.inner,
 			bytesInput(bytes),
+		);
+	}
+
+	setGlobalTransform(entity: EntityId, matrixColMajor: ArrayLike<number>): void {
+		command_buffer_set_global_transform_col_major(
+			this.inner,
+			entity.inner,
+			Array.from(matrixColMajor),
+		);
+	}
+
+	setGlobalTransformFormat(entity: EntityId, formatCode: 0 | 1): void {
+		command_buffer_set_global_transform_format(
+			this.inner,
+			entity.inner,
+			formatCode,
+		);
+	}
+
+	setCameraMatrices(
+		entity: EntityId,
+		viewColMajor: ArrayLike<number>,
+		projColMajor: ArrayLike<number>,
+		near: number,
+		far: number,
+		aspect: number,
+		projectionKind: number,
+		flags: number,
+	): void {
+		command_buffer_set_camera_matrices_col_major(
+			this.inner,
+			entity.inner,
+			Array.from(viewColMajor),
+			Array.from(projColMajor),
+			near,
+			far,
+			aspect,
+			projectionKind,
+			flags,
 		);
 	}
 

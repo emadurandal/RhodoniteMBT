@@ -80,7 +80,10 @@ pub fn CommandBuffer::destroy_entity(Self, EntityId) -> Unit
 pub fn CommandBuffer::is_empty(Self) -> Bool
 pub fn CommandBuffer::len(Self) -> Int
 pub fn CommandBuffer::remove_component(Self, EntityId, ComponentTypeId) -> Unit
+pub fn CommandBuffer::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Unit
 pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, FixedArray[Byte]) -> Unit
+pub fn CommandBuffer::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Unit
+pub fn CommandBuffer::set_global_transform_format(Self, EntityId, @components.GlobalTransformGpuFormat) -> Unit
 
 pub(all) struct ComponentTypeId {
   index : Int
@@ -328,6 +331,9 @@ pub(all) enum WorldCommand {
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
+  SetGlobalTransform(EntityId, @matrix44.Matrix44[Float])
+  SetGlobalTransformFormat(EntityId, @components.GlobalTransformGpuFormat)
+  SetCameraMatrices(EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float)
 }
 
 pub struct WorldHistory {

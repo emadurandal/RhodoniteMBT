@@ -610,6 +610,150 @@ describe("ECS TypeScript wrapper", () => {
 		);
 	});
 
+	it("applies TS command-buffer builtin blob writes in raw system phases", () => {
+		const world = World.new();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+		expect(world.setGlobalTransform(entity, identity)).toBe(true);
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 10, 1, 1, 0),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		const phase = PhaseKey.new("ts/raw-builtin-commands");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new(
+				"raw-builtin-commands",
+				phase,
+				[],
+				[world.globalTransformComponent(), world.cameraComponent()],
+				(_world, _ctx, commands) => {
+					commands.setGlobalTransform(
+						entity,
+						translationMat4ColMajor(2, 3, 4),
+					);
+					commands.setGlobalTransformFormat(entity, 1);
+					commands.setCameraMatrices(
+						camera,
+						identity,
+						identity,
+						0.25,
+						50,
+						1.5,
+						0,
+						2,
+					);
+				},
+			),
+		);
+
+		expect(runner.runPhase(world, SystemContext.new(0.016, 3), phase)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		const cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+	});
+
+	it("tracks TS command-buffer builtin blob writes through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+		expect(world.setGlobalTransform(entity, identity)).toBe(true);
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 10, 1, 1, 0),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		const phase = PhaseKey.new("ts/tracked-builtin-commands");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new(
+				"tracked-builtin-commands",
+				phase,
+				[],
+				[world.globalTransformComponent(), world.cameraComponent()],
+				(_world, _ctx, commands) => {
+					commands.setGlobalTransform(
+						entity,
+						translationMat4ColMajor(5, 6, 7),
+					);
+					commands.setGlobalTransformFormat(entity, 1);
+					commands.setCameraMatrices(
+						camera,
+						identity,
+						identity,
+						0.3,
+						60,
+						2,
+						0,
+						3,
+					);
+				},
+			),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 4),
+				phase,
+				"tracked TS builtin commands",
+			),
+		).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		let cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.3);
+
+		expect(history.undo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			0,
+		);
+		cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+		expect(history.redo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+	});
+
+	it("requires structural write for command-buffer builtin add paths", () => {
+		const world = World.new();
+		const entity = world.createEntity();
+		const phase = PhaseKey.new("ts/builtin-command-structural");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.new(
+				"builtin-command-missing-component",
+				phase,
+				[],
+				[world.globalTransformComponent()],
+				(_world, _ctx, commands) => {
+					commands.setGlobalTransform(entity, identityMat4ColMajor());
+				},
+			),
+		);
+
+		expect(() =>
+			runner.runPhase(world, SystemContext.new(0.016, 5), phase),
+		).toThrow();
+	});
+
 	it("tracks undo and redo through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
