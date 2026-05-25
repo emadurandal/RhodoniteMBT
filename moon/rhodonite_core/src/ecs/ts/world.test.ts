@@ -975,6 +975,124 @@ describe("ECS TypeScript wrapper", () => {
 		expect(redoReport.records[0]?.label).toBe("TS serialization eligibility");
 	});
 
+	it("exports history stacks when retained components have stable identity", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryExportStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryExportStable",
+				schemaVersion: "1",
+				schemaHash: "sha256:ts-history-export-stable",
+			},
+		);
+		const legacy = world.registerCpuComponent("TsHistoryExportLegacy", 4);
+		const stableEntity = world.createEntity();
+		const legacyEntity = world.createEntity();
+
+		expect(
+			world.addComponentBytes(stableEntity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			world.addComponentBytes(legacyEntity, legacy, new Uint8Array([3, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				stableEntity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+
+		const diagnostic = history.lastDiagnostic();
+		const exported = history.exportUndoStack(world);
+		expect(exported).not.toBeNull();
+		expect(exported?.formatVersion).toBe(1);
+		expect(exported?.recordCount).toBe(1);
+		expect(exported?.records[0]?.label).toBe("set_component_bytes");
+		expect(exported?.records[0]?.deltaCount).toBe(1);
+		const delta = exported?.records[0]?.deltas[0];
+		expect(delta?.kind).toBe("component_changed");
+		expect(delta?.entity?.index()).toBe(stableEntity.index());
+		expect(delta?.component).toMatchObject({
+			key: "com.example.TsHistoryExportStable",
+			builtin: false,
+			schemaVersion: "1",
+			schemaHash: "sha256:ts-history-export-stable",
+		});
+		expect(delta?.component?.localComponent.index()).toBe(stable.index());
+		expect(delta?.before?.globalTransformFormat).toBeNull();
+		expect(delta?.before?.bytes).toBeInstanceOf(Uint8Array);
+		expect(Array.from(delta?.before?.bytes ?? [])).toEqual([1, 0, 0, 0]);
+		expect(Array.from(delta?.after?.bytes ?? [])).toEqual([2, 0, 0, 0]);
+		expect(history.lastDiagnostic()).toBe(diagnostic);
+
+		expect(
+			history.setComponentBytes(
+				world,
+				legacyEntity,
+				legacy,
+				new Uint8Array([4, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(history.exportUndoStack(world)).toBeNull();
+		expect(history.undo(world)).toBe(true);
+		expect(history.exportRedoStack(world)).toBeNull();
+	});
+
+	it("imports history stacks from exported plain objects", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const importedUndo = WorldHistory.new();
+		const importedRedo = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryImportStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryImportStable",
+				schemaVersion: "1",
+			},
+		);
+		const entity = world.createEntity();
+
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		const plainUndoArchive = JSON.parse(JSON.stringify(undoArchive));
+		expect(importedUndo.importUndoStack(world, plainUndoArchive)).toBe(true);
+		expect(importedUndo.undoLen()).toBe(1);
+		expect(importedUndo.undo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		const redoArchive = importedUndo.exportRedoStack(world);
+		expect(redoArchive).not.toBeNull();
+		expect(importedRedo.importRedoStack(world, redoArchive ?? plainUndoArchive)).toBe(
+			true,
+		);
+		expect(importedRedo.redoLen()).toBe(1);
+		expect(importedRedo.redo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		const badFormat = { ...plainUndoArchive, formatVersion: 999 };
+		expect(importedUndo.importUndoStack(world, badFormat)).toBe(false);
+		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
+	});
+
 	it("audits direct WorldHistory mutation coverage", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

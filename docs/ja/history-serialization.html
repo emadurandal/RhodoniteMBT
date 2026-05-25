@@ -27,13 +27,16 @@
       <main class="content">
         <article class="doc">
           <h1>履歴シリアライズ</h1>
-          <p class="lead">この文書は将来の <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装の undo/redo record は in-memory のみです。</p>
+          <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は draft の in-memory archive shape を公開していますが、永続 file encoding は未実装です。</p>
 
           <h2>Status</h2>
           <ul>
-            <li><code>WorldHistory</code> は現時点で serialized history API を公開していません。</li>
+            <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に draft in-memory archive を返します。</li>
+            <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>
+            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
+            <li>Import/export は <code>format_version = 1</code> を使います。これは library object model であり、JSON/binary file format ではまだありません。</li>
             <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
-            <li>将来の永続化では <code>format_version</code> を持つ明示的な history format を使います。MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
+            <li>MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
           </ul>
 
@@ -65,6 +68,34 @@
           <h2>Payloads</h2>
           <p>User CPU component は byte-exact payload として扱います。before/after bytes は対応する component schema key と一緒に保存された場合だけ安全に replay できます。import validation は <code>component_by_stable_key</code> で登録済み component を解決し、<code>component_matches_identity</code> で照合します。指定された schema version/hash field は一致必須で、未指定の schema field は wildcard として扱います。schema が変わった場合、bytes を再解釈せず delta を reject します。</p>
           <p>Blob-backed builtin では CPU ref bytes を source of truth として永続化しません。<code>GlobalTransform</code> は logical matrix row と format metadata を保存します。<code>Camera</code> は logical camera GPU row payload と runtime helper に必要な camera metadata を保存します。import 時は現在の session の world が新しい blob row を割り当て、その payload を書き込み、有効な CPU ref component を作ります。</p>
+
+          <h2>Export MVP</h2>
+          <p>現行 export API は、次に Undo / Redo される operation が先頭になる stack order で retained record を返します。先に <code>undo_serialization_report</code> / <code>redo_serialization_report</code> と同じ eligibility check を実行し、1 件でも serialization 不可の record があれば <code>None</code> / <code>null</code> を返します。この処理は history diagnostic や stack を変更しません。</p>
+          <table>
+            <thead><tr><th>Delta</th><th>Exported payload</th></tr></thead>
+            <tbody>
+              <tr><td><code>entity_created</code></td><td>Entity id のみ。</td></tr>
+              <tr><td><code>entity_destroyed</code></td><td>Entity id、stable component identity、copy 済み component bytes。</td></tr>
+              <tr><td><code>component_added</code></td><td>Stable component identity と <code>after</code> bytes。</td></tr>
+              <tr><td><code>component_removed</code></td><td>Stable component identity と <code>before</code> bytes。</td></tr>
+              <tr><td><code>component_changed</code></td><td>Stable component identity、<code>before</code> bytes、<code>after</code> bytes。</td></tr>
+              <tr><td><code>global_transform_changed</code></td><td>Stable builtin identity、logical row bytes、<code>global_transform_format</code> code。</td></tr>
+              <tr><td><code>camera_changed</code></td><td>Stable builtin identity と logical camera row bytes。GlobalTransform format field はありません。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Import MVP</h2>
+          <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。</p>
+          <table>
+            <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
+            <tbody>
+              <tr><td>未対応の <code>format_version</code></td><td><code>import_unsupported_format</code></td></tr>
+              <tr><td>record / delta shape が不正</td><td><code>import_invalid_archive</code></td></tr>
+              <tr><td>stable component identity が解決できない、または一致しない</td><td><code>import_identity_mismatch</code></td></tr>
+              <tr><td>payload format、byte length、row format が不正</td><td><code>import_invalid_payload</code></td></tr>
+              <tr><td>import stack 全体を current world に適用できない</td><td><code>import_validation_failed</code></td></tr>
+            </tbody>
+          </table>
 
           <h2>Replay Validation</h2>
           <p>import と replay は runtime undo/redo と同じ防御方針を使います。record 適用前に検証し、stale delta や schema mismatch を reject し、検証失敗時は stack を動かしません。byte budget と record count limit は runtime retention policy であり、archive compatibility policy ではありません。</p>
