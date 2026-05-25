@@ -67,6 +67,40 @@ describe("ECS TypeScript wrapper", () => {
 		const info = world.componentInfo(cpu);
 		expect(info?.name()).toBe("TsCPU");
 		expect(info?.cpuStride()).toBe(16);
+		expect(info?.stableKey()).toBeNull();
+		expect(info?.schemaVersion()).toBeNull();
+		expect(info?.schemaHash()).toBeNull();
+	});
+
+	it("registers stable component identity metadata", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponentWithIdentity("TsStableCPU", 8, {
+			stableKey: "com.example.TsStableCPU",
+			schemaVersion: "3",
+			schemaHash: "sha256:ts-stable",
+		});
+
+		const info = world.componentInfo(cpu);
+		expect(info?.name()).toBe("TsStableCPU");
+		expect(info?.cpuStride()).toBe(8);
+		expect(info?.stableKey()).toBe("com.example.TsStableCPU");
+		expect(info?.schemaVersion()).toBe("3");
+		expect(info?.schemaHash()).toBe("sha256:ts-stable");
+		expect(world.addComponentBytes(world.createEntity(), cpu, new Uint8Array(8))).toBe(
+			true,
+		);
+	});
+
+	it("rejects duplicate stable component identity keys", () => {
+		const world = World.new();
+		world.registerCpuComponentWithIdentity("TsStableA", 4, {
+			stableKey: "com.example.DuplicateTsStable",
+		});
+		expect(() =>
+			world.registerCpuComponentWithIdentity("TsStableB", 4, {
+				stableKey: "com.example.DuplicateTsStable",
+			}),
+		).toThrow();
 	});
 
 	it("queries CPU component rows without copying the backing storage", () => {

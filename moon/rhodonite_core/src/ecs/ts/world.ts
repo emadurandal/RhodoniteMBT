@@ -41,6 +41,7 @@ import {
 	world_new_with_global_transform_f16,
 	world_orbit_camera_controller_component,
 	world_register_cpu_component,
+	world_register_cpu_component_with_identity,
 	world_remove_component,
 	world_camera_gpu_row_copy,
 	world_set_camera_matrices_col_major,
@@ -124,6 +125,12 @@ import {
 } from "./types.ts";
 import type { PhaseKey, SystemContext, SystemRunner } from "./system.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
+
+export type CpuComponentIdentity = {
+	readonly stableKey: string;
+	readonly schemaVersion?: string;
+	readonly schemaHash?: string;
+};
 
 export class SpawnBatchRow {
   readonly inner: MoonSpawnBatchRow;
@@ -249,6 +256,23 @@ export class World {
 	registerCpuComponent(name: string, cpuStride: number): ComponentTypeId {
 		return new ComponentTypeId(
 			world_register_cpu_component(this.inner, name, cpuStride),
+		);
+	}
+
+	registerCpuComponentWithIdentity(
+		name: string,
+		cpuStride: number,
+		identity: CpuComponentIdentity,
+	): ComponentTypeId {
+		return new ComponentTypeId(
+			world_register_cpu_component_with_identity(
+				this.inner,
+				name,
+				cpuStride,
+				identity.stableKey,
+				identity.schemaVersion,
+				identity.schemaHash,
+			),
 		);
 	}
 

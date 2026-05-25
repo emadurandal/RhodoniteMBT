@@ -137,6 +137,21 @@ pub fn world_register_cpu_component(
 }
 
 ///|
+/// Implements `world_register_cpu_component_with_identity`.
+pub fn world_register_cpu_component_with_identity(
+  world : @ecs.World,
+  name : String,
+  cpu_stride : Int,
+  stable_key : String,
+  schema_version : String?,
+  schema_hash : String?,
+) -> @ecs.ComponentTypeId {
+  world.register_cpu_component_with_identity(
+    name, cpu_stride, stable_key, schema_version, schema_hash,
+  )
+}
+
+///|
 /// Implements `world_component_cpu_stride`.
 pub fn world_component_cpu_stride(
   world : @ecs.World,
@@ -164,6 +179,30 @@ pub fn world_component_info_name(info : @ecs.RegisteredComponent) -> String {
 /// Implements `world_component_info_cpu_stride`.
 pub fn world_component_info_cpu_stride(info : @ecs.RegisteredComponent) -> Int {
   info.cpu_stride
+}
+
+///|
+/// Implements `world_component_info_stable_key`.
+pub fn world_component_info_stable_key(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.stable_key
+}
+
+///|
+/// Implements `world_component_info_schema_version`.
+pub fn world_component_info_schema_version(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.schema_version
+}
+
+///|
+/// Implements `world_component_info_schema_hash`.
+pub fn world_component_info_schema_hash(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.schema_hash
 }
 
 ///|
