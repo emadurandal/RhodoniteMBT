@@ -332,6 +332,8 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
 		expect(history.undo(world)).toBe(true);
 		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(history.redo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
 	it("accepts empty explicit archetype column rows", () => {
