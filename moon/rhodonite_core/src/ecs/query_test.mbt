@@ -302,6 +302,55 @@ test "RawQueryArchetype write_column_tracked records changed rows only" {
 }
 
 ///|
+test "RawQueryArchetype write_column_tracked records no undo for unchanged column" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedNoop", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, _col => ()) {
+      abort("expected noop tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.last_diagnostic(), "transaction_empty")
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_tracked records sparse changed rows only" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedSparse", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, cpu, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, cpu, bytes4(3, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => {
+        col[0] = (9 : Byte)
+        col[8] = (7 : Byte)
+      }) {
+      abort("expected sparse tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 16)
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(9, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(7, 0, 0, 0)))
+}
+
+///|
 test "RawQueryArchetype write_column_tracked compresses inside transaction" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -329,6 +378,41 @@ test "RawQueryArchetype write_column_tracked compresses inside transaction" {
     Some(bytes) => assert_true(bytes == bytes4(3, 0, 0, 0))
     None => abort("expected compressed column redo bytes")
   }
+}
+
+///|
+test "RawQueryArchetype write_column_tracked compresses repeated sparse rows" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchTrackedSparseCompress", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, cpu, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, cpu, bytes4(3, 0, 0, 0)))
+  assert_true(history.begin_transaction("sparse column gesture"))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => {
+        col[0] = (4 : Byte)
+        col[8] = (5 : Byte)
+      }) {
+      abort("expected first sparse tracked column write")
+    }
+    if !arch.write_column_tracked(history, cpu, col => col[8] = (6 : Byte)) {
+      abort("expected second sparse tracked column write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_bytes(), 16)
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(4, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(6, 0, 0, 0)))
 }
 
 ///|

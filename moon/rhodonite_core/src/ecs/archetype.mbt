@@ -28,6 +28,23 @@ fn copy_fixed_range_to_fixed(
 }
 
 ///|
+/// Implements `fixed_ranges_equal`.
+fn fixed_ranges_equal(
+  a : FixedArray[Byte],
+  a_offset : Int,
+  b : FixedArray[Byte],
+  b_offset : Int,
+  len : Int,
+) -> Bool {
+  for i = 0; i < len; i = i + 1 {
+    if a[a_offset + i] != b[b_offset + i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// Implements `ComponentColumn::ensure_row_capacity`.
 fn ComponentColumn::ensure_row_capacity(
   self : ComponentColumn,
