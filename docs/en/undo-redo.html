@@ -18,6 +18,7 @@
         <a href="./ecs.html">ECS</a>
         <a href="./undo-redo.html">Undo / Redo</a>
         <a href="./history-serialization.html">History Serialization</a>
+        <a href="./history-mutation-coverage.html">History Mutation Coverage</a>
         <a href="./input-architecture.html">Input</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
         <a href="./ecs-design-notes.html">ECS Design Notes</a>
@@ -85,17 +86,7 @@ ignore(history.commit_transaction())</code></pre>
           <p>If a transaction is already open, tracked system phases are merged into that transaction. If one queued command fails, later commands still run as before; successful commands remain undoable while the method returns <code>false</code>.</p>
 
           <h2>Mutation API Coverage</h2>
-          <p>When adding a new mutating API, update this table and add a coverage test for the intended history behavior.</p>
-          <table>
-            <thead><tr><th>Surface</th><th>Undo/Redo status</th><th>Use for</th></tr></thead>
-            <tbody>
-              <tr><td><code>World</code> raw mutators</td><td>Untracked; guarded transactions abort raw mutation.</td><td>Runtime systems, simulation, and low-level storage edits.</td></tr>
-              <tr><td><code>WorldHistory</code> direct methods and tracked camera-control helpers</td><td>Tracked for entity create/destroy, component add/set/remove, bulk add/set, spawn batch, Transform3D TRS, ChildOf, GlobalTransform matrix/format, Camera matrices, and orbit camera-control setup/edit/sync helpers.</td><td>Editor and importer authoring operations.</td></tr>
-              <tr><td>Tracked query callbacks</td><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code>, and <code>RawQueryArchetype::write_column_tracked</code> record component byte deltas. Raw query writes remain untracked and are blocked by the guard.</td><td>Selection edits and query-derived authoring loops.</td></tr>
-              <tr><td><code>CommandBuffer</code> and command-system variants</td><td>Raw <code>SystemRunner::run_phase</code> applies commands untracked. <code>WorldHistory::run_system_phase</code> dispatches supported commands through tracked history APIs, including camera-control command systems.</td><td>Editor systems that queue changes during iteration.</td></tr>
-              <tr><td>GPU/blob upload and drain helpers</td><td>Intentionally untracked.</td><td>Derived render data upload, resize events, and readback plumbing.</td></tr>
-            </tbody>
-          </table>
+          <p>Mutation surface ownership is tracked in <a href="./history-mutation-coverage.html">History Mutation Coverage</a>. When adding a new mutating API, update that audit table and add or extend the matching coverage test so the API is explicitly classified as tracked, raw guarded, or intentionally untracked.</p>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> keeps up to 100 committed undo records by default. <code>set_max_undo_records</code> changes that count limit; when the stack exceeds the limit, the oldest records are discarded first. Passing <code>0</code> clears undo/redo state and makes future tracked calls delegate without retaining records. Use <code>undo_len</code> and <code>redo_len</code> to inspect the current retained record counts.</p>

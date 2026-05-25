@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>History Mutation Coverage - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">History Serialization</a>
+        <a href="./history-mutation-coverage.html">History Mutation Coverage</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/history-mutation-coverage.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>History Mutation Coverage</h1>
+          <p class="lead">This page is the audit table for ECS mutation APIs and their Undo/Redo behavior. When adding a mutating API, update this page and add or extend the matching coverage test.</p>
+
+          <h2>Coverage Classes</h2>
+          <table>
+            <thead><tr><th>Class</th><th>Behavior</th><th>Expected tests</th></tr></thead>
+            <tbody>
+              <tr><td>Tracked</td><td>The API records reversible deltas through <code>WorldHistory</code>.</td><td>Undo and redo restore the before and after state.</td></tr>
+              <tr><td>Tracked callback</td><td>The API lends mutable bytes in a callback and records changes at the callback boundary.</td><td>Guarded transactions allow the tracked callback and raw callbacks abort.</td></tr>
+              <tr><td>Tracked command phase</td><td>The system queues commands and <code>WorldHistory::run_system_phase</code> applies them through tracked APIs.</td><td>Queued commands become one undoable record under the phase label.</td></tr>
+              <tr><td>Raw guarded</td><td>The API intentionally bypasses history, but guarded transactions abort it.</td><td>A guarded transaction has a panic/throw coverage test.</td></tr>
+              <tr><td>Intentionally untracked</td><td>The API updates derived runtime data, registration metadata, or readback plumbing.</td><td>Docs explain why it is outside history scope.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Tracked Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Coverage expectation</th></tr></thead>
+            <tbody>
+              <tr><td><code>WorldHistory::create_entity</code>, <code>create_entities</code>, <code>destroy_entity</code></td><td>Entity ids and generations survive undo/redo, including destroy restore.</td></tr>
+              <tr><td><code>add_component</code>, <code>add_component_bytes</code>, <code>set_component_bytes</code>, <code>remove_component</code></td><td>Component presence and payload bytes round-trip.</td></tr>
+              <tr><td><code>add_component_bytes_many</code>, <code>set_component_bytes_many</code></td><td>Bulk helpers validate first, record one operation, and restore every affected row.</td></tr>
+              <tr><td><code>spawn_batch</code></td><td>Spawned entities and initialized component rows undo and redo as a batch.</td></tr>
+              <tr><td><code>set_transform_trs</code>, <code>set_child_of</code></td><td>Authoring transform and parent relationship rows are restored.</td></tr>
+              <tr><td><code>set_global_transform</code>, <code>set_global_transform_format</code>, <code>set_camera_matrices</code></td><td>Blob-backed builtin presence and logical row payloads are restored through dedicated helpers.</td></tr>
+              <tr><td>Tracked camera-control helpers</td><td>Orbit setup, lens, controller, home, transform sync, and blob sync helpers group editor steps into undoable records.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Query And Command Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Undo/Redo status</th></tr></thead>
+            <tbody>
+              <tr><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code></td><td>Tracked callback APIs for row authoring. They delegate without history copies when recording is disabled.</td></tr>
+              <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>Tracked callback API for contiguous column edits. It snapshots the column and records changed rows.</td></tr>
+              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods.</td></tr>
+              <tr><td>Raw <code>QueryRow::write</code>, <code>RawQueryRow::write_view</code>, <code>RawQueryArchetype::write_column</code></td><td>Raw guarded. These are untracked and abort inside guarded history transactions.</td></tr>
+              <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded. Use <code>WorldHistory::run_system_phase</code> for command-buffer edits that need history.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Raw And Untracked Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Direct <code>World</code> mutators and raw <code>World::spawn_batch</code></td><td>Raw guarded. Runtime systems and simulation may use them outside guarded editor transactions.</td></tr>
+              <tr><td>Component registration and identity metadata</td><td>Intentionally untracked. Component schemas are part of application setup, not per-operation editor history.</td></tr>
+              <tr><td>GlobalTransform / Camera blob upload, drain, resize, dense write, and readback helpers</td><td>Intentionally untracked derived data. Use dedicated <code>WorldHistory</code> helpers for authoring changes.</td></tr>
+              <tr><td>Transform propagation and camera view update systems</td><td>Intentionally untracked derived recomputation.</td></tr>
+              <tr><td>Read-only queries and component metadata reads</td><td>No history behavior required.</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

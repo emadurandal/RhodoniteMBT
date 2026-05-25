@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>履歴 Mutation Coverage - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/history-mutation-coverage.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>履歴 Mutation Coverage</h1>
+          <p class="lead">このページは ECS mutation API と Undo/Redo behavior の監査表です。mutating API を追加する場合は、このページと対応する coverage test を同時に更新します。</p>
+
+          <h2>Coverage Classes</h2>
+          <table>
+            <thead><tr><th>Class</th><th>Behavior</th><th>Expected tests</th></tr></thead>
+            <tbody>
+              <tr><td>Tracked</td><td><code>WorldHistory</code> 経由で可逆 delta を記録します。</td><td>Undo / Redo で before / after state が復元されること。</td></tr>
+              <tr><td>Tracked callback</td><td>callback 内だけ mutable bytes を貸し出し、callback 境界で変更を記録します。</td><td>guarded transaction で tracked callback は成功し、raw callback は abort すること。</td></tr>
+              <tr><td>Tracked command phase</td><td>system が command を queue し、<code>WorldHistory::run_system_phase</code> が tracked API 経由で適用します。</td><td>queued command が phase label の 1 件の undoable record になること。</td></tr>
+              <tr><td>Raw guarded</td><td>意図的に history を通しませんが、guarded transaction 中は abort します。</td><td>guarded transaction で panic / throw する coverage test を持つこと。</td></tr>
+              <tr><td>Intentionally untracked</td><td>derived runtime data、registration metadata、readback plumbing を更新します。</td><td>history 対象外である理由を docs に書くこと。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Tracked Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Coverage expectation</th></tr></thead>
+            <tbody>
+              <tr><td><code>WorldHistory::create_entity</code>、<code>create_entities</code>、<code>destroy_entity</code></td><td>destroy restore を含め、EntityId と generation が Undo / Redo をまたいで維持されます。</td></tr>
+              <tr><td><code>add_component</code>、<code>add_component_bytes</code>、<code>set_component_bytes</code>、<code>remove_component</code></td><td>component presence と payload bytes が round-trip します。</td></tr>
+              <tr><td><code>add_component_bytes_many</code>、<code>set_component_bytes_many</code></td><td>bulk helper は先に検証し、1 operation として記録し、対象 row 全体を復元します。</td></tr>
+              <tr><td><code>spawn_batch</code></td><td>spawn された entity と初期化済み component row が batch として Undo / Redo されます。</td></tr>
+              <tr><td><code>set_transform_trs</code>、<code>set_child_of</code></td><td>authoring transform と parent relationship row が復元されます。</td></tr>
+              <tr><td><code>set_global_transform</code>、<code>set_global_transform_format</code>、<code>set_camera_matrices</code></td><td>blob-backed builtin の presence と logical row payload は専用 helper 経由で復元されます。</td></tr>
+              <tr><td>Tracked camera-control helper</td><td>orbit setup、lens、controller、home、transform sync、blob sync helper は editor step を undoable record にまとめます。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Query And Command Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Undo/Redo status</th></tr></thead>
+            <tbody>
+              <tr><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code></td><td>row authoring 用の tracked callback API です。recording disabled 時は history copy なしで委譲します。</td></tr>
+              <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>contiguous column edit 用の tracked callback API です。column を snapshot し、変更された row だけを記録します。</td></tr>
+              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>editor system 用の tracked command path です。対応 command は該当する history method に dispatch されます。</td></tr>
+              <tr><td>Raw <code>QueryRow::write</code>、<code>RawQueryRow::write_view</code>、<code>RawQueryArchetype::write_column</code></td><td>Raw guarded です。untracked であり、guarded history transaction 中は abort します。</td></tr>
+              <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded です。history が必要な command-buffer edit では <code>WorldHistory::run_system_phase</code> を使います。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Raw And Untracked Surface</h2>
+          <table>
+            <thead><tr><th>Surface</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Direct <code>World</code> mutator と raw <code>World::spawn_batch</code></td><td>Raw guarded です。runtime system と simulation は guarded editor transaction の外で使えます。</td></tr>
+              <tr><td>Component registration と identity metadata</td><td>意図的に untracked です。component schema は application setup の一部であり、operation 単位の editor history ではありません。</td></tr>
+              <tr><td>GlobalTransform / Camera blob upload、drain、resize、dense write、readback helper</td><td>意図的に untracked な derived data です。authoring change には専用の <code>WorldHistory</code> helper を使います。</td></tr>
+              <tr><td>Transform propagation と camera view update system</td><td>意図的に untracked な derived recomputation です。</td></tr>
+              <tr><td>Read-only query と component metadata read</td><td>history behavior は不要です。</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

@@ -2121,6 +2121,20 @@ test "WorldHistory direct mutation coverage audit" {
   let world = World::new()
   let history = WorldHistory::new()
   let cpu = world.register_cpu_component("HistoryCoverageCpu", 4)
+  let marker = world.register_cpu_component("HistoryCoverageMarker", 4)
+  let removable = world.register_cpu_component("HistoryCoverageRemovable", 4)
+  let bulk_add0 = world.create_entity()
+  let bulk_add1 = world.create_entity()
+  let bulk_set0 = world.create_entity()
+  let bulk_set1 = world.create_entity()
+  let remove_entity = world.create_entity()
+  let victim = world.create_entity()
+  assert_true(world.add_component_bytes(bulk_set0, cpu, bytes4(10, 0, 0, 0)))
+  assert_true(world.add_component_bytes(bulk_set1, cpu, bytes4(11, 0, 0, 0)))
+  assert_true(
+    world.add_component_bytes(remove_entity, removable, bytes4(90, 0, 0, 0)),
+  )
+  assert_true(world.add_component_bytes(victim, cpu, bytes4(99, 0, 0, 0)))
   let global_matrix = @m44.Matrix44::translation(
     (1.0 : Float),
     (2.0 : Float),
@@ -2129,9 +2143,15 @@ test "WorldHistory direct mutation coverage audit" {
     (0.0 : Float),
   )
   assert_true(history.begin_transaction("Coverage Direct"))
+  let batch_entities = history.create_entities(world, 2)
   let parent = history.create_entity(world)
   let entity = history.create_entity(world)
   let camera = history.create_entity(world)
+  let spawned = history.spawn_batch(world, [marker, cpu], 2, fn(i, _e, row) {
+    row.write(marker, c => c[0] = (30 + i).to_byte())
+    row.write(cpu, c => c[0] = (40 + i).to_byte())
+  })
+  assert_true(history.add_component(world, parent, marker))
   assert_true(
     history.add_component_bytes(world, entity, cpu, bytes4(1, 0, 0, 0)),
   )
@@ -2170,17 +2190,80 @@ test "WorldHistory direct mutation coverage audit" {
       (2.0 : Float),
     ),
   )
+  assert_true(
+    history.add_component_bytes_many(world, marker, [bulk_add0, bulk_add1], [
+      bytes4(50, 0, 0, 0),
+      bytes4(51, 0, 0, 0),
+    ]),
+  )
+  assert_true(
+    history.set_component_bytes_many(world, cpu, [bulk_set0, bulk_set1], [
+      bytes4(12, 0, 0, 0),
+      bytes4(13, 0, 0, 0),
+    ]),
+  )
+  assert_true(history.remove_component(world, remove_entity, removable))
+  assert_true(history.destroy_entity(world, victim))
   assert_true(history.commit_transaction())
   assert_eq(history.undo_len(), 1)
+  assert_eq(batch_entities.length(), 2)
+  assert_eq(spawned.length(), 2)
+  assert_true(world.is_alive(batch_entities[0]))
+  assert_true(world.is_alive(batch_entities[1]))
   assert_true(world.is_alive(parent))
   assert_true(world.is_alive(entity))
   assert_true(world.is_alive(camera))
+  assert_true(world.is_alive(spawned[0]))
+  assert_true(world.is_alive(spawned[1]))
+  assert_true(!world.is_alive(victim))
   assert_true(history.undo(world))
+  assert_true(!world.is_alive(batch_entities[0]))
+  assert_true(!world.is_alive(batch_entities[1]))
   assert_true(!world.is_alive(parent))
   assert_true(!world.is_alive(entity))
   assert_true(!world.is_alive(camera))
+  assert_true(!world.is_alive(spawned[0]))
+  assert_true(!world.is_alive(spawned[1]))
+  assert_true(!world.has_component(bulk_add0, marker))
+  assert_true(!world.has_component(bulk_add1, marker))
+  assert_true(
+    world.component_bytes(bulk_set0, cpu) == Some(bytes4(10, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set1, cpu) == Some(bytes4(11, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(remove_entity, removable) == Some(bytes4(90, 0, 0, 0)),
+  )
+  assert_true(world.is_alive(victim))
+  assert_true(world.component_bytes(victim, cpu) == Some(bytes4(99, 0, 0, 0)))
   assert_true(history.redo(world))
+  assert_true(world.is_alive(batch_entities[0]))
+  assert_true(world.is_alive(batch_entities[1]))
+  assert_true(world.has_component(parent, marker))
+  assert_true(world.is_alive(spawned[0]))
+  assert_true(world.is_alive(spawned[1]))
+  assert_true(
+    world.component_bytes(spawned[0], marker) == Some(bytes4(30, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(spawned[1], cpu) == Some(bytes4(41, 0, 0, 0)),
+  )
   assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(
+    world.component_bytes(bulk_add0, marker) == Some(bytes4(50, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_add1, marker) == Some(bytes4(51, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set0, cpu) == Some(bytes4(12, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set1, cpu) == Some(bytes4(13, 0, 0, 0)),
+  )
+  assert_true(!world.has_component(remove_entity, removable))
+  assert_true(!world.is_alive(victim))
   match world.get_transform(entity) {
     Some(transform) => {
       assert_eq(transform.position.x(), (4.0 : Float))
@@ -2209,9 +2292,32 @@ test "WorldHistory direct mutation coverage audit" {
       )
     None => abort("expected coverage Camera row")
   }
-  assert_true(history.destroy_entity(world, entity))
-  assert_true(!world.is_alive(entity))
-  assert_true(history.undo(world))
-  assert_true(world.is_alive(entity))
-  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "panic WorldHistory guarded transaction rejects raw World mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryGuardRejectWorld", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw world"))
+  ignore(world.set_component_bytes(entity, cpu, bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "panic WorldHistory guarded transaction rejects raw system phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let runner = SystemRunner::new()
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw phase"))
+  ignore(
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      PhaseKey::new("history-guard-raw-phase"),
+    ),
+  )
 }

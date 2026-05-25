@@ -1260,12 +1260,31 @@ describe("ECS TypeScript wrapper", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
 		const cpu = world.registerCpuComponent("TsHistoryCoverageCpu", 4);
+		const marker = world.registerCpuComponent("TsHistoryCoverageMarker", 4);
+		const removable = world.registerCpuComponent("TsHistoryCoverageRemovable", 4);
 		const parent = world.createEntity();
 		const entity = world.createEntity();
 		const camera = world.createEntity();
+		const bulkAdd0 = world.createEntity();
+		const bulkAdd1 = world.createEntity();
+		const bulkSet0 = world.createEntity();
+		const bulkSet1 = world.createEntity();
+		const removeEntity = world.createEntity();
+		const victim = world.createEntity();
 		const identity = identityMat4ColMajor();
 
+		expect(world.addComponentBytes(bulkSet0, cpu, new Uint8Array([10, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(bulkSet1, cpu, new Uint8Array([11, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(removeEntity, removable, new Uint8Array([90, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(victim, cpu, new Uint8Array([99, 0, 0, 0]))).toBe(true);
 		expect(history.beginTransaction("TS coverage direct")).toBe(true);
+		const created = history.createEntity(world);
+		const createdMany = history.createEntities(world, 2);
+		const spawned = history.spawnBatch(world, [marker, cpu], 2, (index, _entity, row) => {
+			row.write(marker, (bytes) => bytes.setF32(0, index + 30));
+			row.write(cpu, (bytes) => bytes.setF32(0, index + 40));
+		});
+		expect(history.addComponent(world, parent, marker)).toBe(true);
 		expect(
 			history.addComponentBytes(world, entity, cpu, new Uint8Array([1, 0, 0, 0])),
 		).toBe(true);
@@ -1297,11 +1316,41 @@ describe("ECS TypeScript wrapper", () => {
 				2,
 			),
 		).toBe(true);
+		expect(
+			history.addComponentBytesMany(
+				world,
+				marker,
+				[bulkAdd0, bulkAdd1],
+				[new Uint8Array([50, 0, 0, 0]), new Uint8Array([51, 0, 0, 0])],
+			),
+		).toBe(true);
+		expect(
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[bulkSet0, bulkSet1],
+				[new Uint8Array([12, 0, 0, 0]), new Uint8Array([13, 0, 0, 0])],
+			),
+		).toBe(true);
+		expect(history.removeComponent(world, removeEntity, removable)).toBe(true);
+		expect(history.destroyEntity(world, victim)).toBe(true);
 		expect(history.commitTransaction()).toBe(true);
 		expect(history.undoLabel()).toBe("TS coverage direct");
+		expect(world.isAlive(created)).toBe(true);
+		expect(createdMany).toHaveLength(2);
+		expect(spawned).toHaveLength(2);
+		expect(world.hasComponent(parent, marker)).toBe(true);
+		expect(world.componentBytesCopy(spawned[0], marker)).toEqual(f32Bytes([30]));
+		expect(world.componentBytesCopy(spawned[1], cpu)).toEqual(f32Bytes([41]));
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(
 			new Uint8Array([2, 0, 0, 0]),
 		);
+		expect(world.componentBytesCopy(bulkAdd0, marker)).toEqual(new Uint8Array([50, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkAdd1, marker)).toEqual(new Uint8Array([51, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkSet0, cpu)).toEqual(new Uint8Array([12, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkSet1, cpu)).toEqual(new Uint8Array([13, 0, 0, 0]));
+		expect(world.hasComponent(removeEntity, removable)).toBe(false);
+		expect(world.isAlive(victim)).toBe(false);
 		expect(world.hasComponent(entity, world.transformComponent())).toBe(true);
 		expect(world.hasComponent(entity, world.childOfComponent())).toBe(true);
 		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
@@ -1311,6 +1360,12 @@ describe("ECS TypeScript wrapper", () => {
 		world.drainCameraBlobWriteViews();
 
 		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(created)).toBe(false);
+		expect(world.isAlive(createdMany[0])).toBe(false);
+		expect(world.isAlive(createdMany[1])).toBe(false);
+		expect(world.isAlive(spawned[0])).toBe(false);
+		expect(world.isAlive(spawned[1])).toBe(false);
+		expect(world.hasComponent(parent, marker)).toBe(false);
 		expect(world.hasComponent(entity, cpu)).toBe(false);
 		expect(world.hasComponent(entity, world.transformComponent())).toBe(false);
 		expect(world.hasComponent(entity, world.childOfComponent())).toBe(false);
@@ -1318,11 +1373,32 @@ describe("ECS TypeScript wrapper", () => {
 			false,
 		);
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+		expect(world.hasComponent(bulkAdd0, marker)).toBe(false);
+		expect(world.hasComponent(bulkAdd1, marker)).toBe(false);
+		expect(world.componentBytesCopy(bulkSet0, cpu)).toEqual(new Uint8Array([10, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkSet1, cpu)).toEqual(new Uint8Array([11, 0, 0, 0]));
+		expect(world.componentBytesCopy(removeEntity, removable)).toEqual(new Uint8Array([90, 0, 0, 0]));
+		expect(world.isAlive(victim)).toBe(true);
+		expect(world.componentBytesCopy(victim, cpu)).toEqual(new Uint8Array([99, 0, 0, 0]));
 
 		expect(history.redo(world)).toBe(true);
+		expect(world.isAlive(created)).toBe(true);
+		expect(world.isAlive(createdMany[0])).toBe(true);
+		expect(world.isAlive(createdMany[1])).toBe(true);
+		expect(world.hasComponent(parent, marker)).toBe(true);
+		expect(world.isAlive(spawned[0])).toBe(true);
+		expect(world.isAlive(spawned[1])).toBe(true);
+		expect(world.componentBytesCopy(spawned[0], marker)).toEqual(f32Bytes([30]));
+		expect(world.componentBytesCopy(spawned[1], cpu)).toEqual(f32Bytes([41]));
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(
 			new Uint8Array([2, 0, 0, 0]),
 		);
+		expect(world.componentBytesCopy(bulkAdd0, marker)).toEqual(new Uint8Array([50, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkAdd1, marker)).toEqual(new Uint8Array([51, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkSet0, cpu)).toEqual(new Uint8Array([12, 0, 0, 0]));
+		expect(world.componentBytesCopy(bulkSet1, cpu)).toEqual(new Uint8Array([13, 0, 0, 0]));
+		expect(world.hasComponent(removeEntity, removable)).toBe(false);
+		expect(world.isAlive(victim)).toBe(false);
 		const childBytes = world.componentBytesCopy(entity, world.childOfComponent());
 		expect(childBytes).not.toBeNull();
 		const childView = new DataView(
@@ -1772,6 +1848,48 @@ describe("ECS TypeScript wrapper", () => {
 		expect(() => world.removeComponent(entity, cpu)).toThrow();
 		expect(history.cancelTransaction()).toBe(true);
 		expect(world.removeComponent(entity, cpu)).toBe(true);
+
+		const rawRowWorld = World.new();
+		const rawRowHistory = WorldHistory.new();
+		const rawRowCpu = rawRowWorld.registerCpuComponent("TsHistoryRawGuardRow", 4);
+		const rawRowEntity = rawRowWorld.createEntity();
+		expect(
+			rawRowWorld.addComponentBytes(
+				rawRowEntity,
+				rawRowCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		rawRowHistory.setRawMutationGuardEnabled(true);
+		expect(
+			rawRowHistory.beginGuardedTransaction(rawRowWorld, "guarded raw row"),
+		).toBe(true);
+		expect(() =>
+			Query.new([rawRowCpu]).forEach(rawRowWorld, (row) => {
+				row.write(rawRowCpu, (bytes) => bytes.setF32(0, 2));
+			}),
+		).toThrow();
+
+		const rawViewWorld = World.new();
+		const rawViewHistory = WorldHistory.new();
+		const rawViewCpu = rawViewWorld.registerCpuComponent("TsHistoryRawGuardView", 4);
+		const rawViewEntity = rawViewWorld.createEntity();
+		expect(
+			rawViewWorld.addComponentBytes(
+				rawViewEntity,
+				rawViewCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		rawViewHistory.setRawMutationGuardEnabled(true);
+		expect(
+			rawViewHistory.beginGuardedTransaction(rawViewWorld, "guarded raw view"),
+		).toBe(true);
+		expect(() =>
+			RawQuery.new([rawViewCpu]).forEach(rawViewWorld, (row) => {
+				row.writeView(rawViewCpu).setF32(0, 2);
+			}),
+		).toThrow();
 
 		const queryWorld = World.new();
 		const queryHistory = WorldHistory.new();
