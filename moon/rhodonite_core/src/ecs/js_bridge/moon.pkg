@@ -93,6 +93,7 @@ options(
         "world_history_set_component_bytes_many",
         "world_history_remove_component",
         "world_history_set_transform_trs",
+        "world_history_set_global_transform_col_major",
         "world_history_set_child_of",
         "world_history_set_camera_matrices_col_major",
         "spawn_batch_row_entity",

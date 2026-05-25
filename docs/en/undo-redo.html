@@ -45,12 +45,12 @@ ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.
 ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
-          <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes; generic Camera component byte writes remain untracked because the row only stores a blob reference.</p>
+          <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_global_transform</code> records GlobalTransform component presence and packed matrix row bytes, while <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes. Generic byte writes for these components remain untracked because their component rows only store blob references.</p>
 
           <h2>Batch Authoring Helpers</h2>
           <p>Use <code>WorldHistory::create_entities</code> when an editor or importer creates many entities as one undoable operation. Use <code>WorldHistory::spawn_batch</code> when large imports should create entities directly in the target archetype with initialized component rows. Use <code>WorldHistory::add_component_bytes_many</code> for adding the same component type to many entities, and <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update an existing component on many entities.</p>
           <p>For query-row authoring, use <code>QueryRow::write_tracked</code> or <code>RawQueryRow::write_tracked</code>. These helpers keep the same callback-scoped write style as <code>QueryRow::write</code>, but copy before/after bytes and record a compressed component delta when history is enabled. For archetype-column authoring, use <code>RawQueryArchetype::write_column_tracked</code>; it snapshots the column at the callback boundary and records only rows whose payload changed.</p>
-          <p>The bulk component helpers validate every target first; if any entity is invalid, duplicated, already has the added component, is missing the changed component, or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes these as <code>WorldHistory.createEntities</code>, <code>WorldHistory.spawnBatch</code>, <code>WorldHistory.addComponentBytesMany</code>, and <code>WorldHistory.setComponentBytesMany</code>.</p>
+          <p>The bulk component helpers validate every target first; if any entity is invalid, duplicated, already has the added component, is missing the changed component, or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes these as <code>WorldHistory.createEntities</code>, <code>WorldHistory.spawnBatch</code>, <code>WorldHistory.addComponentBytesMany</code>, <code>WorldHistory.setComponentBytesMany</code>, <code>WorldHistory.setGlobalTransform</code>, and <code>WorldHistory.setCameraMatrices</code>.</p>
 
           <h2>Enabled State</h2>
           <ul>
@@ -101,7 +101,7 @@ ignore(history.commit_transaction())</code></pre>
             <tbody>
               <tr><td><code>EntityId(index, generation)</code></td><td>Destroy undo restores the same id and generation.</td></tr>
               <tr><td><code>Transform3D</code>, <code>ChildOf</code>, user CPU components</td><td>Component bytes and relationships are restored from history records.</td></tr>
-              <tr><td><code>GlobalTransform</code></td><td>Component presence is restored with a fresh packed-blob reference; transform systems recompute the matrix payload.</td></tr>
+              <tr><td><code>GlobalTransform</code></td><td><code>WorldHistory::set_global_transform</code> restores component presence and the packed matrix row; generic entity/component restores keep valid presence for normal transform-system recomputation.</td></tr>
               <tr><td><code>Camera</code></td><td>Component presence and a readable Camera blob row are restored; camera sync systems regenerate GPU-facing view/projection payload.</td></tr>
               <tr><td>Renderer mesh/material/GPU resources</td><td>Outside v1 history scope. Resource registration and lifetime stay with Renderer or the asset layer.</td></tr>
             </tbody>

@@ -750,6 +750,21 @@ pub fn world_history_set_transform_trs(
 }
 
 ///|
+/// Implements `world_history_set_global_transform_col_major`.
+pub fn world_history_set_global_transform_col_major(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  matrix_col_major : FixedArray[Float],
+) -> Bool {
+  history.set_global_transform(
+    world,
+    entity,
+    matrix44f_from_col_major_array(matrix_col_major),
+  )
+}
+
+///|
 /// Implements `world_history_set_child_of`.
 pub fn world_history_set_child_of(
   history : @ecs.WorldHistory,
