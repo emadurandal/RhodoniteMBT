@@ -587,6 +587,15 @@ pub fn world_history_cancel_transaction(history : @ecs.WorldHistory) -> Bool {
 }
 
 ///|
+/// Implements `world_history_cancel_transaction_reverting`.
+pub fn world_history_cancel_transaction_reverting(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> Bool {
+  history.cancel_transaction_reverting(world)
+}
+
+///|
 /// Implements `world_history_can_undo`.
 pub fn world_history_can_undo(history : @ecs.WorldHistory) -> Bool {
   history.can_undo()

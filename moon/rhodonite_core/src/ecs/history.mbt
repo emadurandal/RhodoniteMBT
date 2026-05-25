@@ -1495,7 +1495,7 @@ pub fn WorldHistory::cancel_transaction(self : WorldHistory) -> Bool {
 
 ///|
 /// Cancels the active transaction and reverts deltas already applied in that transaction.
-fn WorldHistory::cancel_transaction_reverting(
+pub fn WorldHistory::cancel_transaction_reverting(
   self : WorldHistory,
   world : World,
 ) -> Bool {

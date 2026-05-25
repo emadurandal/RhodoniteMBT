@@ -257,6 +257,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_history_cancel_transaction(
 		history: MoonWorldHistory,
 	): MoonBool;
+	export function world_history_cancel_transaction_reverting(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+	): MoonBool;
 	export function world_history_can_undo(history: MoonWorldHistory): MoonBool;
 	export function world_history_can_redo(history: MoonWorldHistory): MoonBool;
 	export function world_history_undo(

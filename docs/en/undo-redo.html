@@ -46,6 +46,7 @@ ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_global_transform</code> records GlobalTransform component presence and packed matrix row bytes, <code>WorldHistory::set_global_transform_format</code> records GlobalTransform format changes with the row payload, and <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes. Generic byte writes for these components remain untracked because their component rows only store blob references.</p>
+          <p><code>cancel_transaction</code> only discards the open record and does not revert world mutations that have already run. Use <code>cancel_transaction_reverting(world)</code> for helper-owned transactions that must fail atomically after applying earlier tracked steps.</p>
 
           <h2>Batch Authoring Helpers</h2>
           <p>Use <code>WorldHistory::create_entities</code> when an editor or importer creates many entities as one undoable operation. Use <code>WorldHistory::spawn_batch</code> when large imports should create entities directly in the target archetype with initialized component rows. Use <code>WorldHistory::add_component_bytes_many</code> for adding the same component type to many entities, and <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update an existing component on many entities.</p>

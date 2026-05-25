@@ -1030,6 +1030,7 @@ export function setupOrbitOrthographicCamera(
 
 function finishTrackedCameraControlTransaction(
 	history: WorldHistory,
+	world: World,
 	opened: boolean,
 	ok: boolean,
 ): boolean {
@@ -1039,7 +1040,7 @@ function finishTrackedCameraControlTransaction(
 	if (ok) {
 		return history.commitTransaction();
 	}
-	history.cancelTransaction();
+	history.cancelTransactionReverting(world);
 	return false;
 }
 
@@ -1068,7 +1069,7 @@ export function setupOrbitOrthographicCameraTracked(
 	const local = localMatrixFromTrs(px, py, pz, qx, qy, qz, qw, 1, 1, 1);
 	const view = mat4Inverse(local);
 	if (view === null) {
-		return finishTrackedCameraControlTransaction(history, opened, false);
+		return finishTrackedCameraControlTransaction(history, world, opened, false);
 	}
 	const ok =
 		history.setTransformTrs(
@@ -1131,7 +1132,7 @@ export function setupOrbitOrthographicCameraTracked(
 			CAMERA_PROJECTION_ORTHOGRAPHIC,
 			desc.flags,
 		);
-	return finishTrackedCameraControlTransaction(history, opened, ok);
+	return finishTrackedCameraControlTransaction(history, world, opened, ok);
 }
 
 function perspectiveProjection(
@@ -1352,7 +1353,7 @@ export function syncOrbitCameraTransformComponentTracked(
 		!world.hasComponent(camera, world.transformComponent())
 	) {
 		if (opened) {
-			history.cancelTransaction();
+			history.cancelTransactionReverting(world);
 		}
 		throw new Error("Failed to update camera Transform3D.");
 	}
@@ -1426,7 +1427,7 @@ export function syncOrbitCameraTransformComponentTracked(
 				localMatrixFromTrs(px, py, pz, q[0], q[1], q[2], q[3], 1, 1, 1),
 			);
 	}
-	if (!finishTrackedCameraControlTransaction(history, opened, ok)) {
+	if (!finishTrackedCameraControlTransaction(history, world, opened, ok)) {
 		throw new Error("Failed to update camera Transform3D.");
 	}
 }

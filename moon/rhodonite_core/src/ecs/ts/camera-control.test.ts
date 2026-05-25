@@ -250,6 +250,34 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
 	});
 
+	it("reverts tracked camera setup when a later tracked step fails", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const orbit = world.orbitCameraControllerComponent();
+		const lens = world.cameraLensComponent();
+		const originalSetCameraMatrices = history.setCameraMatrices.bind(history);
+		history.setCameraMatrices = () => false;
+
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(0.38, 2, 5.6, 0.1, 50, 1, 3.8),
+			),
+		).toBe(false);
+
+		history.setCameraMatrices = originalSetCameraMatrices;
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
+		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(false);
+		expect(world.hasComponent(camera, orbit)).toBe(false);
+		expect(world.hasComponent(camera, world.cameraHomeTransformComponent())).toBe(false);
+		expect(world.hasComponent(camera, lens)).toBe(false);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+	});
+
 	it("tracks camera-control component edits and sync helpers", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

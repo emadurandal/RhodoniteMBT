@@ -64,6 +64,7 @@ import {
 	world_history_can_redo,
 	world_history_can_undo,
 	world_history_cancel_transaction,
+	world_history_cancel_transaction_reverting,
 	world_history_clear,
 	world_history_commit_transaction,
 	world_history_create_entities,
@@ -559,6 +560,12 @@ export class WorldHistory {
 
 	cancelTransaction(): boolean {
 		return moonBool(world_history_cancel_transaction(this.inner));
+	}
+
+	cancelTransactionReverting(world: World): boolean {
+		return moonBool(
+			world_history_cancel_transaction_reverting(this.inner, world.inner),
+		);
 	}
 
 	canUndo(): boolean {
