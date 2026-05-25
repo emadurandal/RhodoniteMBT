@@ -51,6 +51,21 @@ priv struct WorldHistoryRecord {
 }
 
 ///|
+/// Transaction-local lookup key for one component-row delta.
+priv struct HistoryComponentDeltaIndexKey {
+  entity_index : Int
+  entity_generation : Int
+  component_index : Int
+} derive(Eq, Hash)
+
+///|
+/// Transaction-local lookup key for one entity-scoped builtin delta.
+priv struct HistoryEntityDeltaIndexKey {
+  entity_index : Int
+  entity_generation : Int
+} derive(Eq, Hash)
+
+///|
 /// Payload-free diagnostic summary for one reversible delta.
 pub(all) struct WorldHistoryDeltaSummary {
   kind : String
@@ -237,6 +252,18 @@ pub struct WorldHistory {
   priv mut applying : Bool
   priv mut current_label : String
   priv mut current_deltas : Array[WorldDelta]
+  priv current_component_delta_index : @hashmap.HashMap[
+    HistoryComponentDeltaIndexKey,
+    Int,
+  ]
+  priv current_camera_delta_index : @hashmap.HashMap[
+    HistoryEntityDeltaIndexKey,
+    Int,
+  ]
+  priv current_global_transform_delta_index : @hashmap.HashMap[
+    HistoryEntityDeltaIndexKey,
+    Int,
+  ]
   priv undo_stack : Array[WorldHistoryRecord]
   priv redo_stack : Array[WorldHistoryRecord]
   priv mut raw_mutation_guard_enabled : Bool
@@ -2796,28 +2823,109 @@ fn empty_component_bytes() -> FixedArray[Byte] {
 }
 
 ///|
-/// Returns whether two deltas address the same component row.
-fn world_delta_same_component(
-  delta : WorldDelta,
+/// Builds a transaction index key for one component-row delta.
+fn history_component_delta_index_key(
   entity : EntityId,
   component : ComponentTypeId,
-) -> Bool {
-  match delta {
-    ComponentAdded(e, c, _)
-    | ComponentRemoved(e, c, _)
-    | ComponentChanged(e, c, _, _) => e == entity && c == component
-    _ => false
+) -> HistoryComponentDeltaIndexKey {
+  {
+    entity_index: entity.index,
+    entity_generation: entity.generation,
+    component_index: component.index,
   }
 }
 
 ///|
-/// Removes one delta from an array without preserving order after `index`.
-fn remove_delta_at(deltas : Array[WorldDelta], index : Int) -> Unit {
-  let last = deltas.length() - 1
-  for i = index; i < last; i = i + 1 {
-    deltas[i] = deltas[i + 1]
+/// Builds a transaction index key for one entity-scoped builtin delta.
+fn history_entity_delta_index_key(
+  entity : EntityId,
+) -> HistoryEntityDeltaIndexKey {
+  { entity_index: entity.index, entity_generation: entity.generation }
+}
+
+///|
+/// Creates an empty component-delta transaction index.
+fn new_component_delta_index() -> @hashmap.HashMap[
+  HistoryComponentDeltaIndexKey,
+  Int,
+] {
+  @hashmap.HashMap([])
+}
+
+///|
+/// Creates an empty entity-delta transaction index.
+fn new_entity_delta_index() -> @hashmap.HashMap[HistoryEntityDeltaIndexKey, Int] {
+  @hashmap.HashMap([])
+}
+
+///|
+/// Clears every transaction-local delta index.
+fn WorldHistory::clear_current_delta_indices(self : WorldHistory) -> Unit {
+  self.current_component_delta_index.clear()
+  self.current_camera_delta_index.clear()
+  self.current_global_transform_delta_index.clear()
+}
+
+///|
+/// Indexes one current delta by its merge key when it is mergeable.
+fn WorldHistory::index_current_delta_at(
+  self : WorldHistory,
+  index : Int,
+) -> Unit {
+  match self.current_deltas[index] {
+    ComponentAdded(entity, component, _)
+    | ComponentRemoved(entity, component, _)
+    | ComponentChanged(entity, component, _, _) =>
+      self.current_component_delta_index.set(
+        history_component_delta_index_key(entity, component),
+        index,
+      )
+    CameraChanged(entity, _, _) =>
+      self.current_camera_delta_index.set(
+        history_entity_delta_index_key(entity),
+        index,
+      )
+    GlobalTransformChanged(entity, _, _) =>
+      self.current_global_transform_delta_index.set(
+        history_entity_delta_index_key(entity),
+        index,
+      )
+    _ => ()
   }
-  let _ = deltas.pop()
+}
+
+///|
+/// Rebuilds transaction-local indexes from `current_deltas`.
+fn WorldHistory::rebuild_current_delta_indices(self : WorldHistory) -> Unit {
+  self.clear_current_delta_indices()
+  for i = 0; i < self.current_deltas.length(); i = i + 1 {
+    self.index_current_delta_at(i)
+  }
+}
+
+///|
+/// Pushes one current delta and indexes it when it is mergeable.
+fn WorldHistory::push_current_delta(
+  self : WorldHistory,
+  delta : WorldDelta,
+) -> Unit {
+  let index = self.current_deltas.length()
+  self.current_deltas.push(delta)
+  self.index_current_delta_at(index)
+}
+
+///|
+/// Removes one current delta, preserving order and refreshing merge indexes.
+fn WorldHistory::remove_current_delta_at(
+  self : WorldHistory,
+  index : Int,
+) -> Unit {
+  let last = self.current_deltas.length() - 1
+  for i = index; i < last; i = i + 1 {
+    self.current_deltas[i] = self.current_deltas[i + 1]
+  }
+  let _ = self.current_deltas.pop()
+  self.rebuild_current_delta_indices()
 }
 
 ///|
@@ -2829,48 +2937,50 @@ fn WorldHistory::push_component_delta(
   before : FixedArray[Byte],
   after : FixedArray[Byte],
 ) -> Unit {
-  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
-    let existing = self.current_deltas[i]
-    if !world_delta_same_component(existing, entity, component) {
-      continue
-    }
-    match existing {
-      ComponentAdded(_, _, _) =>
-        if after.length() == 0 {
-          remove_delta_at(self.current_deltas, i)
-        } else {
-          self.current_deltas[i] = ComponentAdded(entity, component, after)
-        }
-      ComponentRemoved(_, _, old) =>
-        if after.length() == 0 {
-          self.current_deltas[i] = ComponentRemoved(entity, component, old)
-        } else if old == after {
-          remove_delta_at(self.current_deltas, i)
-        } else {
-          self.current_deltas[i] = ComponentChanged(
-            entity, component, old, after,
-          )
-        }
-      ComponentChanged(_, _, old, _) =>
-        if after.length() == 0 {
-          self.current_deltas[i] = ComponentRemoved(entity, component, old)
-        } else if old == after {
-          remove_delta_at(self.current_deltas, i)
-        } else {
-          self.current_deltas[i] = ComponentChanged(
-            entity, component, old, after,
-          )
-        }
-      _ => ()
-    }
-    return
-  }
-  if before.length() == 0 && after.length() > 0 {
-    self.current_deltas.push(ComponentAdded(entity, component, after))
-  } else if before.length() > 0 && after.length() == 0 {
-    self.current_deltas.push(ComponentRemoved(entity, component, before))
-  } else if before.length() > 0 && after.length() > 0 && before != after {
-    self.current_deltas.push(ComponentChanged(entity, component, before, after))
+  match
+    self.current_component_delta_index.get(
+      history_component_delta_index_key(entity, component),
+    ) {
+    Some(i) =>
+      match self.current_deltas[i] {
+        ComponentAdded(_, _, _) =>
+          if after.length() == 0 {
+            self.remove_current_delta_at(i)
+          } else {
+            self.current_deltas[i] = ComponentAdded(entity, component, after)
+          }
+        ComponentRemoved(_, _, old) =>
+          if after.length() == 0 {
+            self.current_deltas[i] = ComponentRemoved(entity, component, old)
+          } else if old == after {
+            self.remove_current_delta_at(i)
+          } else {
+            self.current_deltas[i] = ComponentChanged(
+              entity, component, old, after,
+            )
+          }
+        ComponentChanged(_, _, old, _) =>
+          if after.length() == 0 {
+            self.current_deltas[i] = ComponentRemoved(entity, component, old)
+          } else if old == after {
+            self.remove_current_delta_at(i)
+          } else {
+            self.current_deltas[i] = ComponentChanged(
+              entity, component, old, after,
+            )
+          }
+        _ => ()
+      }
+    None =>
+      if before.length() == 0 && after.length() > 0 {
+        self.push_current_delta(ComponentAdded(entity, component, after))
+      } else if before.length() > 0 && after.length() == 0 {
+        self.push_current_delta(ComponentRemoved(entity, component, before))
+      } else if before.length() > 0 && after.length() > 0 && before != after {
+        self.push_current_delta(
+          ComponentChanged(entity, component, before, after),
+        )
+      }
   }
 }
 
@@ -2882,14 +2992,15 @@ fn WorldHistory::push_camera_delta(
   before : FixedArray[Byte]?,
   after : FixedArray[Byte],
 ) -> Unit {
-  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
-    match self.current_deltas[i] {
-      CameraChanged(e, old_before, _) =>
-        if e == entity {
+  match
+    self.current_camera_delta_index.get(history_entity_delta_index_key(entity)) {
+    Some(i) =>
+      match self.current_deltas[i] {
+        CameraChanged(_, old_before, _) =>
           match old_before {
             Some(old) =>
               if old == after {
-                remove_delta_at(self.current_deltas, i)
+                self.remove_current_delta_at(i)
               } else {
                 self.current_deltas[i] = CameraChanged(
                   entity, old_before, after,
@@ -2898,17 +3009,16 @@ fn WorldHistory::push_camera_delta(
             None =>
               self.current_deltas[i] = CameraChanged(entity, old_before, after)
           }
-          return
-        }
-      _ => ()
-    }
-  }
-  match before {
-    Some(old) =>
-      if old != after {
-        self.current_deltas.push(CameraChanged(entity, before, after))
+        _ => ()
       }
-    None => self.current_deltas.push(CameraChanged(entity, before, after))
+    None =>
+      match before {
+        Some(old) =>
+          if old != after {
+            self.push_current_delta(CameraChanged(entity, before, after))
+          }
+        None => self.push_current_delta(CameraChanged(entity, before, after))
+      }
   }
 }
 
@@ -2920,14 +3030,17 @@ fn WorldHistory::push_global_transform_delta(
   before : GlobalTransformHistoryRow?,
   after : GlobalTransformHistoryRow,
 ) -> Unit {
-  for i = self.current_deltas.length() - 1; i >= 0; i = i - 1 {
-    match self.current_deltas[i] {
-      GlobalTransformChanged(e, old_before, _) =>
-        if e == entity {
+  match
+    self.current_global_transform_delta_index.get(
+      history_entity_delta_index_key(entity),
+    ) {
+    Some(i) =>
+      match self.current_deltas[i] {
+        GlobalTransformChanged(_, old_before, _) =>
           match old_before {
             Some(old) =>
               if global_transform_history_row_equal(old, after) {
-                remove_delta_at(self.current_deltas, i)
+                self.remove_current_delta_at(i)
               } else {
                 self.current_deltas[i] = GlobalTransformChanged(
                   entity, old_before, after,
@@ -2938,18 +3051,19 @@ fn WorldHistory::push_global_transform_delta(
                 entity, old_before, after,
               )
           }
-          return
-        }
-      _ => ()
-    }
-  }
-  match before {
-    Some(old) =>
-      if !global_transform_history_row_equal(old, after) {
-        self.current_deltas.push(GlobalTransformChanged(entity, before, after))
+        _ => ()
       }
     None =>
-      self.current_deltas.push(GlobalTransformChanged(entity, before, after))
+      match before {
+        Some(old) =>
+          if !global_transform_history_row_equal(old, after) {
+            self.push_current_delta(
+              GlobalTransformChanged(entity, before, after),
+            )
+          }
+        None =>
+          self.push_current_delta(GlobalTransformChanged(entity, before, after))
+      }
   }
 }
 
@@ -2988,6 +3102,7 @@ fn WorldHistory::clear_current(self : WorldHistory) -> Unit {
   self.open = false
   self.current_label = ""
   self.current_deltas = []
+  self.clear_current_delta_indices()
 }
 
 ///|
@@ -3001,6 +3116,9 @@ pub fn WorldHistory::new() -> WorldHistory {
     applying: false,
     current_label: "",
     current_deltas: [],
+    current_component_delta_index: new_component_delta_index(),
+    current_camera_delta_index: new_entity_delta_index(),
+    current_global_transform_delta_index: new_entity_delta_index(),
     undo_stack: [],
     redo_stack: [],
     raw_mutation_guard_enabled: false,
@@ -3334,6 +3452,7 @@ pub fn WorldHistory::begin_transaction(
   self.open = true
   self.current_label = label
   self.current_deltas = []
+  self.clear_current_delta_indices()
   self.clear_diagnostic()
   true
 }
