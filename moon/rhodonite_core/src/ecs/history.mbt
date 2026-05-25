@@ -1680,6 +1680,10 @@ pub fn WorldHistory::add_component_bytes_many(
       "WorldHistory::add_component_bytes_many: entities and bytes_list length mismatch",
     )
   }
+  if entity_array_has_duplicates(entities) {
+    self.set_diagnostic("operation_failed")
+    return false
+  }
   if !self.recording_enabled() || self.applying {
     let mut ok = true
     for i = 0; i < entities.length(); i = i + 1 {
@@ -1696,10 +1700,6 @@ pub fn WorldHistory::add_component_bytes_many(
       },
     )
     return ok
-  }
-  if entity_array_has_duplicates(entities) {
-    self.set_diagnostic("operation_failed")
-    return false
   }
   for i = 0; i < entities.length(); i = i + 1 {
     if !world.is_alive(entities[i]) ||
@@ -1749,6 +1749,10 @@ pub fn WorldHistory::set_component_bytes_many(
     abort(
       "WorldHistory::set_component_bytes_many: entities and bytes_list length mismatch",
     )
+  }
+  if entity_array_has_duplicates(entities) {
+    self.set_diagnostic("operation_failed")
+    return false
   }
   if !self.recording_enabled() ||
     self.applying ||

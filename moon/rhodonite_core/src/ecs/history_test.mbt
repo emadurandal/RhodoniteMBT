@@ -378,6 +378,26 @@ test "WorldHistory bulk component byte changes are atomic on invalid target" {
 }
 
 ///|
+test "WorldHistory bulk component byte changes reject duplicate entities" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryBulkSetDuplicate", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    !history.set_component_bytes_many(world, component, [entity, entity], [
+      bytes4(2, 0, 0, 0),
+      bytes4(3, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(1, 0, 0, 0)),
+  )
+}
+
+///|
 test "WorldHistory bulk component byte adds are atomic on invalid target" {
   let world = World::new()
   let history = WorldHistory::new()

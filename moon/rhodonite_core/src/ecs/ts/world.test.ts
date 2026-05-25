@@ -479,6 +479,16 @@ describe("ECS TypeScript wrapper", () => {
 		).toBe(false);
 		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(world.componentBytesCopy(missing, cpu)).toBeNull();
+		expect(
+			history.setComponentBytesMany(
+				world,
+				cpu,
+				[e0, e0],
+				[new Uint8Array([7, 0, 0, 0]), new Uint8Array([8, 0, 0, 0])],
+			),
+		).toBe(false);
+		expect(history.lastDiagnostic()).toBe("operation_failed");
+		expect(world.componentBytesCopy(e0, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(() =>
 			history.setComponentBytesMany(
 				world,
