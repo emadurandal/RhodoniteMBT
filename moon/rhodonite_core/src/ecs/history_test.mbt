@@ -1199,6 +1199,161 @@ test "WorldHistory GlobalTransform tracking disabled and zero limit delegate" {
 }
 
 ///|
+test "WorldHistory tracks GlobalTransform format add undo and redo" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F16)
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(entity, world.global_transform_component()))
+  assert_true(history.redo(world))
+  let refs_after = world.extract_global_transform_refs([entity])
+  let (format_after, _) = @comp.global_transform_ref_from_component_view(
+    refs_after[0:8],
+  )
+  assert_true(format_after == Affine3x4F16)
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, @m44.Matrix44F::identity())
+    None => abort("expected restored fp16 GlobalTransform")
+  }
+}
+
+///|
+test "WorldHistory tracks GlobalTransform format changes f32 to f16" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let matrix = @m44.Matrix44::translation(
+    (3.0 : Float),
+    (0.5 : Float),
+    (-4.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, matrix))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F16)
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, matrix)
+    None => abort("expected fp16 GlobalTransform")
+  }
+  assert_true(history.undo(world))
+  let refs_undo = world.extract_global_transform_refs([entity])
+  let (format_undo, _) = @comp.global_transform_ref_from_component_view(
+    refs_undo[0:8],
+  )
+  assert_true(format_undo == Affine3x4F32)
+  match world.get_global_transform(entity) {
+    Some(read) => assert_eq(read, matrix)
+    None => abort("expected restored f32 GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  let refs_redo = world.extract_global_transform_refs([entity])
+  let (format_redo, _) = @comp.global_transform_ref_from_component_view(
+    refs_redo[0:8],
+  )
+  assert_true(format_redo == Affine3x4F16)
+}
+
+///|
+test "WorldHistory tracks GlobalTransform format changes f16 to f32" {
+  let world = World::new_with_global_transform_format(Affine3x4F16)
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let matrix = @m44.Matrix44::translation(
+    (6.0 : Float),
+    (0.25 : Float),
+    (2.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, matrix))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F32))
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F32)
+  assert_true(history.undo(world))
+  let refs_undo = world.extract_global_transform_refs([entity])
+  let (format_undo, _) = @comp.global_transform_ref_from_component_view(
+    refs_undo[0:8],
+  )
+  assert_true(format_undo == Affine3x4F16)
+  match world.get_global_transform(entity) {
+    Some(read) => {
+      assert_eq(read.at(0, 3), (6.0 : Float))
+      assert_eq(read.at(1, 3), (0.25 : Float))
+      assert_eq(read.at(2, 3), (2.0 : Float))
+    }
+    None => abort("expected restored f16 GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  let refs_redo = world.extract_global_transform_refs([entity])
+  let (format_redo, _) = @comp.global_transform_ref_from_component_view(
+    refs_redo[0:8],
+  )
+  assert_true(format_redo == Affine3x4F32)
+}
+
+///|
+test "WorldHistory compresses repeated GlobalTransform format changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let matrix = @m44.Matrix44::translation(
+    (2.0 : Float),
+    (0.5 : Float),
+    (1.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, matrix))
+  assert_true(history.begin_transaction("GlobalTransform Format"))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F32))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 72)
+  assert_true(history.undo(world))
+  let refs_undo = world.extract_global_transform_refs([entity])
+  let (format_undo, _) = @comp.global_transform_ref_from_component_view(
+    refs_undo[0:8],
+  )
+  assert_true(format_undo == Affine3x4F32)
+  assert_true(history.redo(world))
+  let refs_redo = world.extract_global_transform_refs([entity])
+  let (format_redo, _) = @comp.global_transform_ref_from_component_view(
+    refs_redo[0:8],
+  )
+  assert_true(format_redo == Affine3x4F16)
+}
+
+///|
+test "WorldHistory GlobalTransform format tracking disabled and zero limit delegate" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  history.set_enabled(false)
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  assert_true(world.has_component(entity, world.global_transform_component()))
+  assert_true(!history.can_undo())
+  history.set_enabled(true)
+  history.set_max_undo_records(0)
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F32))
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F32)
+}
+
+///|
 test "WorldHistory restores destroyed Camera presence with readable blob row" {
   let world = World::new()
   let history = WorldHistory::new()

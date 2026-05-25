@@ -2199,6 +2199,53 @@ pub fn WorldHistory::set_global_transform(
 }
 
 ///|
+/// Sets builtin GlobalTransform storage format through the history layer.
+pub fn WorldHistory::set_global_transform_format(
+  self : WorldHistory,
+  world : World,
+  entity : EntityId,
+  format : @comp.GlobalTransformGpuFormat,
+) -> Bool {
+  if !self.recording_enabled() || self.applying {
+    let ok = world.set_global_transform_format(entity, format)
+    self.set_delegate_diagnostic(
+      ok,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return ok
+  }
+  let global_transform = world.global_transform_component()
+  let before = if world.has_component(entity, global_transform) {
+    match world.global_transform_history_row(entity) {
+      Some(row) => Some(row)
+      None => {
+        self.set_diagnostic("operation_failed")
+        return false
+      }
+    }
+  } else {
+    None
+  }
+  let auto = self.begin_auto("set_global_transform_format")
+  self.begin_tracked_world_mutation(world)
+  let ok = world.set_global_transform_format(entity, format)
+  self.end_tracked_world_mutation(world)
+  if ok {
+    match world.global_transform_history_row(entity) {
+      Some(after) =>
+        self.push_delta(GlobalTransformChanged(entity, before, after))
+      None => ()
+    }
+  }
+  self.finish_auto(auto, ok)
+  ok
+}
+
+///|
 /// Sets builtin Camera matrices through the history layer.
 pub fn WorldHistory::set_camera_matrices(
   self : WorldHistory,

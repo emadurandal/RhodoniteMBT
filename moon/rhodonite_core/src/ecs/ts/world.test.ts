@@ -31,6 +31,13 @@ function translationMat4ColMajor(tx: number, ty: number, tz: number): number[] {
 	return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1];
 }
 
+function globalTransformFormatCode(refs: Uint8Array): number {
+	return new DataView(refs.buffer, refs.byteOffset, refs.byteLength).getUint32(
+		0,
+		true,
+	);
+}
+
 describe("ECS TypeScript wrapper", () => {
 	it("creates entities and invalidates stale handles", () => {
 		const world = World.new();
@@ -340,6 +347,51 @@ describe("ECS TypeScript wrapper", () => {
 		).toBe(true);
 		expect(history.lastDiagnostic()).toBe("recording_disabled");
 		expect(history.undoLen()).toBe(0);
+	});
+
+	it("tracks builtin global transform format through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const entity = world.createEntity();
+
+		expect(history.setGlobalTransformFormat(world, entity, 1)).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			true,
+		);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			false,
+		);
+		expect(history.redo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+
+		expect(
+			history.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		expect(history.setGlobalTransformFormat(world, entity, 0)).toBe(true);
+		let writes = world.drainGlobalTransformBlobWriteViews();
+		expect(writes[0]?.bytes().asUint8Array()?.byteLength).toBe(48);
+		expect(
+			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 12),
+		).toBeCloseTo(4);
+		expect(history.undo(world)).toBe(true);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(writes[0]?.bytes().asUint8Array()?.byteLength).toBe(24);
+		expect(history.redo(world)).toBe(true);
+		writes = world.drainGlobalTransformBlobWriteViews();
+		expect(writes[0]?.bytes().asUint8Array()?.byteLength).toBe(48);
+		expect(history.setGlobalTransformFormat(world, entity, 0)).toBe(true);
+		expect(history.lastDiagnostic()).toBe("transaction_empty");
 	});
 
 	it("sets builtin ChildOf parent links", () => {
