@@ -491,6 +491,47 @@ test "tracked setup orbit orthographic camera rejects existing controller withou
 }
 
 ///|
+test "tracked setup orbit orthographic camera rejects unreadable GlobalTransform without partial state" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let orbit = world.orbit_camera_controller_component()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    world.add_component_bytes(
+      camera,
+      world.global_transform_component(),
+      @comp.global_transform_ref_bytes(Affine3x4F32, 0xffff),
+    ),
+  )
+  assert_true(
+    !setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.38,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.has_component(camera, world.global_transform_component()))
+  assert_true(!world.has_component(camera, orbit))
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(
+    !world.has_component(camera, world.camera_home_transform_component()),
+  )
+  assert_true(!world.has_component(camera, lens))
+  assert_true(!world.has_component(camera, world.camera_component()))
+}
+
+///|
 test "tracked orbit camera edit helpers group drag sync and reset sync" {
   let world = World::new()
   let history = WorldHistory::new()

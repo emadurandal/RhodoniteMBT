@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>履歴シリアライズ - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/history-serialization.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>履歴シリアライズ</h1>
+          <p class="lead">この文書は将来の <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装の undo/redo record は in-memory のみです。</p>
+
+          <h2>Status</h2>
+          <ul>
+            <li><code>WorldHistory</code> は現時点で serialized history API を公開していません。</li>
+            <li>将来の永続化では <code>format_version</code> を持つ明示的な history format を使います。MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
+            <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
+          </ul>
+
+          <h2>Record Shape</h2>
+          <p>将来の history archive は undo stack と redo stack を ordered record として保存します。各 record は label、record-level metadata、ordered delta を持ちます。create 後に component を追加する transaction のように、delta の順序そのものが意味を持ちます。</p>
+          <table>
+            <thead><tr><th>Field</th><th>Policy</th></tr></thead>
+            <tbody>
+              <tr><td><code>format_version</code></td><td>必須です。未対応の major version は推測せず reject します。</td></tr>
+              <tr><td><code>library_version</code></td><td>診断 metadata です。互換性判断は <code>format_version</code> と schema key で行います。</td></tr>
+              <tr><td><code>records</code></td><td>committed undo/redo record を stack order で保存します。</td></tr>
+              <tr><td><code>label</code></td><td>任意の UI metadata です。replay semantics には影響しません。</td></tr>
+              <tr><td><code>deltas</code></td><td>明示的な variant tag と typed payload field を持つ ordered logical delta です。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Identity</h2>
+          <p>Entity identity は runtime restoration policy と同じく <code>index + generation</code> として保存します。destroy の Undo は同じ <code>EntityId</code> を復元します。Component identity にはより強い規則が必要です。<code>ComponentTypeId.index</code> は session-local なので、永続化された key として単独では使いません。</p>
+          <table>
+            <thead><tr><th>Identity</th><th>Serialization policy</th></tr></thead>
+            <tbody>
+              <tr><td>Entity</td><td><code>index</code> と <code>generation</code> を保存します。import は target world がその id を reserve / restore できることを検証します。</td></tr>
+              <tr><td>Builtin component</td><td><code>Transform3D</code>、<code>ChildOf</code>、<code>GlobalTransform</code>、<code>Camera</code> のような stable builtin name を保存します。</td></tr>
+              <tr><td>User CPU component</td><td>application-provided stable key と schema version または hash を必須にします。登録済み component と一致しない場合は replay を reject します。</td></tr>
+              <tr><td>Component index</td><td>local hint として cache してもよいですが、session をまたいだ authoritative key にはしません。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Payloads</h2>
+          <p>User CPU component は byte-exact payload として扱います。before/after bytes は対応する component schema key と一緒に保存された場合だけ安全に replay できます。schema が変わった場合、bytes を再解釈せず delta を reject します。</p>
+          <p>Blob-backed builtin では CPU ref bytes を source of truth として永続化しません。<code>GlobalTransform</code> は logical matrix row と format metadata を保存します。<code>Camera</code> は logical camera GPU row payload と runtime helper に必要な camera metadata を保存します。import 時は現在の session の world が新しい blob row を割り当て、その payload を書き込み、有効な CPU ref component を作ります。</p>
+
+          <h2>Replay Validation</h2>
+          <p>import と replay は runtime undo/redo と同じ防御方針を使います。record 適用前に検証し、stale delta や schema mismatch を reject し、検証失敗時は stack を動かしません。byte budget と record count limit は runtime retention policy であり、archive compatibility policy ではありません。</p>
+
+          <h2>Out Of Scope For V1</h2>
+          <ul>
+            <li>Renderer の mesh/material object、GPU buffer、device resource。</li>
+            <li>ECS component bytes から参照される asset lifetime と external resource handle。</li>
+            <li>collaborative editing merge、conflict resolution、operation transform。</li>
+            <li>明示的な <code>format_version</code> compatibility policy を超えた cross-engine-version replay。</li>
+            <li>open transaction の serialization。永続化対象候補は committed undo/redo record のみです。</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
