@@ -1250,6 +1250,94 @@ describe("ECS TypeScript wrapper", () => {
 		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
 	});
 
+	it("rejects invalid history imports without mutating world or retained stacks", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const undoTarget = WorldHistory.new();
+		const redoTarget = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryAtomicImportStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryAtomicImportStable",
+				schemaVersion: "1",
+			},
+		);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		if (undoArchive == null) {
+			throw new Error("expected undo archive");
+		}
+		expect(undoTarget.importUndoStack(world, undoArchive)).toBe(true);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		const badUndoArchive = {
+			...JSON.parse(JSON.stringify(undoArchive)),
+			formatVersion: 999,
+		};
+		const undoDiagnostic = undoTarget.lastDiagnostic();
+		const undoReport = undoTarget.validateImportUndoStack(world, badUndoArchive);
+		expect(undoReport).toMatchObject({
+			valid: false,
+			reason: "import_unsupported_format",
+			formatVersion: 999,
+		});
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe(undoDiagnostic);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+		expect(undoTarget.importUndoStack(world, badUndoArchive)).toBe(false);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe("import_unsupported_format");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		expect(undoTarget.undo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		const redoArchive = undoTarget.exportRedoStack(world);
+		expect(redoArchive).not.toBeNull();
+		if (redoArchive == null) {
+			throw new Error("expected redo archive");
+		}
+		expect(redoTarget.importRedoStack(world, redoArchive)).toBe(true);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+
+		const badRedoArchive = {
+			...JSON.parse(JSON.stringify(redoArchive)),
+			formatVersion: 999,
+		};
+		expect(redoTarget.importRedoStack(world, badRedoArchive)).toBe(false);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoTarget.lastDiagnostic()).toBe("import_unsupported_format");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+	});
+
 	it("encodes and decodes history archives as JSON", () => {
 		const world = World.new();
 		const source = WorldHistory.new();

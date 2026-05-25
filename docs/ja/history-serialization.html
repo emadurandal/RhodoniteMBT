@@ -88,7 +88,7 @@
           </table>
 
           <h2>Import MVP</h2>
-          <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。</p>
+          <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。target stack を置き換えるのは import 成功時だけで、失敗した import は target stack と world を変更しません。</p>
           <p>validation report API は同じ archive conversion と full-stack applicability check を実行しますが、history stack、world、<code>last_diagnostic</code> を変更しません。top-level / record-level / delta-level の各 report は <code>valid</code>、<code>reason</code>、archive order の index を返します。record index <code>0</code> は次に import される Undo / Redo operation です。delta index は、Undo validation が内部で逆順適用を検証する場合でも、元の archive order を指します。full-stack validation が失敗した場合、失敗した delta と、それ以降の未検証 record / delta report は <code>import_validation_failed</code> で invalid としてマークされます。</p>
           <table>
             <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
