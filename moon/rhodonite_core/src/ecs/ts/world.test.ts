@@ -951,5 +951,67 @@ describe("ECS TypeScript wrapper", () => {
 				0,
 			),
 		).toBeCloseTo(1);
+
+		const blobQueryWorld = World.new();
+		const blobQueryHistory = WorldHistory.new();
+		const blobQueryEntity = blobQueryWorld.createEntity();
+		const blobQueryComponent = blobQueryWorld.globalTransformComponent();
+		expect(
+			blobQueryWorld.setGlobalTransform(blobQueryEntity, identityMat4ColMajor()),
+		).toBe(true);
+		blobQueryHistory.setRawMutationGuardEnabled(true);
+		expect(
+			blobQueryHistory.beginGuardedTransaction(
+				blobQueryWorld,
+				"guarded blob query",
+			),
+		).toBe(true);
+		let sawBlobQuery = false;
+		Query.new([blobQueryComponent]).forEach(blobQueryWorld, (row) => {
+			expect(
+				row.writeTracked(blobQueryHistory, blobQueryComponent, (bytes) => {
+					sawBlobQuery = bytes.length > 0;
+				}),
+			).toBe(true);
+		});
+		expect(sawBlobQuery).toBe(true);
+		expect(blobQueryHistory.commitTransaction()).toBe(true);
+		expect(blobQueryHistory.lastDiagnostic()).toBe("transaction_empty");
+
+		const blobColumnWorld = World.new();
+		const blobColumnHistory = WorldHistory.new();
+		const blobColumnEntity = blobColumnWorld.createEntity();
+		const blobColumnComponent = blobColumnWorld.globalTransformComponent();
+		expect(
+			blobColumnWorld.setGlobalTransform(
+				blobColumnEntity,
+				identityMat4ColMajor(),
+			),
+		).toBe(true);
+		blobColumnHistory.setRawMutationGuardEnabled(true);
+		expect(
+			blobColumnHistory.beginGuardedTransaction(
+				blobColumnWorld,
+				"guarded blob column",
+			),
+		).toBe(true);
+		let sawBlobColumn = false;
+		RawQuery.new([blobColumnComponent]).forEachArchetype(
+			blobColumnWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnTracked(
+						blobColumnHistory,
+						blobColumnComponent,
+						(bytes) => {
+							sawBlobColumn = bytes.length > 0;
+						},
+					),
+				).toBe(true);
+			},
+		);
+		expect(sawBlobColumn).toBe(true);
+		expect(blobColumnHistory.commitTransaction()).toBe(true);
+		expect(blobColumnHistory.lastDiagnostic()).toBe("transaction_empty");
 	});
 });

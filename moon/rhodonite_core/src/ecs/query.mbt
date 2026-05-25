@@ -471,18 +471,21 @@ pub fn QueryRow::write_tracked(
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Bool {
   ignore(self.component_payload_index(component, "QueryRow::write_tracked"))
-  if !history.recording_enabled() ||
-    history.applying ||
-    self.world.history_blob_ref_component(component) {
+  if !history.recording_enabled() || history.applying {
     self.write(component, f)
     let reason = if !history.recording_enabled() {
       "recording_disabled"
-    } else if history.applying {
-      "applying"
     } else {
-      history_diagnostic_none()
+      "applying"
     }
     history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  if self.world.history_blob_ref_component(component) {
+    history.begin_tracked_world_mutation(self.world)
+    self.write(component, f)
+    history.end_tracked_world_mutation(self.world)
+    history.set_delegate_diagnostic(true, history_diagnostic_none())
     return true
   }
   let before = match self.world.component_bytes(self.entity, component) {
@@ -759,18 +762,21 @@ pub fn RawQueryArchetype::write_column_tracked(
   let access_index = self.component_payload_index(
     component, "RawQueryArchetype::write_column_tracked",
   )
-  if !history.recording_enabled() ||
-    history.applying ||
-    self.world.history_blob_ref_component(component) {
+  if !history.recording_enabled() || history.applying {
     f(self.write_column(component))
     let reason = if !history.recording_enabled() {
       "recording_disabled"
-    } else if history.applying {
-      "applying"
     } else {
-      history_diagnostic_none()
+      "applying"
     }
     history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  if self.world.history_blob_ref_component(component) {
+    history.begin_tracked_world_mutation(self.world)
+    f(self.write_column(component))
+    history.end_tracked_world_mutation(self.world)
+    history.set_delegate_diagnostic(true, history_diagnostic_none())
     return true
   }
   let access = self.accesses[access_index]

@@ -172,6 +172,26 @@ test "QueryRow write_tracked works inside guarded transaction" {
 }
 
 ///|
+test "QueryRow write_tracked blob delegate works inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let gt = world.global_transform_component()
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded blob query"))
+  let mut saw_blob = false
+  Query::new([gt]).for_each(world, row => {
+    if !row.write_tracked(history, gt, bytes => saw_blob = bytes.length() > 0) {
+      abort("expected guarded blob query row write")
+    }
+  })
+  assert_true(saw_blob)
+  assert_true(history.commit_transaction())
+  assert_eq(history.last_diagnostic(), "transaction_empty")
+}
+
+///|
 test "RawQuery for_each_archetype exposes contiguous CPU columns" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryArchA", 4)
@@ -323,6 +343,28 @@ test "RawQueryArchetype write_column_tracked works inside guarded transaction" {
     Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
     None => abort("expected guarded tracked column undo bytes")
   }
+}
+
+///|
+test "RawQueryArchetype write_column_tracked blob delegate works inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  let gt = world.global_transform_component()
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded blob column"))
+  let mut saw_blob = false
+  RawQuery::new([gt]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, gt, bytes => {
+        saw_blob = bytes.length() > 0
+      }) {
+      abort("expected guarded blob column write")
+    }
+  })
+  assert_true(saw_blob)
+  assert_true(history.commit_transaction())
+  assert_eq(history.last_diagnostic(), "transaction_empty")
 }
 
 ///|
