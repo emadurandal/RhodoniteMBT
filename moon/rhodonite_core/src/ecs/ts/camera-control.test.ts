@@ -46,6 +46,13 @@ const IDENTITY_MAT4 = new Float32Array([
 	0, 0, 0, 1,
 ]);
 
+function u32Bytes(values: number[]): Uint8Array {
+	const bytes = new Uint8Array(values.length * 4);
+	const view = new DataView(bytes.buffer);
+	values.forEach((value, index) => view.setUint32(index * 4, value, true));
+	return bytes;
+}
+
 describe("OrbitCameraController TypeScript wrapper", () => {
 	it("allows wheel dolly to zoom in to the default lower clamp", () => {
 		const controller = createOrbitCameraController(0);
@@ -278,6 +285,32 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.hasComponent(camera, world.cameraHomeTransformComponent())).toBe(false);
 		expect(world.hasComponent(camera, lens)).toBe(false);
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+	});
+
+	it("rejects tracked camera setup with an unreadable existing Camera row", () => {
+		const cameraWorld = World.new();
+		const cameraHistory = WorldHistory.new();
+		const camera = cameraWorld.createEntity();
+		expect(
+			cameraWorld.addComponentBytes(
+				camera,
+				cameraWorld.cameraComponent(),
+				u32Bytes([0xffff]),
+			),
+		).toBe(true);
+		expect(cameraWorld.cameraGpuRowCopy(camera)).toBeNull();
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				cameraHistory,
+				cameraWorld,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(0.38, 2, 5.6, 0.1, 50, 1, 3.8),
+			),
+		).toBe(false);
+		expect(cameraHistory.undoLen()).toBe(0);
+		expect(cameraWorld.hasComponent(camera, cameraWorld.cameraComponent())).toBe(true);
+		expect(cameraWorld.hasComponent(camera, cameraWorld.orbitCameraControllerComponent())).toBe(false);
+		expect(cameraWorld.hasComponent(camera, cameraWorld.cameraLensComponent())).toBe(false);
 	});
 
 	it("reverts tracked camera setup when a later tracked step fails", () => {

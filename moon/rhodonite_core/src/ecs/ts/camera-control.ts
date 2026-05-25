@@ -1051,7 +1051,11 @@ function canSetupOrbitOrthographicCameraTracked(
 	return (
 		world.isAlive(camera) &&
 		!world.hasComponent(camera, world.orbitCameraControllerComponent()) &&
-		!world.hasComponent(camera, world.cameraLensComponent())
+		!world.hasComponent(camera, world.cameraLensComponent()) &&
+		(!world.hasComponent(camera, world.globalTransformComponent()) ||
+			world.getGlobalTransform(camera) !== null) &&
+		(!world.hasComponent(camera, world.cameraComponent()) ||
+			world.cameraGpuRowCopy(camera) !== null)
 	);
 }
 

@@ -334,6 +334,15 @@ pub fn world_set_camera_matrices_col_major(
 }
 
 ///|
+/// Implements `world_camera_gpu_row_copy`.
+pub fn world_camera_gpu_row_copy(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+) -> FixedArray[Byte]? {
+  world.camera_gpu_row(entity)
+}
+
+///|
 /// Implements `world_update_global_transforms_from_transforms`.
 pub fn world_update_global_transforms_from_transforms(
   world : @ecs.World,

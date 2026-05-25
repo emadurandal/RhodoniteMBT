@@ -40,6 +40,7 @@ import {
 	world_orbit_camera_controller_component,
 	world_register_cpu_component,
 	world_remove_component,
+	world_camera_gpu_row_copy,
 	world_set_camera_matrices_col_major,
 	world_set_child_of,
 	world_set_component_bytes,
@@ -308,6 +309,14 @@ export class World {
 		return world_drain_camera_blob_write_views(this.inner).map(
 			(write) => new GpuWriteView(write),
 		);
+	}
+
+	cameraGpuRowCopy(entity: EntityId): Uint8Array | null {
+		const bytes = world_camera_gpu_row_copy(this.inner, entity.inner);
+		if (bytes === undefined || bytes === null) {
+			return null;
+		}
+		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
 	}
 
 	writeGlobalTransformBlobRangeViews(

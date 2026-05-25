@@ -46,6 +46,7 @@ options(
         "world_set_global_transform_col_major",
         "world_get_global_transform_col_major",
         "world_set_camera_matrices_col_major",
+        "world_camera_gpu_row_copy",
         "world_update_global_transforms_from_transforms",
         "world_set_global_transform_format",
         "world_write_global_transforms_dense_range_views",

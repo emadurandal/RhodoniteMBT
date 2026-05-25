@@ -161,6 +161,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		projectionKind: number,
 		flags: number,
 	): MoonBool;
+	export function world_camera_gpu_row_copy(
+		world: MoonWorld,
+		entity: MoonEntityId,
+	): Uint8Array | number[] | undefined;
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
