@@ -1908,6 +1908,18 @@ pub fn raw_query_archetype_write_column_tracked(
 }
 
 ///|
+/// Implements `raw_query_archetype_write_column_rows_tracked`.
+pub fn raw_query_archetype_write_column_rows_tracked(
+  arch : @ecs.RawQueryArchetype,
+  history : @ecs.WorldHistory,
+  component : @ecs.ComponentTypeId,
+  rows : Array[Int],
+  f : (Int, MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  arch.write_column_rows_tracked(history, component, rows, f)
+}
+
+///|
 /// Implements `phase_key_new`.
 pub fn phase_key_new(name : String) -> @ecs.PhaseKey {
   @ecs.PhaseKey::new(name)

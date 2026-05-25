@@ -31,6 +31,7 @@ import {
 	raw_query_archetype_length,
 	raw_query_archetype_read_column,
 	raw_query_archetype_write_column,
+	raw_query_archetype_write_column_rows_tracked,
 	raw_query_archetype_write_column_tracked,
 	raw_query_for_each,
 	raw_query_for_each_archetype,
@@ -251,6 +252,23 @@ export class RawQueryArchetype {
 				history.inner,
 				component.inner,
 				(bytes) => f(byteView(bytes)),
+			),
+		);
+	}
+
+	writeColumnRowsTracked(
+		history: { readonly inner: MoonWorldHistory },
+		component: ComponentTypeId,
+		rows: number[],
+		f: (row: number, bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			raw_query_archetype_write_column_rows_tracked(
+				this.inner,
+				history.inner,
+				component.inner,
+				rows,
+				(row, bytes) => f(row, byteView(bytes)),
 			),
 		);
 	}

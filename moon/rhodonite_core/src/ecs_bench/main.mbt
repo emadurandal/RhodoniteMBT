@@ -537,6 +537,30 @@ fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_history_archetype_column_rows_tracked_noop`.
+fn bench_history_archetype_column_rows_tracked_noop(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.RawQuery::new([component])
+  let rows : Array[Int] = []
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    if !arch.write_column_rows_tracked(history, component, rows, (_row, _col) => {
+        checksum = checksum + 1
+      }) {
+      abort("expected noop rows tracked column write")
+    }
+  })
+  report(
+    "history_archetype_column_rows_tracked_noop",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
 /// Implements `bench_history_archetype_column_raw_sparse`.
 fn bench_history_archetype_column_raw_sparse(count : Int) -> Unit {
   let (world, component, _) = make_component_world(count)
@@ -593,6 +617,43 @@ fn bench_history_archetype_column_tracked_sparse(count : Int) -> Unit {
   }
   report(
     "history_archetype_column_tracked_sparse",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_archetype_column_rows_tracked_sparse`.
+fn bench_history_archetype_column_rows_tracked_sparse(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.RawQuery::new([component])
+  if !history.begin_transaction("bench column rows tracked sparse") {
+    abort("expected sparse column rows history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let rows : Array[Int] = []
+    for row = 0; row < arch.length(); row = row + 1 {
+      if row % 16 == 0 {
+        rows.push(row)
+      }
+    }
+    if !arch.write_column_rows_tracked(history, component, rows, (row, col) => {
+        let idx = arch.entity(row).gpu_index()
+        write_bench_bytes4_to_view(col, idx + 163)
+        checksum = checksum + idx
+      }) {
+      abort("expected sparse rows tracked column write")
+    }
+  })
+  if !history.commit_transaction() {
+    abort("expected sparse column rows history transaction commit")
+  }
+  report(
+    "history_archetype_column_rows_tracked_sparse",
     count,
     started,
     checksum + history.undo_len() + history.undo_bytes(),
@@ -692,8 +753,10 @@ fn run_history_suite(count : Int) -> Unit {
   bench_history_archetype_column_tracked_enabled(count)
   bench_history_archetype_column_raw_noop(count)
   bench_history_archetype_column_tracked_noop(count)
+  bench_history_archetype_column_rows_tracked_noop(count)
   bench_history_archetype_column_raw_sparse(count)
   bench_history_archetype_column_tracked_sparse(count)
+  bench_history_archetype_column_rows_tracked_sparse(count)
   bench_history_command_raw_phase(count)
   bench_history_command_tracked_phase(count)
 }

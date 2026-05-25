@@ -305,6 +305,57 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
+	it("tracks explicit archetype column rows through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocityRows", 16);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpu, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnRowsTracked(history, cpu, [1], (_row, bytes) => {
+					bytes.setF32(0, 20);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("raw_query_archetype_write_column_rows");
+		expect(history.undoBytes()).toBe(32);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
+		expect(history.undo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+	});
+
+	it("accepts empty explicit archetype column rows", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocityRowsEmpty", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnRowsTracked(history, cpu, [], (_row, bytes) => {
+					bytes.setF32(0, 20);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLen()).toBe(0);
+		expect(history.lastDiagnostic()).toBe("transaction_empty");
+		expect(getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+	});
+
 	it("reuses prepared row query plans", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("PreparedTsCpu", 16);
