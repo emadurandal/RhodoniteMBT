@@ -1803,14 +1803,16 @@ fn world_history_imported_stack_invalid_location(
 }
 
 ///|
-/// Marks one record report as failed by the full-stack import validation pass.
-fn world_history_import_validation_failed_record_report(
+/// Marks one record report suffix as failed by the full-stack import validation pass.
+fn world_history_import_validation_failed_record_report_from_delta(
   report : WorldHistoryImportValidationRecordReport,
   delta_index : Int,
+  undo : Bool,
 ) -> WorldHistoryImportValidationRecordReport {
   let deltas : Array[WorldHistoryImportValidationDeltaReport] = []
   for i = 0; i < report.deltas.length(); i = i + 1 {
-    if i == delta_index {
+    let failed = if undo { i <= delta_index } else { i >= delta_index }
+    if failed {
       deltas.push(
         world_history_import_validation_failed_delta_report(report.deltas[i]),
       )
@@ -1829,19 +1831,48 @@ fn world_history_import_validation_failed_record_report(
 }
 
 ///|
+/// Marks a whole record report as failed by the full-stack import validation pass.
+fn world_history_import_validation_failed_record_report(
+  report : WorldHistoryImportValidationRecordReport,
+) -> WorldHistoryImportValidationRecordReport {
+  let deltas : Array[WorldHistoryImportValidationDeltaReport] = []
+  for i = 0; i < report.deltas.length(); i = i + 1 {
+    deltas.push(
+      world_history_import_validation_failed_delta_report(report.deltas[i]),
+    )
+  }
+  {
+    index: report.index,
+    label: report.label,
+    valid: false,
+    reason: history_import_diagnostic_validation_failed(),
+    delta_count: report.delta_count,
+    deltas,
+  }
+}
+
+///|
 /// Marks one import stack result as failed by the full-stack validation pass.
 fn world_history_import_stack_result_validation_failed(
   imported : WorldHistoryImportStackResult,
   record_index : Int,
   delta_index : Int,
+  undo : Bool,
 ) -> WorldHistoryImportStackResult {
   let record_reports : Array[WorldHistoryImportValidationRecordReport] = []
   for i = 0; i < imported.report.records.length(); i = i + 1 {
     if i == record_index {
       record_reports.push(
-        world_history_import_validation_failed_record_report(
+        world_history_import_validation_failed_record_report_from_delta(
           imported.report.records[i],
           delta_index,
+          undo,
+        ),
+      )
+    } else if i > record_index {
+      record_reports.push(
+        world_history_import_validation_failed_record_report(
+          imported.report.records[i],
         ),
       )
     } else {
@@ -3195,7 +3226,7 @@ fn WorldHistory::import_stack_result(
     world_history_imported_stack_invalid_location(world, imported.records, undo) {
     Some((record_index, delta_index)) =>
       world_history_import_stack_result_validation_failed(
-        imported, record_index, delta_index,
+        imported, record_index, delta_index, undo,
       )
     None => imported
   }

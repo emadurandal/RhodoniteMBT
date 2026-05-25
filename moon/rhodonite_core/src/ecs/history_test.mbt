@@ -1528,6 +1528,56 @@ test "WorldHistory import validates full stack before replacing" {
 }
 
 ///|
+test "WorldHistory import validation marks skipped records and deltas invalid" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let a = world.register_cpu_component_with_identity(
+    "HistoryImportSkippedA",
+    4,
+    "com.example.HistoryImportSkippedA",
+    None,
+    None,
+  )
+  let b = world.register_cpu_component_with_identity(
+    "HistoryImportSkippedB",
+    4,
+    "com.example.HistoryImportSkippedB",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, a, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(entity, b, bytes4(3, 0, 0, 0)))
+  assert_true(source.set_component_bytes(world, entity, a, bytes4(2, 0, 0, 0)))
+  assert_true(source.begin_transaction("multi-set"))
+  assert_true(source.set_component_bytes(world, entity, a, bytes4(5, 0, 0, 0)))
+  assert_true(source.set_component_bytes(world, entity, b, bytes4(4, 0, 0, 0)))
+  assert_true(source.commit_transaction())
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable archive")
+  }
+  assert_eq(archive.record_count, 2)
+  assert_eq(archive.records[0].delta_count, 2)
+  assert_true(world.remove_component(entity, b))
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_validation_failed")
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_validation_failed")
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_validation_failed")
+  assert_true(!report.records[0].deltas[1].valid)
+  assert_eq(report.records[0].deltas[1].reason, "import_validation_failed")
+  assert_true(!report.records[1].valid)
+  assert_eq(report.records[1].reason, "import_validation_failed")
+  assert_true(!report.records[1].deltas[0].valid)
+  assert_eq(report.records[1].deltas[0].reason, "import_validation_failed")
+  assert_eq(imported.last_diagnostic(), "none")
+}
+
+///|
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()
