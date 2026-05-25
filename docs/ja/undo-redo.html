@@ -85,6 +85,20 @@ ignore(history.commit_transaction())</code></pre>
 ))</code></pre>
           <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。MoonBit と TypeScript のどちらでも、queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
+          <h2>TypeScript Wrapper Surface</h2>
+          <p>TypeScript wrapper は <code>@rhodonite/core/ecs</code> から Undo / Redo surface を camelCase method 名で公開します。主な対応は次の表の通りです。詳細な挙動はこのページで説明している MoonBit API と同じです。</p>
+          <table>
+            <thead><tr><th>Area</th><th>MoonBit</th><th>TypeScript</th></tr></thead>
+            <tbody>
+              <tr><td>Transaction</td><td><code>begin_transaction</code>、<code>commit_transaction</code>、<code>cancel_transaction</code>、<code>cancel_transaction_reverting</code></td><td><code>beginTransaction</code>、<code>commitTransaction</code>、<code>cancelTransaction</code>、<code>cancelTransactionReverting</code></td></tr>
+              <tr><td>Guard / limits / diagnostics</td><td><code>begin_guarded_transaction</code>、<code>set_max_undo_records</code>、<code>set_max_undo_bytes</code>、<code>undo_len</code>、<code>last_diagnostic</code></td><td><code>beginGuardedTransaction</code>、<code>setMaxUndoRecords</code>、<code>setMaxUndoBytes</code>、<code>undoLen</code>、<code>lastDiagnostic</code></td></tr>
+              <tr><td>Tracked mutation</td><td><code>set_component_bytes</code>、<code>add_component_bytes_many</code>、<code>set_global_transform</code>、<code>set_camera_matrices</code></td><td><code>setComponentBytes</code>、<code>addComponentBytesMany</code>、<code>setGlobalTransform</code>、<code>setCameraMatrices</code></td></tr>
+              <tr><td>Tracked query callback</td><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code>、<code>RawQueryArchetype::write_column_rows_tracked</code></td><td><code>row.writeTracked</code>、<code>rawRow.writeTracked</code>、<code>archetype.writeColumnRowsTracked</code></td></tr>
+              <tr><td>Tracked system phase</td><td><code>run_system_phase</code></td><td><code>runSystemPhase</code></td></tr>
+              <tr><td>Serialization</td><td><code>undo_serialization_report</code>、<code>export_undo_stack</code>、<code>import_undo_stack</code>、<code>validate_import_undo_stack</code></td><td><code>undoSerializationReport</code>、<code>exportUndoStack</code>、<code>importUndoStack</code>、<code>validateImportUndoStack</code></td></tr>
+            </tbody>
+          </table>
+
           <h2>Mutation API Coverage</h2>
           <p>mutation surface の責務は <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a> で管理します。新しい mutating API を追加する場合は、その監査表と対象 coverage test を更新し、API を tracked、raw guarded、intentionally untracked のどれとして扱うか明示します。</p>
 

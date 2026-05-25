@@ -29,6 +29,7 @@
         <article class="doc">
           <h1>History Mutation Coverage</h1>
           <p class="lead">This page is the audit table for ECS mutation APIs and their Undo/Redo behavior. When adding a mutating API, update this page and add or extend the matching coverage test.</p>
+          <p>The TypeScript wrapper follows the same classification as the MoonBit surface. Public wrapper methods should either delegate to the tracked API listed here, remain raw guarded, or be documented as intentionally untracked with matching TypeScript coverage when the wrapper adds behavior.</p>
 
           <h2>Coverage Classes</h2>
           <table>
