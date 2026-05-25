@@ -297,6 +297,18 @@ pub fn world_set_global_transform_col_major(
 }
 
 ///|
+/// Implements `world_get_global_transform_col_major`.
+pub fn world_get_global_transform_col_major(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+) -> FixedArray[Float]? {
+  match world.get_global_transform(entity) {
+    Some(matrix) => Some(matrix.data())
+    None => None
+  }
+}
+
+///|
 /// Implements `world_set_camera_matrices_col_major`.
 pub fn world_set_camera_matrices_col_major(
   world : @ecs.World,
@@ -319,6 +331,15 @@ pub fn world_set_camera_matrices_col_major(
     projection_kind,
     flags,
   )
+}
+
+///|
+/// Implements `world_camera_gpu_row_copy`.
+pub fn world_camera_gpu_row_copy(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+) -> FixedArray[Byte]? {
+  world.camera_gpu_row(entity)
 }
 
 ///|
@@ -584,6 +605,15 @@ pub fn world_history_commit_transaction(history : @ecs.WorldHistory) -> Bool {
 /// Implements `world_history_cancel_transaction`.
 pub fn world_history_cancel_transaction(history : @ecs.WorldHistory) -> Bool {
   history.cancel_transaction()
+}
+
+///|
+/// Implements `world_history_cancel_transaction_reverting`.
+pub fn world_history_cancel_transaction_reverting(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+) -> Bool {
+  history.cancel_transaction_reverting(world)
 }
 
 ///|
@@ -1314,6 +1344,42 @@ pub fn transform_propagation_system(
   phase : @ecs.PhaseKey,
 ) -> @ecs.System {
   @ecs.transform_propagation_system(world, phase)
+}
+
+///|
+/// Implements `orbit_camera_transform_command_system`.
+pub fn orbit_camera_transform_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  home_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.orbit_camera_transform_command_system(
+    world, phase, orbit_component, home_component,
+  )
+}
+
+///|
+/// Implements `camera_blob_sync_command_system`.
+pub fn camera_blob_sync_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  lens_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.camera_blob_sync_command_system(world, phase, lens_component)
+}
+
+///|
+/// Implements `orbit_camera_blob_sync_command_system`.
+pub fn orbit_camera_blob_sync_command_system(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+  orbit_component : @ecs.ComponentTypeId,
+  lens_component : @ecs.ComponentTypeId,
+) -> @ecs.System {
+  @ecs.orbit_camera_blob_sync_command_system(
+    world, phase, orbit_component, lens_component,
+  )
 }
 
 ///|

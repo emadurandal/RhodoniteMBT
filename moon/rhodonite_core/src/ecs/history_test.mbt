@@ -1497,3 +1497,103 @@ test "WorldHistory Camera tracking disabled and zero limit delegate" {
   assert_eq(history.undo_len(), 0)
   assert_true(!history.can_undo())
 }
+
+///|
+test "WorldHistory direct mutation coverage audit" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryCoverageCpu", 4)
+  let global_matrix = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(history.begin_transaction("Coverage Direct"))
+  let parent = history.create_entity(world)
+  let entity = history.create_entity(world)
+  let camera = history.create_entity(world)
+  assert_true(
+    history.add_component_bytes(world, entity, cpu, bytes4(1, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_component_bytes(world, entity, cpu, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    history.set_transform_trs(
+      world,
+      entity,
+      (4.0 : Float),
+      (5.0 : Float),
+      (6.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(history.set_child_of(world, entity, parent))
+  assert_true(history.set_global_transform(world, entity, global_matrix))
+  assert_true(history.set_global_transform_format(world, entity, Affine3x4F16))
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.25 : Float),
+      (100.0 : Float),
+      (1.5 : Float),
+      (0.0 : Float),
+      (2.0 : Float),
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.is_alive(parent))
+  assert_true(world.is_alive(entity))
+  assert_true(world.is_alive(camera))
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(parent))
+  assert_true(!world.is_alive(entity))
+  assert_true(!world.is_alive(camera))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+  match world.get_transform(entity) {
+    Some(transform) => {
+      assert_eq(transform.position.x(), (4.0 : Float))
+      assert_eq(transform.position.y(), (5.0 : Float))
+      assert_eq(transform.position.z(), (6.0 : Float))
+    }
+    None => abort("expected coverage Transform3D")
+  }
+  assert_true(world.get_child_of(entity) == Some(parent))
+  let refs = world.extract_global_transform_refs([entity])
+  let (format, _) = @comp.global_transform_ref_from_component_view(refs[0:8])
+  assert_true(format == Affine3x4F16)
+  match world.get_global_transform(entity) {
+    Some(read) => {
+      assert_eq(read.at(0, 3), (1.0 : Float))
+      assert_eq(read.at(1, 3), (2.0 : Float))
+      assert_eq(read.at(2, 3), (3.0 : Float))
+    }
+    None => abort("expected coverage GlobalTransform")
+  }
+  match world.camera_gpu_row(camera) {
+    Some(bytes) =>
+      assert_eq(
+        @comp.get_gpu_f32_byte_view(bytes[0:bytes.length()], 268),
+        (0.25 : Float),
+      )
+    None => abort("expected coverage Camera row")
+  }
+  assert_true(history.destroy_entity(world, entity))
+  assert_true(!world.is_alive(entity))
+  assert_true(history.undo(world))
+  assert_true(world.is_alive(entity))
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+}

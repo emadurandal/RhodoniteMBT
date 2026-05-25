@@ -9,13 +9,25 @@ import {
 // Values
 pub fn add_camera_lens_orthographic(World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
 
+pub fn add_camera_lens_orthographic_tracked(WorldHistory, World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
 pub fn add_camera_lens_perspective(World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
+pub fn add_camera_lens_perspective_tracked(WorldHistory, World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
 
 pub fn add_orbit_camera_controller(World, EntityId, ComponentTypeId, Double, Double) -> Bool
 
+pub fn add_orbit_camera_controller_tracked(WorldHistory, World, EntityId, ComponentTypeId, Double, Double) -> Bool
+
 pub fn add_orbit_camera_controller_with_distance(World, EntityId, ComponentTypeId, Double, Double, Float) -> Bool
 
+pub fn add_orbit_camera_controller_with_distance_tracked(WorldHistory, World, EntityId, ComponentTypeId, Double, Double, Float) -> Bool
+
 pub fn add_orbit_camera_controller_with_pose(World, EntityId, ComponentTypeId, Double, Double, Float, Float, Float, Float) -> Bool
+
+pub fn add_orbit_camera_controller_with_pose_tracked(WorldHistory, World, EntityId, ComponentTypeId, Double, Double, Float, Float, Float, Float) -> Bool
+
+pub fn camera_blob_sync_command_system(World, PhaseKey, ComponentTypeId) -> System
 
 pub fn camera_blob_sync_system(World, PhaseKey, ComponentTypeId) -> System
 
@@ -31,11 +43,15 @@ pub fn detect_dense_global_transform_layout(FixedArray[Byte], Int) -> GlobalTran
 
 pub fn detect_global_transform_runs(FixedArray[Byte], Int) -> Array[GlobalTransformRun]
 
+pub fn orbit_camera_blob_sync_command_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
+
 pub fn orbit_camera_blob_sync_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
 
 pub fn orbit_camera_pose(World, EntityId, ComponentTypeId) -> (Float, Float, Float, Float, Float, Float)
 
 pub fn orbit_camera_transform(World, EntityId, ComponentTypeId) -> (Double, Double, Double, Double, Double)
+
+pub fn orbit_camera_transform_command_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
 
 pub fn orbit_camera_transform_system(World, PhaseKey, ComponentTypeId, ComponentTypeId) -> System
 
@@ -49,13 +65,29 @@ pub fn register_orbit_camera_controller_component(World) -> ComponentTypeId
 
 pub fn request_orbit_camera_reset(World, EntityId, ComponentTypeId) -> Bool
 
+pub fn request_orbit_camera_reset_tracked(WorldHistory, World, EntityId, ComponentTypeId) -> Bool
+
 pub fn set_camera_home_from_current_transform(World, EntityId, ComponentTypeId) -> Bool
 
+pub fn set_camera_home_from_current_transform_tracked(WorldHistory, World, EntityId, ComponentTypeId) -> Bool
+
+pub fn set_camera_lens_orthographic_tracked(WorldHistory, World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
+pub fn set_camera_lens_perspective_tracked(WorldHistory, World, EntityId, ComponentTypeId, Float, Float, Float, Float, Float) -> Bool
+
 pub fn setup_orbit_orthographic_camera(World, EntityId, OrbitOrthographicCameraDesc) -> Bool
+
+pub fn setup_orbit_orthographic_camera_tracked(WorldHistory, World, EntityId, OrbitOrthographicCameraDesc) -> Bool
+
+pub fn sync_orbit_camera_blob_component_tracked(WorldHistory, World, EntityId, ComponentTypeId, ComponentTypeId) -> Bool
+
+pub fn sync_orbit_camera_transform_component_tracked(WorldHistory, World, EntityId, ComponentTypeId, ComponentTypeId) -> Bool
 
 pub fn transform_propagation_system(World, PhaseKey) -> System
 
 pub fn update_orbit_camera_controller_from_mouse_frame(World, EntityId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
+
+pub fn update_orbit_camera_controller_from_mouse_frame_tracked(WorldHistory, World, EntityId, Bool, Bool, Bool, Bool, Float, Float, Float) -> Bool
 
 pub fn write_global_transform_blob_by_refs(MutArrayView[Byte], FixedArray[Byte], Int, Int, GlobalTransformDenseLayout?, (GlobalTransformBlobWriter) -> Unit) -> Unit
 
@@ -347,6 +379,7 @@ pub fn WorldHistory::begin_transaction(Self, String) -> Bool
 pub fn WorldHistory::can_redo(Self) -> Bool
 pub fn WorldHistory::can_undo(Self) -> Bool
 pub fn WorldHistory::cancel_transaction(Self) -> Bool
+pub fn WorldHistory::cancel_transaction_reverting(Self, World) -> Bool
 pub fn WorldHistory::clear(Self) -> Unit
 pub fn WorldHistory::commit_transaction(Self) -> Bool
 pub fn WorldHistory::create_entities(Self, World, Int) -> Array[EntityId]

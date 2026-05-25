@@ -40,9 +40,11 @@ import {
 	world_orbit_camera_controller_component,
 	world_register_cpu_component,
 	world_remove_component,
+	world_camera_gpu_row_copy,
 	world_set_camera_matrices_col_major,
 	world_set_child_of,
 	world_set_component_bytes,
+	world_get_global_transform_col_major,
 	world_set_global_transform_col_major,
 	world_set_global_transform_format,
 	world_set_transform_trs,
@@ -64,6 +66,7 @@ import {
 	world_history_can_redo,
 	world_history_can_undo,
 	world_history_cancel_transaction,
+	world_history_cancel_transaction_reverting,
 	world_history_clear,
 	world_history_commit_transaction,
 	world_history_create_entities,
@@ -308,6 +311,14 @@ export class World {
 		);
 	}
 
+	cameraGpuRowCopy(entity: EntityId): Uint8Array | null {
+		const bytes = world_camera_gpu_row_copy(this.inner, entity.inner);
+		if (bytes === undefined || bytes === null) {
+			return null;
+		}
+		return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
+	}
+
 	writeGlobalTransformBlobRangeViews(
 		firstWord: number,
 		wordCount: number,
@@ -364,6 +375,16 @@ export class World {
 				Array.from(matrixColMajor),
 			),
 		);
+	}
+
+	getGlobalTransform(entity: EntityId): Float32Array | null {
+		const data = world_get_global_transform_col_major(this.inner, entity.inner);
+		if (data === undefined || data === null) {
+			return null;
+		}
+		return data instanceof Float32Array
+			? new Float32Array(data)
+			: Float32Array.from(data);
 	}
 
 	setCameraMatrices(
@@ -559,6 +580,12 @@ export class WorldHistory {
 
 	cancelTransaction(): boolean {
 		return moonBool(world_history_cancel_transaction(this.inner));
+	}
+
+	cancelTransactionReverting(world: World): boolean {
+		return moonBool(
+			world_history_cancel_transaction_reverting(this.inner, world.inner),
+		);
 	}
 
 	canUndo(): boolean {

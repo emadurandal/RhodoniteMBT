@@ -146,6 +146,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		entity: MoonEntityId,
 		matrixColMajor: number[],
 	): MoonBool;
+	export function world_get_global_transform_col_major(
+		world: MoonWorld,
+		entity: MoonEntityId,
+	): number[] | undefined;
 	export function world_set_camera_matrices_col_major(
 		world: MoonWorld,
 		entity: MoonEntityId,
@@ -157,6 +161,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		projectionKind: number,
 		flags: number,
 	): MoonBool;
+	export function world_camera_gpu_row_copy(
+		world: MoonWorld,
+		entity: MoonEntityId,
+	): Uint8Array | number[] | undefined;
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
@@ -256,6 +264,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	): MoonBool;
 	export function world_history_cancel_transaction(
 		history: MoonWorldHistory,
+	): MoonBool;
+	export function world_history_cancel_transaction_reverting(
+		history: MoonWorldHistory,
+		world: MoonWorld,
 	): MoonBool;
 	export function world_history_can_undo(history: MoonWorldHistory): MoonBool;
 	export function world_history_can_redo(history: MoonWorldHistory): MoonBool;
@@ -588,6 +600,23 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function transform_propagation_system(
 		world: MoonWorld,
 		phase: MoonPhaseKey,
+	): MoonSystem;
+	export function orbit_camera_transform_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		orbitComponent: MoonComponentTypeId,
+		homeComponent: MoonComponentTypeId,
+	): MoonSystem;
+	export function camera_blob_sync_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		lensComponent: MoonComponentTypeId,
+	): MoonSystem;
+	export function orbit_camera_blob_sync_command_system(
+		world: MoonWorld,
+		phase: MoonPhaseKey,
+		orbitComponent: MoonComponentTypeId,
+		lensComponent: MoonComponentTypeId,
 	): MoonSystem;
 
 	export function system_runner_new(): MoonSystemRunner;

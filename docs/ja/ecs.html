@@ -110,9 +110,10 @@ sequenceDiagram
             <li><code>orbit_camera_transform_system</code> は controller から <code>Transform3D</code> と parentless <code>GlobalTransform</code> を更新する。</li>
             <li><code>camera_blob_sync_system</code> と <code>orbit_camera_blob_sync_system</code> は <code>GlobalTransform + CameraLens</code> から builtin Camera blob を更新する。</li>
           </ul>
+          <p>runtime update では raw camera-control helper と system を使います。Undo / Redo に参加する editor/authoring 変更では、<code>WorldHistory</code> と一緒に MoonBit の <code>*_tracked</code> helper または TypeScript の <code>*Tracked</code> wrapper を使います。drag gesture のような一連の操作は 1 つの transaction にまとめられます。editor code で system として実行したい場合は <code>orbit_camera_transform_command_system</code>、<code>camera_blob_sync_command_system</code>、<code>orbit_camera_blob_sync_command_system</code> を使い、<code>WorldHistory::run_system_phase</code> 経由で phase を実行します。</p>
 
           <h2>TypeScript Wrapper</h2>
-          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、system scheduling、camera-control bytes、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
+          <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、system scheduling、camera-control bytes、GlobalTransform と Camera blob row helper、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
           <p>wrapper は <code>PhaseKey</code>、<code>SystemContext</code>、<code>System</code>、<code>SystemRunner</code>、callback 内で使う <code>CommandBuffer</code> を公開します。system は <code>reads</code>、<code>writes</code>、必要なら structural write permission を宣言して作り、<code>SystemRunner.runPhase(world, ctx, phase)</code> で実行します。command-buffer mutation を undo/redo に記録する場合は <code>WorldHistory.runSystemPhase(..., label)</code> を使います。</p>
           <p>npm root entrypoint では app scheduler の string <code>PhaseKey</code> を <code>PhaseKey</code> として維持し、ECS wrapper class は <code>EcsPhaseKey</code> でも export します。<code>rhodonite-mbt/ecs</code> subpath では ECS class を <code>PhaseKey</code> として export します。</p>
 

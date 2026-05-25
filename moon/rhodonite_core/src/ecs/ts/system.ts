@@ -20,6 +20,9 @@ import {
 	command_buffer_set_component_bytes,
 	command_buffer_set_global_transform_col_major,
 	command_buffer_set_global_transform_format,
+	camera_blob_sync_command_system,
+	orbit_camera_blob_sync_command_system,
+	orbit_camera_transform_command_system,
 	phase_key_name,
 	phase_key_new,
 	system_conflicts_with,
@@ -292,4 +295,50 @@ export function createTransformPropagationSystem(
 	phase: PhaseKey,
 ): System {
 	return new System(transform_propagation_system(world.inner, phase.inner));
+}
+
+export function createOrbitCameraTransformCommandSystem(
+	world: World,
+	phase: PhaseKey,
+	orbitComponent: ComponentTypeId,
+	homeComponent: ComponentTypeId,
+): System {
+	return new System(
+		orbit_camera_transform_command_system(
+			world.inner,
+			phase.inner,
+			orbitComponent.inner,
+			homeComponent.inner,
+		),
+	);
+}
+
+export function createCameraBlobSyncCommandSystem(
+	world: World,
+	phase: PhaseKey,
+	lensComponent: ComponentTypeId,
+): System {
+	return new System(
+		camera_blob_sync_command_system(
+			world.inner,
+			phase.inner,
+			lensComponent.inner,
+		),
+	);
+}
+
+export function createOrbitCameraBlobSyncCommandSystem(
+	world: World,
+	phase: PhaseKey,
+	orbitComponent: ComponentTypeId,
+	lensComponent: ComponentTypeId,
+): System {
+	return new System(
+		orbit_camera_blob_sync_command_system(
+			world.inner,
+			phase.inner,
+			orbitComponent.inner,
+			lensComponent.inner,
+		),
+	);
 }

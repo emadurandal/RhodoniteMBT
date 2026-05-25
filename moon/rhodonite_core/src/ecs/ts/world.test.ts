@@ -275,6 +275,9 @@ describe("ECS TypeScript wrapper", () => {
 		expect(entity).toBeDefined();
 
 		world.updateGlobalTransformsFromTransforms();
+		expect(Array.from(world.getGlobalTransform(entity!) ?? [])).toEqual(
+			identityMat4ColMajor(),
+		);
 		const writes = world.drainGlobalTransformBlobWriteViews();
 		expect(writes.length).toBeGreaterThan(0);
 		expect(writes[0]?.bytes().asUint8Array()).toBeInstanceOf(Uint8Array);
@@ -752,6 +755,90 @@ describe("ECS TypeScript wrapper", () => {
 		expect(() =>
 			runner.runPhase(world, SystemContext.new(0.016, 5), phase),
 		).toThrow();
+	});
+
+	it("audits direct WorldHistory mutation coverage", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryCoverageCpu", 4);
+		const parent = world.createEntity();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(history.beginTransaction("TS coverage direct")).toBe(true);
+		expect(
+			history.addComponentBytes(world, entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			history.setTransformTrs(world, entity, 4, 5, 6, 0, 0, 0, 1, 1, 1, 1),
+		).toBe(true);
+		expect(history.setChildOf(world, entity, parent)).toBe(true);
+		expect(
+			history.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(1, 2, 3),
+			),
+		).toBe(true);
+		expect(history.setGlobalTransformFormat(world, entity, 1)).toBe(true);
+		expect(
+			history.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLabel()).toBe("TS coverage direct");
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
+		);
+		expect(world.hasComponent(entity, world.transformComponent())).toBe(true);
+		expect(world.hasComponent(entity, world.childOfComponent())).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(entity, cpu)).toBe(false);
+		expect(world.hasComponent(entity, world.transformComponent())).toBe(false);
+		expect(world.hasComponent(entity, world.childOfComponent())).toBe(false);
+		expect(world.hasComponent(entity, world.globalTransformComponent())).toBe(
+			false,
+		);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+
+		expect(history.redo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
+		);
+		const childBytes = world.componentBytesCopy(entity, world.childOfComponent());
+		expect(childBytes).not.toBeNull();
+		const childView = new DataView(
+			childBytes?.buffer ?? new ArrayBuffer(0),
+			childBytes?.byteOffset ?? 0,
+			childBytes?.byteLength ?? 0,
+		);
+		expect(childView.getUint32(0, true)).toBe(parent.index());
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		const cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
 	});
 
 	it("tracks undo and redo through WorldHistory", () => {

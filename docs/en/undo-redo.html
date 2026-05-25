@@ -46,11 +46,13 @@ ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
           <p>Use dedicated tracked helpers for blob-backed builtins. <code>WorldHistory::set_global_transform</code> records GlobalTransform component presence and packed matrix row bytes, <code>WorldHistory::set_global_transform_format</code> records GlobalTransform format changes with the row payload, and <code>WorldHistory::set_camera_matrices</code> records Camera component presence and Camera GPU row bytes. Generic byte writes for these components remain untracked because their component rows only store blob references.</p>
+          <p><code>cancel_transaction</code> only discards the open record and does not revert world mutations that have already run. Use <code>cancel_transaction_reverting(world)</code> for helper-owned transactions that must fail atomically after applying earlier tracked steps.</p>
 
           <h2>Batch Authoring Helpers</h2>
           <p>Use <code>WorldHistory::create_entities</code> when an editor or importer creates many entities as one undoable operation. Use <code>WorldHistory::spawn_batch</code> when large imports should create entities directly in the target archetype with initialized component rows. Use <code>WorldHistory::add_component_bytes_many</code> for adding the same component type to many entities, and <code>WorldHistory::set_component_bytes_many</code> for selection or query-derived edits that update an existing component on many entities.</p>
           <p>For query-row authoring, use <code>QueryRow::write_tracked</code> or <code>RawQueryRow::write_tracked</code>. These helpers keep the same callback-scoped write style as <code>QueryRow::write</code>, but copy before/after bytes and record a compressed component delta when history is enabled. For archetype-column authoring, use <code>RawQueryArchetype::write_column_tracked</code>; it snapshots the column at the callback boundary and records only rows whose payload changed.</p>
           <p>The bulk component helpers validate every target first; if any entity is invalid, duplicated, already has the added component, is missing the changed component, or a payload has the wrong size, nothing is changed and the method returns <code>false</code>. The TypeScript wrapper exposes these as <code>WorldHistory.createEntities</code>, <code>WorldHistory.spawnBatch</code>, <code>WorldHistory.addComponentBytesMany</code>, <code>WorldHistory.setComponentBytesMany</code>, <code>WorldHistory.setGlobalTransform</code>, <code>WorldHistory.setGlobalTransformFormat</code>, and <code>WorldHistory.setCameraMatrices</code>.</p>
+          <p>Camera-control authoring helpers have tracked variants for editor flows, including orbit controller add/update/reset, camera home, lens add/set, orbit orthographic setup, and orbit transform/blob sync. Runtime camera-control systems keep using the raw helpers; editor tools can wrap a drag or reset gesture in one <code>WorldHistory</code> transaction.</p>
 
           <h2>Enabled State</h2>
           <ul>
@@ -70,6 +72,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Tracked Command Buffers</h2>
           <p>Use <code>WorldHistory::run_system_phase</code> when editor systems queue mutations through <code>CommandBuffer</code>. It runs the phase like <code>SystemRunner::run_phase</code>, but applies queued commands through tracked history methods and records them under the supplied label. Command buffers can queue the blob-backed builtin helpers as <code>set_global_transform</code>, <code>set_global_transform_format</code>, and <code>set_camera_matrices</code>; the tracked phase dispatches them through the matching <code>WorldHistory</code> helpers.</p>
+          <p>Camera-control has command-system variants for editor flows: <code>orbit_camera_transform_command_system</code>, <code>camera_blob_sync_command_system</code>, and <code>orbit_camera_blob_sync_command_system</code>. Run them with <code>WorldHistory::run_system_phase</code> to record the queued Transform3D, GlobalTransform, and Camera blob writes; keep the raw camera-control systems on runtime paths that do not need history.</p>
           <p>The TypeScript wrapper exposes the same path as <code>WorldHistory.runSystemPhase(runner, world, ctx, phase, label)</code> with <code>SystemRunner</code>, <code>System</code>, <code>SystemContext</code>, and <code>CommandBuffer</code> from <code>@rhodonite/core/ecs</code>. TypeScript systems can queue the builtin commands as <code>commands.setGlobalTransform</code>, <code>commands.setGlobalTransformFormat</code>, and <code>commands.setCameraMatrices</code>.</p>
           <pre><code class="language-moonbit">ignore(history.run_system_phase(
   runner,
@@ -79,6 +82,19 @@ ignore(history.commit_transaction())</code></pre>
   "Apply Commands",
 ))</code></pre>
           <p>If a transaction is already open, tracked system phases are merged into that transaction. If one queued command fails, later commands still run as before; successful commands remain undoable while the method returns <code>false</code>.</p>
+
+          <h2>Mutation API Coverage</h2>
+          <p>When adding a new mutating API, update this table and add a coverage test for the intended history behavior.</p>
+          <table>
+            <thead><tr><th>Surface</th><th>Undo/Redo status</th><th>Use for</th></tr></thead>
+            <tbody>
+              <tr><td><code>World</code> raw mutators</td><td>Untracked; guarded transactions abort raw mutation.</td><td>Runtime systems, simulation, and low-level storage edits.</td></tr>
+              <tr><td><code>WorldHistory</code> direct methods and tracked camera-control helpers</td><td>Tracked for entity create/destroy, component add/set/remove, bulk add/set, spawn batch, Transform3D TRS, ChildOf, GlobalTransform matrix/format, Camera matrices, and orbit camera-control setup/edit/sync helpers.</td><td>Editor and importer authoring operations.</td></tr>
+              <tr><td>Tracked query callbacks</td><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code>, and <code>RawQueryArchetype::write_column_tracked</code> record component byte deltas. Raw query writes remain untracked and are blocked by the guard.</td><td>Selection edits and query-derived authoring loops.</td></tr>
+              <tr><td><code>CommandBuffer</code> and command-system variants</td><td>Raw <code>SystemRunner::run_phase</code> applies commands untracked. <code>WorldHistory::run_system_phase</code> dispatches supported commands through tracked history APIs, including camera-control command systems.</td><td>Editor systems that queue changes during iteration.</td></tr>
+              <tr><td>GPU/blob upload and drain helpers</td><td>Intentionally untracked.</td><td>Derived render data upload, resize events, and readback plumbing.</td></tr>
+            </tbody>
+          </table>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> keeps up to 100 committed undo records by default. <code>set_max_undo_records</code> changes that count limit; when the stack exceeds the limit, the oldest records are discarded first. Passing <code>0</code> clears undo/redo state and makes future tracked calls delegate without retaining records. Use <code>undo_len</code> and <code>redo_len</code> to inspect the current retained record counts.</p>
