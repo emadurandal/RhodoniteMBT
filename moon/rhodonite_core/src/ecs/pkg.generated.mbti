@@ -311,9 +311,11 @@ pub fn World::camera_home_transform_component(Self) -> ComponentTypeId
 pub fn World::camera_lens_component(Self) -> ComponentTypeId
 pub fn World::camera_ref(Self, EntityId) -> CameraRef?
 pub fn World::child_of_component(Self) -> ComponentTypeId
+pub fn World::component_by_stable_key(Self, String) -> ComponentTypeId?
 pub fn World::component_bytes(Self, EntityId, ComponentTypeId) -> FixedArray[Byte]?
 pub fn World::component_cpu_stride(Self, ComponentTypeId) -> Int?
 pub fn World::component_info(Self, ComponentTypeId) -> RegisteredComponent?
+pub fn World::component_matches_identity(Self, ComponentTypeId, String, String?, String?) -> Bool
 pub fn World::component_registration_locked(Self) -> Bool
 pub fn World::compute_global_transform(Self, EntityId) -> @matrix44.Matrix44[Float]?
 pub fn World::create_entity(Self) -> EntityId

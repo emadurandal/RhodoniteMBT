@@ -32,6 +32,60 @@ test "World exposes component metadata without exposing registry mutation" {
     }
     None => abort("expected stable component metadata")
   }
+  assert_true(
+    world.component_by_stable_key("com.example.StableMetadataCPU") ==
+    Some(stable),
+  )
+  assert_true(world.component_by_stable_key("com.example.Missing") is None)
+  assert_true(world.component_by_stable_key("MetadataCPU") is None)
+  assert_true(
+    world.component_matches_identity(
+      stable,
+      "com.example.StableMetadataCPU",
+      None,
+      None,
+    ),
+  )
+  assert_true(
+    world.component_matches_identity(
+      stable,
+      "com.example.StableMetadataCPU",
+      Some("2"),
+      Some("sha256:stable-metadata"),
+    ),
+  )
+  assert_true(
+    !world.component_matches_identity(
+      stable,
+      "com.example.StableMetadataCPU",
+      Some("3"),
+      None,
+    ),
+  )
+  assert_true(
+    !world.component_matches_identity(
+      stable,
+      "com.example.StableMetadataCPU",
+      None,
+      Some("sha256:mismatch"),
+    ),
+  )
+  assert_true(
+    !world.component_matches_identity(
+      cpu,
+      "com.example.StableMetadataCPU",
+      None,
+      None,
+    ),
+  )
+  assert_true(
+    !world.component_matches_identity(
+      ComponentTypeId::new(9999),
+      "com.example.StableMetadataCPU",
+      None,
+      None,
+    ),
+  )
   assert_true(world.component_cpu_stride(cpu) is Some(4))
   assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
 }

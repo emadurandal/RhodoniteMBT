@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	ComponentTypeId,
 	GpuLayout,
 	EntityId,
 	PhaseKey,
@@ -70,6 +71,11 @@ describe("ECS TypeScript wrapper", () => {
 		expect(info?.stableKey()).toBeNull();
 		expect(info?.schemaVersion()).toBeNull();
 		expect(info?.schemaHash()).toBeNull();
+		expect(
+			world.componentMatchesIdentity(cpu, {
+				stableKey: "com.example.TsCPU",
+			}),
+		).toBe(false);
 	});
 
 	it("registers stable component identity metadata", () => {
@@ -86,6 +92,40 @@ describe("ECS TypeScript wrapper", () => {
 		expect(info?.stableKey()).toBe("com.example.TsStableCPU");
 		expect(info?.schemaVersion()).toBe("3");
 		expect(info?.schemaHash()).toBe("sha256:ts-stable");
+		expect(world.componentByStableKey("com.example.TsStableCPU")?.index()).toBe(
+			cpu.index(),
+		);
+		expect(world.componentByStableKey("com.example.MissingTsStable")).toBeNull();
+		expect(world.componentByStableKey("TsStableCPU")).toBeNull();
+		expect(
+			world.componentMatchesIdentity(cpu, {
+				stableKey: "com.example.TsStableCPU",
+			}),
+		).toBe(true);
+		expect(
+			world.componentMatchesIdentity(cpu, {
+				stableKey: "com.example.TsStableCPU",
+				schemaVersion: "3",
+				schemaHash: "sha256:ts-stable",
+			}),
+		).toBe(true);
+		expect(
+			world.componentMatchesIdentity(cpu, {
+				stableKey: "com.example.TsStableCPU",
+				schemaVersion: "4",
+			}),
+		).toBe(false);
+		expect(
+			world.componentMatchesIdentity(cpu, {
+				stableKey: "com.example.TsStableCPU",
+				schemaHash: "sha256:mismatch",
+			}),
+		).toBe(false);
+		expect(
+			world.componentMatchesIdentity(ComponentTypeId.new(9999), {
+				stableKey: "com.example.TsStableCPU",
+			}),
+		).toBe(false);
 		expect(world.addComponentBytes(world.createEntity(), cpu, new Uint8Array(8))).toBe(
 			true,
 		);

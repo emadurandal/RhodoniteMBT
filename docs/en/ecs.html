@@ -44,7 +44,7 @@ flowchart LR
   CB --> CQ[resize/write queues]
           </div>
           <ul>
-            <li>User components are registered as <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> and packed into per-archetype <code>ComponentColumn</code> buffers. Stable identity metadata is optional at runtime and is used by future history serialization.</li>
+            <li>User components are registered as <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> and packed into per-archetype <code>ComponentColumn</code> buffers. Stable identity metadata is optional at runtime and can be resolved with <code>component_by_stable_key</code> / <code>component_matches_identity</code> for future history serialization.</li>
             <li><code>GlobalTransform</code> and <code>Camera</code> store small CPU refs in rows; their matrix bytes live in dedicated blob stores.</li>
             <li>CPU columns grow by replacing fixed backing buffers instead of appending bytes one at a time, which avoids large JS <code>Array.push</code> hot paths.</li>
             <li><code>reserve_batch_capacity</code> and <code>spawn_batch</code> control archetype capacity for large spawn batches.</li>

@@ -170,6 +170,29 @@ pub fn world_component_info(
 }
 
 ///|
+/// Implements `world_component_by_stable_key`.
+pub fn world_component_by_stable_key(
+  world : @ecs.World,
+  stable_key : String,
+) -> @ecs.ComponentTypeId? {
+  world.component_by_stable_key(stable_key)
+}
+
+///|
+/// Implements `world_component_matches_identity`.
+pub fn world_component_matches_identity(
+  world : @ecs.World,
+  component : @ecs.ComponentTypeId,
+  stable_key : String,
+  schema_version : String?,
+  schema_hash : String?,
+) -> Bool {
+  world.component_matches_identity(
+    component, stable_key, schema_version, schema_hash,
+  )
+}
+
+///|
 /// Implements `world_component_info_name`.
 pub fn world_component_info_name(info : @ecs.RegisteredComponent) -> String {
   info.name

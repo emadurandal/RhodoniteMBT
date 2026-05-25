@@ -44,7 +44,7 @@ flowchart LR
   CB --> CQ[resize/write queues]
           </div>
           <ul>
-            <li>User-registered component は <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> として登録され、payload は archetype ごとの <code>ComponentColumn</code> に <code>row * stride</code> で packed されます。stable identity metadata は runtime では任意で、将来の history serialization で使います。</li>
+            <li>User-registered component は <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> として登録され、payload は archetype ごとの <code>ComponentColumn</code> に <code>row * stride</code> で packed されます。stable identity metadata は runtime では任意で、将来の history serialization 向けに <code>component_by_stable_key</code> / <code>component_matches_identity</code> で解決できます。</li>
             <li><code>GlobalTransform</code> と <code>Camera</code> は CPU row に小さな ref を置き、matrix bytes は専用 blob store に置きます。</li>
             <li>CPU column は固定長 buffer を backing storage とし、capacity 拡張時は buffer を差し替えます。JS backend で byte 単位の <code>Array.push</code> hot path を避けます。</li>
             <li><code>reserve_batch_capacity</code> と <code>spawn_batch</code> は大量 spawn 時の archetype capacity 拡張を制御する API です。</li>

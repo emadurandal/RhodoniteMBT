@@ -63,7 +63,7 @@
           </table>
 
           <h2>Payloads</h2>
-          <p>User CPU component は byte-exact payload として扱います。before/after bytes は対応する component schema key と一緒に保存された場合だけ安全に replay できます。schema が変わった場合、bytes を再解釈せず delta を reject します。</p>
+          <p>User CPU component は byte-exact payload として扱います。before/after bytes は対応する component schema key と一緒に保存された場合だけ安全に replay できます。import validation は <code>component_by_stable_key</code> で登録済み component を解決し、<code>component_matches_identity</code> で照合します。指定された schema version/hash field は一致必須で、未指定の schema field は wildcard として扱います。schema が変わった場合、bytes を再解釈せず delta を reject します。</p>
           <p>Blob-backed builtin では CPU ref bytes を source of truth として永続化しません。<code>GlobalTransform</code> は logical matrix row と format metadata を保存します。<code>Camera</code> は logical camera GPU row payload と runtime helper に必要な camera metadata を保存します。import 時は現在の session の world が新しい blob row を割り当て、その payload を書き込み、有効な CPU ref component を作ります。</p>
 
           <h2>Replay Validation</h2>
