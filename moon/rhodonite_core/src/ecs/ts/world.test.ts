@@ -934,18 +934,75 @@ describe("ECS TypeScript wrapper", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
 		const cpu = world.registerCpuComponent("TsHistorySummaryCpu", 4);
-		const entity = world.createEntity();
+		const removable = world.registerCpuComponent("TsHistorySummaryRemovable", 4);
+		const changedEntity = world.createEntity();
+		const addEntity = world.createEntity();
+		const removeEntity = world.createEntity();
+		const globalEntity = world.createEntity();
+		const cameraEntity = world.createEntity();
+		const identity = identityMat4ColMajor();
 		expect(
-			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+			world.addComponentBytes(changedEntity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			world.addComponentBytes(
+				removeEntity,
+				removable,
+				new Uint8Array([7, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			world.setGlobalTransform(
+				globalEntity,
+				translationMat4ColMajor(1, 2, 3),
+			),
+		).toBe(true);
+		expect(
+			world.setCameraMatrices(cameraEntity, identity, identity, 0.1, 50, 1, 1, 0),
 		).toBe(true);
 
-		expect(history.beginTransaction("TS summary change")).toBe(true);
+		expect(history.beginTransaction("TS summary mixed")).toBe(true);
+		const created = history.createEntity(world);
 		expect(
-			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
+			history.addComponentBytes(
+				world,
+				addEntity,
+				cpu,
+				new Uint8Array([8, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(history.removeComponent(world, removeEntity, removable)).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				changedEntity,
+				cpu,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			history.setGlobalTransform(
+				world,
+				globalEntity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		expect(
+			history.setCameraMatrices(
+				world,
+				cameraEntity,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
 		).toBe(true);
 		expect(history.commitTransaction()).toBe(true);
 		expect(history.beginTransaction("TS summary destroy")).toBe(true);
-		expect(history.destroyEntity(world, entity)).toBe(true);
+		expect(history.destroyEntity(world, changedEntity)).toBe(true);
 		expect(history.commitTransaction()).toBe(true);
 
 		const diagnostic = history.lastDiagnostic();
@@ -964,30 +1021,116 @@ describe("ECS TypeScript wrapper", () => {
 			beforePresent: true,
 			afterPresent: false,
 		});
-		expect(summaries[0]?.deltas[0]?.entity?.index()).toBe(entity.index());
+		expect(summaries[0]?.deltas[0]?.entity?.index()).toBe(
+			changedEntity.index(),
+		);
 		expect(summaries[1]).toMatchObject({
-			label: "TS summary change",
-			deltaCount: 1,
-			payloadBytes: 8,
+			label: "TS summary mixed",
+			deltaCount: 6,
+			payloadBytes: 688,
 		});
+		expect(summaries[1]?.deltas.map((delta) => delta.kind)).toEqual([
+			"entity_created",
+			"component_added",
+			"component_removed",
+			"component_changed",
+			"global_transform_changed",
+			"camera_changed",
+		]);
 		expect(summaries[1]?.deltas[0]).toMatchObject({
+			kind: "entity_created",
+			component: null,
+			componentCount: 0,
+			payloadBytes: 0,
+			beforePresent: false,
+			afterPresent: true,
+		});
+		expect(summaries[1]?.deltas[0]?.entity?.index()).toBe(created.index());
+		expect(summaries[1]?.deltas[1]).toMatchObject({
+			kind: "component_added",
+			componentCount: 0,
+			payloadBytes: 4,
+			beforePresent: false,
+			afterPresent: true,
+		});
+		expect(summaries[1]?.deltas[1]?.entity?.index()).toBe(addEntity.index());
+		expect(summaries[1]?.deltas[1]?.component?.index()).toBe(cpu.index());
+		expect(summaries[1]?.deltas[2]).toMatchObject({
+			kind: "component_removed",
+			componentCount: 0,
+			payloadBytes: 4,
+			beforePresent: true,
+			afterPresent: false,
+		});
+		expect(summaries[1]?.deltas[2]?.entity?.index()).toBe(removeEntity.index());
+		expect(summaries[1]?.deltas[2]?.component?.index()).toBe(
+			removable.index(),
+		);
+		expect(summaries[1]?.deltas[3]).toMatchObject({
 			kind: "component_changed",
 			componentCount: 0,
 			payloadBytes: 8,
 			beforePresent: true,
 			afterPresent: true,
 		});
-		expect(summaries[1]?.deltas[0]?.entity?.index()).toBe(entity.index());
-		expect(summaries[1]?.deltas[0]?.component?.index()).toBe(cpu.index());
+		expect(summaries[1]?.deltas[3]?.entity?.index()).toBe(
+			changedEntity.index(),
+		);
+		expect(summaries[1]?.deltas[3]?.component?.index()).toBe(cpu.index());
+		expect(summaries[1]?.deltas[4]).toMatchObject({
+			kind: "global_transform_changed",
+			component: null,
+			componentCount: 0,
+			payloadBytes: 96,
+			beforePresent: true,
+			afterPresent: true,
+		});
+		expect(summaries[1]?.deltas[4]?.entity?.index()).toBe(globalEntity.index());
+		expect(summaries[1]?.deltas[5]).toMatchObject({
+			kind: "camera_changed",
+			component: null,
+			componentCount: 0,
+			payloadBytes: 576,
+			beforePresent: true,
+			afterPresent: true,
+		});
+		expect(summaries[1]?.deltas[5]?.entity?.index()).toBe(cameraEntity.index());
+		for (const summary of summaries) {
+			for (const delta of summary.deltas) {
+				expect("bytes" in (delta as unknown as Record<string, unknown>)).toBe(
+					false,
+				);
+				expect("before" in (delta as unknown as Record<string, unknown>)).toBe(
+					false,
+				);
+				expect("after" in (delta as unknown as Record<string, unknown>)).toBe(
+					false,
+				);
+			}
+		}
 		expect(history.lastDiagnostic()).toBe(diagnostic);
 		expect(history.undoLen()).toBe(2);
 		expect(history.redoLen()).toBe(0);
 
 		expect(history.undo(world)).toBe(true);
+		expect(history.undo(world)).toBe(true);
 		const redoSummaries = history.redoSummary();
-		expect(redoSummaries).toHaveLength(1);
-		expect(redoSummaries[0]?.label).toBe("TS summary destroy");
-		expect(redoSummaries[0]?.deltas[0]?.kind).toBe("entity_destroyed");
+		expect(redoSummaries).toHaveLength(2);
+		expect(redoSummaries[0]?.label).toBe("TS summary mixed");
+		expect(redoSummaries[0]?.deltas.map((delta) => delta.kind)).toEqual([
+			"entity_created",
+			"component_added",
+			"component_removed",
+			"component_changed",
+			"global_transform_changed",
+			"camera_changed",
+		]);
+		expect(redoSummaries[0]?.payloadBytes).toBe(summaries[1]?.payloadBytes);
+		expect(redoSummaries[1]?.label).toBe("TS summary destroy");
+		expect(redoSummaries[1]?.deltas[0]?.kind).toBe("entity_destroyed");
+		expect(redoSummaries[1]?.payloadBytes).toBe(summaries[0]?.payloadBytes);
+		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(2);
 	});
 
 	it("reports history serialization eligibility without exposing payloads", () => {
