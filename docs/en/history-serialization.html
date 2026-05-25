@@ -18,6 +18,7 @@
         <a href="./ecs.html">ECS</a>
         <a href="./undo-redo.html">Undo / Redo</a>
         <a href="./history-serialization.html">History Serialization</a>
+        <a href="./history-mutation-coverage.html">History Mutation Coverage</a>
         <a href="./input-architecture.html">Input</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
         <a href="./ecs-design-notes.html">ECS Design Notes</a>
@@ -33,8 +34,10 @@
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return a draft in-memory archive when all retained records are eligible for serialization.</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> and <code>WorldHistory::import_redo_stack(world, archive)</code> validate and replace the target stack from that archive without mutating the world.</li>
-            <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, and <code>importRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
-            <li>Import/export use <code>format_version = 1</code>. This is a library object model, not yet a JSON/binary file format.</li>
+            <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> and <code>WorldHistory::validate_import_redo_stack(world, archive)</code> return dry-run import validation reports with record and delta locations.</li>
+            <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, <code>importRedoStack</code>, <code>validateImportUndoStack</code>, and <code>validateImportRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
+            <li>The TypeScript npm surface also exposes <code>encodeHistoryExportJson</code> and <code>decodeHistoryExportJson</code> for a JSON archive string format.</li>
+            <li>Import/export and JSON archive encoding use <code>format_version = 1</code>. MoonBit core still exposes the in-memory object model only; JSON encoding is implemented in TypeScript.</li>
             <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
             <li>MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
@@ -86,6 +89,7 @@
 
           <h2>Import MVP</h2>
           <p>Import consumes the same in-memory archive shape and replaces only the target stack. It does not append to existing records and does not clear the opposite stack. The target world must already be in the current state represented by the archive; import validates the full stack against that world before replacing anything.</p>
+          <p>The validation report APIs run the same archive conversion and full-stack applicability checks without changing history stacks, the world, or <code>last_diagnostic</code>. Top-level, record-level, and delta-level reports expose <code>valid</code>, <code>reason</code>, and archive-order indexes. Record index <code>0</code> is the next imported undo or redo operation; delta indexes refer to the original archive order even when undo validation checks deltas in reverse application order. When full-stack validation fails, the failing delta and any later unvalidated record or delta reports are marked invalid with <code>import_validation_failed</code>.</p>
           <table>
             <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
             <tbody>
@@ -94,6 +98,19 @@
               <tr><td>Missing or mismatched stable component identity</td><td><code>import_identity_mismatch</code></td></tr>
               <tr><td>Invalid payload format, byte length, or row format</td><td><code>import_invalid_payload</code></td></tr>
               <tr><td>The full imported stack cannot apply to the current world</td><td><code>import_validation_failed</code></td></tr>
+            </tbody>
+          </table>
+
+          <h2>JSON Archive MVP</h2>
+          <p><code>encodeHistoryExportJson</code> converts a TypeScript <code>HistoryExport</code> into a JSON string, and <code>decodeHistoryExportJson</code> validates that JSON string and returns a <code>HistoryExport</code> that can be passed to <code>importUndoStack</code> or <code>importRedoStack</code>.</p>
+          <table>
+            <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
+            <tbody>
+              <tr><td>Naming</td><td>Archive fields use snake_case, such as <code>format_version</code>, <code>record_count</code>, <code>delta_count</code>, <code>local_component</code>, and <code>global_transform_format</code>.</td></tr>
+              <tr><td>Entity</td><td>Stored as <code>{ index, generation }</code>.</td></tr>
+              <tr><td>Component</td><td>Stored as <code>{ index }</code> only as a local hint beside stable component identity metadata.</td></tr>
+              <tr><td>Bytes</td><td>Stored as <code>bytes_base64</code>. Number-array byte payloads are not emitted or accepted by the MVP decoder.</td></tr>
+              <tr><td>Validation</td><td>The decoder rejects unsupported versions, invalid JSON shape, unsupported delta kinds, invalid base64, and mismatched record/delta counts by throwing <code>Error</code>.</td></tr>
             </tbody>
           </table>
 

@@ -18,6 +18,7 @@
         <a href="./ecs.html">ECS</a>
         <a href="./undo-redo.html">Undo / Redo</a>
         <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a>
         <a href="./input-architecture.html">入力</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
         <a href="./ecs-design-notes.html">ECS Design Notes</a>
@@ -33,8 +34,10 @@
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に draft in-memory archive を返します。</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>
-            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
-            <li>Import/export は <code>format_version = 1</code> を使います。これは library object model であり、JSON/binary file format ではまだありません。</li>
+            <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> と <code>WorldHistory::validate_import_redo_stack(world, archive)</code> は、record / delta 位置を含む dry-run import validation report を返します。</li>
+            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code>、<code>validateImportUndoStack</code>、<code>validateImportRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
+            <li>TypeScript npm surface は JSON archive string format 用に <code>encodeHistoryExportJson</code> と <code>decodeHistoryExportJson</code> も公開します。</li>
+            <li>Import/export と JSON archive encoding は <code>format_version = 1</code> を使います。MoonBit core は in-memory object model のみを公開し、JSON encoding は TypeScript 側で実装します。</li>
             <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
             <li>MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
@@ -86,6 +89,7 @@
 
           <h2>Import MVP</h2>
           <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。</p>
+          <p>validation report API は同じ archive conversion と full-stack applicability check を実行しますが、history stack、world、<code>last_diagnostic</code> を変更しません。top-level / record-level / delta-level の各 report は <code>valid</code>、<code>reason</code>、archive order の index を返します。record index <code>0</code> は次に import される Undo / Redo operation です。delta index は、Undo validation が内部で逆順適用を検証する場合でも、元の archive order を指します。full-stack validation が失敗した場合、失敗した delta と、それ以降の未検証 record / delta report は <code>import_validation_failed</code> で invalid としてマークされます。</p>
           <table>
             <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
             <tbody>
@@ -94,6 +98,19 @@
               <tr><td>stable component identity が解決できない、または一致しない</td><td><code>import_identity_mismatch</code></td></tr>
               <tr><td>payload format、byte length、row format が不正</td><td><code>import_invalid_payload</code></td></tr>
               <tr><td>import stack 全体を current world に適用できない</td><td><code>import_validation_failed</code></td></tr>
+            </tbody>
+          </table>
+
+          <h2>JSON Archive MVP</h2>
+          <p><code>encodeHistoryExportJson</code> は TypeScript の <code>HistoryExport</code> を JSON string に変換します。<code>decodeHistoryExportJson</code> はその JSON string を検証し、<code>importUndoStack</code> / <code>importRedoStack</code> に渡せる <code>HistoryExport</code> を返します。</p>
+          <table>
+            <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
+            <tbody>
+              <tr><td>Naming</td><td>Archive field は <code>format_version</code>、<code>record_count</code>、<code>delta_count</code>、<code>local_component</code>、<code>global_transform_format</code> のような snake_case を使います。</td></tr>
+              <tr><td>Entity</td><td><code>{ index, generation }</code> として保存します。</td></tr>
+              <tr><td>Component</td><td>Stable component identity metadata と併せて、local hint として <code>{ index }</code> を保存します。</td></tr>
+              <tr><td>Bytes</td><td><code>bytes_base64</code> として保存します。MVP decoder は number-array byte payload を出力せず、受け付けません。</td></tr>
+              <tr><td>Validation</td><td>未対応 version、不正な JSON shape、未対応 delta kind、不正 base64、record/delta count 不一致は <code>Error</code> を throw します。</td></tr>
             </tbody>
           </table>
 

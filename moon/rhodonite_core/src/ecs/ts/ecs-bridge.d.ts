@@ -18,6 +18,9 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonWorldHistorySerializationRecordReport = object;
 	export type MoonWorldHistorySerializationDeltaReport = object;
 	export type MoonWorldHistorySerializationComponentReport = object;
+	export type MoonWorldHistoryImportValidationReport = object;
+	export type MoonWorldHistoryImportValidationRecordReport = object;
+	export type MoonWorldHistoryImportValidationDeltaReport = object;
 	export type MoonWorldHistoryExport = object;
 	export type MoonWorldHistoryExportRecord = object;
 	export type MoonWorldHistoryExportDelta = object;
@@ -313,6 +316,70 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		exported: MoonWorldHistoryExport,
 	): MoonBool;
+	export function world_history_validate_import_undo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		exported: MoonWorldHistoryExport,
+	): MoonWorldHistoryImportValidationReport;
+	export function world_history_validate_import_redo_stack(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		exported: MoonWorldHistoryExport,
+	): MoonWorldHistoryImportValidationReport;
+	export function world_history_import_validation_report_valid(
+		report: MoonWorldHistoryImportValidationReport,
+	): MoonBool;
+	export function world_history_import_validation_report_reason(
+		report: MoonWorldHistoryImportValidationReport,
+	): string;
+	export function world_history_import_validation_report_format_version(
+		report: MoonWorldHistoryImportValidationReport,
+	): number;
+	export function world_history_import_validation_report_record_count(
+		report: MoonWorldHistoryImportValidationReport,
+	): number;
+	export function world_history_import_validation_report_records(
+		report: MoonWorldHistoryImportValidationReport,
+	): MoonWorldHistoryImportValidationRecordReport[];
+	export function world_history_import_validation_record_report_index(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): number;
+	export function world_history_import_validation_record_report_label(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): string;
+	export function world_history_import_validation_record_report_valid(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): MoonBool;
+	export function world_history_import_validation_record_report_reason(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): string;
+	export function world_history_import_validation_record_report_delta_count(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): number;
+	export function world_history_import_validation_record_report_deltas(
+		report: MoonWorldHistoryImportValidationRecordReport,
+	): MoonWorldHistoryImportValidationDeltaReport[];
+	export function world_history_import_validation_delta_report_index(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): number;
+	export function world_history_import_validation_delta_report_kind(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): string;
+	export function world_history_import_validation_delta_report_entity(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): MoonEntityId | undefined;
+	export function world_history_import_validation_delta_report_component(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): MoonComponentTypeId | undefined;
+	export function world_history_import_validation_delta_report_component_key(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): string | undefined;
+	export function world_history_import_validation_delta_report_valid(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): MoonBool;
+	export function world_history_import_validation_delta_report_reason(
+		report: MoonWorldHistoryImportValidationDeltaReport,
+	): string;
 	export function world_history_serialization_report_serializable(
 		report: MoonWorldHistorySerializationReport,
 	): MoonBool;

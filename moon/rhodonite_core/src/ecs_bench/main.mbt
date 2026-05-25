@@ -114,6 +114,44 @@ fn make_world_batch(
 }
 
 ///|
+/// Implements `bench_bytes4`.
+fn bench_bytes4(seed : Int) -> FixedArray[Byte] {
+  let bytes = FixedArray::make(4, (0 : Byte))
+  bytes[0] = seed.to_byte()
+  bytes[1] = (seed + 1).to_byte()
+  bytes[2] = (seed + 2).to_byte()
+  bytes[3] = (seed + 3).to_byte()
+  bytes
+}
+
+///|
+/// Implements `write_bench_bytes4_to_view`.
+fn write_bench_bytes4_to_view(view : MutArrayView[Byte], seed : Int) -> Unit {
+  view[0] = seed.to_byte()
+  view[1] = (seed + 1).to_byte()
+  view[2] = (seed + 2).to_byte()
+  view[3] = (seed + 3).to_byte()
+}
+
+///|
+/// Implements `make_component_world`.
+fn make_component_world(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, Array[@ecs.EntityId]) {
+  let world = @ecs.World::new()
+  let component = world.register_cpu_component("BenchHistoryBytes", 4)
+  let entities : Array[@ecs.EntityId] = []
+  for i = 0; i < count; i = i + 1 {
+    let entity = world.create_entity()
+    if !world.add_component_bytes(entity, component, bench_bytes4(i)) {
+      abort("expected benchmark component add")
+    }
+    entities.push(entity)
+  }
+  (world, component, entities)
+}
+
+///|
 /// Implements `report`.
 fn report(name : String, count : Int, started : Double, checksum : Int) -> Unit {
   let elapsed = monotonic_ms() - started
@@ -229,6 +267,334 @@ fn bench_make_world_batch(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_history_raw_set_component_bytes`.
+fn bench_history_raw_set_component_bytes(count : Int) -> Unit {
+  let (world, component, entities) = make_component_world(count)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !world.set_component_bytes(entities[i], component, bench_bytes4(i + 17)) {
+      abort("expected raw component set")
+    }
+    checksum = checksum + entities[i].gpu_index()
+  }
+  report("history_raw_set_component_bytes", count, started, checksum)
+}
+
+///|
+/// Implements `bench_history_disabled_set_component_bytes`.
+fn bench_history_disabled_set_component_bytes(count : Int) -> Unit {
+  let (world, component, entities) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  history.set_enabled(false)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !history.set_component_bytes(
+        world,
+        entities[i],
+        component,
+        bench_bytes4(i + 31),
+      ) {
+      abort("expected disabled history component set")
+    }
+    checksum = checksum + entities[i].gpu_index()
+  }
+  report(
+    "history_disabled_set_component_bytes",
+    count,
+    started,
+    checksum + history.undo_len(),
+  )
+}
+
+///|
+/// Implements `bench_history_enabled_transaction_set_component_bytes`.
+fn bench_history_enabled_transaction_set_component_bytes(count : Int) -> Unit {
+  let (world, component, entities) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  if !history.begin_transaction("bench set bytes") {
+    abort("expected history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !history.set_component_bytes(
+        world,
+        entities[i],
+        component,
+        bench_bytes4(i + 47),
+      ) {
+      abort("expected history component set")
+    }
+    checksum = checksum + entities[i].gpu_index()
+  }
+  if !history.commit_transaction() {
+    abort("expected history transaction commit")
+  }
+  report(
+    "history_enabled_transaction_set_component_bytes",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_guarded_transaction_set_component_bytes`.
+fn bench_history_guarded_transaction_set_component_bytes(count : Int) -> Unit {
+  let (world, component, entities) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  history.set_raw_mutation_guard_enabled(true)
+  if !history.begin_guarded_transaction(world, "bench guarded set bytes") {
+    abort("expected guarded history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if !history.set_component_bytes(
+        world,
+        entities[i],
+        component,
+        bench_bytes4(i + 61),
+      ) {
+      abort("expected guarded history component set")
+    }
+    checksum = checksum + entities[i].gpu_index()
+  }
+  if !history.commit_transaction() {
+    abort("expected guarded history transaction commit")
+  }
+  report(
+    "history_guarded_transaction_set_component_bytes",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_query_row_tracked_disabled`.
+fn bench_history_query_row_tracked_disabled(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  history.set_enabled(false)
+  let query = @ecs.Query::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each(world, row => {
+    let idx = row.entity().gpu_index()
+    if !row.write_tracked(history, component, view => {
+        write_bench_bytes4_to_view(view, idx + 71)
+      }) {
+      abort("expected disabled tracked row write")
+    }
+    checksum = checksum + idx
+  })
+  report(
+    "history_query_row_tracked_disabled",
+    count,
+    started,
+    checksum + history.undo_len(),
+  )
+}
+
+///|
+/// Implements `bench_history_query_row_tracked_enabled`.
+fn bench_history_query_row_tracked_enabled(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.Query::new([component])
+  if !history.begin_transaction("bench query row tracked") {
+    abort("expected query row history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each(world, row => {
+    let idx = row.entity().gpu_index()
+    if !row.write_tracked(history, component, view => {
+        write_bench_bytes4_to_view(view, idx + 83)
+      }) {
+      abort("expected tracked row write")
+    }
+    checksum = checksum + idx
+  })
+  if !history.commit_transaction() {
+    abort("expected query row history transaction commit")
+  }
+  report(
+    "history_query_row_tracked_enabled",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_archetype_column_tracked_disabled`.
+fn bench_history_archetype_column_tracked_disabled(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  history.set_enabled(false)
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(component)
+    if !arch.write_column_tracked(history, component, col => {
+        for row = 0; row < arch.length(); row = row + 1 {
+          let idx = arch.entity(row).gpu_index()
+          write_bench_bytes4_to_view(
+            col.mut_view(start=row * stride, end=row * stride + stride),
+            idx + 97,
+          )
+          checksum = checksum + idx
+        }
+      }) {
+      abort("expected disabled tracked column write")
+    }
+  })
+  report(
+    "history_archetype_column_tracked_disabled",
+    count,
+    started,
+    checksum + history.undo_len(),
+  )
+}
+
+///|
+/// Implements `bench_history_archetype_column_tracked_enabled`.
+fn bench_history_archetype_column_tracked_enabled(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.RawQuery::new([component])
+  if !history.begin_transaction("bench column tracked") {
+    abort("expected column history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(component)
+    if !arch.write_column_tracked(history, component, col => {
+        for row = 0; row < arch.length(); row = row + 1 {
+          let idx = arch.entity(row).gpu_index()
+          write_bench_bytes4_to_view(
+            col.mut_view(start=row * stride, end=row * stride + stride),
+            idx + 109,
+          )
+          checksum = checksum + idx
+        }
+      }) {
+      abort("expected tracked column write")
+    }
+  })
+  if !history.commit_transaction() {
+    abort("expected column history transaction commit")
+  }
+  report(
+    "history_archetype_column_tracked_enabled",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_command_raw_phase`.
+fn bench_history_command_raw_phase(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let phase = @ecs.PhaseKey::new("history-command-raw-bench")
+  let query = @ecs.Query::new([component])
+  let runner = @ecs.SystemRunner::new()
+  let mut checksum = 0
+  runner.add_system(
+    @ecs.System::new("history-command-raw-write", phase, [], [component], (
+      system_world,
+      _ctx,
+      commands,
+    ) => {
+      query.for_each(system_world, row => {
+        let idx = row.entity().gpu_index()
+        commands.set_component_bytes(
+          row.entity(),
+          component,
+          bench_bytes4(idx + 131),
+        )
+        checksum = checksum + idx
+      })
+    }),
+  )
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected raw command phase")
+  }
+  report("history_command_raw_phase", count, started, checksum)
+}
+
+///|
+/// Implements `bench_history_command_tracked_phase`.
+fn bench_history_command_tracked_phase(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let phase = @ecs.PhaseKey::new("history-command-tracked-bench")
+  let query = @ecs.Query::new([component])
+  let runner = @ecs.SystemRunner::new()
+  let mut checksum = 0
+  runner.add_system(
+    @ecs.System::new("history-command-tracked-write", phase, [], [component], (
+      system_world,
+      _ctx,
+      commands,
+    ) => {
+      query.for_each(system_world, row => {
+        let idx = row.entity().gpu_index()
+        commands.set_component_bytes(
+          row.entity(),
+          component,
+          bench_bytes4(idx + 149),
+        )
+        checksum = checksum + idx
+      })
+    }),
+  )
+  let started = monotonic_ms()
+  if !history.run_system_phase(
+      runner,
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+      "bench command tracked",
+    ) {
+    abort("expected tracked command phase")
+  }
+  report(
+    "history_command_tracked_phase",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `run_history_suite`.
+fn run_history_suite(count : Int) -> Unit {
+  bench_history_raw_set_component_bytes(count)
+  bench_history_disabled_set_component_bytes(count)
+  bench_history_enabled_transaction_set_component_bytes(count)
+  bench_history_guarded_transaction_set_component_bytes(count)
+  bench_history_query_row_tracked_disabled(count)
+  bench_history_query_row_tracked_enabled(count)
+  bench_history_archetype_column_tracked_disabled(count)
+  bench_history_archetype_column_tracked_enabled(count)
+  bench_history_command_raw_phase(count)
+  bench_history_command_tracked_phase(count)
+}
+
+///|
 /// Implements `run_suite`.
 fn run_suite(count : Int) -> Unit {
   bench_query_row(count)
@@ -237,12 +603,15 @@ fn run_suite(count : Int) -> Unit {
   bench_global_and_drain(count)
   bench_global_and_drain_views(count)
   bench_make_world_batch(count)
+  run_history_suite(count)
 }
 
 ///|
 /// Implements `main {`.
 fn main {
-  println("ecs_bench: QueryRow vs archetype vs builtin transform paths")
+  println(
+    "ecs_bench: QueryRow vs archetype vs builtin transform and history paths",
+  )
   run_suite(1000)
   run_suite(10000)
 }

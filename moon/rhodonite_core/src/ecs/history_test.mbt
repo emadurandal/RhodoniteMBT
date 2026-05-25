@@ -1274,6 +1274,21 @@ test "WorldHistory imports stable component undo stack" {
     Some(archive) => archive
     None => abort("expected exportable undo archive")
   }
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(report.valid)
+  assert_eq(report.reason, "none")
+  assert_eq(report.record_count, 1)
+  assert_eq(report.records[0].index, 0)
+  assert_eq(report.records[0].label, "set_component_bytes")
+  assert_true(report.records[0].valid)
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_eq(report.records[0].deltas[0].kind, "component_changed")
+  assert_true(
+    report.records[0].deltas[0].component_key ==
+    Some("com.example.HistoryImportStable"),
+  )
+  assert_true(report.records[0].deltas[0].valid)
+  assert_eq(imported.last_diagnostic(), "none")
   assert_true(imported.import_undo_stack(world, archive))
   assert_eq(imported.undo_len(), 1)
   assert_true(imported.undo(world))
@@ -1450,6 +1465,22 @@ test "WorldHistory import rejects invalid archive without mutating stacks" {
     record_count: 1,
     records: bad_records,
   }
+  let diagnostic_before_validate = imported.last_diagnostic()
+  let report = imported.validate_import_undo_stack(world, bad_archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_identity_mismatch")
+  assert_eq(report.record_count, 1)
+  assert_eq(report.records[0].index, 0)
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_identity_mismatch")
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_true(
+    report.records[0].deltas[0].component_key ==
+    Some("com.example.MissingHistoryImportRejectStable"),
+  )
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_identity_mismatch")
+  assert_eq(imported.last_diagnostic(), diagnostic_before_validate)
   assert_true(!imported.import_undo_stack(world, bad_archive))
   assert_eq(imported.last_diagnostic(), "import_identity_mismatch")
   assert_eq(imported.undo_len(), 1)
@@ -1480,10 +1511,70 @@ test "WorldHistory import validates full stack before replacing" {
     None => abort("expected exportable archive")
   }
   assert_true(world.remove_component(entity, component))
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_validation_failed")
+  assert_eq(report.records[0].index, 0)
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_validation_failed")
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_validation_failed")
+  assert_eq(imported.last_diagnostic(), "none")
   assert_true(!imported.import_undo_stack(world, archive))
   assert_eq(imported.last_diagnostic(), "import_validation_failed")
   assert_eq(imported.undo_len(), 0)
   assert_true(!world.has_component(entity, component))
+}
+
+///|
+test "WorldHistory import validation marks skipped records and deltas invalid" {
+  let world = World::new()
+  let source = WorldHistory::new()
+  let imported = WorldHistory::new()
+  let a = world.register_cpu_component_with_identity(
+    "HistoryImportSkippedA",
+    4,
+    "com.example.HistoryImportSkippedA",
+    None,
+    None,
+  )
+  let b = world.register_cpu_component_with_identity(
+    "HistoryImportSkippedB",
+    4,
+    "com.example.HistoryImportSkippedB",
+    None,
+    None,
+  )
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, a, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(entity, b, bytes4(3, 0, 0, 0)))
+  assert_true(source.set_component_bytes(world, entity, a, bytes4(2, 0, 0, 0)))
+  assert_true(source.begin_transaction("multi-set"))
+  assert_true(source.set_component_bytes(world, entity, a, bytes4(5, 0, 0, 0)))
+  assert_true(source.set_component_bytes(world, entity, b, bytes4(4, 0, 0, 0)))
+  assert_true(source.commit_transaction())
+  let archive = match source.export_undo_stack(world) {
+    Some(archive) => archive
+    None => abort("expected exportable archive")
+  }
+  assert_eq(archive.record_count, 2)
+  assert_eq(archive.records[0].delta_count, 2)
+  assert_true(world.remove_component(entity, b))
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_validation_failed")
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_validation_failed")
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_validation_failed")
+  assert_true(!report.records[0].deltas[1].valid)
+  assert_eq(report.records[0].deltas[1].reason, "import_validation_failed")
+  assert_true(!report.records[1].valid)
+  assert_eq(report.records[1].reason, "import_validation_failed")
+  assert_true(!report.records[1].deltas[0].valid)
+  assert_eq(report.records[1].deltas[0].reason, "import_validation_failed")
+  assert_eq(imported.last_diagnostic(), "none")
 }
 
 ///|
@@ -2080,6 +2171,20 @@ test "WorldHistory direct mutation coverage audit" {
   let world = World::new()
   let history = WorldHistory::new()
   let cpu = world.register_cpu_component("HistoryCoverageCpu", 4)
+  let marker = world.register_cpu_component("HistoryCoverageMarker", 4)
+  let removable = world.register_cpu_component("HistoryCoverageRemovable", 4)
+  let bulk_add0 = world.create_entity()
+  let bulk_add1 = world.create_entity()
+  let bulk_set0 = world.create_entity()
+  let bulk_set1 = world.create_entity()
+  let remove_entity = world.create_entity()
+  let victim = world.create_entity()
+  assert_true(world.add_component_bytes(bulk_set0, cpu, bytes4(10, 0, 0, 0)))
+  assert_true(world.add_component_bytes(bulk_set1, cpu, bytes4(11, 0, 0, 0)))
+  assert_true(
+    world.add_component_bytes(remove_entity, removable, bytes4(90, 0, 0, 0)),
+  )
+  assert_true(world.add_component_bytes(victim, cpu, bytes4(99, 0, 0, 0)))
   let global_matrix = @m44.Matrix44::translation(
     (1.0 : Float),
     (2.0 : Float),
@@ -2088,9 +2193,15 @@ test "WorldHistory direct mutation coverage audit" {
     (0.0 : Float),
   )
   assert_true(history.begin_transaction("Coverage Direct"))
+  let batch_entities = history.create_entities(world, 2)
   let parent = history.create_entity(world)
   let entity = history.create_entity(world)
   let camera = history.create_entity(world)
+  let spawned = history.spawn_batch(world, [marker, cpu], 2, fn(i, _e, row) {
+    row.write(marker, c => c[0] = (30 + i).to_byte())
+    row.write(cpu, c => c[0] = (40 + i).to_byte())
+  })
+  assert_true(history.add_component(world, parent, marker))
   assert_true(
     history.add_component_bytes(world, entity, cpu, bytes4(1, 0, 0, 0)),
   )
@@ -2129,17 +2240,80 @@ test "WorldHistory direct mutation coverage audit" {
       (2.0 : Float),
     ),
   )
+  assert_true(
+    history.add_component_bytes_many(world, marker, [bulk_add0, bulk_add1], [
+      bytes4(50, 0, 0, 0),
+      bytes4(51, 0, 0, 0),
+    ]),
+  )
+  assert_true(
+    history.set_component_bytes_many(world, cpu, [bulk_set0, bulk_set1], [
+      bytes4(12, 0, 0, 0),
+      bytes4(13, 0, 0, 0),
+    ]),
+  )
+  assert_true(history.remove_component(world, remove_entity, removable))
+  assert_true(history.destroy_entity(world, victim))
   assert_true(history.commit_transaction())
   assert_eq(history.undo_len(), 1)
+  assert_eq(batch_entities.length(), 2)
+  assert_eq(spawned.length(), 2)
+  assert_true(world.is_alive(batch_entities[0]))
+  assert_true(world.is_alive(batch_entities[1]))
   assert_true(world.is_alive(parent))
   assert_true(world.is_alive(entity))
   assert_true(world.is_alive(camera))
+  assert_true(world.is_alive(spawned[0]))
+  assert_true(world.is_alive(spawned[1]))
+  assert_true(!world.is_alive(victim))
   assert_true(history.undo(world))
+  assert_true(!world.is_alive(batch_entities[0]))
+  assert_true(!world.is_alive(batch_entities[1]))
   assert_true(!world.is_alive(parent))
   assert_true(!world.is_alive(entity))
   assert_true(!world.is_alive(camera))
+  assert_true(!world.is_alive(spawned[0]))
+  assert_true(!world.is_alive(spawned[1]))
+  assert_true(!world.has_component(bulk_add0, marker))
+  assert_true(!world.has_component(bulk_add1, marker))
+  assert_true(
+    world.component_bytes(bulk_set0, cpu) == Some(bytes4(10, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set1, cpu) == Some(bytes4(11, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(remove_entity, removable) == Some(bytes4(90, 0, 0, 0)),
+  )
+  assert_true(world.is_alive(victim))
+  assert_true(world.component_bytes(victim, cpu) == Some(bytes4(99, 0, 0, 0)))
   assert_true(history.redo(world))
+  assert_true(world.is_alive(batch_entities[0]))
+  assert_true(world.is_alive(batch_entities[1]))
+  assert_true(world.has_component(parent, marker))
+  assert_true(world.is_alive(spawned[0]))
+  assert_true(world.is_alive(spawned[1]))
+  assert_true(
+    world.component_bytes(spawned[0], marker) == Some(bytes4(30, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(spawned[1], cpu) == Some(bytes4(41, 0, 0, 0)),
+  )
   assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(
+    world.component_bytes(bulk_add0, marker) == Some(bytes4(50, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_add1, marker) == Some(bytes4(51, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set0, cpu) == Some(bytes4(12, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(bulk_set1, cpu) == Some(bytes4(13, 0, 0, 0)),
+  )
+  assert_true(!world.has_component(remove_entity, removable))
+  assert_true(!world.is_alive(victim))
   match world.get_transform(entity) {
     Some(transform) => {
       assert_eq(transform.position.x(), (4.0 : Float))
@@ -2168,9 +2342,32 @@ test "WorldHistory direct mutation coverage audit" {
       )
     None => abort("expected coverage Camera row")
   }
-  assert_true(history.destroy_entity(world, entity))
-  assert_true(!world.is_alive(entity))
-  assert_true(history.undo(world))
-  assert_true(world.is_alive(entity))
-  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "panic WorldHistory guarded transaction rejects raw World mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryGuardRejectWorld", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw world"))
+  ignore(world.set_component_bytes(entity, cpu, bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "panic WorldHistory guarded transaction rejects raw system phase" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let runner = SystemRunner::new()
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw phase"))
+  ignore(
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      PhaseKey::new("history-guard-raw-phase"),
+    ),
+  )
 }

@@ -18,6 +18,7 @@
         <a href="./ecs.html">ECS</a>
         <a href="./undo-redo.html">Undo / Redo</a>
         <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a>
         <a href="./input-architecture.html">入力</a>
         <a href="./visual-regression-tests.html">Visual Regression</a>
         <a href="./ecs-design-notes.html">ECS Design Notes</a>
@@ -85,17 +86,7 @@ ignore(history.commit_transaction())</code></pre>
           <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
           <h2>Mutation API Coverage</h2>
-          <p>新しい mutating API を追加する場合は、この表と対象の coverage test を同時に更新します。</p>
-          <table>
-            <thead><tr><th>Surface</th><th>Undo/Redo status</th><th>Use for</th></tr></thead>
-            <tbody>
-              <tr><td><code>World</code> raw mutator</td><td>untracked です。guarded transaction 中は raw mutation が abort します。</td><td>runtime system、simulation、低レベル storage edit。</td></tr>
-              <tr><td><code>WorldHistory</code> direct method と tracked camera-control helper</td><td>entity create/destroy、component add/set/remove、bulk add/set、spawn batch、Transform3D TRS、ChildOf、GlobalTransform matrix/format、Camera matrices、orbit camera-control setup/edit/sync helper を tracked に記録します。</td><td>editor/importer の authoring operation。</td></tr>
-              <tr><td>Tracked query callback</td><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code>、<code>RawQueryArchetype::write_column_tracked</code> は component byte delta を記録します。raw query write は untracked のままで、guard 対象です。</td><td>selection edit や query 由来の authoring loop。</td></tr>
-              <tr><td><code>CommandBuffer</code> と command-system variant</td><td>raw <code>SystemRunner::run_phase</code> は untracked に apply します。<code>WorldHistory::run_system_phase</code> は camera-control command system を含む対応 command を tracked history API 経由で dispatch します。</td><td>iteration 中に変更を queue する editor system。</td></tr>
-              <tr><td>GPU/blob upload and drain helper</td><td>意図的に untracked です。</td><td>derived render data upload、resize event、readback plumbing。</td></tr>
-            </tbody>
-          </table>
+          <p>mutation surface の責務は <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a> で管理します。新しい mutating API を追加する場合は、その監査表と対象 coverage test を更新し、API を tracked、raw guarded、intentionally untracked のどれとして扱うか明示します。</p>
 
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で件数上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
@@ -131,6 +122,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Performance</h2>
           <p>Undo/Redo の主なコストは変更前後の component bytes コピーと history record allocation です。履歴が無効な場合、tracked query callback は raw write path に委譲し、bytes copy や delta retention は行いません。runtime system や animation は untracked API を使い、drag のような editor gesture は transaction で 1 record にまとめます。</p>
+          <p><code>pnpm run bench:ecs:js</code> または <code>pnpm run bench:ecs:native</code> で ECS benchmark 上の履歴 overhead を比較できます。出力には raw component write、無効/有効状態の <code>WorldHistory::set_component_bytes</code>、guarded transaction、tracked query row callback、tracked archetype column callback、raw と tracked の command-buffer phase が含まれます。</p>
         </article>
       </main>
     </div>

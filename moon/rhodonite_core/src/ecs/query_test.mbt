@@ -172,6 +172,20 @@ test "QueryRow write_tracked works inside guarded transaction" {
 }
 
 ///|
+test "panic QueryRow raw write aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryRowRawGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw query"))
+  Query::new([cpu]).for_each(world, row => {
+    row.write(cpu, bytes => bytes[0] = (2 : Byte))
+  })
+}
+
+///|
 test "QueryRow write_tracked blob delegate works inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -189,6 +203,21 @@ test "QueryRow write_tracked blob delegate works inside guarded transaction" {
   assert_true(saw_blob)
   assert_true(history.commit_transaction())
   assert_eq(history.last_diagnostic(), "transaction_empty")
+}
+
+///|
+test "panic RawQueryRow raw write view aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("RawQueryRowRawGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw row"))
+  RawQuery::new([cpu]).for_each(world, row => {
+    let bytes = row.write_view(cpu)
+    bytes[0] = (2 : Byte)
+  })
 }
 
 ///|
@@ -343,6 +372,21 @@ test "RawQueryArchetype write_column_tracked works inside guarded transaction" {
     Some(bytes) => assert_true(bytes == bytes4(1, 0, 0, 0))
     None => abort("expected guarded tracked column undo bytes")
   }
+}
+
+///|
+test "panic RawQueryArchetype raw write column aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("RawQueryArchRawGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw column"))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    let column = arch.write_column(cpu)
+    column[0] = (2 : Byte)
+  })
 }
 
 ///|

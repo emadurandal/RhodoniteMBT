@@ -427,6 +427,8 @@ pub fn WorldHistory::undo_label(Self) -> String?
 pub fn WorldHistory::undo_len(Self) -> Int
 pub fn WorldHistory::undo_serialization_report(Self, World) -> WorldHistorySerializationReport
 pub fn WorldHistory::undo_summary(Self) -> Array[WorldHistoryRecordSummary]
+pub fn WorldHistory::validate_import_redo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
+pub fn WorldHistory::validate_import_undo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
 
 pub(all) struct WorldHistoryDeltaSummary {
   kind : String
@@ -475,6 +477,33 @@ pub(all) struct WorldHistoryExportRecord {
   label : String
   delta_count : Int
   deltas : Array[WorldHistoryExportDelta]
+}
+
+pub(all) struct WorldHistoryImportValidationDeltaReport {
+  index : Int
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_key : String?
+  valid : Bool
+  reason : String
+}
+
+pub(all) struct WorldHistoryImportValidationRecordReport {
+  index : Int
+  label : String
+  valid : Bool
+  reason : String
+  delta_count : Int
+  deltas : Array[WorldHistoryImportValidationDeltaReport]
+}
+
+pub(all) struct WorldHistoryImportValidationReport {
+  valid : Bool
+  reason : String
+  format_version : Int
+  record_count : Int
+  records : Array[WorldHistoryImportValidationRecordReport]
 }
 
 pub(all) struct WorldHistoryRecordSummary {

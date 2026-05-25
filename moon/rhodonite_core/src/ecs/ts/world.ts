@@ -15,6 +15,9 @@ import type {
 	MoonWorldHistoryExportDelta,
 	MoonWorldHistoryExportPayload,
 	MoonWorldHistoryExportRecord,
+	MoonWorldHistoryImportValidationDeltaReport,
+	MoonWorldHistoryImportValidationRecordReport,
+	MoonWorldHistoryImportValidationReport,
 	MoonWorldHistoryRecordSummary,
 	MoonWorldHistorySerializationComponentReport,
 	MoonWorldHistorySerializationDeltaReport,
@@ -128,6 +131,24 @@ import {
 	world_history_export_undo_stack,
 	world_history_import_redo_stack,
 	world_history_import_undo_stack,
+	world_history_import_validation_delta_report_component,
+	world_history_import_validation_delta_report_component_key,
+	world_history_import_validation_delta_report_entity,
+	world_history_import_validation_delta_report_index,
+	world_history_import_validation_delta_report_kind,
+	world_history_import_validation_delta_report_reason,
+	world_history_import_validation_delta_report_valid,
+	world_history_import_validation_record_report_delta_count,
+	world_history_import_validation_record_report_deltas,
+	world_history_import_validation_record_report_index,
+	world_history_import_validation_record_report_label,
+	world_history_import_validation_record_report_reason,
+	world_history_import_validation_record_report_valid,
+	world_history_import_validation_report_format_version,
+	world_history_import_validation_report_reason,
+	world_history_import_validation_report_record_count,
+	world_history_import_validation_report_records,
+	world_history_import_validation_report_valid,
 	world_history_last_diagnostic,
 	world_history_max_undo_bytes,
 	world_history_max_undo_records,
@@ -184,6 +205,8 @@ import {
 	world_history_undo_len,
 	world_history_undo_serialization_report,
 	world_history_undo_summary,
+	world_history_validate_import_redo_stack,
+	world_history_validate_import_undo_stack,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -682,6 +705,43 @@ export type HistorySerializationReport = {
 	readonly records: HistorySerializationRecordReport[];
 };
 
+export type HistoryImportValidationReason =
+	| "none"
+	| "transaction_open"
+	| "applying"
+	| "import_unsupported_format"
+	| "import_invalid_archive"
+	| "import_identity_mismatch"
+	| "import_invalid_payload"
+	| "import_validation_failed";
+
+export type HistoryImportValidationDeltaReport = {
+	readonly index: number;
+	readonly kind: string;
+	readonly entity: EntityId | null;
+	readonly component: ComponentTypeId | null;
+	readonly componentKey: string | null;
+	readonly valid: boolean;
+	readonly reason: HistoryImportValidationReason;
+};
+
+export type HistoryImportValidationRecordReport = {
+	readonly index: number;
+	readonly label: string;
+	readonly valid: boolean;
+	readonly reason: HistoryImportValidationReason;
+	readonly deltaCount: number;
+	readonly deltas: HistoryImportValidationDeltaReport[];
+};
+
+export type HistoryImportValidationReport = {
+	readonly valid: boolean;
+	readonly reason: HistoryImportValidationReason;
+	readonly formatVersion: number;
+	readonly recordCount: number;
+	readonly records: HistoryImportValidationRecordReport[];
+};
+
 export type HistoryExportComponentIdentity = {
 	readonly localComponent: ComponentTypeId;
 	readonly key: string;
@@ -847,6 +907,61 @@ function historySerializationReportFromBridge(
 		recordCount: world_history_serialization_report_record_count(report),
 		records: world_history_serialization_report_records(report).map((record) =>
 			historySerializationRecordReportFromBridge(record),
+		),
+	};
+}
+
+function historyImportValidationDeltaReportFromBridge(
+	report: MoonWorldHistoryImportValidationDeltaReport,
+): HistoryImportValidationDeltaReport {
+	return {
+		index: world_history_import_validation_delta_report_index(report),
+		kind: world_history_import_validation_delta_report_kind(report),
+		entity: historySummaryEntity(
+			world_history_import_validation_delta_report_entity(report),
+		),
+		component: historySummaryComponent(
+			world_history_import_validation_delta_report_component(report),
+		),
+		componentKey:
+			world_history_import_validation_delta_report_component_key(report) ??
+			null,
+		valid: moonBool(world_history_import_validation_delta_report_valid(report)),
+		reason: world_history_import_validation_delta_report_reason(
+			report,
+		) as HistoryImportValidationReason,
+	};
+}
+
+function historyImportValidationRecordReportFromBridge(
+	report: MoonWorldHistoryImportValidationRecordReport,
+): HistoryImportValidationRecordReport {
+	return {
+		index: world_history_import_validation_record_report_index(report),
+		label: world_history_import_validation_record_report_label(report),
+		valid: moonBool(world_history_import_validation_record_report_valid(report)),
+		reason: world_history_import_validation_record_report_reason(
+			report,
+		) as HistoryImportValidationReason,
+		deltaCount: world_history_import_validation_record_report_delta_count(report),
+		deltas: world_history_import_validation_record_report_deltas(report).map(
+			(delta) => historyImportValidationDeltaReportFromBridge(delta),
+		),
+	};
+}
+
+function historyImportValidationReportFromBridge(
+	report: MoonWorldHistoryImportValidationReport,
+): HistoryImportValidationReport {
+	return {
+		valid: moonBool(world_history_import_validation_report_valid(report)),
+		reason: world_history_import_validation_report_reason(
+			report,
+		) as HistoryImportValidationReason,
+		formatVersion: world_history_import_validation_report_format_version(report),
+		recordCount: world_history_import_validation_report_record_count(report),
+		records: world_history_import_validation_report_records(report).map(
+			(record) => historyImportValidationRecordReportFromBridge(record),
 		),
 	};
 }
@@ -1155,6 +1270,32 @@ export class WorldHistory {
 	importRedoStack(world: World, archive: HistoryExport): boolean {
 		return moonBool(
 			world_history_import_redo_stack(
+				this.inner,
+				world.inner,
+				historyExportToBridge(archive),
+			),
+		);
+	}
+
+	validateImportUndoStack(
+		world: World,
+		archive: HistoryExport,
+	): HistoryImportValidationReport {
+		return historyImportValidationReportFromBridge(
+			world_history_validate_import_undo_stack(
+				this.inner,
+				world.inner,
+				historyExportToBridge(archive),
+			),
+		);
+	}
+
+	validateImportRedoStack(
+		world: World,
+		archive: HistoryExport,
+	): HistoryImportValidationReport {
+		return historyImportValidationReportFromBridge(
+			world_history_validate_import_redo_stack(
 				this.inner,
 				world.inner,
 				historyExportToBridge(archive),
