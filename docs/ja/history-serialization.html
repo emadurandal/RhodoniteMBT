@@ -33,7 +33,8 @@
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に draft in-memory archive を返します。</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>
-            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
+            <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> と <code>WorldHistory::validate_import_redo_stack(world, archive)</code> は、record / delta 位置を含む dry-run import validation report を返します。</li>
+            <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code>、<code>validateImportUndoStack</code>、<code>validateImportRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
             <li>TypeScript npm surface は JSON archive string format 用に <code>encodeHistoryExportJson</code> と <code>decodeHistoryExportJson</code> も公開します。</li>
             <li>Import/export と JSON archive encoding は <code>format_version = 1</code> を使います。MoonBit core は in-memory object model のみを公開し、JSON encoding は TypeScript 側で実装します。</li>
             <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
@@ -87,6 +88,7 @@
 
           <h2>Import MVP</h2>
           <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。</p>
+          <p>validation report API は同じ archive conversion と full-stack applicability check を実行しますが、history stack、world、<code>last_diagnostic</code> を変更しません。top-level / record-level / delta-level の各 report は <code>valid</code>、<code>reason</code>、archive order の index を返します。record index <code>0</code> は次に import される Undo / Redo operation です。delta index は、Undo validation が内部で逆順適用を検証する場合でも、元の archive order を指します。</p>
           <table>
             <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
             <tbody>

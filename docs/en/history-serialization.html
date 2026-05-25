@@ -33,7 +33,8 @@
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return a draft in-memory archive when all retained records are eligible for serialization.</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> and <code>WorldHistory::import_redo_stack(world, archive)</code> validate and replace the target stack from that archive without mutating the world.</li>
-            <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, and <code>importRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
+            <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> and <code>WorldHistory::validate_import_redo_stack(world, archive)</code> return dry-run import validation reports with record and delta locations.</li>
+            <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, <code>importRedoStack</code>, <code>validateImportUndoStack</code>, and <code>validateImportRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
             <li>The TypeScript npm surface also exposes <code>encodeHistoryExportJson</code> and <code>decodeHistoryExportJson</code> for a JSON archive string format.</li>
             <li>Import/export and JSON archive encoding use <code>format_version = 1</code>. MoonBit core still exposes the in-memory object model only; JSON encoding is implemented in TypeScript.</li>
             <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
@@ -87,6 +88,7 @@
 
           <h2>Import MVP</h2>
           <p>Import consumes the same in-memory archive shape and replaces only the target stack. It does not append to existing records and does not clear the opposite stack. The target world must already be in the current state represented by the archive; import validates the full stack against that world before replacing anything.</p>
+          <p>The validation report APIs run the same archive conversion and full-stack applicability checks without changing history stacks, the world, or <code>last_diagnostic</code>. Top-level, record-level, and delta-level reports expose <code>valid</code>, <code>reason</code>, and archive-order indexes. Record index <code>0</code> is the next imported undo or redo operation; delta indexes refer to the original archive order even when undo validation checks deltas in reverse application order.</p>
           <table>
             <thead><tr><th>Failure</th><th>Diagnostic</th></tr></thead>
             <tbody>

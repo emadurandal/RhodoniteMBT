@@ -164,6 +164,39 @@ pub(all) struct WorldHistoryExport {
 }
 
 ///|
+/// Payload-free validation report for one imported delta.
+pub(all) struct WorldHistoryImportValidationDeltaReport {
+  index : Int
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_key : String?
+  valid : Bool
+  reason : String
+}
+
+///|
+/// Payload-free validation report for one imported record.
+pub(all) struct WorldHistoryImportValidationRecordReport {
+  index : Int
+  label : String
+  valid : Bool
+  reason : String
+  delta_count : Int
+  deltas : Array[WorldHistoryImportValidationDeltaReport]
+}
+
+///|
+/// Payload-free validation report for one imported history archive.
+pub(all) struct WorldHistoryImportValidationReport {
+  valid : Bool
+  reason : String
+  format_version : Int
+  record_count : Int
+  records : Array[WorldHistoryImportValidationRecordReport]
+}
+
+///|
 /// Conversion result for one imported history delta.
 priv struct WorldHistoryImportDeltaResult {
   delta : WorldDelta?
@@ -175,6 +208,7 @@ priv struct WorldHistoryImportDeltaResult {
 priv struct WorldHistoryImportRecordResult {
   record : WorldHistoryRecord?
   diagnostic : String
+  report : WorldHistoryImportValidationRecordReport
 }
 
 ///|
@@ -183,6 +217,7 @@ priv struct WorldHistoryImportStackResult {
   records : Array[WorldHistoryRecord]
   diagnostic : String
   ok : Bool
+  report : WorldHistoryImportValidationReport
 }
 
 ///|
@@ -1129,6 +1164,89 @@ fn world_history_import_camera_payload(
 }
 
 ///|
+/// Returns the optional stable component key carried by one exported delta.
+fn world_history_export_delta_component_key(
+  delta : WorldHistoryExportDelta,
+) -> String? {
+  match delta.component {
+    Some(identity) => Some(identity.key)
+    None => None
+  }
+}
+
+///|
+/// Returns the imported component id addressed by one converted delta.
+fn world_history_imported_delta_component(
+  world : World,
+  delta : WorldDelta,
+) -> ComponentTypeId? {
+  match delta {
+    EntityCreated(_) => None
+    EntityDestroyed(_) => None
+    ComponentAdded(_, component, _) => Some(component)
+    ComponentRemoved(_, component, _) => Some(component)
+    ComponentChanged(_, component, _, _) => Some(component)
+    GlobalTransformChanged(_, _, _) => Some(world.global_transform_component())
+    CameraChanged(_, _, _) => Some(world.camera_component())
+  }
+}
+
+///|
+/// Returns the resolved component id when an exported delta carries resolvable identity.
+fn world_history_import_delta_report_component(
+  world : World,
+  exported : WorldHistoryExportDelta,
+  result : WorldHistoryImportDeltaResult,
+) -> ComponentTypeId? {
+  match result.delta {
+    Some(delta) => world_history_imported_delta_component(world, delta)
+    None =>
+      match exported.component {
+        Some(identity) =>
+          world_history_import_component_identity(world, identity)
+        None => None
+      }
+  }
+}
+
+///|
+/// Builds a payload-free validation report for one imported delta conversion.
+fn world_history_import_delta_report(
+  world : World,
+  index : Int,
+  exported : WorldHistoryExportDelta,
+  result : WorldHistoryImportDeltaResult,
+) -> WorldHistoryImportValidationDeltaReport {
+  {
+    index,
+    kind: exported.kind,
+    entity: exported.entity,
+    component: world_history_import_delta_report_component(
+      world, exported, result,
+    ),
+    component_key: world_history_export_delta_component_key(exported),
+    valid: result.delta is Some(_),
+    reason: result.diagnostic,
+  }
+}
+
+///|
+/// Builds an import validation delta report for a validation-stage failure.
+fn world_history_import_validation_failed_delta_report(
+  report : WorldHistoryImportValidationDeltaReport,
+) -> WorldHistoryImportValidationDeltaReport {
+  {
+    index: report.index,
+    kind: report.kind,
+    entity: report.entity,
+    component: report.component,
+    component_key: report.component_key,
+    valid: false,
+    reason: history_import_diagnostic_validation_failed(),
+  }
+}
+
+///|
 /// Builds a failed import delta result.
 fn world_history_import_delta_failure(
   diagnostic : String,
@@ -1500,42 +1618,88 @@ fn world_history_import_delta(
 ///|
 /// Builds a failed import record result.
 fn world_history_import_record_failure(
+  index : Int,
+  record : WorldHistoryExportRecord,
   diagnostic : String,
+  deltas : Array[WorldHistoryImportValidationDeltaReport],
 ) -> WorldHistoryImportRecordResult {
-  { record: None, diagnostic }
+  {
+    record: None,
+    diagnostic,
+    report: {
+      index,
+      label: record.label,
+      valid: false,
+      reason: diagnostic,
+      delta_count: record.delta_count,
+      deltas,
+    },
+  }
 }
 
 ///|
 /// Converts an exported record into the internal history record shape.
 fn world_history_import_record(
   world : World,
+  index : Int,
   record : WorldHistoryExportRecord,
 ) -> WorldHistoryImportRecordResult {
+  let delta_reports : Array[WorldHistoryImportValidationDeltaReport] = []
   if record.delta_count != record.deltas.length() {
     return world_history_import_record_failure(
+      index,
+      record,
       history_import_diagnostic_invalid_archive(),
+      delta_reports,
     )
   }
   let deltas : Array[WorldDelta] = []
   for i = 0; i < record.deltas.length(); i = i + 1 {
-    match world_history_import_delta(world, record.deltas[i]) {
+    let result = world_history_import_delta(world, record.deltas[i])
+    delta_reports.push(
+      world_history_import_delta_report(world, i, record.deltas[i], result),
+    )
+    match result {
       { delta: Some(delta), .. } => deltas.push(delta)
       { diagnostic, .. } =>
-        return world_history_import_record_failure(diagnostic)
+        return world_history_import_record_failure(
+          index, record, diagnostic, delta_reports,
+        )
     }
   }
   {
     record: Some({ label: record.label, deltas }),
     diagnostic: history_diagnostic_none(),
+    report: {
+      index,
+      label: record.label,
+      valid: true,
+      reason: history_diagnostic_none(),
+      delta_count: record.delta_count,
+      deltas: delta_reports,
+    },
   }
 }
 
 ///|
 /// Builds a failed import stack result.
 fn world_history_import_stack_failure(
+  archive : WorldHistoryExport,
   diagnostic : String,
+  records : Array[WorldHistoryImportValidationRecordReport],
 ) -> WorldHistoryImportStackResult {
-  { records: [], diagnostic, ok: false }
+  {
+    records: [],
+    diagnostic,
+    ok: false,
+    report: {
+      valid: false,
+      reason: diagnostic,
+      format_version: archive.format_version,
+      record_count: archive.record_count,
+      records,
+    },
+  }
 }
 
 ///|
@@ -1544,74 +1708,158 @@ fn world_history_import_stack_records(
   world : World,
   archive : WorldHistoryExport,
 ) -> WorldHistoryImportStackResult {
+  let record_reports : Array[WorldHistoryImportValidationRecordReport] = []
   if archive.format_version != world_history_export_format_version() {
     return world_history_import_stack_failure(
+      archive,
       history_import_diagnostic_unsupported_format(),
+      record_reports,
     )
   }
   if archive.record_count != archive.records.length() {
     return world_history_import_stack_failure(
+      archive,
       history_import_diagnostic_invalid_archive(),
+      record_reports,
     )
   }
   let records : Array[WorldHistoryRecord] = []
   for i = 0; i < archive.records.length(); i = i + 1 {
-    match world_history_import_record(world, archive.records[i]) {
-      { record: Some(record), .. } => records.push(record)
-      { diagnostic, .. } =>
-        return world_history_import_stack_failure(diagnostic)
+    match world_history_import_record(world, i, archive.records[i]) {
+      { record: Some(record), report, .. } => {
+        records.push(record)
+        record_reports.push(report)
+      }
+      { diagnostic, report, .. } => {
+        record_reports.push(report)
+        return world_history_import_stack_failure(
+          archive, diagnostic, record_reports,
+        )
+      }
     }
   }
-  { records, diagnostic: history_diagnostic_none(), ok: true }
+  {
+    records,
+    diagnostic: history_diagnostic_none(),
+    ok: true,
+    report: {
+      valid: true,
+      reason: history_diagnostic_none(),
+      format_version: archive.format_version,
+      record_count: archive.record_count,
+      records: record_reports,
+    },
+  }
 }
 
 ///|
-/// Validates one imported undo record against an accumulated predicted state.
-fn HistoryValidationState::validate_imported_undo_record(
+/// Returns the archive delta index that makes an imported undo record invalid.
+fn HistoryValidationState::imported_undo_record_invalid_delta_index(
   self : HistoryValidationState,
   record : WorldHistoryRecord,
-) -> Bool {
+) -> Int? {
   for i = record.deltas.length() - 1; i >= 0; i = i - 1 {
     if !self.validate_delta_inverse(record.deltas[i]) {
-      return false
+      return Some(i)
     }
   }
-  true
+  None
 }
 
 ///|
-/// Validates one imported redo record against an accumulated predicted state.
-fn HistoryValidationState::validate_imported_redo_record(
+/// Returns the archive delta index that makes an imported redo record invalid.
+fn HistoryValidationState::imported_redo_record_invalid_delta_index(
   self : HistoryValidationState,
   record : WorldHistoryRecord,
-) -> Bool {
+) -> Int? {
   for i = 0; i < record.deltas.length(); i = i + 1 {
     if !self.validate_delta(record.deltas[i]) {
-      return false
+      return Some(i)
     }
   }
-  true
+  None
 }
 
 ///|
-/// Validates an imported stack from next-operation-first records.
-fn world_history_validate_imported_stack(
+/// Returns the first record and delta index that makes an imported stack invalid.
+fn world_history_imported_stack_invalid_location(
   world : World,
   records : Array[WorldHistoryRecord],
   undo : Bool,
-) -> Bool {
+) -> (Int, Int)? {
   let state = HistoryValidationState::new(world)
   for i = 0; i < records.length(); i = i + 1 {
-    let ok = if undo {
-      state.validate_imported_undo_record(records[i])
+    let invalid_delta = if undo {
+      state.imported_undo_record_invalid_delta_index(records[i])
     } else {
-      state.validate_imported_redo_record(records[i])
+      state.imported_redo_record_invalid_delta_index(records[i])
     }
-    if !ok {
-      return false
+    match invalid_delta {
+      Some(delta_index) => return Some((i, delta_index))
+      None => ()
     }
   }
-  true
+  None
+}
+
+///|
+/// Marks one record report as failed by the full-stack import validation pass.
+fn world_history_import_validation_failed_record_report(
+  report : WorldHistoryImportValidationRecordReport,
+  delta_index : Int,
+) -> WorldHistoryImportValidationRecordReport {
+  let deltas : Array[WorldHistoryImportValidationDeltaReport] = []
+  for i = 0; i < report.deltas.length(); i = i + 1 {
+    if i == delta_index {
+      deltas.push(
+        world_history_import_validation_failed_delta_report(report.deltas[i]),
+      )
+    } else {
+      deltas.push(report.deltas[i])
+    }
+  }
+  {
+    index: report.index,
+    label: report.label,
+    valid: false,
+    reason: history_import_diagnostic_validation_failed(),
+    delta_count: report.delta_count,
+    deltas,
+  }
+}
+
+///|
+/// Marks one import stack result as failed by the full-stack validation pass.
+fn world_history_import_stack_result_validation_failed(
+  imported : WorldHistoryImportStackResult,
+  record_index : Int,
+  delta_index : Int,
+) -> WorldHistoryImportStackResult {
+  let record_reports : Array[WorldHistoryImportValidationRecordReport] = []
+  for i = 0; i < imported.report.records.length(); i = i + 1 {
+    if i == record_index {
+      record_reports.push(
+        world_history_import_validation_failed_record_report(
+          imported.report.records[i],
+          delta_index,
+        ),
+      )
+    } else {
+      record_reports.push(imported.report.records[i])
+    }
+  }
+  {
+    records: imported.records,
+    diagnostic: history_import_diagnostic_validation_failed(),
+    ok: false,
+    report: {
+      valid: false,
+      reason: history_import_diagnostic_validation_failed(),
+      format_version: imported.report.format_version,
+      record_count: imported.report.record_count,
+      records: record_reports,
+    },
+  }
 }
 
 ///|
@@ -2921,6 +3169,59 @@ fn WorldHistory::trim_imported_stack_to_limit(
 }
 
 ///|
+/// Builds a full import result, including dry-run validation against world state.
+fn WorldHistory::import_stack_result(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+  undo : Bool,
+) -> WorldHistoryImportStackResult {
+  let empty_records : Array[WorldHistoryImportValidationRecordReport] = []
+  if self.open {
+    return world_history_import_stack_failure(
+      archive, "transaction_open", empty_records,
+    )
+  }
+  if self.applying {
+    return world_history_import_stack_failure(
+      archive, "applying", empty_records,
+    )
+  }
+  let imported = world_history_import_stack_records(world, archive)
+  if !imported.ok {
+    return imported
+  }
+  match
+    world_history_imported_stack_invalid_location(world, imported.records, undo) {
+    Some((record_index, delta_index)) =>
+      world_history_import_stack_result_validation_failed(
+        imported, record_index, delta_index,
+      )
+    None => imported
+  }
+}
+
+///|
+/// Validates an undo archive without mutating history stacks or diagnostics.
+pub fn WorldHistory::validate_import_undo_stack(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+) -> WorldHistoryImportValidationReport {
+  self.import_stack_result(world, archive, true).report
+}
+
+///|
+/// Validates a redo archive without mutating history stacks or diagnostics.
+pub fn WorldHistory::validate_import_redo_stack(
+  self : WorldHistory,
+  world : World,
+  archive : WorldHistoryExport,
+) -> WorldHistoryImportValidationReport {
+  self.import_stack_result(world, archive, false).report
+}
+
+///|
 /// Imports one history stack from an in-memory archive, replacing the target stack.
 fn WorldHistory::import_stack(
   self : WorldHistory,
@@ -2928,21 +3229,9 @@ fn WorldHistory::import_stack(
   archive : WorldHistoryExport,
   undo : Bool,
 ) -> Bool {
-  if self.open {
-    self.set_diagnostic("transaction_open")
-    return false
-  }
-  if self.applying {
-    self.set_diagnostic("applying")
-    return false
-  }
-  let imported = world_history_import_stack_records(world, archive)
+  let imported = self.import_stack_result(world, archive, undo)
   if !imported.ok {
     self.set_diagnostic(imported.diagnostic)
-    return false
-  }
-  if !world_history_validate_imported_stack(world, imported.records, undo) {
-    self.set_diagnostic(history_import_diagnostic_validation_failed())
     return false
   }
   if undo {

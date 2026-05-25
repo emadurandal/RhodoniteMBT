@@ -693,6 +693,170 @@ pub fn world_history_import_redo_stack(
 }
 
 ///|
+/// Implements `world_history_validate_import_undo_stack`.
+pub fn world_history_validate_import_undo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  exported : @ecs.WorldHistoryExport,
+) -> @ecs.WorldHistoryImportValidationReport {
+  history.validate_import_undo_stack(world, exported)
+}
+
+///|
+/// Implements `world_history_validate_import_redo_stack`.
+pub fn world_history_validate_import_redo_stack(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  exported : @ecs.WorldHistoryExport,
+) -> @ecs.WorldHistoryImportValidationReport {
+  history.validate_import_redo_stack(world, exported)
+}
+
+///|
+/// Implements `world_history_import_validation_report_valid`.
+pub fn world_history_import_validation_report_valid(
+  report : @ecs.WorldHistoryImportValidationReport,
+) -> Bool {
+  report.valid
+}
+
+///|
+/// Implements `world_history_import_validation_report_reason`.
+pub fn world_history_import_validation_report_reason(
+  report : @ecs.WorldHistoryImportValidationReport,
+) -> String {
+  report.reason
+}
+
+///|
+/// Implements `world_history_import_validation_report_format_version`.
+pub fn world_history_import_validation_report_format_version(
+  report : @ecs.WorldHistoryImportValidationReport,
+) -> Int {
+  report.format_version
+}
+
+///|
+/// Implements `world_history_import_validation_report_record_count`.
+pub fn world_history_import_validation_report_record_count(
+  report : @ecs.WorldHistoryImportValidationReport,
+) -> Int {
+  report.record_count
+}
+
+///|
+/// Implements `world_history_import_validation_report_records`.
+pub fn world_history_import_validation_report_records(
+  report : @ecs.WorldHistoryImportValidationReport,
+) -> Array[@ecs.WorldHistoryImportValidationRecordReport] {
+  report.records
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_index`.
+pub fn world_history_import_validation_record_report_index(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> Int {
+  report.index
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_label`.
+pub fn world_history_import_validation_record_report_label(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> String {
+  report.label
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_valid`.
+pub fn world_history_import_validation_record_report_valid(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> Bool {
+  report.valid
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_reason`.
+pub fn world_history_import_validation_record_report_reason(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> String {
+  report.reason
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_delta_count`.
+pub fn world_history_import_validation_record_report_delta_count(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> Int {
+  report.delta_count
+}
+
+///|
+/// Implements `world_history_import_validation_record_report_deltas`.
+pub fn world_history_import_validation_record_report_deltas(
+  report : @ecs.WorldHistoryImportValidationRecordReport,
+) -> Array[@ecs.WorldHistoryImportValidationDeltaReport] {
+  report.deltas
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_index`.
+pub fn world_history_import_validation_delta_report_index(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> Int {
+  report.index
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_kind`.
+pub fn world_history_import_validation_delta_report_kind(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> String {
+  report.kind
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_entity`.
+pub fn world_history_import_validation_delta_report_entity(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> @ecs.EntityId? {
+  report.entity
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_component`.
+pub fn world_history_import_validation_delta_report_component(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> @ecs.ComponentTypeId? {
+  report.component
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_component_key`.
+pub fn world_history_import_validation_delta_report_component_key(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> String? {
+  report.component_key
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_valid`.
+pub fn world_history_import_validation_delta_report_valid(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> Bool {
+  report.valid
+}
+
+///|
+/// Implements `world_history_import_validation_delta_report_reason`.
+pub fn world_history_import_validation_delta_report_reason(
+  report : @ecs.WorldHistoryImportValidationDeltaReport,
+) -> String {
+  report.reason
+}
+
+///|
 /// Implements `world_history_serialization_report_serializable`.
 pub fn world_history_serialization_report_serializable(
   report : @ecs.WorldHistorySerializationReport,

@@ -1073,6 +1073,32 @@ describe("ECS TypeScript wrapper", () => {
 		const undoArchive = source.exportUndoStack(world);
 		expect(undoArchive).not.toBeNull();
 		const plainUndoArchive = JSON.parse(JSON.stringify(undoArchive));
+		const report = importedUndo.validateImportUndoStack(world, plainUndoArchive);
+		expect(report).toMatchObject({
+			valid: true,
+			reason: "none",
+			recordCount: 1,
+			records: [
+				{
+					index: 0,
+					label: "set_component_bytes",
+					valid: true,
+					reason: "none",
+					deltaCount: 1,
+					deltas: [
+						{
+							index: 0,
+							kind: "component_changed",
+							valid: true,
+							reason: "none",
+							componentKey: "com.example.TsHistoryImportStable",
+						},
+					],
+				},
+			],
+		});
+		expect(importedUndo.undoLen()).toBe(0);
+		expect(importedUndo.lastDiagnostic()).toBe("none");
 		expect(importedUndo.importUndoStack(world, plainUndoArchive)).toBe(true);
 		expect(importedUndo.undoLen()).toBe(1);
 		expect(importedUndo.undo(world)).toBe(true);
@@ -1091,6 +1117,38 @@ describe("ECS TypeScript wrapper", () => {
 		]);
 
 		const badFormat = { ...plainUndoArchive, formatVersion: 999 };
+		const badFormatReport = importedUndo.validateImportUndoStack(world, badFormat);
+		expect(badFormatReport).toMatchObject({
+			valid: false,
+			reason: "import_unsupported_format",
+			formatVersion: 999,
+		});
+		expect(importedUndo.lastDiagnostic()).toBe("none");
+		const badIdentityArchive = JSON.parse(JSON.stringify(plainUndoArchive));
+		badIdentityArchive.records[0].deltas[0].component.key =
+			"com.example.MissingTsHistoryImportStable";
+		const badIdentityReport =
+			importedUndo.validateImportUndoStack(world, badIdentityArchive);
+		expect(badIdentityReport).toMatchObject({
+			valid: false,
+			reason: "import_identity_mismatch",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_identity_mismatch",
+					deltas: [
+						{
+							index: 0,
+							componentKey: "com.example.MissingTsHistoryImportStable",
+							valid: false,
+							reason: "import_identity_mismatch",
+						},
+					],
+				},
+			],
+		});
+		expect(importedUndo.lastDiagnostic()).toBe("none");
 		expect(importedUndo.importUndoStack(world, badFormat)).toBe(false);
 		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
 	});

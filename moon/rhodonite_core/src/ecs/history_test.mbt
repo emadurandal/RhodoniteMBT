@@ -1274,6 +1274,21 @@ test "WorldHistory imports stable component undo stack" {
     Some(archive) => archive
     None => abort("expected exportable undo archive")
   }
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(report.valid)
+  assert_eq(report.reason, "none")
+  assert_eq(report.record_count, 1)
+  assert_eq(report.records[0].index, 0)
+  assert_eq(report.records[0].label, "set_component_bytes")
+  assert_true(report.records[0].valid)
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_eq(report.records[0].deltas[0].kind, "component_changed")
+  assert_true(
+    report.records[0].deltas[0].component_key ==
+    Some("com.example.HistoryImportStable"),
+  )
+  assert_true(report.records[0].deltas[0].valid)
+  assert_eq(imported.last_diagnostic(), "none")
   assert_true(imported.import_undo_stack(world, archive))
   assert_eq(imported.undo_len(), 1)
   assert_true(imported.undo(world))
@@ -1450,6 +1465,22 @@ test "WorldHistory import rejects invalid archive without mutating stacks" {
     record_count: 1,
     records: bad_records,
   }
+  let diagnostic_before_validate = imported.last_diagnostic()
+  let report = imported.validate_import_undo_stack(world, bad_archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_identity_mismatch")
+  assert_eq(report.record_count, 1)
+  assert_eq(report.records[0].index, 0)
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_identity_mismatch")
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_true(
+    report.records[0].deltas[0].component_key ==
+    Some("com.example.MissingHistoryImportRejectStable"),
+  )
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_identity_mismatch")
+  assert_eq(imported.last_diagnostic(), diagnostic_before_validate)
   assert_true(!imported.import_undo_stack(world, bad_archive))
   assert_eq(imported.last_diagnostic(), "import_identity_mismatch")
   assert_eq(imported.undo_len(), 1)
@@ -1480,6 +1511,16 @@ test "WorldHistory import validates full stack before replacing" {
     None => abort("expected exportable archive")
   }
   assert_true(world.remove_component(entity, component))
+  let report = imported.validate_import_undo_stack(world, archive)
+  assert_true(!report.valid)
+  assert_eq(report.reason, "import_validation_failed")
+  assert_eq(report.records[0].index, 0)
+  assert_true(!report.records[0].valid)
+  assert_eq(report.records[0].reason, "import_validation_failed")
+  assert_eq(report.records[0].deltas[0].index, 0)
+  assert_true(!report.records[0].deltas[0].valid)
+  assert_eq(report.records[0].deltas[0].reason, "import_validation_failed")
+  assert_eq(imported.last_diagnostic(), "none")
   assert_true(!imported.import_undo_stack(world, archive))
   assert_eq(imported.last_diagnostic(), "import_validation_failed")
   assert_eq(imported.undo_len(), 0)
