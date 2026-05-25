@@ -1187,6 +1187,57 @@ pub fn command_buffer_set_component_bytes(
 }
 
 ///|
+/// Implements `command_buffer_set_global_transform_col_major`.
+pub fn command_buffer_set_global_transform_col_major(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  matrix_col_major : FixedArray[Float],
+) -> Unit {
+  commands.set_global_transform(
+    entity,
+    matrix44f_from_col_major_array(matrix_col_major),
+  )
+}
+
+///|
+/// Implements `command_buffer_set_global_transform_format`.
+pub fn command_buffer_set_global_transform_format(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  format_code : UInt,
+) -> Unit {
+  commands.set_global_transform_format(
+    entity,
+    @comp.global_transform_format_from_code(format_code),
+  )
+}
+
+///|
+/// Implements `command_buffer_set_camera_matrices_col_major`.
+pub fn command_buffer_set_camera_matrices_col_major(
+  commands : @ecs.CommandBuffer,
+  entity : @ecs.EntityId,
+  view_col_major : FixedArray[Float],
+  proj_col_major : FixedArray[Float],
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Unit {
+  commands.set_camera_matrices(
+    entity,
+    matrix44f_from_col_major_array(view_col_major),
+    matrix44f_from_col_major_array(proj_col_major),
+    near,
+    far,
+    aspect,
+    projection_kind,
+    flags,
+  )
+}
+
+///|
 /// Implements `command_buffer_remove_component`.
 pub fn command_buffer_remove_component(
   commands : @ecs.CommandBuffer,

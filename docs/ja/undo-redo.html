@@ -69,8 +69,8 @@ ignore(history.commit_transaction())</code></pre>
           <p>guard は既存 runtime behavior を維持するためデフォルトでは off です。animation や simulation の hot path ではなく、tracked API へ移行中の editor/importer code で使う想定です。</p>
 
           <h2>Tracked Command Buffers</h2>
-          <p>editor system が <code>CommandBuffer</code> に mutation を queue する場合は <code>WorldHistory::run_system_phase</code> を使います。これは <code>SystemRunner::run_phase</code> と同じように phase を実行しつつ、queued command を tracked history method 経由で apply し、指定した label の record に保存します。</p>
-          <p>TypeScript wrapper では同じ経路を <code>WorldHistory.runSystemPhase(runner, world, ctx, phase, label)</code> として公開します。<code>SystemRunner</code>、<code>System</code>、<code>SystemContext</code>、<code>CommandBuffer</code> は <code>@rhodonite/core/ecs</code> から利用できます。</p>
+          <p>editor system が <code>CommandBuffer</code> に mutation を queue する場合は <code>WorldHistory::run_system_phase</code> を使います。これは <code>SystemRunner::run_phase</code> と同じように phase を実行しつつ、queued command を tracked history method 経由で apply し、指定した label の record に保存します。Command buffer では blob-backed builtin helper を <code>set_global_transform</code>、<code>set_global_transform_format</code>、<code>set_camera_matrices</code> として queue できます。tracked phase では対応する <code>WorldHistory</code> helper 経由で dispatch します。</p>
+          <p>TypeScript wrapper では同じ経路を <code>WorldHistory.runSystemPhase(runner, world, ctx, phase, label)</code> として公開します。<code>SystemRunner</code>、<code>System</code>、<code>SystemContext</code>、<code>CommandBuffer</code> は <code>@rhodonite/core/ecs</code> から利用できます。TypeScript system では builtin command を <code>commands.setGlobalTransform</code>、<code>commands.setGlobalTransformFormat</code>、<code>commands.setCameraMatrices</code> として queue できます。</p>
           <pre><code class="language-moonbit">ignore(history.run_system_phase(
   runner,
   world,

@@ -74,6 +74,19 @@ fn CommandBuffer::assert_structural_write(
 }
 
 ///|
+/// Requires structural write permission when a builtin setter may add a component.
+fn CommandBuffer::assert_structural_write_if_missing_component(
+  self : CommandBuffer,
+  entity : EntityId,
+  component : ComponentTypeId,
+  operation : String,
+) -> Unit {
+  if !self.world.has_component(entity, component) {
+    self.assert_structural_write(operation)
+  }
+}
+
+///|
 /// Implements `CommandBuffer::len`.
 pub fn CommandBuffer::len(self : CommandBuffer) -> Int {
   self.commands.length()
@@ -157,6 +170,63 @@ pub fn CommandBuffer::remove_component(
 }
 
 ///|
+/// Queues a builtin GlobalTransform matrix write.
+pub fn CommandBuffer::set_global_transform(
+  self : CommandBuffer,
+  entity : EntityId,
+  matrix : @m44.Matrix44F,
+) -> Unit {
+  let component = self.world.global_transform_component()
+  self.assert_component_write(component, "CommandBuffer::set_global_transform")
+  self.assert_structural_write_if_missing_component(
+    entity, component, "CommandBuffer::set_global_transform",
+  )
+  self.commands.push(SetGlobalTransform(entity, matrix))
+}
+
+///|
+/// Queues a builtin GlobalTransform storage format write.
+pub fn CommandBuffer::set_global_transform_format(
+  self : CommandBuffer,
+  entity : EntityId,
+  format : @comp.GlobalTransformGpuFormat,
+) -> Unit {
+  let component = self.world.global_transform_component()
+  self.assert_component_write(
+    component, "CommandBuffer::set_global_transform_format",
+  )
+  self.assert_structural_write_if_missing_component(
+    entity, component, "CommandBuffer::set_global_transform_format",
+  )
+  self.commands.push(SetGlobalTransformFormat(entity, format))
+}
+
+///|
+/// Queues builtin Camera matrices and metadata.
+pub fn CommandBuffer::set_camera_matrices(
+  self : CommandBuffer,
+  entity : EntityId,
+  view : @m44.Matrix44F,
+  proj : @m44.Matrix44F,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Unit {
+  let component = self.world.camera_component()
+  self.assert_component_write(component, "CommandBuffer::set_camera_matrices")
+  self.assert_structural_write_if_missing_component(
+    entity, component, "CommandBuffer::set_camera_matrices",
+  )
+  self.commands.push(
+    SetCameraMatrices(
+      entity, view, proj, near, far, aspect, projection_kind, flags,
+    ),
+  )
+}
+
+///|
 /// Applies commands in insertion order, then clears the buffer.
 ///
 /// Returns `false` if any command could not be applied, for example because the target entity was
@@ -175,6 +245,23 @@ fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
         self.world.set_component_bytes(entity, component, bytes)
       RemoveComponent(entity, component) =>
         self.world.remove_component(entity, component)
+      SetGlobalTransform(entity, matrix) =>
+        self.world.set_global_transform(entity, matrix)
+      SetGlobalTransformFormat(entity, format) =>
+        self.world.set_global_transform_format(entity, format)
+      SetCameraMatrices(
+        entity,
+        view,
+        proj,
+        near,
+        far,
+        aspect,
+        projection_kind,
+        flags
+      ) =>
+        self.world.set_camera_matrices(
+          entity, view, proj, near, far, aspect, projection_kind, flags,
+        )
     }
     if !command_ok {
       ok = false
@@ -206,6 +293,31 @@ fn CommandBuffer::apply_tracked(
         history.set_component_bytes(self.world, entity, component, bytes)
       RemoveComponent(entity, component) =>
         history.remove_component(self.world, entity, component)
+      SetGlobalTransform(entity, matrix) =>
+        history.set_global_transform(self.world, entity, matrix)
+      SetGlobalTransformFormat(entity, format) =>
+        history.set_global_transform_format(self.world, entity, format)
+      SetCameraMatrices(
+        entity,
+        view,
+        proj,
+        near,
+        far,
+        aspect,
+        projection_kind,
+        flags
+      ) =>
+        history.set_camera_matrices(
+          self.world,
+          entity,
+          view,
+          proj,
+          near,
+          far,
+          aspect,
+          projection_kind,
+          flags,
+        )
     }
     if !command_ok {
       ok = false

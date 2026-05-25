@@ -243,6 +243,18 @@ pub(all) enum WorldCommand {
   AddComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   SetComponentBytes(EntityId, ComponentTypeId, FixedArray[Byte])
   RemoveComponent(EntityId, ComponentTypeId)
+  SetGlobalTransform(EntityId, @m44.Matrix44F)
+  SetGlobalTransformFormat(EntityId, @comp.GlobalTransformGpuFormat)
+  SetCameraMatrices(
+    EntityId,
+    @m44.Matrix44F,
+    @m44.Matrix44F,
+    Float,
+    Float,
+    Float,
+    Float,
+    Float
+  )
 }
 
 ///|
