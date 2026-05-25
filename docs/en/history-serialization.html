@@ -103,6 +103,7 @@
 
           <h2>JSON Archive MVP</h2>
           <p><code>encodeHistoryExportJson</code> converts a TypeScript <code>HistoryExport</code> into a JSON string, and <code>decodeHistoryExportJson</code> validates that JSON string and returns a <code>HistoryExport</code> that can be passed to <code>importUndoStack</code> or <code>importRedoStack</code>. The JSON helpers preserve builtin logical payloads too, including GlobalTransform row bytes with <code>global_transform_format</code> and Camera row bytes.</p>
+          <p>The JSON decoder is only the wire-shape gate: it rejects malformed JSON, unsupported archive versions, missing required fields, unsupported delta kinds, invalid base64, and mismatched record or delta counts. Import validation remains the world-aware gate; it resolves component identity, validates payload applicability against the current world, and leaves the world, stacks, and <code>last_diagnostic</code> unchanged for dry-run validation.</p>
           <table>
             <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
             <tbody>

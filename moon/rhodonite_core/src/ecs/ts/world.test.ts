@@ -1495,6 +1495,43 @@ describe("ECS TypeScript wrapper", () => {
 			2, 0, 0, 0,
 		]);
 
+		const badUndoPayloadArchive = JSON.parse(JSON.stringify(undoArchive));
+		badUndoPayloadArchive.records[0].deltas[0].after.bytes = [3, 0, 0];
+		const undoPayloadDiagnostic = undoTarget.lastDiagnostic();
+		const undoPayloadReport =
+			undoTarget.validateImportUndoStack(world, badUndoPayloadArchive);
+		expect(undoPayloadReport).toMatchObject({
+			valid: false,
+			reason: "import_invalid_payload",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_invalid_payload",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_invalid_payload",
+						},
+					],
+				},
+			],
+		});
+		expect(undoTarget.lastDiagnostic()).toBe(undoPayloadDiagnostic);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+		expect(undoTarget.importUndoStack(world, badUndoPayloadArchive)).toBe(false);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe("import_invalid_payload");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
 		expect(undoTarget.undo(world)).toBe(true);
 		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
 			1, 0, 0, 0,
@@ -1507,6 +1544,43 @@ describe("ECS TypeScript wrapper", () => {
 		expect(redoTarget.importRedoStack(world, redoArchive)).toBe(true);
 		expect(redoTarget.undoLen()).toBe(0);
 		expect(redoTarget.redoLen()).toBe(1);
+
+		const badRedoPayloadArchive = JSON.parse(JSON.stringify(redoArchive));
+		badRedoPayloadArchive.records[0].deltas[0].before.bytes = [3, 0, 0];
+		const redoPayloadDiagnostic = redoTarget.lastDiagnostic();
+		const redoPayloadReport =
+			redoTarget.validateImportRedoStack(world, badRedoPayloadArchive);
+		expect(redoPayloadReport).toMatchObject({
+			valid: false,
+			reason: "import_invalid_payload",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_invalid_payload",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_invalid_payload",
+						},
+					],
+				},
+			],
+		});
+		expect(redoTarget.lastDiagnostic()).toBe(redoPayloadDiagnostic);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		expect(redoTarget.importRedoStack(world, badRedoPayloadArchive)).toBe(false);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoTarget.lastDiagnostic()).toBe("import_invalid_payload");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
 
 		const badRedoArchive = {
 			...JSON.parse(JSON.stringify(redoArchive)),
@@ -1593,6 +1667,9 @@ describe("ECS TypeScript wrapper", () => {
 			decodeHistoryExportJson(JSON.stringify({ ...wire, format_version: 999 })),
 		).toThrow(/unsupported format_version/);
 		expect(() =>
+			decodeHistoryExportJson(JSON.stringify({ ...wire, record_count: 2 })),
+		).toThrow(/record_count/);
+		expect(() =>
 			decodeHistoryExportJson(
 				JSON.stringify({
 					...wire,
@@ -1600,6 +1677,24 @@ describe("ECS TypeScript wrapper", () => {
 				}),
 			),
 		).toThrow(/delta_count/);
+		expect(() =>
+			decodeHistoryExportJson(
+				JSON.stringify({
+					...wire,
+					records: [{ ...wire.records[0], delta_count: 2 }],
+				}),
+			),
+		).toThrow(/delta_count/);
+		const unknownKindWire = JSON.parse(JSON.stringify(wire));
+		unknownKindWire.records[0].deltas[0].kind = "future_delta";
+		expect(() =>
+			decodeHistoryExportJson(JSON.stringify(unknownKindWire)),
+		).toThrow(/history delta kind/);
+		const missingComponentKeyWire = JSON.parse(JSON.stringify(wire));
+		delete missingComponentKeyWire.records[0].deltas[0].component.key;
+		expect(() =>
+			decodeHistoryExportJson(JSON.stringify(missingComponentKeyWire)),
+		).toThrow(/component.key/);
 		expect(() =>
 			decodeHistoryExportJson(
 				JSON.stringify({
