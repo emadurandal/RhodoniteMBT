@@ -1959,6 +1959,38 @@ fn WorldHistory::validate_record_for_redo(
 }
 
 ///|
+/// Reapplies original deltas that had already been undone before an undo failure.
+fn WorldHistory::rollback_applied_undo_deltas(
+  self : WorldHistory,
+  world : World,
+  record : WorldHistoryRecord,
+  failed_index : Int,
+) -> Bool {
+  for i = failed_index + 1; i < record.deltas.length(); i = i + 1 {
+    if !self.apply_delta(world, record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Applies inverse deltas for redo work that completed before a redo failure.
+fn WorldHistory::rollback_applied_redo_deltas(
+  self : WorldHistory,
+  world : World,
+  record : WorldHistoryRecord,
+  failed_index : Int,
+) -> Bool {
+  for i = failed_index - 1; i >= 0; i = i - 1 {
+    if !self.apply_delta_inverse(world, record.deltas[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// Undoes the most recent committed transaction.
 pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
   if !self.enabled || self.max_undo_records <= 0 {
@@ -1982,32 +2014,43 @@ pub fn WorldHistory::undo(self : WorldHistory, world : World) -> Bool {
     self.set_diagnostic("validation_failed")
     return false
   }
-  let record = match self.undo_stack.pop() {
-    Some(record) => record
-    None => {
-      self.set_diagnostic("empty_undo_stack")
-      return false
-    }
-  }
+  let record = next
   self.applying = true
   world.begin_history_tracked_mutation()
   ignore(record.label)
-  let mut ok = true
+  let mut failed_index = -1
   for i = record.deltas.length() - 1; i >= 0; i = i - 1 {
     if !self.apply_delta_inverse(world, record.deltas[i]) {
-      ok = false
+      failed_index = i
+      break
     }
+  }
+  let rollback_ok = if failed_index >= 0 {
+    self.rollback_applied_undo_deltas(world, record, failed_index)
+  } else {
+    true
   }
   world.end_history_tracked_mutation()
   self.applying = false
-  if ok {
+  if failed_index < 0 {
+    let record = match self.undo_stack.pop() {
+      Some(record) => record
+      None => {
+        self.set_diagnostic("empty_undo_stack")
+        return false
+      }
+    }
     self.redo_stack.push(record)
     self.set_trim_diagnostic(self.trim_stacks_to_limit())
+    true
+  } else if rollback_ok {
+    self.set_diagnostic("apply_failed_rolled_back")
+    false
   } else {
     self.clear()
     self.set_diagnostic("apply_failed")
+    false
   }
-  ok
 }
 
 ///|
@@ -2034,30 +2077,41 @@ pub fn WorldHistory::redo(self : WorldHistory, world : World) -> Bool {
     self.set_diagnostic("validation_failed")
     return false
   }
-  let record = match self.redo_stack.pop() {
-    Some(record) => record
-    None => {
-      self.set_diagnostic("empty_redo_stack")
-      return false
-    }
-  }
+  let record = next
   self.applying = true
   world.begin_history_tracked_mutation()
   ignore(record.label)
-  let mut ok = true
+  let mut failed_index = -1
   for i = 0; i < record.deltas.length(); i = i + 1 {
     if !self.apply_delta(world, record.deltas[i]) {
-      ok = false
+      failed_index = i
+      break
     }
+  }
+  let rollback_ok = if failed_index >= 0 {
+    self.rollback_applied_redo_deltas(world, record, failed_index)
+  } else {
+    true
   }
   world.end_history_tracked_mutation()
   self.applying = false
-  if ok {
+  if failed_index < 0 {
+    let record = match self.redo_stack.pop() {
+      Some(record) => record
+      None => {
+        self.set_diagnostic("empty_redo_stack")
+        return false
+      }
+    }
     self.undo_stack.push(record)
     self.set_trim_diagnostic(self.trim_stacks_to_limit())
+    true
+  } else if rollback_ok {
+    self.set_diagnostic("apply_failed_rolled_back")
+    false
   } else {
     self.clear()
     self.set_diagnostic("apply_failed")
+    false
   }
-  ok
 }

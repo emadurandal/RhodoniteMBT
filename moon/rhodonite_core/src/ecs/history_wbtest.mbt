@@ -13,6 +13,97 @@ fn history_wb_bytes4(
 }
 
 ///|
+test "WorldHistory undo failure rollback reapplies completed deltas" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryUndoRollback", 4)
+  let entity = world.create_entity()
+  let before = history_wb_bytes4(1, 0, 0, 0)
+  let after = history_wb_bytes4(2, 0, 0, 0)
+  assert_true(world.add_component_bytes(entity, component, after))
+  let record : WorldHistoryRecord = {
+    label: "undo rollback",
+    deltas: [
+      ComponentChanged(entity, component, before, after),
+      ComponentChanged(entity, component, before, after),
+    ],
+  }
+  world.begin_history_tracked_mutation()
+  assert_true(history.apply_delta_inverse(world, record.deltas[1]))
+  assert_true(world.component_bytes(entity, component) == Some(before))
+  assert_true(history.rollback_applied_undo_deltas(world, record, 0))
+  world.end_history_tracked_mutation()
+  assert_true(world.component_bytes(entity, component) == Some(after))
+}
+
+///|
+test "WorldHistory redo failure rollback inverses completed deltas" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryRedoRollback", 4)
+  let entity = world.create_entity()
+  let before = history_wb_bytes4(1, 0, 0, 0)
+  let after = history_wb_bytes4(2, 0, 0, 0)
+  assert_true(world.add_component_bytes(entity, component, before))
+  let record : WorldHistoryRecord = {
+    label: "redo rollback",
+    deltas: [
+      ComponentChanged(entity, component, before, after),
+      ComponentChanged(entity, component, before, after),
+    ],
+  }
+  world.begin_history_tracked_mutation()
+  assert_true(history.apply_delta(world, record.deltas[0]))
+  assert_true(world.component_bytes(entity, component) == Some(after))
+  assert_true(history.rollback_applied_redo_deltas(world, record, 1))
+  world.end_history_tracked_mutation()
+  assert_true(world.component_bytes(entity, component) == Some(before))
+}
+
+///|
+test "WorldHistory undo apply failure rolls back and keeps stacks" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let bad = world.create_entity()
+  let good = world.create_entity()
+  world.locations[bad.index] = None
+  history.undo_stack.push({
+    label: "undo apply failure",
+    deltas: [EntityCreated(bad), EntityCreated(good)],
+  })
+  assert_true(!history.undo(world))
+  assert_eq(history.last_diagnostic(), "apply_failed_rolled_back")
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  assert_true(world.is_alive(good))
+}
+
+///|
+test "WorldHistory redo apply failure rolls back and keeps stacks" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryRedoApplyRollback", 4)
+  let bad = world.create_entity()
+  let good = world.create_entity()
+  let before = history_wb_bytes4(1, 0, 0, 0)
+  let after = history_wb_bytes4(2, 0, 0, 0)
+  assert_true(world.add_component_bytes(good, component, before))
+  world.locations[bad.index] = None
+  history.redo_stack.push({
+    label: "redo apply failure",
+    deltas: [
+      ComponentChanged(good, component, before, after),
+      EntityDestroyed({ entity: bad, components: [] }),
+    ],
+  })
+  assert_true(!history.redo(world))
+  assert_eq(history.last_diagnostic(), "apply_failed_rolled_back")
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  assert_true(world.component_bytes(good, component) == Some(before))
+}
+
+///|
 test "WorldHistory compresses repeated CameraChanged deltas inside transaction" {
   let world = World::new()
   let history = WorldHistory::new()

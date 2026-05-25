@@ -84,9 +84,10 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Apply Validation</h2>
           <p><code>undo</code> または <code>redo</code> が record を適用する前に、<code>WorldHistory</code> は現在の world が record 内の全 delta を順序通り受け入れられるか検証します。検証に失敗した場合、method は world を変更せず、undo/redo stack 間で record を移動せずに <code>false</code> を返します。これにより untracked edit 後の stale record を保護しつつ、create 後に component を追加するような依存関係を持つ valid transaction は通常通り replay できます。</p>
+          <p>同じ record 内の先行 delta が適用された後に後続 delta の適用が失敗した場合、<code>WorldHistory</code> は適用済み delta の rollback を試み、undo/redo stack は移動しません。rollback に成功した場合は <code>apply_failed_rolled_back</code>、rollback も失敗した場合は history を clear して <code>apply_failed</code> を返します。</p>
 
           <h2>Diagnostics</h2>
-          <p><code>last_diagnostic</code> は直近の history operation に対する stable reason code を返します。通常成功時は <code>none</code> に戻り、<code>empty_undo_stack</code>、<code>validation_failed</code>、<code>operation_failed</code> などの失敗時は editor UI や test が原因を確認できます。成功した操作でも、record が <code>max_undo_bytes</code> を超えて保持されなかった場合は <code>record_dropped_byte_limit</code> のような non-retention reason を返します。</p>
+          <p><code>last_diagnostic</code> は直近の history operation に対する stable reason code を返します。通常成功時は <code>none</code> に戻り、<code>empty_undo_stack</code>、<code>validation_failed</code>、<code>apply_failed_rolled_back</code>、<code>operation_failed</code> などの失敗時は editor UI や test が原因を確認できます。成功した操作でも、record が <code>max_undo_bytes</code> を超えて保持されなかった場合は <code>record_dropped_byte_limit</code> のような non-retention reason を返します。</p>
 
           <h2>Labels</h2>
           <p>transaction label は UI metadata です。<code>undo_label</code> と <code>redo_label</code> は次に実行可能な undo / redo record の label を返すため、editor UI は <code>Undo Move Entity</code> のような command 表示を作れます。label は world state、transaction ordering、delta application には影響しません。</p>
