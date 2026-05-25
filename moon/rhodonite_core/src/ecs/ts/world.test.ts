@@ -2456,6 +2456,74 @@ describe("ECS TypeScript wrapper", () => {
 		).toThrow();
 	});
 
+	it("keeps stacks and world unchanged when undo and redo validation fails", () => {
+		const undoWorld = World.new();
+		const undoHistory = WorldHistory.new();
+		const undoCpu = undoWorld.registerCpuComponent("TsHistoryUndoValidate", 4);
+		const undoEntity = undoWorld.createEntity();
+		expect(
+			undoWorld.addComponentBytes(
+				undoEntity,
+				undoCpu,
+				new Uint8Array([1, 1, 1, 1]),
+			),
+		).toBe(true);
+		expect(
+			undoHistory.setComponentBytes(
+				undoWorld,
+				undoEntity,
+				undoCpu,
+				new Uint8Array([2, 2, 2, 2]),
+			),
+		).toBe(true);
+		expect(undoWorld.destroyEntity(undoEntity)).toBe(true);
+		expect(undoHistory.undo(undoWorld)).toBe(false);
+		expect(undoHistory.lastDiagnostic()).toBe("validation_failed");
+		expect(undoHistory.undoLen()).toBe(1);
+		expect(undoHistory.redoLen()).toBe(0);
+		expect(undoWorld.isAlive(undoEntity)).toBe(false);
+
+		const redoWorld = World.new();
+		const redoHistory = WorldHistory.new();
+		const redoCpu = redoWorld.registerCpuComponent("TsHistoryRedoValidate", 4);
+		const redoEntity = redoWorld.createEntity();
+		expect(
+			redoWorld.addComponentBytes(
+				redoEntity,
+				redoCpu,
+				new Uint8Array([1, 1, 1, 1]),
+			),
+		).toBe(true);
+		expect(
+			redoHistory.setComponentBytes(
+				redoWorld,
+				redoEntity,
+				redoCpu,
+				new Uint8Array([2, 2, 2, 2]),
+			),
+		).toBe(true);
+		expect(redoHistory.undo(redoWorld)).toBe(true);
+		expect(redoWorld.removeComponent(redoEntity, redoCpu)).toBe(true);
+		expect(redoHistory.redo(redoWorld)).toBe(false);
+		expect(redoHistory.lastDiagnostic()).toBe("validation_failed");
+		expect(redoHistory.undoLen()).toBe(0);
+		expect(redoHistory.redoLen()).toBe(1);
+		expect(redoWorld.hasComponent(redoEntity, redoCpu)).toBe(false);
+
+		const generationWorld = World.new();
+		const generationHistory = WorldHistory.new();
+		const created = generationHistory.createEntity(generationWorld);
+		expect(generationHistory.undo(generationWorld)).toBe(true);
+		const replacement = generationWorld.createEntity();
+		expect(replacement.index()).toBe(created.index());
+		expect(generationWorld.destroyEntity(replacement)).toBe(true);
+		expect(generationHistory.redo(generationWorld)).toBe(false);
+		expect(generationHistory.lastDiagnostic()).toBe("validation_failed");
+		expect(generationHistory.undoLen()).toBe(0);
+		expect(generationHistory.redoLen()).toBe(1);
+		expect(generationWorld.isAlive(created)).toBe(false);
+	});
+
 	it("clears history when disabled", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
