@@ -276,6 +276,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		count: number,
 	): MoonEntityId[];
+	export function world_history_spawn_batch(
+		history: MoonWorldHistory,
+		world: MoonWorld,
+		components: MoonComponentTypeId[],
+		count: number,
+		f: (index: number, entity: MoonEntityId, row: MoonSpawnBatchRow) => void,
+	): MoonEntityId[];
 	export function world_history_destroy_entity(
 		history: MoonWorldHistory,
 		world: MoonWorld,

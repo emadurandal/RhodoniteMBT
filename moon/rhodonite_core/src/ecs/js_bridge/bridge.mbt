@@ -636,6 +636,18 @@ pub fn world_history_create_entities(
 }
 
 ///|
+/// Implements `world_history_spawn_batch`.
+pub fn world_history_spawn_batch(
+  history : @ecs.WorldHistory,
+  world : @ecs.World,
+  components : Array[@ecs.ComponentTypeId],
+  count : Int,
+  f : (Int, @ecs.EntityId, @ecs.SpawnBatchRow) -> Unit,
+) -> Array[@ecs.EntityId] {
+  history.spawn_batch(world, components, count, f)
+}
+
+///|
 /// Implements `world_history_destroy_entity`.
 pub fn world_history_destroy_entity(
   history : @ecs.WorldHistory,

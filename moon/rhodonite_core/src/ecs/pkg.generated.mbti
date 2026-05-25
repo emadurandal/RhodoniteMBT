@@ -364,6 +364,7 @@ pub fn WorldHistory::set_max_undo_bytes(Self, Int) -> Unit
 pub fn WorldHistory::set_max_undo_records(Self, Int) -> Unit
 pub fn WorldHistory::set_raw_mutation_guard_enabled(Self, Bool) -> Unit
 pub fn WorldHistory::set_transform_trs(Self, World, EntityId, Float, Float, Float, Double, Double, Double, Double, Float, Float, Float) -> Bool
+pub fn WorldHistory::spawn_batch(Self, World, Array[ComponentTypeId], Int, (Int, EntityId, SpawnBatchRow) -> Unit) -> Array[EntityId]
 pub fn WorldHistory::undo(Self, World) -> Bool
 pub fn WorldHistory::undo_bytes(Self) -> Int
 pub fn WorldHistory::undo_label(Self) -> String?

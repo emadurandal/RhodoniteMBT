@@ -84,6 +84,7 @@ options(
         "world_history_redo",
         "world_history_create_entity",
         "world_history_create_entities",
+        "world_history_spawn_batch",
         "world_history_destroy_entity",
         "world_history_add_component",
         "world_history_add_component_bytes",
