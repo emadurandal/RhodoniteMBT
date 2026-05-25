@@ -441,6 +441,36 @@ describe("ECS TypeScript wrapper", () => {
 		expect(world.componentBytesCopy(entities[1], cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
 	});
 
+	it("tracks spawnBatch rows through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpuA = world.registerCpuComponent("TsHistorySpawnBatchA", 4);
+		const cpuB = world.registerCpuComponent("TsHistorySpawnBatchB", 4);
+
+		const entities = history.spawnBatch(world, [cpuB, cpuA], 2, (index, entity, row) => {
+			expect(row.entity().index()).toBe(entity.index());
+			row.write(cpuA, (bytes) => bytes.setF32(0, index + 1));
+			row.write(cpuB, (bytes) => bytes.setF32(0, index + 10));
+		});
+
+		expect(entities).toHaveLength(2);
+		expect(history.undoLabel()).toBe("spawn_batch");
+		expect(getF32(world.componentBytesCopy(entities[1], cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(getF32(world.componentBytesCopy(entities[1], cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(11);
+		expect(history.undo(world)).toBe(true);
+		expect(world.isAlive(entities[0])).toBe(false);
+		expect(world.isAlive(entities[1])).toBe(false);
+		expect(history.redo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(entities[1], cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(getF32(world.componentBytesCopy(entities[1], cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(11);
+
+		expect(() =>
+			history.spawnBatch(world, [cpuA, cpuA], 1, () => {
+				// Duplicate components follow raw World.spawnBatch and abort.
+			}),
+		).toThrow();
+	});
+
 	it("tracks bulk component byte changes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -682,6 +712,11 @@ describe("ECS TypeScript wrapper", () => {
 			world.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0])),
 		).toThrow();
 		expect(() =>
+			world.spawnBatch([cpu], 1, (_index, _entity, row) => {
+				row.write(cpu, (bytes) => bytes.setF32(0, 42));
+			}),
+		).toThrow();
+		expect(() =>
 			SystemRunner.new().runPhase(
 				world,
 				SystemContext.new(0.016, 1),
@@ -691,6 +726,11 @@ describe("ECS TypeScript wrapper", () => {
 		expect(
 			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
 		).toBe(true);
+		expect(
+			history.spawnBatch(world, [cpu], 1, (_index, _entity, row) => {
+				row.write(cpu, (bytes) => bytes.setF32(0, 7));
+			}),
+		).toHaveLength(1);
 		expect(history.commitTransaction()).toBe(true);
 		expect(
 			world.setComponentBytes(entity, cpu, new Uint8Array([3, 0, 0, 0])),

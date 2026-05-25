@@ -1495,6 +1495,74 @@ pub fn WorldHistory::create_entities(
 }
 
 ///|
+/// Records one spawned entity snapshot as creation plus component add deltas.
+fn WorldHistory::record_spawned_entity_snapshot(
+  self : WorldHistory,
+  snapshot : EntitySnapshot,
+) -> Unit {
+  self.record_entity_created(snapshot.entity)
+  for i = 0; i < snapshot.components.length(); i = i + 1 {
+    let component = snapshot.components[i].component
+    let bytes = snapshot.components[i].bytes
+    self.push_delta(ComponentAdded(snapshot.entity, component, bytes))
+  }
+}
+
+///|
+/// Creates many entities directly in an archetype and records their initialized rows.
+pub fn WorldHistory::spawn_batch(
+  self : WorldHistory,
+  world : World,
+  components : Array[ComponentTypeId],
+  count : Int,
+  write : (Int, EntityId, SpawnBatchRow) -> Unit,
+) -> Array[EntityId] {
+  if count < 0 {
+    abort("WorldHistory::spawn_batch: count must be non-negative")
+  }
+  if component_array_has_duplicates(components) {
+    abort("WorldHistory::spawn_batch: duplicate component")
+  }
+  if count == 0 {
+    self.clear_diagnostic()
+    return []
+  }
+  if !self.recording_enabled() || self.applying {
+    let entities = world.spawn_batch(components, count, write)
+    self.set_delegate_diagnostic(
+      entities.length() == count,
+      if self.applying {
+        "applying"
+      } else {
+        "recording_disabled"
+      },
+    )
+    return entities
+  }
+  let auto = self.begin_auto("spawn_batch")
+  self.begin_tracked_world_mutation(world)
+  let entities = world.spawn_batch(components, count, write)
+  self.end_tracked_world_mutation(world)
+  let mut ok = entities.length() == count
+  if ok {
+    let snapshots : Array[EntitySnapshot] = []
+    for i = 0; i < entities.length(); i = i + 1 {
+      match world.entity_snapshot(entities[i]) {
+        Some(snapshot) => snapshots.push(snapshot)
+        None => ok = false
+      }
+    }
+    if ok {
+      for i = 0; i < snapshots.length(); i = i + 1 {
+        self.record_spawned_entity_snapshot(snapshots[i])
+      }
+    }
+  }
+  self.finish_auto(auto, ok)
+  entities
+}
+
+///|
 /// Destroys an entity and records a restorable snapshot.
 pub fn WorldHistory::destroy_entity(
   self : WorldHistory,

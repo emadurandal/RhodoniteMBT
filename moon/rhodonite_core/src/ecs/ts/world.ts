@@ -89,6 +89,7 @@ import {
 	world_history_set_max_undo_bytes,
 	world_history_set_max_undo_records,
 	world_history_set_raw_mutation_guard_enabled,
+	world_history_spawn_batch,
 	world_history_set_transform_trs,
 	world_history_undo,
 	world_history_undo_bytes,
@@ -582,6 +583,22 @@ export class WorldHistory {
 		return world_history_create_entities(this.inner, world.inner, count).map(
 			(entity) => new EntityId(entity),
 		);
+	}
+
+	spawnBatch(
+		world: World,
+		components: ComponentTypeId[],
+		count: number,
+		f: (index: number, entity: EntityId, row: SpawnBatchRow) => void,
+	): EntityId[] {
+		return world_history_spawn_batch(
+			this.inner,
+			world.inner,
+			components.map((component) => component.inner),
+			count,
+			(index, entity, row) =>
+				f(index, new EntityId(entity), new SpawnBatchRow(row)),
+		).map((entity) => new EntityId(entity));
 	}
 
 	destroyEntity(world: World, entity: EntityId): boolean {

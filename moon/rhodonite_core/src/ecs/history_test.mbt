@@ -301,6 +301,95 @@ test "WorldHistory groups batch create and bulk add in one open transaction" {
 }
 
 ///|
+test "WorldHistory undoes and redoes tracked spawn batch rows" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu_a = world.register_cpu_component("HistorySpawnBatchA", 4)
+  let cpu_b = world.register_cpu_component("HistorySpawnBatchB", 4)
+  let entities = history.spawn_batch(world, [cpu_b, cpu_a], 2, fn(i, _e, row) {
+    row.write(cpu_a, c => c[0] = (10 + i).to_byte())
+    row.write(cpu_b, c => c[0] = (20 + i).to_byte())
+  })
+  assert_eq(entities.length(), 2)
+  assert_eq(history.undo_len(), 1)
+  assert_true(
+    world.component_bytes(entities[0], cpu_a) == Some(bytes4(10, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[1], cpu_b) == Some(bytes4(21, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(entities[0]))
+  assert_true(!world.is_alive(entities[1]))
+  assert_true(history.redo(world))
+  assert_true(world.is_alive(entities[0]))
+  assert_true(world.is_alive(entities[1]))
+  assert_true(
+    world.component_bytes(entities[0], cpu_a) == Some(bytes4(10, 0, 0, 0)),
+  )
+  assert_true(
+    world.component_bytes(entities[1], cpu_b) == Some(bytes4(21, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory groups tracked spawn batch with later edits in one transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistorySpawnBatchGroup", 4)
+  assert_true(history.begin_transaction("spawn group"))
+  let entities = history.spawn_batch(world, [cpu], 1, fn(_i, _e, row) {
+    row.write(cpu, c => c[0] = (1 : Byte))
+  })
+  assert_true(
+    history.set_component_bytes(world, entities[0], cpu, bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(
+    world.component_bytes(entities[0], cpu) == Some(bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_true(!world.is_alive(entities[0]))
+  assert_true(history.redo(world))
+  assert_true(
+    world.component_bytes(entities[0], cpu) == Some(bytes4(2, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory tracked spawn batch reports unknown component without recording" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entities = history.spawn_batch(world, [ComponentTypeId::new(9999)], 2, fn(
+    _i,
+    _e,
+    _row,
+  ) {
+    ()
+  })
+  assert_eq(entities.length(), 0)
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 0)
+}
+
+///|
+test "WorldHistory zero max undo records spawn batch without recording" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistorySpawnBatchZeroLimit", 4)
+  history.set_max_undo_records(0)
+  let entities = history.spawn_batch(world, [cpu], 1, fn(_i, _e, row) {
+    row.write(cpu, c => c[0] = (7 : Byte))
+  })
+  assert_eq(entities.length(), 1)
+  assert_eq(history.undo_len(), 0)
+  assert_true(
+    world.component_bytes(entities[0], cpu) == Some(bytes4(7, 0, 0, 0)),
+  )
+}
+
+///|
 test "WorldHistory bulk redo uses stored world bytes not caller buffers" {
   let world = World::new()
   let history = WorldHistory::new()
