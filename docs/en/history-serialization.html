@@ -32,6 +32,7 @@
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory</code> does not currently expose a serialized history API.</li>
+            <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
             <li>Future persistence must use an explicit history format with a <code>format_version</code>; MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
           </ul>
@@ -56,7 +57,7 @@
             <tbody>
               <tr><td>Entity</td><td>Persist <code>index</code> and <code>generation</code>. Import validates that the target world can reserve or restore those ids.</td></tr>
               <tr><td>Built-in component</td><td>Persist a stable builtin name such as <code>Transform3D</code>, <code>ChildOf</code>, <code>GlobalTransform</code>, or <code>Camera</code>.</td></tr>
-              <tr><td>User CPU component</td><td>Require an application-provided stable key plus schema version or hash. Replay is rejected when the registered component does not match.</td></tr>
+              <tr><td>User CPU component</td><td>Require registration with <code>register_cpu_component_with_identity</code>, using an application-provided stable key plus schema version or hash. Replay is rejected when the registered component does not match.</td></tr>
               <tr><td>Component index</td><td>May be cached as a local hint, but cannot be authoritative across sessions.</td></tr>
             </tbody>
           </table>

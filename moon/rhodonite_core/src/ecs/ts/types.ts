@@ -32,6 +32,9 @@ import {
 	gpu_layout_transform3d,
 	world_component_info_cpu_stride,
 	world_component_info_name,
+	world_component_info_schema_hash,
+	world_component_info_schema_version,
+	world_component_info_stable_key,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { moonBool } from "./views.ts";
 
@@ -179,5 +182,17 @@ export class RegisteredComponent {
 
 	cpuStride(): number {
 		return world_component_info_cpu_stride(this.inner);
+	}
+
+	stableKey(): string | null {
+		return world_component_info_stable_key(this.inner) ?? null;
+	}
+
+	schemaVersion(): string | null {
+		return world_component_info_schema_version(this.inner) ?? null;
+	}
+
+	schemaHash(): string | null {
+		return world_component_info_schema_hash(this.inner) ?? null;
 	}
 }

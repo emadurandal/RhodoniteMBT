@@ -36,10 +36,16 @@ pub fn ComponentTypeId::new(index : Int) -> ComponentTypeId {
 
 ///|
 /// Metadata for one registered component: `cpu_stride` is the SoA row width.
+///
+/// `stable_key`, `schema_version`, and `schema_hash` are optional authoring
+/// metadata for future history serialization; runtime ECS lookup still uses `id`.
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
   cpu_stride : Int
+  stable_key : String?
+  schema_version : String?
+  schema_hash : String?
 }
 
 ///|

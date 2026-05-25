@@ -260,6 +260,9 @@ pub(all) struct RegisteredComponent {
   id : ComponentTypeId
   name : String
   cpu_stride : Int
+  stable_key : String?
+  schema_version : String?
+  schema_hash : String?
 }
 
 pub struct SpawnBatchRow {
@@ -334,6 +337,7 @@ pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::orbit_camera_controller_component(Self) -> ComponentTypeId
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
+pub fn World::register_cpu_component_with_identity(Self, String, Int, String, String?, String?) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::reserve_batch_capacity(Self, Array[ComponentTypeId], Int) -> Bool
 pub fn World::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
@@ -395,6 +399,7 @@ pub fn WorldHistory::redo(Self, World) -> Bool
 pub fn WorldHistory::redo_bytes(Self) -> Int
 pub fn WorldHistory::redo_label(Self) -> String?
 pub fn WorldHistory::redo_len(Self) -> Int
+pub fn WorldHistory::redo_summary(Self) -> Array[WorldHistoryRecordSummary]
 pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
 pub fn WorldHistory::run_system_phase(Self, SystemRunner, World, SystemContext, PhaseKey, String) -> Bool
 pub fn WorldHistory::set_camera_matrices(Self, World, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
@@ -413,6 +418,24 @@ pub fn WorldHistory::undo(Self, World) -> Bool
 pub fn WorldHistory::undo_bytes(Self) -> Int
 pub fn WorldHistory::undo_label(Self) -> String?
 pub fn WorldHistory::undo_len(Self) -> Int
+pub fn WorldHistory::undo_summary(Self) -> Array[WorldHistoryRecordSummary]
+
+pub(all) struct WorldHistoryDeltaSummary {
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_count : Int
+  payload_bytes : Int
+  before_present : Bool
+  after_present : Bool
+}
+
+pub(all) struct WorldHistoryRecordSummary {
+  label : String
+  delta_count : Int
+  payload_bytes : Int
+  deltas : Array[WorldHistoryDeltaSummary]
+}
 
 // Type aliases
 

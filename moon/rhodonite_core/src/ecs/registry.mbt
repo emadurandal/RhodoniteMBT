@@ -15,8 +15,52 @@ fn ComponentRegistry::register_cpu(
   name : String,
   cpu_stride : Int,
 ) -> ComponentTypeId {
+  self.register_cpu_with_identity(name, cpu_stride, None, None, None)
+}
+
+///|
+/// Aborts if `stable_key` is empty or already used by another registered component.
+fn ComponentRegistry::assert_unique_stable_key(
+  self : ComponentRegistry,
+  stable_key : String,
+) -> Unit {
+  if stable_key == "" {
+    abort("component stable key must not be empty")
+  }
+  for i = 0; i < self.components.length(); i = i + 1 {
+    match self.components[i].stable_key {
+      Some(existing) =>
+        if existing == stable_key {
+          abort("duplicate component stable key: \{stable_key}")
+        }
+      None => ()
+    }
+  }
+}
+
+///|
+/// Registers a CPU component with optional stable identity metadata.
+fn ComponentRegistry::register_cpu_with_identity(
+  self : ComponentRegistry,
+  name : String,
+  cpu_stride : Int,
+  stable_key : String?,
+  schema_version : String?,
+  schema_hash : String?,
+) -> ComponentTypeId {
+  match stable_key {
+    Some(key) => self.assert_unique_stable_key(key)
+    None => ()
+  }
   let id = ComponentTypeId::new(self.components.length())
-  self.components.push({ id, name, cpu_stride })
+  self.components.push({
+    id,
+    name,
+    cpu_stride,
+    stable_key,
+    schema_version,
+    schema_hash,
+  })
   id
 }
 

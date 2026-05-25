@@ -6,6 +6,8 @@ import type {
 	MoonGpuWriteView,
 	MoonSpawnBatchRow,
 	MoonWorld,
+	MoonWorldHistoryDeltaSummary,
+	MoonWorldHistoryRecordSummary,
 	MoonWorldHistory,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -39,6 +41,7 @@ import {
 	world_new_with_global_transform_f16,
 	world_orbit_camera_controller_component,
 	world_register_cpu_component,
+	world_register_cpu_component_with_identity,
 	world_remove_component,
 	world_camera_gpu_row_copy,
 	world_set_camera_matrices_col_major,
@@ -71,6 +74,13 @@ import {
 	world_history_commit_transaction,
 	world_history_create_entities,
 	world_history_create_entity,
+	world_history_delta_summary_after_present,
+	world_history_delta_summary_before_present,
+	world_history_delta_summary_component,
+	world_history_delta_summary_component_count,
+	world_history_delta_summary_entity,
+	world_history_delta_summary_kind,
+	world_history_delta_summary_payload_bytes,
 	world_history_destroy_entity,
 	world_history_enabled,
 	world_history_last_diagnostic,
@@ -82,7 +92,12 @@ import {
 	world_history_redo_bytes,
 	world_history_redo_label,
 	world_history_redo_len,
+	world_history_redo_summary,
 	world_history_remove_component,
+	world_history_record_summary_delta_count,
+	world_history_record_summary_deltas,
+	world_history_record_summary_label,
+	world_history_record_summary_payload_bytes,
 	world_history_run_system_phase,
 	world_history_set_child_of,
 	world_history_set_camera_matrices_col_major,
@@ -100,6 +115,7 @@ import {
 	world_history_undo_bytes,
 	world_history_undo_label,
 	world_history_undo_len,
+	world_history_undo_summary,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	ComponentTypeId,
@@ -110,8 +126,14 @@ import {
 import type { PhaseKey, SystemContext, SystemRunner } from "./system.ts";
 import { ByteView, byteView, bytesInput, moonBool } from "./views.ts";
 
+export type CpuComponentIdentity = {
+	readonly stableKey: string;
+	readonly schemaVersion?: string;
+	readonly schemaHash?: string;
+};
+
 export class SpawnBatchRow {
-	readonly inner: MoonSpawnBatchRow;
+  readonly inner: MoonSpawnBatchRow;
 
 	constructor(inner: MoonSpawnBatchRow) {
 		this.inner = inner;
@@ -234,6 +256,23 @@ export class World {
 	registerCpuComponent(name: string, cpuStride: number): ComponentTypeId {
 		return new ComponentTypeId(
 			world_register_cpu_component(this.inner, name, cpuStride),
+		);
+	}
+
+	registerCpuComponentWithIdentity(
+		name: string,
+		cpuStride: number,
+		identity: CpuComponentIdentity,
+	): ComponentTypeId {
+		return new ComponentTypeId(
+			world_register_cpu_component_with_identity(
+				this.inner,
+				name,
+				cpuStride,
+				identity.stableKey,
+				identity.schemaVersion,
+				identity.schemaHash,
+			),
 		);
 	}
 
@@ -486,7 +525,80 @@ export class World {
 			(index, entity, row) =>
 				f(index, new EntityId(entity), new SpawnBatchRow(row)),
 		).map((entity) => new EntityId(entity));
-	}
+  }
+}
+
+export type HistoryDeltaKind =
+	| "entity_created"
+	| "entity_destroyed"
+	| "component_added"
+	| "component_removed"
+	| "component_changed"
+	| "global_transform_changed"
+	| "camera_changed";
+
+export type HistoryDeltaSummary = {
+	readonly kind: HistoryDeltaKind;
+	readonly entity: EntityId | null;
+	readonly component: ComponentTypeId | null;
+	readonly componentCount: number;
+	readonly payloadBytes: number;
+	readonly beforePresent: boolean;
+	readonly afterPresent: boolean;
+};
+
+export type HistoryRecordSummary = {
+	readonly label: string;
+	readonly deltaCount: number;
+	readonly payloadBytes: number;
+	readonly deltas: HistoryDeltaSummary[];
+};
+
+function historySummaryEntity(
+	entity:
+		| ReturnType<typeof world_history_delta_summary_entity>
+		| null
+		| undefined,
+): EntityId | null {
+	return entity == null ? null : new EntityId(entity);
+}
+
+function historySummaryComponent(
+	component:
+		| ReturnType<typeof world_history_delta_summary_component>
+		| null
+		| undefined,
+): ComponentTypeId | null {
+	return component == null ? null : new ComponentTypeId(component);
+}
+
+function historyDeltaSummaryFromBridge(
+	summary: MoonWorldHistoryDeltaSummary,
+): HistoryDeltaSummary {
+	return {
+		kind: world_history_delta_summary_kind(summary) as HistoryDeltaKind,
+		entity: historySummaryEntity(world_history_delta_summary_entity(summary)),
+		component: historySummaryComponent(
+			world_history_delta_summary_component(summary),
+		),
+		componentCount: world_history_delta_summary_component_count(summary),
+		payloadBytes: world_history_delta_summary_payload_bytes(summary),
+		beforePresent: moonBool(world_history_delta_summary_before_present(summary)),
+		afterPresent: moonBool(world_history_delta_summary_after_present(summary)),
+	};
+}
+
+function historyRecordSummaryFromBridge(
+	summary: MoonWorldHistoryRecordSummary,
+): HistoryRecordSummary {
+	return {
+		label: world_history_record_summary_label(summary),
+		deltaCount: world_history_record_summary_delta_count(summary),
+		payloadBytes: world_history_record_summary_payload_bytes(summary),
+		deltas: world_history_record_summary_deltas(summary).map((delta) =>
+			historyDeltaSummaryFromBridge(delta),
+		),
+	};
 }
 
 export class WorldHistory {
@@ -550,6 +662,18 @@ export class WorldHistory {
 
 	redoBytes(): number {
 		return world_history_redo_bytes(this.inner);
+	}
+
+	undoSummary(): HistoryRecordSummary[] {
+		return world_history_undo_summary(this.inner).map((summary) =>
+			historyRecordSummaryFromBridge(summary),
+		);
+	}
+
+	redoSummary(): HistoryRecordSummary[] {
+		return world_history_redo_summary(this.inner).map((summary) =>
+			historyRecordSummaryFromBridge(summary),
+		);
 	}
 
 	lastDiagnostic(): string {

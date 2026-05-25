@@ -137,6 +137,21 @@ pub fn world_register_cpu_component(
 }
 
 ///|
+/// Implements `world_register_cpu_component_with_identity`.
+pub fn world_register_cpu_component_with_identity(
+  world : @ecs.World,
+  name : String,
+  cpu_stride : Int,
+  stable_key : String,
+  schema_version : String?,
+  schema_hash : String?,
+) -> @ecs.ComponentTypeId {
+  world.register_cpu_component_with_identity(
+    name, cpu_stride, stable_key, schema_version, schema_hash,
+  )
+}
+
+///|
 /// Implements `world_component_cpu_stride`.
 pub fn world_component_cpu_stride(
   world : @ecs.World,
@@ -164,6 +179,30 @@ pub fn world_component_info_name(info : @ecs.RegisteredComponent) -> String {
 /// Implements `world_component_info_cpu_stride`.
 pub fn world_component_info_cpu_stride(info : @ecs.RegisteredComponent) -> Int {
   info.cpu_stride
+}
+
+///|
+/// Implements `world_component_info_stable_key`.
+pub fn world_component_info_stable_key(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.stable_key
+}
+
+///|
+/// Implements `world_component_info_schema_version`.
+pub fn world_component_info_schema_version(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.schema_version
+}
+
+///|
+/// Implements `world_component_info_schema_hash`.
+pub fn world_component_info_schema_hash(
+  info : @ecs.RegisteredComponent,
+) -> String? {
+  info.schema_hash
 }
 
 ///|
@@ -556,6 +595,110 @@ pub fn world_history_undo_bytes(history : @ecs.WorldHistory) -> Int {
 /// Implements `world_history_redo_bytes`.
 pub fn world_history_redo_bytes(history : @ecs.WorldHistory) -> Int {
   history.redo_bytes()
+}
+
+///|
+/// Implements `world_history_undo_summary`.
+pub fn world_history_undo_summary(
+  history : @ecs.WorldHistory,
+) -> Array[@ecs.WorldHistoryRecordSummary] {
+  history.undo_summary()
+}
+
+///|
+/// Implements `world_history_redo_summary`.
+pub fn world_history_redo_summary(
+  history : @ecs.WorldHistory,
+) -> Array[@ecs.WorldHistoryRecordSummary] {
+  history.redo_summary()
+}
+
+///|
+/// Implements `world_history_record_summary_label`.
+pub fn world_history_record_summary_label(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> String {
+  summary.label
+}
+
+///|
+/// Implements `world_history_record_summary_delta_count`.
+pub fn world_history_record_summary_delta_count(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Int {
+  summary.delta_count
+}
+
+///|
+/// Implements `world_history_record_summary_payload_bytes`.
+pub fn world_history_record_summary_payload_bytes(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Int {
+  summary.payload_bytes
+}
+
+///|
+/// Implements `world_history_record_summary_deltas`.
+pub fn world_history_record_summary_deltas(
+  summary : @ecs.WorldHistoryRecordSummary,
+) -> Array[@ecs.WorldHistoryDeltaSummary] {
+  summary.deltas
+}
+
+///|
+/// Implements `world_history_delta_summary_kind`.
+pub fn world_history_delta_summary_kind(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> String {
+  summary.kind
+}
+
+///|
+/// Implements `world_history_delta_summary_entity`.
+pub fn world_history_delta_summary_entity(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> @ecs.EntityId? {
+  summary.entity
+}
+
+///|
+/// Implements `world_history_delta_summary_component`.
+pub fn world_history_delta_summary_component(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> @ecs.ComponentTypeId? {
+  summary.component
+}
+
+///|
+/// Implements `world_history_delta_summary_component_count`.
+pub fn world_history_delta_summary_component_count(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Int {
+  summary.component_count
+}
+
+///|
+/// Implements `world_history_delta_summary_payload_bytes`.
+pub fn world_history_delta_summary_payload_bytes(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Int {
+  summary.payload_bytes
+}
+
+///|
+/// Implements `world_history_delta_summary_before_present`.
+pub fn world_history_delta_summary_before_present(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Bool {
+  summary.before_present
+}
+
+///|
+/// Implements `world_history_delta_summary_after_present`.
+pub fn world_history_delta_summary_after_present(
+  summary : @ecs.WorldHistoryDeltaSummary,
+) -> Bool {
+  summary.after_present
 }
 
 ///|

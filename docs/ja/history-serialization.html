@@ -32,6 +32,7 @@
           <h2>Status</h2>
           <ul>
             <li><code>WorldHistory</code> は現時点で serialized history API を公開していません。</li>
+            <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
             <li>将来の永続化では <code>format_version</code> を持つ明示的な history format を使います。MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
           </ul>
@@ -56,7 +57,7 @@
             <tbody>
               <tr><td>Entity</td><td><code>index</code> と <code>generation</code> を保存します。import は target world がその id を reserve / restore できることを検証します。</td></tr>
               <tr><td>Builtin component</td><td><code>Transform3D</code>、<code>ChildOf</code>、<code>GlobalTransform</code>、<code>Camera</code> のような stable builtin name を保存します。</td></tr>
-              <tr><td>User CPU component</td><td>application-provided stable key と schema version または hash を必須にします。登録済み component と一致しない場合は replay を reject します。</td></tr>
+              <tr><td>User CPU component</td><td><code>register_cpu_component_with_identity</code> で登録し、application-provided stable key と schema version または hash を持つことを必須にします。登録済み component と一致しない場合は replay を reject します。</td></tr>
               <tr><td>Component index</td><td>local hint として cache してもよいですが、session をまたいだ authoritative key にはしません。</td></tr>
             </tbody>
           </table>

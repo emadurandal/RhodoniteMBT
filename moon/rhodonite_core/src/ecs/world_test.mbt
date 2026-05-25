@@ -9,11 +9,62 @@ test "World exposes component metadata without exposing registry mutation" {
     Some(info) => {
       assert_eq(info.name, "MetadataCPU")
       assert_eq(info.cpu_stride, 4)
+      assert_true(info.stable_key is None)
+      assert_true(info.schema_version is None)
+      assert_true(info.schema_hash is None)
     }
     None => abort("expected component metadata")
   }
+  let stable = world.register_cpu_component_with_identity(
+    "StableMetadataCPU",
+    8,
+    "com.example.StableMetadataCPU",
+    Some("2"),
+    Some("sha256:stable-metadata"),
+  )
+  match world.component_info(stable) {
+    Some(info) => {
+      assert_eq(info.name, "StableMetadataCPU")
+      assert_eq(info.cpu_stride, 8)
+      assert_true(info.stable_key == Some("com.example.StableMetadataCPU"))
+      assert_true(info.schema_version == Some("2"))
+      assert_true(info.schema_hash == Some("sha256:stable-metadata"))
+    }
+    None => abort("expected stable component metadata")
+  }
   assert_true(world.component_cpu_stride(cpu) is Some(4))
   assert_true(world.component_info(ComponentTypeId::new(9999)) is None)
+}
+
+///|
+test "panic World rejects duplicate component stable keys" {
+  let world = World::new()
+  ignore(
+    world.register_cpu_component_with_identity(
+      "DuplicateStableA",
+      4,
+      "com.example.DuplicateStable",
+      None,
+      None,
+    ),
+  )
+  ignore(
+    world.register_cpu_component_with_identity(
+      "DuplicateStableB",
+      4,
+      "com.example.DuplicateStable",
+      None,
+      None,
+    ),
+  )
+}
+
+///|
+test "panic World rejects empty component stable keys" {
+  let world = World::new()
+  ignore(
+    world.register_cpu_component_with_identity("EmptyStable", 4, "", None, None),
+  )
 }
 
 ///|

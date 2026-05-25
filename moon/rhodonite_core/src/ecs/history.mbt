@@ -51,6 +51,27 @@ priv struct WorldHistoryRecord {
 }
 
 ///|
+/// Payload-free diagnostic summary for one reversible delta.
+pub(all) struct WorldHistoryDeltaSummary {
+  kind : String
+  entity : EntityId?
+  component : ComponentTypeId?
+  component_count : Int
+  payload_bytes : Int
+  before_present : Bool
+  after_present : Bool
+}
+
+///|
+/// Payload-free diagnostic summary for one committed history record.
+pub(all) struct WorldHistoryRecordSummary {
+  label : String
+  delta_count : Int
+  payload_bytes : Int
+  deltas : Array[WorldHistoryDeltaSummary]
+}
+
+///|
 /// Whether applying stack limits dropped at least one retained record.
 priv struct HistoryTrimResult {
   record_limit : Bool
@@ -158,6 +179,126 @@ fn world_history_stack_payload_bytes(
     total = total + world_history_record_payload_bytes(records[i])
   }
   total
+}
+
+///|
+/// Returns a stable public diagnostic kind string for one delta.
+fn world_delta_summary_kind(delta : WorldDelta) -> String {
+  match delta {
+    EntityCreated(_) => "entity_created"
+    EntityDestroyed(_) => "entity_destroyed"
+    ComponentAdded(_, _, _) => "component_added"
+    ComponentRemoved(_, _, _) => "component_removed"
+    ComponentChanged(_, _, _, _) => "component_changed"
+    GlobalTransformChanged(_, _, _) => "global_transform_changed"
+    CameraChanged(_, _, _) => "camera_changed"
+  }
+}
+
+///|
+/// Converts one internal delta to a payload-free public diagnostic summary.
+fn world_delta_summary(delta : WorldDelta) -> WorldHistoryDeltaSummary {
+  match delta {
+    EntityCreated(entity) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: None,
+        component_count: 0,
+        payload_bytes: 0,
+        before_present: false,
+        after_present: true,
+      }
+    EntityDestroyed(snapshot) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(snapshot.entity),
+        component: None,
+        component_count: snapshot.components.length(),
+        payload_bytes: world_delta_payload_bytes(delta),
+        before_present: true,
+        after_present: false,
+      }
+    ComponentAdded(entity, component, bytes) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: Some(component),
+        component_count: 0,
+        payload_bytes: bytes.length(),
+        before_present: false,
+        after_present: true,
+      }
+    ComponentRemoved(entity, component, bytes) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: Some(component),
+        component_count: 0,
+        payload_bytes: bytes.length(),
+        before_present: true,
+        after_present: false,
+      }
+    ComponentChanged(entity, component, before, after) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: Some(component),
+        component_count: 0,
+        payload_bytes: before.length() + after.length(),
+        before_present: true,
+        after_present: true,
+      }
+    GlobalTransformChanged(entity, before, _) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: None,
+        component_count: 0,
+        payload_bytes: world_delta_payload_bytes(delta),
+        before_present: before is Some(_),
+        after_present: true,
+      }
+    CameraChanged(entity, before, _) =>
+      {
+        kind: world_delta_summary_kind(delta),
+        entity: Some(entity),
+        component: None,
+        component_count: 0,
+        payload_bytes: world_delta_payload_bytes(delta),
+        before_present: before is Some(_),
+        after_present: true,
+      }
+  }
+}
+
+///|
+/// Converts one retained history record to a payload-free public summary.
+fn world_history_record_summary(
+  record : WorldHistoryRecord,
+) -> WorldHistoryRecordSummary {
+  let deltas : Array[WorldHistoryDeltaSummary] = []
+  for i = 0; i < record.deltas.length(); i = i + 1 {
+    deltas.push(world_delta_summary(record.deltas[i]))
+  }
+  {
+    label: record.label,
+    delta_count: record.deltas.length(),
+    payload_bytes: world_history_record_payload_bytes(record),
+    deltas,
+  }
+}
+
+///|
+/// Converts a history stack to summaries with the next operation first.
+fn world_history_stack_summary_next_first(
+  records : Array[WorldHistoryRecord],
+) -> Array[WorldHistoryRecordSummary] {
+  let summaries : Array[WorldHistoryRecordSummary] = []
+  for i = records.length() - 1; i >= 0; i = i - 1 {
+    summaries.push(world_history_record_summary(records[i]))
+  }
+  summaries
 }
 
 ///|
@@ -1386,6 +1527,22 @@ pub fn WorldHistory::undo_bytes(self : WorldHistory) -> Int {
 /// Returns the payload bytes currently retained on the redo stack.
 pub fn WorldHistory::redo_bytes(self : WorldHistory) -> Int {
   world_history_stack_payload_bytes(self.redo_stack)
+}
+
+///|
+/// Returns payload-free summaries of retained undo records, next undo first.
+pub fn WorldHistory::undo_summary(
+  self : WorldHistory,
+) -> Array[WorldHistoryRecordSummary] {
+  world_history_stack_summary_next_first(self.undo_stack)
+}
+
+///|
+/// Returns payload-free summaries of retained redo records, next redo first.
+pub fn WorldHistory::redo_summary(
+  self : WorldHistory,
+) -> Array[WorldHistoryRecordSummary] {
+  world_history_stack_summary_next_first(self.redo_stack)
 }
 
 ///|
