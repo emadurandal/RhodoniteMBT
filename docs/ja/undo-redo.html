@@ -45,7 +45,7 @@ ignore(history.set_transform_trs(world, entity, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.
 ignore(history.commit_transaction())
 ignore(history.undo(world))
 ignore(history.redo(world))</code></pre>
-          <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_global_transform</code> は GlobalTransform component presence と packed matrix row bytes を記録し、<code>WorldHistory::set_global_transform_format</code> は GlobalTransform format 変更と row payload を記録し、<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。これらの component に対する generic な byte write は、component row が blob ref だけを持つため untracked のままです。</p>
+          <p>blob-backed builtin には専用の tracked helper を使います。<code>WorldHistory::set_global_transform</code> は GlobalTransform component presence と packed matrix row bytes を記録し、<code>WorldHistory::set_global_transform_format</code> は GlobalTransform format 変更と row payload を記録し、<code>WorldHistory::set_camera_matrices</code> は Camera component presence と Camera GPU row bytes を記録します。これらの component に対する generic な byte write は、component row が blob ref だけを持つため untracked のままです。blob-backed builtin は CPU component row と参照先 blob row の両方が読める場合だけ valid です。tracked camera-control helper は既存の GlobalTransform または Camera row が読めない場合、setup/sync mutation を適用する前に reject します。</p>
           <p><code>cancel_transaction</code> は open record を破棄するだけで、すでに実行された world mutation は戻しません。helper が所有する transaction で、途中まで適用した tracked step も含めて atomic に失敗させる場合は <code>cancel_transaction_reverting(world)</code> を使います。</p>
 
           <h2>Batch Authoring Helpers</h2>

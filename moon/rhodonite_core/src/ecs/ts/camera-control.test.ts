@@ -287,7 +287,31 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
 	});
 
-	it("rejects tracked camera setup with an unreadable existing Camera row", () => {
+	it("rejects tracked camera setup with unreadable existing blob rows", () => {
+		const globalWorld = World.new();
+		const globalHistory = WorldHistory.new();
+		const globalCamera = globalWorld.createEntity();
+		expect(
+			globalWorld.addComponentBytes(
+				globalCamera,
+				globalWorld.globalTransformComponent(),
+				u32Bytes([0, 0xffff]),
+			),
+		).toBe(true);
+		expect(globalWorld.getGlobalTransform(globalCamera)).toBeNull();
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				globalHistory,
+				globalWorld,
+				globalCamera,
+				createOrbitOrthographicCameraDescFromYzPosition(0.38, 2, 5.6, 0.1, 50, 1, 3.8),
+			),
+		).toBe(false);
+		expect(globalHistory.undoLen()).toBe(0);
+		expect(globalWorld.hasComponent(globalCamera, globalWorld.globalTransformComponent())).toBe(true);
+		expect(globalWorld.hasComponent(globalCamera, globalWorld.orbitCameraControllerComponent())).toBe(false);
+		expect(globalWorld.hasComponent(globalCamera, globalWorld.cameraLensComponent())).toBe(false);
+
 		const cameraWorld = World.new();
 		const cameraHistory = WorldHistory.new();
 		const camera = cameraWorld.createEntity();

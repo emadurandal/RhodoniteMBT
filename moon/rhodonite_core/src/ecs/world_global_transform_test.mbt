@@ -16,6 +16,28 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 }
 
 ///|
+test "GlobalTransform unreadable ref returns none and does not reformat" {
+  let world = World::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.add_component_bytes(
+      entity,
+      world.global_transform_component(),
+      @comp.global_transform_ref_bytes(Affine3x4F32, 0xffff),
+    ),
+  )
+  match world.get_global_transform(entity) {
+    Some(_) => abort("expected unreadable GlobalTransform to return None")
+    None => ()
+  }
+  assert_true(!world.set_global_transform_format(entity, Affine3x4F16))
+  match world.get_global_transform(entity) {
+    Some(_) => abort("expected unreadable GlobalTransform to stay unreadable")
+    None => ()
+  }
+}
+
+///|
 test "GlobalTransform fp16 world uses 24 byte packed blob slots" {
   let world = World::new_with_global_transform_format(Affine3x4F16)
   let gt_id = world.global_transform_component()

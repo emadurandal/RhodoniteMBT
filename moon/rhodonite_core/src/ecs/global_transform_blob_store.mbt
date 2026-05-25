@@ -54,15 +54,15 @@ fn GlobalTransformBlobStore::read_matrix(
   self : GlobalTransformBlobStore,
   format : @comp.GlobalTransformGpuFormat,
   word_offset : Int,
-) -> @m44.Matrix44F {
+) -> @m44.Matrix44F? {
   match
     self.store.read_words(
       word_offset,
       @comp.global_transform_word_count(format),
     ) {
     Some(bytes) =>
-      @comp.matrix44f_from_global_transform_gpu_bytes(bytes, format)
-    None => @m44.Matrix44F::identity()
+      Some(@comp.matrix44f_from_global_transform_gpu_bytes(bytes, format))
+    None => None
   }
 }
 

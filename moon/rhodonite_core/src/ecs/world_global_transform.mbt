@@ -140,26 +140,33 @@ pub fn World::set_global_transform_format(
   if !self.is_alive(entity) {
     return false
   }
-  let matrix = match self.get_global_transform(entity) {
-    Some(m) => m
-    None => @m44.Matrix44F::identity()
-  }
-  match self.global_transform_ref(entity) {
+  let (had_component, matrix) = match self.global_transform_ref(entity) {
     Some(old_ref) => {
       if old_ref.format == format {
         return true
       }
+      let matrix = match
+        self.global_transform_blob.read_matrix(
+          old_ref.format,
+          old_ref.word_offset,
+        ) {
+        Some(m) => m
+        None => return false
+      }
       self.global_transform_blob.free(old_ref.format, old_ref.word_offset)
+      (true, matrix)
     }
-    None =>
+    None => {
       if !self.can_add_missing_component_from_setter(
           id, "World::set_global_transform_format",
         ) {
         return false
       }
+      (false, @m44.Matrix44F::identity())
+    }
   }
   let new_ref = self.alloc_global_transform_ref(format, matrix)
-  if self.has_component(entity, id) {
+  if had_component {
     self.write_global_transform_ref_component(entity, new_ref)
   } else {
     self.add_component_bytes(
@@ -183,12 +190,7 @@ pub fn World::get_global_transform(
   }
   match self.global_transform_ref(entity) {
     Some(gt_ref) =>
-      Some(
-        self.global_transform_blob.read_matrix(
-          gt_ref.format,
-          gt_ref.word_offset,
-        ),
-      )
+      self.global_transform_blob.read_matrix(gt_ref.format, gt_ref.word_offset)
     None => None
   }
 }
