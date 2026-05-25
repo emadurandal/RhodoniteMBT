@@ -2051,6 +2051,52 @@ describe("ECS TypeScript wrapper", () => {
 			),
 		).toBeCloseTo(1);
 
+		const trackedColumnRowsWorld = World.new();
+		const trackedColumnRowsHistory = WorldHistory.new();
+		const trackedColumnRowsCpu = trackedColumnRowsWorld.registerCpuComponent(
+			"TsHistoryTrackedColumnRows",
+			4,
+		);
+		const trackedColumnRowsEntity = trackedColumnRowsWorld.createEntity();
+		expect(
+			trackedColumnRowsWorld.addComponentBytes(
+				trackedColumnRowsEntity,
+				trackedColumnRowsCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedColumnRowsHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedColumnRowsHistory.beginGuardedTransaction(
+				trackedColumnRowsWorld,
+				"guarded tracked column rows",
+			),
+		).toBe(true);
+		RawQuery.new([trackedColumnRowsCpu]).forEachArchetype(
+			trackedColumnRowsWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnRowsTracked(
+						trackedColumnRowsHistory,
+						trackedColumnRowsCpu,
+						[0],
+						(_row, bytes) => bytes.setF32(0, 8),
+					),
+				).toBe(true);
+			},
+		);
+		expect(trackedColumnRowsHistory.commitTransaction()).toBe(true);
+		expect(trackedColumnRowsHistory.undo(trackedColumnRowsWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedColumnRowsWorld.componentBytesCopy(
+					trackedColumnRowsEntity,
+					trackedColumnRowsCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
+
 		const blobQueryWorld = World.new();
 		const blobQueryHistory = WorldHistory.new();
 		const blobQueryEntity = blobQueryWorld.createEntity();
