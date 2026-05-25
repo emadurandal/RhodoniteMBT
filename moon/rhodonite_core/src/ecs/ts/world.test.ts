@@ -2530,11 +2530,40 @@ describe("ECS TypeScript wrapper", () => {
 		const cpu = world.registerCpuComponent("TsHistoryDisabled", 4);
 		const entity = world.createEntity();
 
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(history.undoBytes()).toBe(8);
+		expect(history.undoLabel()).toBe("set_component_bytes");
+		expect(history.undoSummary()).toHaveLength(1);
+		expect(history.beginTransaction("disable open")).toBe(true);
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		history.setEnabled(false);
 		expect(history.enabled()).toBe(false);
-		expect(history.addComponentBytes(world, entity, cpu, new Uint8Array([9, 9, 9, 9]))).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
+		expect(history.undoBytes()).toBe(0);
+		expect(history.redoBytes()).toBe(0);
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+		expect(history.undoSummary()).toEqual([]);
+		expect(history.redoSummary()).toEqual([]);
+		expect(history.lastDiagnostic()).toBe("none");
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([4, 0, 0, 0]))).toBe(true);
 		expect(world.hasComponent(entity, cpu)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLen()).toBe(0);
+		expect(history.undoSummary()).toEqual([]);
+		history.setEnabled(true);
+		expect(history.enabled()).toBe(true);
+		expect(history.lastDiagnostic()).toBe("none");
+		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([5, 0, 0, 0]))).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(history.undoLabel()).toBe("set_component_bytes");
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([4, 0, 0, 0]));
 	});
 
 	it("limits WorldHistory undo records and exposes stack lengths", () => {
@@ -2630,8 +2659,16 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.undoLabel()).toBe("Move Entity");
 		expect(history.redoLabel()).toBe("");
 		history.clear();
+		expect(history.enabled()).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
+		expect(history.undoBytes()).toBe(0);
+		expect(history.redoBytes()).toBe(0);
 		expect(history.undoLabel()).toBeNull();
 		expect(history.redoLabel()).toBeNull();
+		expect(history.undoSummary()).toEqual([]);
+		expect(history.redoSummary()).toEqual([]);
+		expect(history.lastDiagnostic()).toBe("none");
 	});
 
 	it("treats zero max undo records as unrecorded tracked changes", () => {
@@ -2646,10 +2683,21 @@ describe("ECS TypeScript wrapper", () => {
 		history.setMaxUndoRecords(0);
 		expect(history.maxUndoRecords()).toBe(0);
 		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
+		expect(history.undoBytes()).toBe(0);
+		expect(history.redoBytes()).toBe(0);
+		expect(history.undoLabel()).toBeNull();
+		expect(history.redoLabel()).toBeNull();
+		expect(history.undoSummary()).toEqual([]);
+		expect(history.redoSummary()).toEqual([]);
 		expect(history.beginTransaction("no-records")).toBe(false);
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
 		expect(history.setComponentBytes(world, entity, cpu, new Uint8Array([3, 0, 0, 0]))).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([3, 0, 0, 0]));
 		expect(history.canUndo()).toBe(false);
+		expect(history.lastDiagnostic()).toBe("recording_disabled");
+		expect(history.undoLabel()).toBeNull();
+		expect(history.undoSummary()).toEqual([]);
 	});
 
 	it("cancelTransactionReverting rolls back tracked transaction mutations", () => {
