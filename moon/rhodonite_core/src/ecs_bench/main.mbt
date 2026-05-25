@@ -500,6 +500,106 @@ fn bench_history_archetype_column_tracked_enabled(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_history_archetype_column_raw_noop`.
+fn bench_history_archetype_column_raw_noop(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let _ = arch.write_column(component)
+    checksum = checksum + arch.length()
+  })
+  report("history_archetype_column_raw_noop", count, started, checksum)
+}
+
+///|
+/// Implements `bench_history_archetype_column_tracked_noop`.
+fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, component, _col => {
+        checksum = checksum + arch.length()
+      }) {
+      abort("expected noop tracked column write")
+    }
+  })
+  report(
+    "history_archetype_column_tracked_noop",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
+/// Implements `bench_history_archetype_column_raw_sparse`.
+fn bench_history_archetype_column_raw_sparse(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let query = @ecs.RawQuery::new([component])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(component)
+    let col = arch.write_column(component)
+    for row = 0; row < arch.length(); row = row + 1 {
+      if row % 16 == 0 {
+        let idx = arch.entity(row).gpu_index()
+        write_bench_bytes4_to_view(
+          col.mut_view(start=row * stride, end=row * stride + stride),
+          idx + 151,
+        )
+        checksum = checksum + idx
+      }
+    }
+  })
+  report("history_archetype_column_raw_sparse", count, started, checksum)
+}
+
+///|
+/// Implements `bench_history_archetype_column_tracked_sparse`.
+fn bench_history_archetype_column_tracked_sparse(count : Int) -> Unit {
+  let (world, component, _) = make_component_world(count)
+  let history = @ecs.WorldHistory::new()
+  let query = @ecs.RawQuery::new([component])
+  if !history.begin_transaction("bench column tracked sparse") {
+    abort("expected sparse column history transaction begin")
+  }
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(component)
+    if !arch.write_column_tracked(history, component, col => {
+        for row = 0; row < arch.length(); row = row + 1 {
+          if row % 16 == 0 {
+            let idx = arch.entity(row).gpu_index()
+            write_bench_bytes4_to_view(
+              col.mut_view(start=row * stride, end=row * stride + stride),
+              idx + 157,
+            )
+            checksum = checksum + idx
+          }
+        }
+      }) {
+      abort("expected sparse tracked column write")
+    }
+  })
+  if !history.commit_transaction() {
+    abort("expected sparse column history transaction commit")
+  }
+  report(
+    "history_archetype_column_tracked_sparse",
+    count,
+    started,
+    checksum + history.undo_len() + history.undo_bytes(),
+  )
+}
+
+///|
 /// Implements `bench_history_command_raw_phase`.
 fn bench_history_command_raw_phase(count : Int) -> Unit {
   let (world, component, _) = make_component_world(count)
@@ -590,6 +690,10 @@ fn run_history_suite(count : Int) -> Unit {
   bench_history_query_row_tracked_enabled(count)
   bench_history_archetype_column_tracked_disabled(count)
   bench_history_archetype_column_tracked_enabled(count)
+  bench_history_archetype_column_raw_noop(count)
+  bench_history_archetype_column_tracked_noop(count)
+  bench_history_archetype_column_raw_sparse(count)
+  bench_history_archetype_column_tracked_sparse(count)
   bench_history_command_raw_phase(count)
   bench_history_command_tracked_phase(count)
 }

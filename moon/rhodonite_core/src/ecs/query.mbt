@@ -794,9 +794,9 @@ pub fn RawQueryArchetype::write_column_tracked(
   history.end_tracked_world_mutation(self.world)
   for row = 0; row < row_count; row = row + 1 {
     let offset = row * col.stride
-    let before = copy_fixed_range_to_fixed(before_column, offset, col.stride)
-    let after = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
-    if before != after {
+    if !fixed_ranges_equal(before_column, offset, col.bytes, offset, col.stride) {
+      let before = copy_fixed_range_to_fixed(before_column, offset, col.stride)
+      let after = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
       history.push_delta(
         ComponentChanged(arch.entities[row], component, before, after),
       )
