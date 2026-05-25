@@ -1141,6 +1141,93 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.exportRedoStack(world)).toBeNull();
 	});
 
+	it("round-trips builtin history archives through TypeScript JSON helpers", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const imported = WorldHistory.new();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(world.setGlobalTransform(entity, translationMat4ColMajor(1, 2, 3))).toBe(true);
+		expect(world.setGlobalTransformFormat(entity, 0)).toBe(true);
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 50, 1, 1, 0),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		expect(source.beginTransaction("TS builtin archive")).toBe(true);
+		expect(
+			source.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		expect(source.setGlobalTransformFormat(world, entity, 1)).toBe(true);
+		expect(
+			source.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		expect(source.commitTransaction()).toBe(true);
+
+		const archive = source.exportUndoStack(world);
+		expect(archive).not.toBeNull();
+		if (archive == null) {
+			throw new Error("expected builtin archive");
+		}
+		expect(archive.recordCount).toBe(1);
+		const deltas = archive.records[0]?.deltas ?? [];
+		const globalDelta = deltas.find(
+			(delta) => delta.kind === "global_transform_changed",
+		);
+		const cameraDelta = deltas.find((delta) => delta.kind === "camera_changed");
+		expect(globalDelta?.component).toMatchObject({
+			key: "GlobalTransform",
+			builtin: true,
+		});
+		expect(globalDelta?.before?.globalTransformFormat).toBe(0);
+		expect(globalDelta?.after?.globalTransformFormat).toBe(1);
+		expect(globalDelta?.before?.bytes).toBeInstanceOf(Uint8Array);
+		expect(globalDelta?.after?.bytes).toBeInstanceOf(Uint8Array);
+		expect(getF32(globalDelta?.before?.bytes ?? new Uint8Array(), 12)).toBeCloseTo(1);
+		expect(cameraDelta?.component).toMatchObject({
+			key: "Camera",
+			builtin: true,
+		});
+		expect(cameraDelta?.before?.globalTransformFormat).toBeNull();
+		expect(cameraDelta?.after?.globalTransformFormat).toBeNull();
+		expect(getF32(cameraDelta?.before?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.1);
+		expect(getF32(cameraDelta?.after?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.25);
+
+		const json = encodeHistoryExportJson(archive);
+		const decoded = decodeHistoryExportJson(json);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+		expect(imported.importUndoStack(world, decoded)).toBe(true);
+		expect(imported.undo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			0,
+		);
+		expect(Array.from(world.getGlobalTransform(entity) ?? [])).toEqual(
+			translationMat4ColMajor(1, 2, 3),
+		);
+		const cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+	});
+
 	it("imports history stacks from exported plain objects", () => {
 		const world = World.new();
 		const source = WorldHistory.new();

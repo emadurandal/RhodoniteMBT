@@ -102,7 +102,7 @@
           </table>
 
           <h2>JSON Archive MVP</h2>
-          <p><code>encodeHistoryExportJson</code> converts a TypeScript <code>HistoryExport</code> into a JSON string, and <code>decodeHistoryExportJson</code> validates that JSON string and returns a <code>HistoryExport</code> that can be passed to <code>importUndoStack</code> or <code>importRedoStack</code>.</p>
+          <p><code>encodeHistoryExportJson</code> converts a TypeScript <code>HistoryExport</code> into a JSON string, and <code>decodeHistoryExportJson</code> validates that JSON string and returns a <code>HistoryExport</code> that can be passed to <code>importUndoStack</code> or <code>importRedoStack</code>. The JSON helpers preserve builtin logical payloads too, including GlobalTransform row bytes with <code>global_transform_format</code> and Camera row bytes.</p>
           <table>
             <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
             <tbody>

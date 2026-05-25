@@ -102,7 +102,7 @@
           </table>
 
           <h2>JSON Archive MVP</h2>
-          <p><code>encodeHistoryExportJson</code> は TypeScript の <code>HistoryExport</code> を JSON string に変換します。<code>decodeHistoryExportJson</code> はその JSON string を検証し、<code>importUndoStack</code> / <code>importRedoStack</code> に渡せる <code>HistoryExport</code> を返します。</p>
+          <p><code>encodeHistoryExportJson</code> は TypeScript の <code>HistoryExport</code> を JSON string に変換します。<code>decodeHistoryExportJson</code> はその JSON string を検証し、<code>importUndoStack</code> / <code>importRedoStack</code> に渡せる <code>HistoryExport</code> を返します。JSON helper は builtin logical payload も保持します。GlobalTransform row bytes と <code>global_transform_format</code>、Camera row bytes が対象です。</p>
           <table>
             <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
             <tbody>
