@@ -14,6 +14,8 @@ import {
 	SystemRunner,
 	World,
 	WorldHistory,
+	decodeHistoryExportJson,
+	encodeHistoryExportJson,
 	getF32,
 } from "./index.ts";
 
@@ -1091,6 +1093,109 @@ describe("ECS TypeScript wrapper", () => {
 		const badFormat = { ...plainUndoArchive, formatVersion: 999 };
 		expect(importedUndo.importUndoStack(world, badFormat)).toBe(false);
 		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
+	});
+
+	it("encodes and decodes history archives as JSON", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const importedUndo = WorldHistory.new();
+		const importedRedo = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryJsonStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryJsonStable",
+				schemaHash: "sha256:ts-history-json-stable",
+			},
+		);
+		const entity = world.createEntity();
+
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		const json = encodeHistoryExportJson(undoArchive ?? {
+			formatVersion: 1,
+			recordCount: 0,
+			records: [],
+		});
+		const wire = JSON.parse(json);
+		expect(wire).toMatchObject({
+			format_version: 1,
+			record_count: 1,
+		});
+		expect(wire.records[0].delta_count).toBe(1);
+		expect(wire.records[0].deltas[0].component.local_component).toEqual({
+			index: stable.index(),
+		});
+		expect(wire.records[0].deltas[0].before.bytes_base64).toBe("AQAAAA==");
+		expect(wire.records[0].deltas[0].before.bytes).toBeUndefined();
+
+		const decoded = decodeHistoryExportJson(json);
+		expect(importedUndo.importUndoStack(world, decoded)).toBe(true);
+		expect(importedUndo.undo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+
+		const redoArchive = importedUndo.exportRedoStack(world);
+		expect(redoArchive).not.toBeNull();
+		const redoJson = encodeHistoryExportJson(redoArchive ?? {
+			formatVersion: 1,
+			recordCount: 0,
+			records: [],
+		});
+		expect(
+			importedRedo.importRedoStack(world, decodeHistoryExportJson(redoJson)),
+		).toBe(true);
+		expect(importedRedo.redo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		expect(() =>
+			decodeHistoryExportJson(JSON.stringify({ ...wire, format_version: 999 })),
+		).toThrow(/unsupported format_version/);
+		expect(() =>
+			decodeHistoryExportJson(
+				JSON.stringify({
+					...wire,
+					records: [{ ...wire.records[0], delta_count: "1" }],
+				}),
+			),
+		).toThrow(/delta_count/);
+		expect(() =>
+			decodeHistoryExportJson(
+				JSON.stringify({
+					...wire,
+					records: [
+						{
+							...wire.records[0],
+							deltas: [
+								{
+									...wire.records[0].deltas[0],
+									before: {
+										...wire.records[0].deltas[0].before,
+										bytes_base64: "not base64",
+									},
+								},
+							],
+						},
+					],
+				}),
+			),
+		).toThrow(/base64/);
+		expect(() => decodeHistoryExportJson("{")).toThrow(/invalid JSON/);
 	});
 
 	it("audits direct WorldHistory mutation coverage", () => {
