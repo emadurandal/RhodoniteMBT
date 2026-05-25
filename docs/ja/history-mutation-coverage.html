@@ -72,13 +72,14 @@
 
           <h2>Raw And Untracked Surface</h2>
           <table>
-            <thead><tr><th>Surface</th><th>Status</th></tr></thead>
+            <thead><tr><th>Surface</th><th>Record status</th><th>Guarded transaction status</th></tr></thead>
             <tbody>
-              <tr><td>Direct <code>World</code> mutator と raw <code>World::spawn_batch</code></td><td>Raw guarded です。runtime system と simulation は guarded editor transaction の外で使えます。</td></tr>
-              <tr><td>Component registration と identity metadata</td><td>意図的に untracked です。component schema は application setup の一部であり、operation 単位の editor history ではありません。</td></tr>
-              <tr><td>GlobalTransform / Camera blob upload、drain、resize、dense write、readback helper</td><td>意図的に untracked な derived data です。authoring change には専用の <code>WorldHistory</code> helper を使います。</td></tr>
-              <tr><td>Transform propagation と camera view update system</td><td>意図的に untracked な derived recomputation です。</td></tr>
-              <tr><td>Read-only query と component metadata read</td><td>history behavior は不要です。</td></tr>
+              <tr><td>Direct <code>World</code> mutator と raw <code>World::spawn_batch</code></td><td>raw で record は作りません。runtime system と simulation は editor history の外で使えます。</td><td>abort します。guarded editor transaction 内では対応する <code>WorldHistory</code> helper を使います。</td></tr>
+              <tr><td>Component registration と identity metadata</td><td>意図的に untracked な setup metadata です。component schema は operation 単位の editor history ではありません。</td><td>registration は guarded 中に abort します。metadata read は許可されます。</td></tr>
+              <tr><td>GlobalTransform / Camera blob upload、resize、dense write helper</td><td>意図的に untracked な derived data です。authoring change には専用の <code>WorldHistory</code> helper を使います。</td><td>mutating helper は guarded 中に abort します。</td></tr>
+              <tr><td>GlobalTransform / Camera blob drain と readback helper</td><td>readback plumbing で record は作りません。</td><td>ECS authoring state を変更しないため許可されます。</td></tr>
+              <tr><td>Transform propagation と camera view update system</td><td>意図的に untracked な derived recomputation です。</td><td>guarded editor transaction の外の runtime path で使います。</td></tr>
+              <tr><td>Read-only query と component metadata read</td><td>history behavior は不要です。</td><td>許可されます。</td></tr>
             </tbody>
           </table>
         </article>

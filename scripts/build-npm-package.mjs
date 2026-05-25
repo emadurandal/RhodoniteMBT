@@ -55,7 +55,10 @@ function ensureMoonBridgeBuilt(kind) {
 function copyWrapperSource(kind) {
   cpSync(sources[kind], path.join(buildSrc, kind), {
     recursive: true,
-    filter: (source) => !source.endsWith(".test.ts") && !source.endsWith("-bridge.d.ts"),
+    filter: (source) =>
+      !source.endsWith(".test.ts") &&
+      !source.endsWith("-bridge.d.ts") &&
+      !source.split(path.sep).includes("test-support"),
   });
 }
 

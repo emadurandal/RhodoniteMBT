@@ -72,13 +72,14 @@
 
           <h2>Raw And Untracked Surface</h2>
           <table>
-            <thead><tr><th>Surface</th><th>Status</th></tr></thead>
+            <thead><tr><th>Surface</th><th>Record status</th><th>Guarded transaction status</th></tr></thead>
             <tbody>
-              <tr><td>Direct <code>World</code> mutators and raw <code>World::spawn_batch</code></td><td>Raw guarded. Runtime systems and simulation may use them outside guarded editor transactions.</td></tr>
-              <tr><td>Component registration and identity metadata</td><td>Intentionally untracked. Component schemas are part of application setup, not per-operation editor history.</td></tr>
-              <tr><td>GlobalTransform / Camera blob upload, drain, resize, dense write, and readback helpers</td><td>Intentionally untracked derived data. Use dedicated <code>WorldHistory</code> helpers for authoring changes.</td></tr>
-              <tr><td>Transform propagation and camera view update systems</td><td>Intentionally untracked derived recomputation.</td></tr>
-              <tr><td>Read-only queries and component metadata reads</td><td>No history behavior required.</td></tr>
+              <tr><td>Direct <code>World</code> mutators and raw <code>World::spawn_batch</code></td><td>Raw, no record. Runtime systems and simulation may use them outside editor history.</td><td>Abort. Use the matching <code>WorldHistory</code> helper inside guarded editor transactions.</td></tr>
+              <tr><td>Component registration and identity metadata</td><td>Intentionally untracked setup metadata. Component schemas are not per-operation editor history.</td><td>Registration aborts while guarded; metadata reads are allowed.</td></tr>
+              <tr><td>GlobalTransform / Camera blob upload, resize, and dense write helpers</td><td>Intentionally untracked derived data. Use dedicated <code>WorldHistory</code> helpers for authoring changes.</td><td>Mutating helpers abort while guarded.</td></tr>
+              <tr><td>GlobalTransform / Camera blob drain and readback helpers</td><td>Readback plumbing, no record.</td><td>Allowed because they do not mutate ECS authoring state.</td></tr>
+              <tr><td>Transform propagation and camera view update systems</td><td>Intentionally untracked derived recomputation.</td><td>Keep on runtime paths outside guarded editor transactions.</td></tr>
+              <tr><td>Read-only queries and component metadata reads</td><td>No history behavior required.</td><td>Allowed.</td></tr>
             </tbody>
           </table>
         </article>

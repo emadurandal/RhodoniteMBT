@@ -79,6 +79,29 @@ test "WorldHistory undo apply failure rolls back and keeps stacks" {
 }
 
 ///|
+test "WorldHistory undo apply failure clears history when rollback fails" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryUndoApplyHardClear", 4)
+  let bad = world.create_entity()
+  let good = world.create_entity()
+  let bytes = history_wb_bytes4(1, 0, 0, 0)
+  world.locations[bad.index] = None
+  history.undo_stack.push({
+    label: "undo apply hard clear",
+    deltas: [
+      EntityCreated(bad),
+      EntityCreated(good),
+      ComponentRemoved(good, component, bytes),
+    ],
+  })
+  assert_true(!history.undo(world))
+  assert_eq(history.last_diagnostic(), "apply_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+}
+
+///|
 test "WorldHistory redo apply failure rolls back and keeps stacks" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -101,6 +124,29 @@ test "WorldHistory redo apply failure rolls back and keeps stacks" {
   assert_eq(history.undo_len(), 0)
   assert_eq(history.redo_len(), 1)
   assert_true(world.component_bytes(good, component) == Some(before))
+}
+
+///|
+test "WorldHistory redo apply failure clears history when rollback fails" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryRedoApplyHardClear", 4)
+  let bad = world.create_entity()
+  let good = world.create_entity()
+  let bytes = history_wb_bytes4(1, 0, 0, 0)
+  world.locations[bad.index] = None
+  history.redo_stack.push({
+    label: "redo apply hard clear",
+    deltas: [
+      ComponentAdded(good, component, bytes),
+      EntityDestroyed({ entity: good, components: [] }),
+      EntityDestroyed({ entity: bad, components: [] }),
+    ],
+  })
+  assert_true(!history.redo(world))
+  assert_eq(history.last_diagnostic(), "apply_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
 }
 
 ///|

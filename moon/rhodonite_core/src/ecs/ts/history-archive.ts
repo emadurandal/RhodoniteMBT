@@ -10,7 +10,7 @@ import type {
 	HistoryExportDelta,
 	HistoryExportPayload,
 	HistoryExportRecord,
-} from "./world.ts";
+} from "./world-history-types.ts";
 
 type JsonObject = Record<string, unknown>;
 
