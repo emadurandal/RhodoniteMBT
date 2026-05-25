@@ -83,7 +83,7 @@ ignore(history.commit_transaction())</code></pre>
   phase,
   "Apply Commands",
 ))</code></pre>
-          <p>If a transaction is already open, tracked system phases are merged into that transaction. If one queued command fails, later commands still run as before; successful commands remain undoable while the method returns <code>false</code>.</p>
+          <p>If a transaction is already open, tracked system phases are merged into that transaction. In both MoonBit and TypeScript, if one queued command fails, later commands still run as before; successful commands remain undoable while the method returns <code>false</code>.</p>
 
           <h2>Mutation API Coverage</h2>
           <p>Mutation surface ownership is tracked in <a href="./history-mutation-coverage.html">History Mutation Coverage</a>. When adding a new mutating API, update that audit table and add or extend the matching coverage test so the API is explicitly classified as tracked, raw guarded, or intentionally untracked.</p>

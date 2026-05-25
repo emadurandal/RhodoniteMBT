@@ -742,6 +742,50 @@ describe("ECS TypeScript wrapper", () => {
 		);
 	});
 
+	it("keeps successful TS command-buffer deltas when a later command fails", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemPartialCpu", 4);
+		const entity = world.createEntity();
+		const missing = EntityId.new(entity.index() + 100, 0);
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+
+		const phase = PhaseKey.new("ts/tracked-partial-failure");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newWithStructuralWrite(
+				"tracked-partial-failure",
+				phase,
+				[],
+				[cpu],
+				(_world, _ctx, commands) => {
+					commands.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0]));
+					commands.destroyEntity(missing);
+				},
+			),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 3),
+				phase,
+				"tracked TS partial failure",
+			),
+		).toBe(false);
+		expect(history.undoLen()).toBe(1);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([9, 0, 0, 0]),
+		);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+	});
+
 	it("applies TS command-buffer builtin blob writes in raw system phases", () => {
 		const world = World.new();
 		const entity = world.createEntity();

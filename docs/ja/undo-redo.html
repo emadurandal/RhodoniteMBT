@@ -83,7 +83,7 @@ ignore(history.commit_transaction())</code></pre>
   phase,
   "Apply Commands",
 ))</code></pre>
-          <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
+          <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。MoonBit と TypeScript のどちらでも、queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
           <h2>Mutation API Coverage</h2>
           <p>mutation surface の責務は <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a> で管理します。新しい mutating API を追加する場合は、その監査表と対象 coverage test を更新し、API を tracked、raw guarded、intentionally untracked のどれとして扱うか明示します。</p>

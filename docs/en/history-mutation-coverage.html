@@ -63,7 +63,7 @@
               <tr><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code></td><td>Tracked callback APIs for row authoring. They delegate without history copies when recording is disabled.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>Tracked callback API for full-column edits. It snapshots the column and records changed rows.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>Tracked callback API for sparse column edits when the caller already knows the candidate rows. It snapshots and records only those row views.</td></tr>
-              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods.</td></tr>
+              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods; if a later command fails, successful commands remain undoable.</td></tr>
               <tr><td>Raw <code>QueryRow::write</code>, <code>RawQueryRow::write_view</code>, <code>RawQueryArchetype::write_column</code></td><td>Raw guarded. These are untracked and abort inside guarded history transactions.</td></tr>
               <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded. Use <code>WorldHistory::run_system_phase</code> for command-buffer edits that need history.</td></tr>
             </tbody>
