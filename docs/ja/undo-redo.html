@@ -80,6 +80,19 @@ ignore(history.commit_transaction())</code></pre>
 ))</code></pre>
           <p>すでに transaction が開いている場合、tracked system phase はその transaction に合流します。queued command の一部が失敗しても従来通り後続 command は実行されます。成功した command は undo 可能なまま残り、method は <code>false</code> を返します。</p>
 
+          <h2>Mutation API Coverage</h2>
+          <p>新しい mutating API を追加する場合は、この表と対象の coverage test を同時に更新します。</p>
+          <table>
+            <thead><tr><th>Surface</th><th>Undo/Redo status</th><th>Use for</th></tr></thead>
+            <tbody>
+              <tr><td><code>World</code> raw mutator</td><td>untracked です。guarded transaction 中は raw mutation が abort します。</td><td>runtime system、simulation、低レベル storage edit。</td></tr>
+              <tr><td><code>WorldHistory</code> direct method</td><td>entity create/destroy、component add/set/remove、bulk add/set、spawn batch、Transform3D TRS、ChildOf、GlobalTransform matrix/format、Camera matrices を tracked に記録します。</td><td>editor/importer の authoring operation。</td></tr>
+              <tr><td>Tracked query callback</td><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code>、<code>RawQueryArchetype::write_column_tracked</code> は component byte delta を記録します。raw query write は untracked のままで、guard 対象です。</td><td>selection edit や query 由来の authoring loop。</td></tr>
+              <tr><td><code>CommandBuffer</code></td><td>raw <code>SystemRunner::run_phase</code> は untracked に apply します。<code>WorldHistory::run_system_phase</code> は対応 command を tracked history API 経由で dispatch します。</td><td>iteration 中に変更を queue する editor system。</td></tr>
+              <tr><td>GPU/blob upload and drain helper</td><td>意図的に untracked です。</td><td>derived render data upload、resize event、readback plumbing。</td></tr>
+            </tbody>
+          </table>
+
           <h2>History Limits</h2>
           <p><code>WorldHistory::new</code> はデフォルトで最大 100 件の committed undo record を保持します。<code>set_max_undo_records</code> で件数上限を変更でき、上限を超えた場合は古い record から破棄します。<code>0</code> を渡すと undo/redo state を clear し、以後の tracked call は record を保持せず <code>World</code> に委譲します。現在保持している件数は <code>undo_len</code> と <code>redo_len</code> で確認します。</p>
           <p><code>set_max_undo_bytes</code> は retained undo/redo stack に任意の payload byte budget を追加します。デフォルトは <code>0</code> で、byte 数は無制限です。<code>undo_bytes</code> と <code>redo_bytes</code> は保持中の payload bytes を返します。label、entity id、container overhead は含みません。1 件の committed record が非ゼロの byte budget より大きい場合、world mutation は成功したまま、その record は undo 用に保持されません。</p>
