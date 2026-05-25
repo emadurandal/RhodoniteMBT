@@ -416,6 +416,143 @@ test "RawQueryArchetype write_column_tracked compresses repeated sparse rows" {
 }
 
 ///|
+test "RawQueryArchetype write_column_rows_tracked records sparse requested rows" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedSparse", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, cpu, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, cpu, bytes4(3, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_rows_tracked(history, cpu, [0, 2], (row, bytes) => {
+        bytes[0] = (row + 7).to_byte()
+      }) {
+      abort("expected sparse rows tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 16)
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(7, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(9, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(e0, cpu) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(world.component_bytes(e1, cpu) == Some(bytes4(2, 0, 0, 0)))
+  assert_true(world.component_bytes(e2, cpu) == Some(bytes4(3, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_rows_tracked accepts empty rows as no-op" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedEmpty", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_rows_tracked(history, cpu, [], (_row, bytes) => {
+        bytes[0] = (9 : Byte)
+      }) {
+      abort("expected empty rows tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.undo_bytes(), 0)
+  assert_eq(history.last_diagnostic(), "transaction_empty")
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_rows_tracked rejects invalid row before mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedInvalid", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  let mut called = false
+  let mut ok = true
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    ok = arch.write_column_rows_tracked(history, cpu, [0, 1], (_row, bytes) => {
+      called = true
+      bytes[0] = (9 : Byte)
+    })
+  })
+  assert_true(!ok)
+  assert_true(!called)
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_rows_tracked compresses duplicate rows" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedDuplicate", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    let mut write_value = (2 : Byte)
+    if !arch.write_column_rows_tracked(history, cpu, [0, 0], (_row, bytes) => {
+        bytes[0] = write_value
+        write_value = (3 : Byte)
+      }) {
+      abort("expected duplicate rows tracked column write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.undo_bytes(), 8)
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(3, 0, 0, 0)))
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(1, 0, 0, 0)))
+  assert_true(history.redo(world))
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(3, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_rows_tracked delegates when history disabled" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedDisabled", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_enabled(false)
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_rows_tracked(history, cpu, [0], (_row, bytes) => {
+        bytes[0] = (8 : Byte)
+      }) {
+      abort("expected disabled rows tracked column write")
+    }
+  })
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(8, 0, 0, 0)))
+}
+
+///|
+test "RawQueryArchetype write_column_rows_tracked works inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("QueryArchRowsTrackedGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded row column"))
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_rows_tracked(history, cpu, [0], (_row, bytes) => {
+        bytes[0] = (5 : Byte)
+      }) {
+      abort("expected guarded rows tracked column write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_true(history.undo(world))
+  assert_true(world.component_bytes(entity, cpu) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
 test "RawQueryArchetype write_column_tracked delegates when history disabled" {
   let world = World::new()
   let history = WorldHistory::new()

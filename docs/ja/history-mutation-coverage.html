@@ -29,6 +29,7 @@
         <article class="doc">
           <h1>履歴 Mutation Coverage</h1>
           <p class="lead">このページは ECS mutation API と Undo/Redo behavior の監査表です。mutating API を追加する場合は、このページと対応する coverage test を同時に更新します。</p>
+          <p>TypeScript wrapper も MoonBit surface と同じ分類に従います。公開 wrapper method はここに載っている tracked API へ委譲するか、raw guarded のままにするか、intentionally untracked として docs に明記し、wrapper 側で挙動を足す場合は対応する TypeScript coverage も追加します。</p>
 
           <h2>Coverage Classes</h2>
           <table>
@@ -61,8 +62,9 @@
             <thead><tr><th>Surface</th><th>Undo/Redo status</th></tr></thead>
             <tbody>
               <tr><td><code>QueryRow::write_tracked</code>、<code>RawQueryRow::write_tracked</code></td><td>row authoring 用の tracked callback API です。recording disabled 時は history copy なしで委譲します。</td></tr>
-              <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>contiguous column edit 用の tracked callback API です。column を snapshot し、変更された row だけを記録します。</td></tr>
-              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>editor system 用の tracked command path です。対応 command は該当する history method に dispatch されます。</td></tr>
+              <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>full-column edit 用の tracked callback API です。column を snapshot し、変更された row だけを記録します。</td></tr>
+              <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>呼び出し側が候補 row を知っている sparse column edit 用の tracked callback API です。指定 row view だけを snapshot して記録します。</td></tr>
+              <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>editor system 用の tracked command path です。対応 command は該当する history method に dispatch されます。後続 command が失敗しても、成功済み command は undo 可能なまま残ります。</td></tr>
               <tr><td>Raw <code>QueryRow::write</code>、<code>RawQueryRow::write_view</code>、<code>RawQueryArchetype::write_column</code></td><td>Raw guarded です。untracked であり、guarded history transaction 中は abort します。</td></tr>
               <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded です。history が必要な command-buffer edit では <code>WorldHistory::run_system_phase</code> を使います。</td></tr>
             </tbody>

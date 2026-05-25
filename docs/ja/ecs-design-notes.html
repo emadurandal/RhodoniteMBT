@@ -33,7 +33,7 @@
 
           <h2>Query View Lifetime</h2>
           <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。view を外へ逃がさない API 形状にしているため、system 実行順や将来の並列化に向けた最低限の境界を保ちます。</p>
-          <p><code>RawQueryArchetype::write_column</code> は archetype column 全体の mutable view を貸し出す untracked expert API です。同一 component の重複 mutable view を避けるため、query required set の duplicate check に依存します。同じ column-style write を undo/redo tracking したい場合は <code>RawQueryArchetype::write_column_tracked</code> を使います。</p>
+          <p><code>RawQueryArchetype::write_column</code> は archetype column 全体の mutable view を貸し出す untracked expert API です。同一 component の重複 mutable view を避けるため、query required set の duplicate check に依存します。full-column write を undo/redo tracking したい場合は <code>RawQueryArchetype::write_column_tracked</code> を使います。呼び出し側が変更候補の sparse column rows を知っている場合は <code>RawQueryArchetype::write_column_rows_tracked</code> を使います。</p>
 
           <h2>SystemRunner Access Declaration</h2>
           <ul>

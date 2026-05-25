@@ -805,3 +805,86 @@ pub fn RawQueryArchetype::write_column_tracked(
   history.finish_auto(auto, true)
   true
 }
+
+///|
+/// Returns whether every row index is valid for this archetype length.
+fn raw_query_rows_valid(rows : Array[Int], row_count : Int) -> Bool {
+  for i = 0; i < rows.length(); i = i + 1 {
+    if rows[i] < 0 || rows[i] >= row_count {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Runs `f` with mutable row views for known changed rows and records those rows through `history`.
+///
+/// This is the sparse counterpart to `write_column_tracked`: callers provide the candidate row
+/// indices up front, so unchanged rows outside that set are never snapshotted or scanned.
+pub fn RawQueryArchetype::write_column_rows_tracked(
+  self : RawQueryArchetype,
+  history : WorldHistory,
+  component : ComponentTypeId,
+  rows : Array[Int],
+  f : (Int, MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::write_column_rows_tracked",
+  )
+  let access = self.accesses[access_index]
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let row_count = arch.entities.length()
+  if !raw_query_rows_valid(rows, row_count) {
+    history.set_diagnostic("operation_failed")
+    return false
+  }
+  if !history.recording_enabled() || history.applying {
+    let column = self.write_column(component)
+    for i = 0; i < rows.length(); i = i + 1 {
+      let row = rows[i]
+      let offset = row * col.stride
+      f(row, column.mut_view(start=offset, end=offset + col.stride))
+    }
+    let reason = if !history.recording_enabled() {
+      "recording_disabled"
+    } else {
+      "applying"
+    }
+    history.set_delegate_diagnostic(true, reason)
+    return true
+  }
+  if self.world.history_blob_ref_component(component) {
+    history.begin_tracked_world_mutation(self.world)
+    let column = self.write_column(component)
+    for i = 0; i < rows.length(); i = i + 1 {
+      let row = rows[i]
+      let offset = row * col.stride
+      f(row, column.mut_view(start=offset, end=offset + col.stride))
+    }
+    history.end_tracked_world_mutation(self.world)
+    history.set_delegate_diagnostic(true, history_diagnostic_none())
+    return true
+  }
+  let auto = history.begin_auto("raw_query_archetype_write_column_rows")
+  history.begin_tracked_world_mutation(self.world)
+  self.world.assert_system_component_write(
+    component, "RawQueryArchetype::write_column_rows_tracked",
+  )
+  for i = 0; i < rows.length(); i = i + 1 {
+    let row = rows[i]
+    let offset = row * col.stride
+    let before = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
+    f(row, col.bytes.mut_view(start=offset, end=offset + col.stride))
+    let after = copy_fixed_range_to_fixed(col.bytes, offset, col.stride)
+    if before != after {
+      history.push_delta(
+        ComponentChanged(arch.entities[row], component, before, after),
+      )
+    }
+  }
+  history.end_tracked_world_mutation(self.world)
+  history.finish_auto(auto, true)
+  true
+}

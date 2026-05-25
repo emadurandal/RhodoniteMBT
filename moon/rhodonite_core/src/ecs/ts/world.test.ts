@@ -305,6 +305,59 @@ describe("ECS TypeScript wrapper", () => {
 		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
+	it("tracks explicit archetype column rows through WorldHistory", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocityRows", 16);
+		const e0 = world.createEntity();
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpu, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnRowsTracked(history, cpu, [1], (_row, bytes) => {
+					bytes.setF32(0, 20);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLabel()).toBe("raw_query_archetype_write_column_rows");
+		expect(history.undoBytes()).toBe(32);
+		expect(getF32(world.componentBytesCopy(e0, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
+		expect(history.undo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(2);
+		expect(history.redo(world)).toBe(true);
+		expect(getF32(world.componentBytesCopy(e1, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(20);
+	});
+
+	it("accepts empty explicit archetype column rows", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TrackedVelocityRowsEmpty", 16);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			expect(
+				archetype.writeColumnRowsTracked(history, cpu, [], (_row, bytes) => {
+					bytes.setF32(0, 20);
+				}),
+			).toBe(true);
+		});
+
+		expect(history.undoLen()).toBe(0);
+		expect(history.lastDiagnostic()).toBe("transaction_empty");
+		expect(getF32(world.componentBytesCopy(entity, cpu) ?? new Uint8Array(), 0)).toBeCloseTo(1);
+	});
+
 	it("reuses prepared row query plans", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("PreparedTsCpu", 16);
@@ -689,6 +742,50 @@ describe("ECS TypeScript wrapper", () => {
 		);
 	});
 
+	it("keeps successful TS command-buffer deltas when a later command fails", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemPartialCpu", 4);
+		const entity = world.createEntity();
+		const missing = EntityId.new(entity.index() + 100, 0);
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+
+		const phase = PhaseKey.new("ts/tracked-partial-failure");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newWithStructuralWrite(
+				"tracked-partial-failure",
+				phase,
+				[],
+				[cpu],
+				(_world, _ctx, commands) => {
+					commands.setComponentBytes(entity, cpu, new Uint8Array([9, 0, 0, 0]));
+					commands.destroyEntity(missing);
+				},
+			),
+		);
+
+		expect(
+			history.runSystemPhase(
+				runner,
+				world,
+				SystemContext.new(0.016, 3),
+				phase,
+				"tracked TS partial failure",
+			),
+		).toBe(false);
+		expect(history.undoLen()).toBe(1);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([9, 0, 0, 0]),
+		);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+	});
+
 	it("applies TS command-buffer builtin blob writes in raw system phases", () => {
 		const world = World.new();
 		const entity = world.createEntity();
@@ -1044,6 +1141,189 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.exportRedoStack(world)).toBeNull();
 	});
 
+	it("round-trips builtin history archives through TypeScript JSON helpers", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const imported = WorldHistory.new();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(world.setGlobalTransform(entity, translationMat4ColMajor(1, 2, 3))).toBe(true);
+		expect(world.setGlobalTransformFormat(entity, 0)).toBe(true);
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 50, 1, 1, 0),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		expect(source.beginTransaction("TS builtin archive")).toBe(true);
+		expect(
+			source.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		expect(source.setGlobalTransformFormat(world, entity, 1)).toBe(true);
+		expect(
+			source.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		expect(source.commitTransaction()).toBe(true);
+
+		const archive = source.exportUndoStack(world);
+		expect(archive).not.toBeNull();
+		if (archive == null) {
+			throw new Error("expected builtin archive");
+		}
+		expect(archive.recordCount).toBe(1);
+		const deltas = archive.records[0]?.deltas ?? [];
+		const globalDelta = deltas.find(
+			(delta) => delta.kind === "global_transform_changed",
+		);
+		const cameraDelta = deltas.find((delta) => delta.kind === "camera_changed");
+		expect(globalDelta?.component).toMatchObject({
+			key: "GlobalTransform",
+			builtin: true,
+		});
+		expect(globalDelta?.before?.globalTransformFormat).toBe(0);
+		expect(globalDelta?.after?.globalTransformFormat).toBe(1);
+		expect(globalDelta?.before?.bytes).toBeInstanceOf(Uint8Array);
+		expect(globalDelta?.after?.bytes).toBeInstanceOf(Uint8Array);
+		expect(getF32(globalDelta?.before?.bytes ?? new Uint8Array(), 12)).toBeCloseTo(1);
+		expect(cameraDelta?.component).toMatchObject({
+			key: "Camera",
+			builtin: true,
+		});
+		expect(cameraDelta?.before?.globalTransformFormat).toBeNull();
+		expect(cameraDelta?.after?.globalTransformFormat).toBeNull();
+		expect(getF32(cameraDelta?.before?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.1);
+		expect(getF32(cameraDelta?.after?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.25);
+
+		const json = encodeHistoryExportJson(archive);
+		const decoded = decodeHistoryExportJson(json);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+		expect(imported.importUndoStack(world, decoded)).toBe(true);
+		expect(imported.undo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			0,
+		);
+		expect(Array.from(world.getGlobalTransform(entity) ?? [])).toEqual(
+			translationMat4ColMajor(1, 2, 3),
+		);
+		const cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.1);
+	});
+
+	it("round-trips builtin redo history archives through TypeScript JSON helpers", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const imported = WorldHistory.new();
+		const entity = world.createEntity();
+		const camera = world.createEntity();
+		const identity = identityMat4ColMajor();
+
+		expect(world.setGlobalTransform(entity, translationMat4ColMajor(1, 2, 3))).toBe(true);
+		expect(world.setGlobalTransformFormat(entity, 0)).toBe(true);
+		expect(
+			world.setCameraMatrices(camera, identity, identity, 0.1, 50, 1, 1, 0),
+		).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+
+		expect(source.beginTransaction("TS builtin redo archive")).toBe(true);
+		expect(
+			source.setGlobalTransform(
+				world,
+				entity,
+				translationMat4ColMajor(4, 5, 6),
+			),
+		).toBe(true);
+		expect(source.setGlobalTransformFormat(world, entity, 1)).toBe(true);
+		expect(
+			source.setCameraMatrices(
+				world,
+				camera,
+				identity,
+				identity,
+				0.25,
+				100,
+				1.5,
+				0,
+				2,
+			),
+		).toBe(true);
+		expect(source.commitTransaction()).toBe(true);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+		expect(source.undo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			0,
+		);
+		expect(Array.from(world.getGlobalTransform(entity) ?? [])).toEqual(
+			translationMat4ColMajor(1, 2, 3),
+		);
+
+		const archive = source.exportRedoStack(world);
+		expect(archive).not.toBeNull();
+		if (archive == null) {
+			throw new Error("expected builtin redo archive");
+		}
+		expect(archive.recordCount).toBe(1);
+		const deltas = archive.records[0]?.deltas ?? [];
+		const globalDelta = deltas.find(
+			(delta) => delta.kind === "global_transform_changed",
+		);
+		const cameraDelta = deltas.find((delta) => delta.kind === "camera_changed");
+		expect(globalDelta?.component).toMatchObject({
+			key: "GlobalTransform",
+			builtin: true,
+		});
+		expect(globalDelta?.before?.globalTransformFormat).toBe(0);
+		expect(globalDelta?.after?.globalTransformFormat).toBe(1);
+		expect(globalDelta?.before?.bytes).toBeInstanceOf(Uint8Array);
+		expect(globalDelta?.after?.bytes).toBeInstanceOf(Uint8Array);
+		expect(getF32(globalDelta?.before?.bytes ?? new Uint8Array(), 12)).toBeCloseTo(1);
+		expect(cameraDelta?.component).toMatchObject({
+			key: "Camera",
+			builtin: true,
+		});
+		expect(cameraDelta?.before?.globalTransformFormat).toBeNull();
+		expect(cameraDelta?.after?.globalTransformFormat).toBeNull();
+		expect(getF32(cameraDelta?.before?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.1);
+		expect(getF32(cameraDelta?.after?.bytes ?? new Uint8Array(), 268)).toBeCloseTo(0.25);
+
+		const json = encodeHistoryExportJson(archive);
+		const decoded = decodeHistoryExportJson(json);
+		world.drainGlobalTransformBlobWriteViews();
+		world.drainCameraBlobWriteViews();
+		expect(imported.importRedoStack(world, decoded)).toBe(true);
+		expect(imported.redo(world)).toBe(true);
+		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
+			1,
+		);
+		expect(Array.from(world.getGlobalTransform(entity) ?? [])).toEqual(
+			translationMat4ColMajor(4, 5, 6),
+		);
+		const cameraWrites = world.drainCameraBlobWriteViews();
+		expect(
+			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
+		).toBeCloseTo(0.25);
+	});
+
 	it("imports history stacks from exported plain objects", () => {
 		const world = World.new();
 		const source = WorldHistory.new();
@@ -1153,6 +1433,168 @@ describe("ECS TypeScript wrapper", () => {
 		expect(importedUndo.lastDiagnostic()).toBe("import_unsupported_format");
 	});
 
+	it("rejects invalid history imports without mutating world or retained stacks", () => {
+		const world = World.new();
+		const source = WorldHistory.new();
+		const undoTarget = WorldHistory.new();
+		const redoTarget = WorldHistory.new();
+		const stable = world.registerCpuComponentWithIdentity(
+			"TsHistoryAtomicImportStable",
+			4,
+			{
+				stableKey: "com.example.TsHistoryAtomicImportStable",
+				schemaVersion: "1",
+			},
+		);
+		const entity = world.createEntity();
+		expect(
+			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		expect(
+			source.setComponentBytes(
+				world,
+				entity,
+				stable,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		const undoArchive = source.exportUndoStack(world);
+		expect(undoArchive).not.toBeNull();
+		if (undoArchive == null) {
+			throw new Error("expected undo archive");
+		}
+		expect(undoTarget.importUndoStack(world, undoArchive)).toBe(true);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		const badUndoArchive = {
+			...JSON.parse(JSON.stringify(undoArchive)),
+			formatVersion: 999,
+		};
+		const undoDiagnostic = undoTarget.lastDiagnostic();
+		const undoReport = undoTarget.validateImportUndoStack(world, badUndoArchive);
+		expect(undoReport).toMatchObject({
+			valid: false,
+			reason: "import_unsupported_format",
+			formatVersion: 999,
+		});
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe(undoDiagnostic);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+		expect(undoTarget.importUndoStack(world, badUndoArchive)).toBe(false);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe("import_unsupported_format");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		const badUndoPayloadArchive = JSON.parse(JSON.stringify(undoArchive));
+		badUndoPayloadArchive.records[0].deltas[0].after.bytes = [3, 0, 0];
+		const undoPayloadDiagnostic = undoTarget.lastDiagnostic();
+		const undoPayloadReport =
+			undoTarget.validateImportUndoStack(world, badUndoPayloadArchive);
+		expect(undoPayloadReport).toMatchObject({
+			valid: false,
+			reason: "import_invalid_payload",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_invalid_payload",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_invalid_payload",
+						},
+					],
+				},
+			],
+		});
+		expect(undoTarget.lastDiagnostic()).toBe(undoPayloadDiagnostic);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+		expect(undoTarget.importUndoStack(world, badUndoPayloadArchive)).toBe(false);
+		expect(undoTarget.undoLen()).toBe(1);
+		expect(undoTarget.redoLen()).toBe(0);
+		expect(undoTarget.lastDiagnostic()).toBe("import_invalid_payload");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			2, 0, 0, 0,
+		]);
+
+		expect(undoTarget.undo(world)).toBe(true);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		const redoArchive = undoTarget.exportRedoStack(world);
+		expect(redoArchive).not.toBeNull();
+		if (redoArchive == null) {
+			throw new Error("expected redo archive");
+		}
+		expect(redoTarget.importRedoStack(world, redoArchive)).toBe(true);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+
+		const badRedoPayloadArchive = JSON.parse(JSON.stringify(redoArchive));
+		badRedoPayloadArchive.records[0].deltas[0].before.bytes = [3, 0, 0];
+		const redoPayloadDiagnostic = redoTarget.lastDiagnostic();
+		const redoPayloadReport =
+			redoTarget.validateImportRedoStack(world, badRedoPayloadArchive);
+		expect(redoPayloadReport).toMatchObject({
+			valid: false,
+			reason: "import_invalid_payload",
+			records: [
+				{
+					index: 0,
+					valid: false,
+					reason: "import_invalid_payload",
+					deltas: [
+						{
+							index: 0,
+							valid: false,
+							reason: "import_invalid_payload",
+						},
+					],
+				},
+			],
+		});
+		expect(redoTarget.lastDiagnostic()).toBe(redoPayloadDiagnostic);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+		expect(redoTarget.importRedoStack(world, badRedoPayloadArchive)).toBe(false);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoTarget.lastDiagnostic()).toBe("import_invalid_payload");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+
+		const badRedoArchive = {
+			...JSON.parse(JSON.stringify(redoArchive)),
+			formatVersion: 999,
+		};
+		expect(redoTarget.importRedoStack(world, badRedoArchive)).toBe(false);
+		expect(redoTarget.undoLen()).toBe(0);
+		expect(redoTarget.redoLen()).toBe(1);
+		expect(redoTarget.lastDiagnostic()).toBe("import_unsupported_format");
+		expect(Array.from(world.componentBytesCopy(entity, stable) ?? [])).toEqual([
+			1, 0, 0, 0,
+		]);
+	});
+
 	it("encodes and decodes history archives as JSON", () => {
 		const world = World.new();
 		const source = WorldHistory.new();
@@ -1225,6 +1667,9 @@ describe("ECS TypeScript wrapper", () => {
 			decodeHistoryExportJson(JSON.stringify({ ...wire, format_version: 999 })),
 		).toThrow(/unsupported format_version/);
 		expect(() =>
+			decodeHistoryExportJson(JSON.stringify({ ...wire, record_count: 2 })),
+		).toThrow(/record_count/);
+		expect(() =>
 			decodeHistoryExportJson(
 				JSON.stringify({
 					...wire,
@@ -1232,6 +1677,24 @@ describe("ECS TypeScript wrapper", () => {
 				}),
 			),
 		).toThrow(/delta_count/);
+		expect(() =>
+			decodeHistoryExportJson(
+				JSON.stringify({
+					...wire,
+					records: [{ ...wire.records[0], delta_count: 2 }],
+				}),
+			),
+		).toThrow(/delta_count/);
+		const unknownKindWire = JSON.parse(JSON.stringify(wire));
+		unknownKindWire.records[0].deltas[0].kind = "future_delta";
+		expect(() =>
+			decodeHistoryExportJson(JSON.stringify(unknownKindWire)),
+		).toThrow(/history delta kind/);
+		const missingComponentKeyWire = JSON.parse(JSON.stringify(wire));
+		delete missingComponentKeyWire.records[0].deltas[0].component.key;
+		expect(() =>
+			decodeHistoryExportJson(JSON.stringify(missingComponentKeyWire)),
+		).toThrow(/component.key/);
 		expect(() =>
 			decodeHistoryExportJson(
 				JSON.stringify({
@@ -1805,6 +2268,78 @@ describe("ECS TypeScript wrapper", () => {
 		expect(history.canUndo()).toBe(false);
 	});
 
+	it("cancelTransactionReverting rolls back tracked transaction mutations", () => {
+		const cancelWorld = World.new();
+		const cancelHistory = WorldHistory.new();
+		const cancelCpu = cancelWorld.registerCpuComponent("TsHistoryCancelCpu", 4);
+		const cancelEntity = cancelWorld.createEntity();
+		expect(
+			cancelWorld.addComponentBytes(
+				cancelEntity,
+				cancelCpu,
+				new Uint8Array([1, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(cancelHistory.beginTransaction("discard only")).toBe(true);
+		expect(
+			cancelHistory.setComponentBytes(
+				cancelWorld,
+				cancelEntity,
+				cancelCpu,
+				new Uint8Array([2, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(cancelHistory.cancelTransaction()).toBe(true);
+		expect(cancelHistory.undoLen()).toBe(0);
+		expect(cancelWorld.componentBytesCopy(cancelEntity, cancelCpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
+		);
+
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryRevertCpu", 4);
+		const marker = world.registerCpuComponent("TsHistoryRevertMarker", 4);
+		const entity = world.createEntity();
+		const addEntity = world.createEntity();
+		const victim = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		expect(world.addComponentBytes(victim, cpu, new Uint8Array([7, 0, 0, 0]))).toBe(true);
+		expect(history.beginTransaction("revert tracked steps")).toBe(true);
+		expect(
+			history.setComponentBytes(
+				world,
+				entity,
+				cpu,
+				new Uint8Array([3, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(
+			history.addComponentBytes(
+				world,
+				addEntity,
+				marker,
+				new Uint8Array([9, 0, 0, 0]),
+			),
+		).toBe(true);
+		expect(history.destroyEntity(world, victim)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([3, 0, 0, 0]),
+		);
+		expect(world.hasComponent(addEntity, marker)).toBe(true);
+		expect(world.isAlive(victim)).toBe(false);
+
+		expect(history.cancelTransactionReverting(world)).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+		expect(world.hasComponent(addEntity, marker)).toBe(false);
+		expect(world.isAlive(victim)).toBe(true);
+		expect(world.componentBytesCopy(victim, cpu)).toEqual(
+			new Uint8Array([7, 0, 0, 0]),
+		);
+	});
+
 	it("guards raw World mutations during guarded WorldHistory transactions", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -1993,6 +2528,52 @@ describe("ECS TypeScript wrapper", () => {
 				trackedColumnWorld.componentBytesCopy(
 					trackedColumnEntity,
 					trackedColumnCpu,
+				) ?? new Uint8Array(),
+				0,
+			),
+		).toBeCloseTo(1);
+
+		const trackedColumnRowsWorld = World.new();
+		const trackedColumnRowsHistory = WorldHistory.new();
+		const trackedColumnRowsCpu = trackedColumnRowsWorld.registerCpuComponent(
+			"TsHistoryTrackedColumnRows",
+			4,
+		);
+		const trackedColumnRowsEntity = trackedColumnRowsWorld.createEntity();
+		expect(
+			trackedColumnRowsWorld.addComponentBytes(
+				trackedColumnRowsEntity,
+				trackedColumnRowsCpu,
+				f32Bytes([1]),
+			),
+		).toBe(true);
+		trackedColumnRowsHistory.setRawMutationGuardEnabled(true);
+		expect(
+			trackedColumnRowsHistory.beginGuardedTransaction(
+				trackedColumnRowsWorld,
+				"guarded tracked column rows",
+			),
+		).toBe(true);
+		RawQuery.new([trackedColumnRowsCpu]).forEachArchetype(
+			trackedColumnRowsWorld,
+			(archetype) => {
+				expect(
+					archetype.writeColumnRowsTracked(
+						trackedColumnRowsHistory,
+						trackedColumnRowsCpu,
+						[0],
+						(_row, bytes) => bytes.setF32(0, 8),
+					),
+				).toBe(true);
+			},
+		);
+		expect(trackedColumnRowsHistory.commitTransaction()).toBe(true);
+		expect(trackedColumnRowsHistory.undo(trackedColumnRowsWorld)).toBe(true);
+		expect(
+			getF32(
+				trackedColumnRowsWorld.componentBytesCopy(
+					trackedColumnRowsEntity,
+					trackedColumnRowsCpu,
 				) ?? new Uint8Array(),
 				0,
 			),

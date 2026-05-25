@@ -224,6 +224,7 @@ options(
         "raw_query_archetype_read_column",
         "raw_query_archetype_write_column",
         "raw_query_archetype_write_column_tracked",
+        "raw_query_archetype_write_column_rows_tracked",
         "phase_key_new",
         "phase_key_name",
         "system_context_new",
