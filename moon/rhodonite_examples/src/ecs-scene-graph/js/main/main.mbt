@@ -39,7 +39,7 @@ async fn create_undo_redo_webgpu_demo_state_async(
   let platform = @app_browser.run_platform(
     @app_browser.PlatformConfig::new(canvas),
     @app_browser.PlatformApp::default_engine(
-      @demo_state.setup_undo_redo_visual_engine,
+      @demo_state.setup_undo_redo_interactive_engine,
     ),
     @app_browser.PlatformOptions::interactive(),
   )

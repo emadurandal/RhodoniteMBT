@@ -6,7 +6,7 @@
 ///|
 /// Creates DemoState, applies the Undo/Redo edit, and registers render handlers.
 fn setup_engine(engine : @app.Engine) -> Bool {
-  @demo_state.setup_undo_redo_visual_engine(engine)
+  @demo_state.setup_undo_redo_interactive_engine(engine)
 }
 
 ///|

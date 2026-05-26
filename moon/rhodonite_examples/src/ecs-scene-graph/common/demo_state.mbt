@@ -17,6 +17,14 @@ pub(all) struct DemoState {
 }
 
 ///|
+/// Defines interactive Undo/Redo sample state layered over the scene graph demo.
+pub(all) struct UndoRedoDemoState {
+  demo : DemoState
+  history : @ecs.WorldHistory
+  mut edit_index : Int
+}
+
+///|
 /// Implements `quat_y`.
 fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
   let half = angle * 0.5
@@ -248,6 +256,111 @@ pub fn DemoState::apply_undo_redo_visual_edit(self : DemoState) -> Bool {
 }
 
 ///|
+/// Creates interactive Undo/Redo state for the current engine scene.
+pub fn create_undo_redo_demo_state(
+  scene : @app.Scene,
+  renderer : @app.Renderer,
+  target : @app.RenderTargetResources,
+  context? : @wgpu.GPUCanvasContext? = None,
+) -> UndoRedoDemoState {
+  {
+    demo: create_demo_state(scene, renderer, target, context~),
+    history: @ecs.WorldHistory::new(),
+    edit_index: 0,
+  }
+}
+
+///|
+/// Applies one tracked scene edit for the interactive Undo/Redo sample.
+pub fn UndoRedoDemoState::apply_move(self : UndoRedoDemoState) -> Bool {
+  let world = self.demo.scene.world()
+  let body = self.demo.bodies[1]
+  let next_index = self.edit_index + 1
+  let offset = Float::from_double((next_index % 4).to_double() * 0.35)
+  let ok = self.history.with_transaction(world, "Move Earth \{next_index}", fn() {
+    self.history.set_transform_trs(
+      world,
+      body,
+      (1.15 : Float) + offset,
+      (0.0 : Float),
+      (1.65 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (0.36 : Float),
+      (0.36 : Float),
+      (0.36 : Float),
+    )
+  })
+  if ok {
+    self.edit_index = next_index
+    ignore(self.demo.scene.prepare_render_state())
+  }
+  ok
+}
+
+///|
+/// Undoes one interactive sample edit and refreshes renderable state.
+pub fn UndoRedoDemoState::undo(self : UndoRedoDemoState) -> Bool {
+  let ok = self.history.undo(self.demo.scene.world())
+  if ok {
+    ignore(self.demo.scene.prepare_render_state())
+  }
+  ok
+}
+
+///|
+/// Redoes one interactive sample edit and refreshes renderable state.
+pub fn UndoRedoDemoState::redo(self : UndoRedoDemoState) -> Bool {
+  let ok = self.history.redo(self.demo.scene.world())
+  if ok {
+    ignore(self.demo.scene.prepare_render_state())
+  }
+  ok
+}
+
+///|
+/// Handles keyboard input for the interactive Undo/Redo sample.
+pub fn UndoRedoDemoState::update_from_input(
+  self : UndoRedoDemoState,
+  input : @input.InputState,
+) -> Bool {
+  if input.key_pressed(@input.KeyCode::key_m()) ||
+    input.key_pressed(@input.KeyCode::space()) ||
+    input.key_pressed(@input.KeyCode::enter()) {
+    return self.apply_move()
+  }
+  if input.key_pressed(@input.KeyCode::key_z()) {
+    return self.undo()
+  }
+  if input.key_pressed(@input.KeyCode::key_y()) {
+    return self.redo()
+  }
+  false
+}
+
+///|
+/// Registers input and render handlers for the interactive Undo/Redo sample.
+pub fn register_undo_redo_engine_handlers(
+  engine : @app.Engine,
+  demo_state : UndoRedoDemoState,
+) -> Unit {
+  engine.add_phase_handler(
+    @app.phase_input(),
+    fn(engine, _frame) {
+      if demo_state.update_from_input(engine.input()) {
+        engine.request_render("undo-redo")
+      }
+    },
+    slot=@app.PhaseSlot::AfterSystems,
+  )
+  engine.on_scene_render(demo_state.demo.scene, fn(_frame) {
+    render_current_frame(demo_state.demo)
+  })
+}
+
+///|
 /// Creates DemoState, applies the Undo/Redo visual edit, and registers rendering only.
 pub fn setup_undo_redo_visual_engine(engine : @app.Engine) -> Bool {
   let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
@@ -263,6 +376,20 @@ pub fn setup_undo_redo_visual_engine(engine : @app.Engine) -> Bool {
   engine.on_scene_render(demo_state.scene, fn(_frame) {
     render_current_frame(demo_state)
   })
+  true
+}
+
+///|
+/// Creates interactive Undo/Redo state and registers input/render handlers.
+pub fn setup_undo_redo_interactive_engine(engine : @app.Engine) -> Bool {
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
+  let demo_state = create_undo_redo_demo_state(
+    engine.main_scene(),
+    engine.renderer(),
+    engine.render_target_resources(),
+    context=Some(canvas_context),
+  )
+  register_undo_redo_engine_handlers(engine, demo_state)
   true
 }
 
