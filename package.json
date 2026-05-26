@@ -36,6 +36,7 @@
     "test:core:js": "pnpm run build:core:js && vitest run moon/rhodonite_core/src/math/ts moon/rhodonite_core/src/ecs/ts",
     "test:app:ts": "pnpm run build:core:js && vitest run moon/rhodonite/src/app/ts",
     "test:core:mbt": "bash scripts/test-rhodonite-core-mbt.sh",
+    "test:examples:interaction:browser": "pnpm run build && node scripts/run-browser-interaction-regression.mjs",
     "test:examples:visual:native": "node scripts/run-visual-regression.mjs native",
     "test:examples:visual:browser": "node scripts/run-visual-regression.mjs browser",
     "test:examples:visual": "node scripts/run-visual-regression.mjs all",
