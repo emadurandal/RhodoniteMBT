@@ -89,30 +89,113 @@ fn CameraBlobStore::f32_matches_row(
 }
 
 ///|
-/// Implements `CameraBlobStore::inputs_match_row`.
-fn CameraBlobStore::inputs_match_row(
+/// Returns the first and last scalar GPU words that differ from the requested Camera inputs.
+fn CameraBlobStore::changed_scalar_word_bounds(
   self : CameraBlobStore,
-  word_offset : Int,
-  view : @m44.Matrix44F,
-  proj : @m44.Matrix44F,
+  byte_offset : Int,
   near : Float,
   far : Float,
   aspect : Float,
   projection_kind : Float,
   flags : Float,
+) -> (Int, Int)? {
+  let mut first = -1
+  let mut last = -1
+  if !self.f32_matches_row(byte_offset + 268, near) {
+    first = 67
+    last = 67
+  }
+  if !self.f32_matches_row(byte_offset + 272, far) {
+    if first < 0 {
+      first = 68
+    }
+    last = 68
+  }
+  if !self.f32_matches_row(byte_offset + 276, aspect) {
+    if first < 0 {
+      first = 69
+    }
+    last = 69
+  }
+  if !self.f32_matches_row(byte_offset + 280, projection_kind) {
+    if first < 0 {
+      first = 70
+    }
+    last = 70
+  }
+  if !self.f32_matches_row(byte_offset + 284, flags) {
+    if first < 0 {
+      first = 71
+    }
+    last = 71
+  }
+  if first < 0 {
+    None
+  } else {
+    Some((first, last))
+  }
+}
+
+///|
+/// Returns the Camera scalar value stored in a row-relative GPU word.
+fn camera_scalar_value_for_word(
+  word : Int,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Float {
+  if word == 67 {
+    near
+  } else if word == 68 {
+    far
+  } else if word == 69 {
+    aspect
+  } else if word == 70 {
+    projection_kind
+  } else {
+    flags
+  }
+}
+
+///|
+/// Writes a contiguous Camera scalar word range and marks only that range dirty.
+fn CameraBlobStore::write_scalar_word_range(
+  self : CameraBlobStore,
+  word_offset : Int,
+  first_word : Int,
+  last_word : Int,
+  near : Float,
+  far : Float,
+  aspect : Float,
+  projection_kind : Float,
+  flags : Float,
+) -> Unit {
+  self.store.write_words(word_offset + first_word, last_word - first_word + 1, fn(
+    row,
+  ) {
+    for word = first_word; word <= last_word; word = word + 1 {
+      @comp.put_gpu_f32_mut_view(
+        row,
+        (word - first_word) * 4,
+        camera_scalar_value_for_word(
+          word, near, far, aspect, projection_kind, flags,
+        ).to_double(),
+      )
+    }
+  })
+}
+
+///|
+/// Reports whether the stored Camera blob range is readable.
+fn CameraBlobStore::valid_row_range(
+  self : CameraBlobStore,
+  word_offset : Int,
 ) -> Bool {
   let byte_offset = word_offset * 4
-  if word_offset < 0 ||
-    byte_offset + @comp.camera_gpu_byte_stride() > self.store.bytes.length() {
-    return false
-  }
-  self.matrix_matches_std140_row(byte_offset + 64, view) &&
-  self.matrix_matches_std140_row(byte_offset + 128, proj) &&
-  self.f32_matches_row(byte_offset + 268, near) &&
-  self.f32_matches_row(byte_offset + 272, far) &&
-  self.f32_matches_row(byte_offset + 276, aspect) &&
-  self.f32_matches_row(byte_offset + 280, projection_kind) &&
-  self.f32_matches_row(byte_offset + 284, flags)
+  word_offset >= 0 &&
+  byte_offset + @comp.camera_gpu_byte_stride() <= self.store.bytes.length()
 }
 
 ///|
@@ -128,15 +211,32 @@ fn CameraBlobStore::write_matrices_if_changed(
   projection_kind : Float,
   flags : Float,
 ) -> Bool {
-  if self.inputs_match_row(
+  if !self.valid_row_range(word_offset) {
+    self.write_matrices(
       word_offset, view, proj, near, far, aspect, projection_kind, flags,
-    ) {
-    return false
+    )
+    return true
   }
-  self.write_matrices(
-    word_offset, view, proj, near, far, aspect, projection_kind, flags,
-  )
-  true
+  let byte_offset = word_offset * 4
+  if !self.matrix_matches_std140_row(byte_offset + 64, view) ||
+    !self.matrix_matches_std140_row(byte_offset + 128, proj) {
+    self.write_matrices(
+      word_offset, view, proj, near, far, aspect, projection_kind, flags,
+    )
+    return true
+  }
+  match
+    self.changed_scalar_word_bounds(
+      byte_offset, near, far, aspect, projection_kind, flags,
+    ) {
+    Some((first_word, last_word)) => {
+      self.write_scalar_word_range(
+        word_offset, first_word, last_word, near, far, aspect, projection_kind, flags,
+      )
+      true
+    }
+    None => false
+  }
 }
 
 ///|

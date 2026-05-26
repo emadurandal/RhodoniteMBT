@@ -19,6 +19,7 @@ import {
 	expect,
 	f32Bytes,
 	getF32,
+	getGpuWriteF32,
 	globalTransformFormatCode,
 	identityMat4ColMajor,
 	it,
@@ -231,9 +232,7 @@ describe("ECS TypeScript wrapper: builtins", () => {
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
 		let writes = world.drainCameraBlobWriteViews();
 		expect(writes).toHaveLength(1);
-		expect(
-			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.1);
+		expect(getGpuWriteF32(writes[0], 268)).toBeCloseTo(0.1);
 
 		expect(history.undo(world)).toBe(true);
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
@@ -256,19 +255,13 @@ describe("ECS TypeScript wrapper: builtins", () => {
 			),
 		).toBe(true);
 		writes = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.25);
+		expect(getGpuWriteF32(writes[0], 268)).toBeCloseTo(0.25);
 		expect(history.undo(world)).toBe(true);
 		writes = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.1);
+		expect(getGpuWriteF32(writes[0], 268)).toBeCloseTo(0.1);
 		expect(history.redo(world)).toBe(true);
 		writes = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(writes[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.25);
+		expect(getGpuWriteF32(writes[0], 268)).toBeCloseTo(0.25);
 	});
 
 

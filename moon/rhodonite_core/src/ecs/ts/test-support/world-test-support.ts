@@ -1,6 +1,8 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
+import { getF32 as readF32 } from "../index.ts";
+
 export { describe, expect, it } from "vitest";
 export {
 	ComponentTypeId,
@@ -45,5 +47,21 @@ export function globalTransformFormatCode(refs: Uint8Array): number {
 	return new DataView(refs.buffer, refs.byteOffset, refs.byteLength).getUint32(
 		0,
 		true,
+	);
+}
+
+type GpuWriteLike = {
+	byteOffset(): number;
+	bytes(): { asUint8Array(): Uint8Array };
+};
+
+export function getGpuWriteF32(
+	write: GpuWriteLike | undefined,
+	absoluteByteOffset: number,
+): number {
+	if (!write) return 0;
+	return readF32(
+		write.bytes().asUint8Array(),
+		absoluteByteOffset - write.byteOffset(),
 	);
 }

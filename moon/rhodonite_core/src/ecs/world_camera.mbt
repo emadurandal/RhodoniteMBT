@@ -86,38 +86,37 @@ pub fn World::set_camera_matrices(
   self.assert_not_history_raw_mutation("World::set_camera_matrices")
   let id = self.camera_component_id
   self.assert_system_component_write(id, "World::set_camera_matrices")
-  if !self.has_component(entity, id) {
-    if !self.can_add_missing_component_from_setter(
-        id, "World::set_camera_matrices",
-      ) {
-      return false
+  match self.camera_ref_unchecked(entity) {
+    Some(camera_ref) => {
+      ignore(
+        self.camera_blob.write_matrices_if_changed(
+          camera_ref.word_offset,
+          view,
+          proj,
+          near,
+          far,
+          aspect,
+          projection_kind,
+          flags,
+        ),
+      )
+      true
     }
-    let camera_ref = self.alloc_camera_ref(
-      view, proj, near, far, aspect, projection_kind, flags,
-    )
-    self.add_component_bytes(
-      entity,
-      id,
-      @comp.camera_ref_bytes(camera_ref.word_offset),
-    )
-  } else {
-    match self.camera_ref(entity) {
-      Some(camera_ref) => {
-        ignore(
-          self.camera_blob.write_matrices_if_changed(
-            camera_ref.word_offset,
-            view,
-            proj,
-            near,
-            far,
-            aspect,
-            projection_kind,
-            flags,
-          ),
-        )
-        true
+    None => {
+      if !self.is_alive(entity) ||
+        !self.can_add_missing_component_from_setter(
+          id, "World::set_camera_matrices",
+        ) {
+        return false
       }
-      None => false
+      let camera_ref = self.alloc_camera_ref(
+        view, proj, near, far, aspect, projection_kind, flags,
+      )
+      self.add_component_bytes(
+        entity,
+        id,
+        @comp.camera_ref_bytes(camera_ref.word_offset),
+      )
     }
   }
 }

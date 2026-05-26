@@ -110,6 +110,124 @@ test "builtin Camera identical set skips duplicate blob write" {
 }
 
 ///|
+test "builtin Camera scalar-only far update writes only far word" {
+  let world = World::new()
+  let camera = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (200.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let writes = world.drain_camera_blob_write_views()
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 272)
+  assert_eq(writes[0].bytes.length(), 4)
+}
+
+///|
+test "builtin Camera scalar-only sparse update writes scalar span" {
+  let world = World::new()
+  let camera = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.2 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  let writes = world.drain_camera_blob_write_views()
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 268)
+  assert_eq(writes[0].bytes.length(), 20)
+}
+
+///|
+test "builtin Camera view update still writes full row" {
+  let world = World::new()
+  let camera = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  let changed_view = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      changed_view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let writes = world.drain_camera_blob_write_views()
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), @comp.camera_gpu_byte_stride())
+}
+
+///|
 test "orbit camera reset restores home Transform3D" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()

@@ -18,7 +18,7 @@ import {
 	encodeHistoryExportJson,
 	expect,
 	f32Bytes,
-	getF32,
+	getGpuWriteF32,
 	globalTransformFormatCode,
 	identityMat4ColMajor,
 	it,
@@ -216,9 +216,7 @@ describe("ECS TypeScript wrapper: system", () => {
 			1,
 		);
 		const cameraWrites = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.25);
+		expect(getGpuWriteF32(cameraWrites[0], 268)).toBeCloseTo(0.25);
 	});
 
 
@@ -276,18 +274,14 @@ describe("ECS TypeScript wrapper: system", () => {
 			1,
 		);
 		let cameraWrites = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.3);
+		expect(getGpuWriteF32(cameraWrites[0], 268)).toBeCloseTo(0.3);
 
 		expect(history.undo(world)).toBe(true);
 		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
 			0,
 		);
 		cameraWrites = world.drainCameraBlobWriteViews();
-		expect(
-			getF32(cameraWrites[0]?.bytes().asUint8Array() ?? new Uint8Array(), 268),
-		).toBeCloseTo(0.1);
+		expect(getGpuWriteF32(cameraWrites[0], 268)).toBeCloseTo(0.1);
 		expect(history.redo(world)).toBe(true);
 		expect(globalTransformFormatCode(world.extractGlobalTransformRefs([entity]))).toBe(
 			1,
