@@ -102,6 +102,8 @@ golden image readback with:
 pnpm run test:examples:interaction:browser
 ```
 
+GitHub Actions runs this WebGPU-independent interaction regression as a PR gate.
+
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
 variants. The mass-cubes demos use the same packed transform ref path as the
 TypeScript demo, and a source-level precision-mode constant can switch all

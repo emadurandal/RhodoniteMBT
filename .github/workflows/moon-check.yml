@@ -29,3 +29,49 @@ jobs:
       - name: Check workspace (all targets)
         working-directory: ${{ github.workspace }}
         run: moon check --target all
+
+  browser-interaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: MoonBit version
+        run: moon version --all
+
+      - name: Moon update (registry index & deps)
+        working-directory: ${{ github.workspace }}
+        run: moon update
+
+      - name: Setup Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Chrome version
+        run: '"${{ steps.setup-chrome.outputs.chrome-path }}" --version'
+
+      - name: Core TypeScript tests
+        working-directory: ${{ github.workspace }}
+        run: pnpm run test:core:js
+
+      - name: Browser interaction regression
+        working-directory: ${{ github.workspace }}
+        env:
+          RHODONITE_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: pnpm run test:examples:interaction:browser

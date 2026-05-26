@@ -49,6 +49,7 @@ pnpm run test:examples:visual:browser
 pnpm run test:examples:visual:update
 pnpm run test:examples:visual:update:native
 pnpm run test:examples:visual:update:browser
+pnpm run test:examples:interaction:browser
 
 pnpm run test:examples:visual -- --verbose</code></pre>
 
@@ -71,7 +72,9 @@ pnpm run test:examples:visual -- --verbose</code></pre>
             <li>native は <code>webgpu_objects/native</code> を override し、次の canvas presentation を present 前に capture します。browser は <code>webgpu_objects/js</code> を override し、MoonBit、TypeScript、WASM variants の presented canvas pixels を readback します。</li>
             <li><code>scripts/run-visual-regression.mjs</code> は native/browser をまとめ、MoonBit warnings を通常非表示にします。</li>
             <li><code>scripts/run-browser-visual-regression.mjs</code> は Vite と local result server を起動し、headless Chrome/Chromium から result を受け取ります。</li>
+            <li><code>scripts/run-browser-interaction-regression.mjs</code> は production の軽量 Undo/Redo interaction HTML を使う WebGPU 非依存 test です。CI は button、shortcut、key-repeat behavior の PR gate としてこれを実行します。</li>
             <li>WebGPU adapter creation や Chrome startup に失敗する環境では skip message を出して pass します。golden 更新は WebGPU-capable machine で行います。</li>
+            <li>visual regression は WebGPU adapter、driver、headless browser output の環境差があり得るため、明示的な rendering / golden 確認として残します。</li>
           </ul>
         </article>
       </main>
