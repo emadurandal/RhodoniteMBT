@@ -79,6 +79,12 @@ fn PackedGpuBlobStore::mark_dirty_words(
 }
 
 ///|
+/// Implements `PackedGpuBlobStore::has_dirty_words`.
+fn PackedGpuBlobStore::has_dirty_words(self : PackedGpuBlobStore) -> Bool {
+  self.dirty_word_first.length() > 0
+}
+
+///|
 /// Implements `PackedGpuBlobStore::alloc_words`.
 fn PackedGpuBlobStore::alloc_words(
   self : PackedGpuBlobStore,

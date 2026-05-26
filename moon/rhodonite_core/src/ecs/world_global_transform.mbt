@@ -208,6 +208,16 @@ pub fn World::drain_global_transform_blob_write_views(
 }
 
 ///|
+/// Reports whether the GlobalTransform packed blob has queued GPU write views.
+pub fn World::has_global_transform_blob_write_views(self : World) -> Bool {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::has_global_transform_blob_write_views",
+  )
+  self.global_transform_blob.has_write_views()
+}
+
+///|
 /// Implements `World::write_global_transform_blob_range_views`.
 pub fn World::write_global_transform_blob_range_views(
   self : World,

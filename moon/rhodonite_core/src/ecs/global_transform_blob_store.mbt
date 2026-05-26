@@ -108,6 +108,14 @@ fn GlobalTransformBlobStore::write_word_range_views(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::has_write_views`.
+fn GlobalTransformBlobStore::has_write_views(
+  self : GlobalTransformBlobStore,
+) -> Bool {
+  self.store.has_dirty_words()
+}
+
+///|
 /// Implements `GlobalTransformBlobStore::drain_write_views`.
 fn GlobalTransformBlobStore::drain_write_views(
   self : GlobalTransformBlobStore,

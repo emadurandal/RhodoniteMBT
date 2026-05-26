@@ -81,6 +81,12 @@ fn CameraBlobStore::read_row(
 }
 
 ///|
+/// Implements `CameraBlobStore::has_write_views`.
+fn CameraBlobStore::has_write_views(self : CameraBlobStore) -> Bool {
+  self.store.has_dirty_words()
+}
+
+///|
 /// Implements `CameraBlobStore::drain_write_views`.
 fn CameraBlobStore::drain_write_views(
   self : CameraBlobStore,

@@ -170,6 +170,14 @@ pub fn World::drain_camera_blob_write_views(
 }
 
 ///|
+/// Reports whether the Camera packed blob has queued GPU write views.
+pub fn World::has_camera_blob_write_views(self : World) -> Bool {
+  let id = self.camera_component_id
+  self.assert_system_component_write(id, "World::has_camera_blob_write_views")
+  self.camera_blob.has_write_views()
+}
+
+///|
 /// Implements `World::drain_camera_blob_resize_events`.
 pub fn World::drain_camera_blob_resize_events(
   self : World,
