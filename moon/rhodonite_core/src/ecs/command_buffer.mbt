@@ -87,6 +87,79 @@ fn CommandBuffer::assert_structural_write_if_missing_component(
 }
 
 ///|
+/// Sentinel component used when a command failure has no component target.
+fn command_failure_no_component() -> ComponentTypeId {
+  ComponentTypeId::new(-1)
+}
+
+///|
+/// Returns a stable command kind for execution reports.
+fn world_command_kind(command : WorldCommand) -> String {
+  match command {
+    CreateEntity(_) => "create_entity"
+    DestroyEntity(_) => "destroy_entity"
+    AddComponent(_, _) => "add_component"
+    AddComponentBytes(_, _, _) => "add_component_bytes"
+    SetComponentBytes(_, _, _) => "set_component_bytes"
+    RemoveComponent(_, _) => "remove_component"
+    SetGlobalTransform(_, _) => "set_global_transform"
+    SetGlobalTransformFormat(_, _) => "set_global_transform_format"
+    SetCameraMatrices(_, _, _, _, _, _, _, _) => "set_camera_matrices"
+  }
+}
+
+///|
+/// Returns the entity targeted by a command.
+fn world_command_entity(command : WorldCommand) -> EntityId {
+  match command {
+    CreateEntity(entity) => entity
+    DestroyEntity(entity) => entity
+    AddComponent(entity, _) => entity
+    AddComponentBytes(entity, _, _) => entity
+    SetComponentBytes(entity, _, _) => entity
+    RemoveComponent(entity, _) => entity
+    SetGlobalTransform(entity, _) => entity
+    SetGlobalTransformFormat(entity, _) => entity
+    SetCameraMatrices(entity, _, _, _, _, _, _, _) => entity
+  }
+}
+
+///|
+/// Returns the component targeted by a command, or a sentinel for structural-only commands.
+fn CommandBuffer::command_component(
+  self : CommandBuffer,
+  command : WorldCommand,
+) -> ComponentTypeId {
+  match command {
+    CreateEntity(_) => command_failure_no_component()
+    DestroyEntity(_) => command_failure_no_component()
+    AddComponent(_, component) => component
+    AddComponentBytes(_, component, _) => component
+    SetComponentBytes(_, component, _) => component
+    RemoveComponent(_, component) => component
+    SetGlobalTransform(_, _) => self.world.global_transform_component()
+    SetGlobalTransformFormat(_, _) => self.world.global_transform_component()
+    SetCameraMatrices(_, _, _, _, _, _, _, _) => self.world.camera_component()
+  }
+}
+
+///|
+/// Builds one command failure report with stable metadata.
+fn CommandBuffer::command_failure(
+  self : CommandBuffer,
+  command : WorldCommand,
+  command_index : Int,
+) -> CommandBufferCommandFailure {
+  {
+    command_index,
+    command_kind: world_command_kind(command),
+    reason: "apply_failed",
+    entity: world_command_entity(command),
+    component: self.command_component(command),
+  }
+}
+
+///|
 /// Implements `CommandBuffer::len`.
 pub fn CommandBuffer::len(self : CommandBuffer) -> Int {
   self.commands.length()
@@ -227,14 +300,18 @@ pub fn CommandBuffer::set_camera_matrices(
 }
 
 ///|
-/// Applies commands in insertion order, then clears the buffer.
-///
-/// Returns `false` if any command could not be applied, for example because the target entity was
-/// already dead by the time the command ran. Later commands still run.
-fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
-  let mut ok = true
+/// Applies commands in insertion order and returns a report for one system buffer.
+fn CommandBuffer::apply_report(
+  self : CommandBuffer,
+  runner_index : Int,
+  batch_index : Int,
+) -> SystemRunSystemReport {
+  let queued_command_count = self.commands.length()
+  let mut applied_command_count = 0
+  let failures : Array[CommandBufferCommandFailure] = []
   for i = 0; i < self.commands.length(); i = i + 1 {
-    let command_ok = match self.commands[i] {
+    let command = self.commands[i]
+    let command_ok = match command {
       CreateEntity(entity) => self.world.finalize_reserved_entity(entity)
       DestroyEntity(entity) => self.world.destroy_entity(entity)
       AddComponent(entity, component) =>
@@ -263,25 +340,40 @@ fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
           entity, view, proj, near, far, aspect, projection_kind, flags,
         )
     }
-    if !command_ok {
-      ok = false
+    if command_ok {
+      applied_command_count = applied_command_count + 1
+    } else {
+      failures.push(self.command_failure(command, i))
     }
   }
   while self.commands.length() > 0 {
     let _ = self.commands.pop()
   }
-  ok
+  {
+    runner_index,
+    batch_index,
+    name: self.system_name,
+    queued_command_count,
+    applied_command_count,
+    failed_command_count: failures.length(),
+    failures,
+  }
 }
 
 ///|
-/// Applies commands through WorldHistory tracked APIs, then clears the buffer.
-fn CommandBuffer::apply_tracked(
+/// Applies commands through WorldHistory tracked APIs and returns a report.
+fn CommandBuffer::apply_tracked_report(
   self : CommandBuffer,
   history : WorldHistory,
-) -> Bool {
-  let mut ok = true
+  runner_index : Int,
+  batch_index : Int,
+) -> SystemRunSystemReport {
+  let queued_command_count = self.commands.length()
+  let mut applied_command_count = 0
+  let failures : Array[CommandBufferCommandFailure] = []
   for i = 0; i < self.commands.length(); i = i + 1 {
-    let command_ok = match self.commands[i] {
+    let command = self.commands[i]
+    let command_ok = match command {
       CreateEntity(entity) =>
         history.finalize_reserved_entity(self.world, entity)
       DestroyEntity(entity) => history.destroy_entity(self.world, entity)
@@ -319,12 +411,22 @@ fn CommandBuffer::apply_tracked(
           flags,
         )
     }
-    if !command_ok {
-      ok = false
+    if command_ok {
+      applied_command_count = applied_command_count + 1
+    } else {
+      failures.push(self.command_failure(command, i))
     }
   }
   while self.commands.length() > 0 {
     let _ = self.commands.pop()
   }
-  ok
+  {
+    runner_index,
+    batch_index,
+    name: self.system_name,
+    queued_command_count,
+    applied_command_count,
+    failed_command_count: failures.length(),
+    failures,
+  }
 }

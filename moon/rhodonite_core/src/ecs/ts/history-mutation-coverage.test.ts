@@ -176,6 +176,7 @@ const auditedSurfaces: readonly SurfaceAudit[] = [
 			"setGlobalTransformFormat",
 			"setCameraMatrices",
 			"runSystemPhase",
+			"runSystemPhaseReport",
 		],
 		read_only: [
 			"enabled",
@@ -249,7 +250,7 @@ const auditedSurfaces: readonly SurfaceAudit[] = [
 		],
 	}),
 	surfaceAudit("SystemRunner", SystemRunner, {
-		raw_guarded: ["runPhase"],
+		raw_guarded: ["runPhase", "runPhaseReport"],
 		intentionally_untracked: ["addSystem"],
 		read_only: ["len", "hasParallelAccessConflicts", "planPhase"],
 	}),
@@ -349,6 +350,7 @@ const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 			"destroy_entity",
 			"remove_component",
 			"run_system_phase",
+			"run_system_phase_report",
 			"set_camera_matrices",
 			"set_child_of",
 			"set_component_bytes",
@@ -452,7 +454,7 @@ const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 		],
 	}),
 	moonBitSurfaceAudit("SystemRunner", {
-		raw_guarded: ["run_phase"],
+		raw_guarded: ["run_phase", "run_phase_report"],
 		intentionally_untracked: ["add_system"],
 		read_only: ["has_parallel_access_conflicts", "len", "new", "plan_phase"],
 	}),
@@ -620,6 +622,15 @@ const bridgeParityEntries: readonly BridgeParityEntry[] = [
 		tsMethod: "runSystemPhase",
 		moonBitReceiver: "WorldHistory",
 		moonBitMethod: "run_system_phase",
+	},
+	{
+		label: "WorldHistory::run_system_phase_report",
+		bridge: "world_history_run_system_phase_report",
+		wrapperSource: "world-history.ts",
+		surface: "WorldHistory",
+		tsMethod: "runSystemPhaseReport",
+		moonBitReceiver: "WorldHistory",
+		moonBitMethod: "run_system_phase_report",
 	},
 	{
 		label: "QueryRow::write_tracked",

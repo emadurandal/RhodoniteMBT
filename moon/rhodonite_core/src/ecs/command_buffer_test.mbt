@@ -81,6 +81,97 @@ test "CommandBuffer applies queued component writes and reports failed commands"
 }
 
 ///|
+test "SystemRunner run_phase_report exposes command apply failures" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandBufferReportA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let missing = EntityId::new(e.index + 100, 0)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_with_structural_write(
+      "report-failure",
+      update_phase(),
+      [],
+      [qa],
+      (_w, _ctx, commands) => {
+        commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+        commands.destroy_entity(missing)
+      },
+    ),
+  )
+  let report = runner.run_phase_report(
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    update_phase(),
+  )
+  assert_false(report.ok)
+  assert_eq(report.batch_count, 1)
+  assert_eq(report.system_count, 1)
+  assert_eq(report.queued_command_count, 2)
+  assert_eq(report.applied_command_count, 1)
+  assert_eq(report.failed_command_count, 1)
+  let batch = report.batches[0]
+  assert_false(batch.ok)
+  assert_eq(batch.index, 0)
+  let system = batch.systems[0]
+  assert_eq(system.runner_index, 0)
+  assert_eq(system.batch_index, 0)
+  assert_eq(system.name, "report-failure")
+  assert_eq(system.queued_command_count, 2)
+  assert_eq(system.applied_command_count, 1)
+  assert_eq(system.failed_command_count, 1)
+  let failure = system.failures[0]
+  assert_eq(failure.command_index, 1)
+  assert_eq(failure.command_kind, "destroy_entity")
+  assert_eq(failure.reason, "apply_failed")
+  assert_eq(failure.entity.index, missing.index)
+  assert_eq(failure.component.index, -1)
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "SystemRunner run_phase_report reports successful command counts" {
+  let world = World::new()
+  let qa = world.register_cpu_component("CommandBufferReportSuccessA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("report-success", update_phase(), [], [qa], (_w, _ctx, commands) => {
+      commands.set_component_bytes(e, qa, bytes4(3, 0, 0, 0))
+    }),
+  )
+  let report = runner.run_phase_report(
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    update_phase(),
+  )
+  assert_true(report.ok)
+  assert_eq(report.batch_count, 1)
+  assert_eq(report.system_count, 1)
+  assert_eq(report.queued_command_count, 1)
+  assert_eq(report.applied_command_count, 1)
+  assert_eq(report.failed_command_count, 0)
+  assert_eq(report.batches[0].systems[0].name, "report-success")
+}
+
+///|
+test "SystemRunner run_phase_report returns empty success for empty phase" {
+  let world = World::new()
+  let runner = SystemRunner::new()
+  let report = runner.run_phase_report(
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    update_phase(),
+  )
+  assert_true(report.ok)
+  assert_eq(report.batch_count, 0)
+  assert_eq(report.system_count, 0)
+  assert_eq(report.failed_command_count, 0)
+}
+
+///|
 test "CommandBuffer create_entity reserves id and applies components after query" {
   let world = World::new()
   let qa = world.register_cpu_component("CommandCreateSource", 4)
@@ -429,6 +520,46 @@ test "WorldHistory keeps successful CommandBuffer deltas when a later command fa
   assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 0, 0, 0)))
   assert_true(history.undo(world))
   assert_true(world.component_bytes(e, qa) == Some(bytes4(1, 0, 0, 0)))
+}
+
+///|
+test "WorldHistory run_system_phase_report exposes tracked command failures" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("HistoryCommandReportA", 4)
+  let e = world.create_entity()
+  let missing = EntityId::new(e.index + 100, 0)
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_with_structural_write(
+      "history-report-failure",
+      update_phase(),
+      [],
+      [qa],
+      (_w, _ctx, commands) => {
+        commands.set_component_bytes(e, qa, bytes4(2, 0, 0, 0))
+        commands.destroy_entity(missing)
+      },
+    ),
+  )
+  let report = history.run_system_phase_report(
+    runner,
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    update_phase(),
+    "History Report Failure",
+  )
+  assert_false(report.ok)
+  assert_eq(report.failed_command_count, 1)
+  assert_eq(
+    report.batches[0].systems[0].failures[0].command_kind,
+    "destroy_entity",
+  )
+  assert_eq(report.batches[0].systems[0].failures[0].reason, "apply_failed")
+  assert_eq(history.last_diagnostic(), "operation_failed")
+  assert_eq(history.undo_len(), 1)
+  assert_true(world.component_bytes(e, qa) == Some(bytes4(2, 0, 0, 0)))
 }
 
 ///|

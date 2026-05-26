@@ -117,6 +117,14 @@ pub fn CommandBuffer::set_component_bytes(Self, EntityId, ComponentTypeId, Fixed
 pub fn CommandBuffer::set_global_transform(Self, EntityId, @matrix44.Matrix44[Float]) -> Unit
 pub fn CommandBuffer::set_global_transform_format(Self, EntityId, @components.GlobalTransformGpuFormat) -> Unit
 
+pub(all) struct CommandBufferCommandFailure {
+  command_index : Int
+  command_kind : String
+  reason : String
+  entity : EntityId
+  component : ComponentTypeId
+}
+
 pub(all) struct ComponentTypeId {
   index : Int
 } derive(Eq)
@@ -384,6 +392,37 @@ pub(all) struct SystemPlanSystem {
   structural_write : Bool
 }
 
+pub(all) struct SystemRunBatchReport {
+  index : Int
+  ok : Bool
+  system_count : Int
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  systems : Array[SystemRunSystemReport]
+}
+
+pub(all) struct SystemRunReport {
+  phase : PhaseKey
+  ok : Bool
+  batch_count : Int
+  system_count : Int
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  batches : Array[SystemRunBatchReport]
+}
+
+pub(all) struct SystemRunSystemReport {
+  runner_index : Int
+  batch_index : Int
+  name : String
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  failures : Array[CommandBufferCommandFailure]
+}
+
 pub struct SystemRunner {
   // private fields
 }
@@ -393,6 +432,7 @@ pub fn SystemRunner::len(Self) -> Int
 pub fn SystemRunner::new() -> Self
 pub fn SystemRunner::plan_phase(Self, PhaseKey) -> SystemPhasePlan
 pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
+pub fn SystemRunner::run_phase_report(Self, World, SystemContext, PhaseKey) -> SystemRunReport
 
 pub struct World {
   // private fields
@@ -507,6 +547,7 @@ pub fn WorldHistory::redo_serialization_report(Self, World) -> WorldHistorySeria
 pub fn WorldHistory::redo_summary(Self) -> Array[WorldHistoryRecordSummary]
 pub fn WorldHistory::remove_component(Self, World, EntityId, ComponentTypeId) -> Bool
 pub fn WorldHistory::run_system_phase(Self, SystemRunner, World, SystemContext, PhaseKey, String) -> Bool
+pub fn WorldHistory::run_system_phase_report(Self, SystemRunner, World, SystemContext, PhaseKey, String) -> SystemRunReport
 pub fn WorldHistory::set_camera_matrices(Self, World, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool
 pub fn WorldHistory::set_child_of(Self, World, EntityId, EntityId) -> Bool
 pub fn WorldHistory::set_component_bytes(Self, World, EntityId, ComponentTypeId, FixedArray[Byte]) -> Bool

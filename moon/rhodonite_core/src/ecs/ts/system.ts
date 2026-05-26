@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+	MoonCommandBufferCommandFailure,
 	MoonCommandBuffer,
 	MoonPhaseKey,
 	MoonSystem,
@@ -9,9 +10,17 @@ import type {
 	MoonSystemPhasePlan,
 	MoonSystemPlanBatch,
 	MoonSystemPlanSystem,
+	MoonSystemRunBatchReport,
+	MoonSystemRunReport,
+	MoonSystemRunSystemReport,
 	MoonSystemRunner,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
+	command_buffer_command_failure_command_index,
+	command_buffer_command_failure_command_kind,
+	command_buffer_command_failure_component,
+	command_buffer_command_failure_entity,
+	command_buffer_command_failure_reason,
 	command_buffer_add_component,
 	command_buffer_add_component_bytes,
 	command_buffer_create_entity,
@@ -42,6 +51,7 @@ import {
 	system_runner_new,
 	system_runner_plan_phase,
 	system_runner_run_phase,
+	system_runner_run_phase_report,
 	system_structural_write,
 	system_writes,
 	system_name,
@@ -57,6 +67,28 @@ import {
 	system_plan_system_runner_index,
 	system_plan_system_structural_write,
 	system_plan_system_writes,
+	system_run_batch_report_applied_command_count,
+	system_run_batch_report_failed_command_count,
+	system_run_batch_report_index,
+	system_run_batch_report_ok,
+	system_run_batch_report_queued_command_count,
+	system_run_batch_report_system_count,
+	system_run_batch_report_systems,
+	system_run_report_applied_command_count,
+	system_run_report_batch_count,
+	system_run_report_batches,
+	system_run_report_failed_command_count,
+	system_run_report_ok,
+	system_run_report_phase,
+	system_run_report_queued_command_count,
+	system_run_report_system_count,
+	system_run_system_report_applied_command_count,
+	system_run_system_report_batch_index,
+	system_run_system_report_failed_command_count,
+	system_run_system_report_failures,
+	system_run_system_report_name,
+	system_run_system_report_queued_command_count,
+	system_run_system_report_runner_index,
 	transform_propagation_system,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
@@ -360,6 +392,152 @@ export class SystemPhasePlan {
 	}
 }
 
+export class CommandBufferCommandFailure {
+	readonly inner: MoonCommandBufferCommandFailure;
+
+	constructor(inner: MoonCommandBufferCommandFailure) {
+		this.inner = inner;
+	}
+
+	commandIndex(): number {
+		return command_buffer_command_failure_command_index(this.inner);
+	}
+
+	commandKind(): string {
+		return command_buffer_command_failure_command_kind(this.inner);
+	}
+
+	reason(): string {
+		return command_buffer_command_failure_reason(this.inner);
+	}
+
+	entity(): EntityId {
+		return new EntityId(command_buffer_command_failure_entity(this.inner));
+	}
+
+	component(): ComponentTypeId {
+		return new ComponentTypeId(command_buffer_command_failure_component(this.inner));
+	}
+}
+
+export class SystemRunSystemReport {
+	readonly inner: MoonSystemRunSystemReport;
+
+	constructor(inner: MoonSystemRunSystemReport) {
+		this.inner = inner;
+	}
+
+	runnerIndex(): number {
+		return system_run_system_report_runner_index(this.inner);
+	}
+
+	batchIndex(): number {
+		return system_run_system_report_batch_index(this.inner);
+	}
+
+	name(): string {
+		return system_run_system_report_name(this.inner);
+	}
+
+	queuedCommandCount(): number {
+		return system_run_system_report_queued_command_count(this.inner);
+	}
+
+	appliedCommandCount(): number {
+		return system_run_system_report_applied_command_count(this.inner);
+	}
+
+	failedCommandCount(): number {
+		return system_run_system_report_failed_command_count(this.inner);
+	}
+
+	failures(): CommandBufferCommandFailure[] {
+		return system_run_system_report_failures(this.inner).map(
+			(failure) => new CommandBufferCommandFailure(failure),
+		);
+	}
+}
+
+export class SystemRunBatchReport {
+	readonly inner: MoonSystemRunBatchReport;
+
+	constructor(inner: MoonSystemRunBatchReport) {
+		this.inner = inner;
+	}
+
+	index(): number {
+		return system_run_batch_report_index(this.inner);
+	}
+
+	ok(): boolean {
+		return moonBool(system_run_batch_report_ok(this.inner));
+	}
+
+	systemCount(): number {
+		return system_run_batch_report_system_count(this.inner);
+	}
+
+	queuedCommandCount(): number {
+		return system_run_batch_report_queued_command_count(this.inner);
+	}
+
+	appliedCommandCount(): number {
+		return system_run_batch_report_applied_command_count(this.inner);
+	}
+
+	failedCommandCount(): number {
+		return system_run_batch_report_failed_command_count(this.inner);
+	}
+
+	systems(): SystemRunSystemReport[] {
+		return system_run_batch_report_systems(this.inner).map(
+			(system) => new SystemRunSystemReport(system),
+		);
+	}
+}
+
+export class SystemRunReport {
+	readonly inner: MoonSystemRunReport;
+
+	constructor(inner: MoonSystemRunReport) {
+		this.inner = inner;
+	}
+
+	phase(): PhaseKey {
+		return new PhaseKey(system_run_report_phase(this.inner));
+	}
+
+	ok(): boolean {
+		return moonBool(system_run_report_ok(this.inner));
+	}
+
+	batchCount(): number {
+		return system_run_report_batch_count(this.inner);
+	}
+
+	systemCount(): number {
+		return system_run_report_system_count(this.inner);
+	}
+
+	queuedCommandCount(): number {
+		return system_run_report_queued_command_count(this.inner);
+	}
+
+	appliedCommandCount(): number {
+		return system_run_report_applied_command_count(this.inner);
+	}
+
+	failedCommandCount(): number {
+		return system_run_report_failed_command_count(this.inner);
+	}
+
+	batches(): SystemRunBatchReport[] {
+		return system_run_report_batches(this.inner).map(
+			(batch) => new SystemRunBatchReport(batch),
+		);
+	}
+}
+
 export class SystemRunner {
 	readonly inner: MoonSystemRunner;
 
@@ -390,6 +568,17 @@ export class SystemRunner {
 	runPhase(world: World, ctx: SystemContext, phase: PhaseKey): boolean {
 		return moonBool(
 			system_runner_run_phase(this.inner, world.inner, ctx.inner, phase.inner),
+		);
+	}
+
+	runPhaseReport(world: World, ctx: SystemContext, phase: PhaseKey): SystemRunReport {
+		return new SystemRunReport(
+			system_runner_run_phase_report(
+				this.inner,
+				world.inner,
+				ctx.inner,
+				phase.inner,
+			),
 		);
 	}
 }

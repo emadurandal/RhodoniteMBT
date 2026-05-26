@@ -2796,6 +2796,17 @@ pub fn system_runner_run_phase(
 }
 
 ///|
+/// Implements `system_runner_run_phase_report`.
+pub fn system_runner_run_phase_report(
+  runner : @ecs.SystemRunner,
+  world : @ecs.World,
+  ctx : @ecs.SystemContext,
+  phase : @ecs.PhaseKey,
+) -> @ecs.SystemRunReport {
+  runner.run_phase_report(world, ctx, phase)
+}
+
+///|
 /// Implements `world_history_run_system_phase`.
 pub fn world_history_run_system_phase(
   history : @ecs.WorldHistory,
@@ -2806,6 +2817,223 @@ pub fn world_history_run_system_phase(
   label : String,
 ) -> Bool {
   history.run_system_phase(runner, world, ctx, phase, label)
+}
+
+///|
+/// Implements `world_history_run_system_phase_report`.
+pub fn world_history_run_system_phase_report(
+  history : @ecs.WorldHistory,
+  runner : @ecs.SystemRunner,
+  world : @ecs.World,
+  ctx : @ecs.SystemContext,
+  phase : @ecs.PhaseKey,
+  label : String,
+) -> @ecs.SystemRunReport {
+  history.run_system_phase_report(runner, world, ctx, phase, label)
+}
+
+///|
+/// Implements `system_run_report_phase`.
+pub fn system_run_report_phase(report : @ecs.SystemRunReport) -> @ecs.PhaseKey {
+  report.phase
+}
+
+///|
+/// Implements `system_run_report_ok`.
+pub fn system_run_report_ok(report : @ecs.SystemRunReport) -> Bool {
+  report.ok
+}
+
+///|
+/// Implements `system_run_report_batch_count`.
+pub fn system_run_report_batch_count(report : @ecs.SystemRunReport) -> Int {
+  report.batch_count
+}
+
+///|
+/// Implements `system_run_report_system_count`.
+pub fn system_run_report_system_count(report : @ecs.SystemRunReport) -> Int {
+  report.system_count
+}
+
+///|
+/// Implements `system_run_report_queued_command_count`.
+pub fn system_run_report_queued_command_count(
+  report : @ecs.SystemRunReport,
+) -> Int {
+  report.queued_command_count
+}
+
+///|
+/// Implements `system_run_report_applied_command_count`.
+pub fn system_run_report_applied_command_count(
+  report : @ecs.SystemRunReport,
+) -> Int {
+  report.applied_command_count
+}
+
+///|
+/// Implements `system_run_report_failed_command_count`.
+pub fn system_run_report_failed_command_count(
+  report : @ecs.SystemRunReport,
+) -> Int {
+  report.failed_command_count
+}
+
+///|
+/// Implements `system_run_report_batches`.
+pub fn system_run_report_batches(
+  report : @ecs.SystemRunReport,
+) -> Array[@ecs.SystemRunBatchReport] {
+  report.batches
+}
+
+///|
+/// Implements `system_run_batch_report_index`.
+pub fn system_run_batch_report_index(report : @ecs.SystemRunBatchReport) -> Int {
+  report.index
+}
+
+///|
+/// Implements `system_run_batch_report_ok`.
+pub fn system_run_batch_report_ok(report : @ecs.SystemRunBatchReport) -> Bool {
+  report.ok
+}
+
+///|
+/// Implements `system_run_batch_report_system_count`.
+pub fn system_run_batch_report_system_count(
+  report : @ecs.SystemRunBatchReport,
+) -> Int {
+  report.system_count
+}
+
+///|
+/// Implements `system_run_batch_report_queued_command_count`.
+pub fn system_run_batch_report_queued_command_count(
+  report : @ecs.SystemRunBatchReport,
+) -> Int {
+  report.queued_command_count
+}
+
+///|
+/// Implements `system_run_batch_report_applied_command_count`.
+pub fn system_run_batch_report_applied_command_count(
+  report : @ecs.SystemRunBatchReport,
+) -> Int {
+  report.applied_command_count
+}
+
+///|
+/// Implements `system_run_batch_report_failed_command_count`.
+pub fn system_run_batch_report_failed_command_count(
+  report : @ecs.SystemRunBatchReport,
+) -> Int {
+  report.failed_command_count
+}
+
+///|
+/// Implements `system_run_batch_report_systems`.
+pub fn system_run_batch_report_systems(
+  report : @ecs.SystemRunBatchReport,
+) -> Array[@ecs.SystemRunSystemReport] {
+  report.systems
+}
+
+///|
+/// Implements `system_run_system_report_runner_index`.
+pub fn system_run_system_report_runner_index(
+  report : @ecs.SystemRunSystemReport,
+) -> Int {
+  report.runner_index
+}
+
+///|
+/// Implements `system_run_system_report_batch_index`.
+pub fn system_run_system_report_batch_index(
+  report : @ecs.SystemRunSystemReport,
+) -> Int {
+  report.batch_index
+}
+
+///|
+/// Implements `system_run_system_report_name`.
+pub fn system_run_system_report_name(
+  report : @ecs.SystemRunSystemReport,
+) -> String {
+  report.name
+}
+
+///|
+/// Implements `system_run_system_report_queued_command_count`.
+pub fn system_run_system_report_queued_command_count(
+  report : @ecs.SystemRunSystemReport,
+) -> Int {
+  report.queued_command_count
+}
+
+///|
+/// Implements `system_run_system_report_applied_command_count`.
+pub fn system_run_system_report_applied_command_count(
+  report : @ecs.SystemRunSystemReport,
+) -> Int {
+  report.applied_command_count
+}
+
+///|
+/// Implements `system_run_system_report_failed_command_count`.
+pub fn system_run_system_report_failed_command_count(
+  report : @ecs.SystemRunSystemReport,
+) -> Int {
+  report.failed_command_count
+}
+
+///|
+/// Implements `system_run_system_report_failures`.
+pub fn system_run_system_report_failures(
+  report : @ecs.SystemRunSystemReport,
+) -> Array[@ecs.CommandBufferCommandFailure] {
+  report.failures
+}
+
+///|
+/// Implements `command_buffer_command_failure_command_index`.
+pub fn command_buffer_command_failure_command_index(
+  failure : @ecs.CommandBufferCommandFailure,
+) -> Int {
+  failure.command_index
+}
+
+///|
+/// Implements `command_buffer_command_failure_command_kind`.
+pub fn command_buffer_command_failure_command_kind(
+  failure : @ecs.CommandBufferCommandFailure,
+) -> String {
+  failure.command_kind
+}
+
+///|
+/// Implements `command_buffer_command_failure_reason`.
+pub fn command_buffer_command_failure_reason(
+  failure : @ecs.CommandBufferCommandFailure,
+) -> String {
+  failure.reason
+}
+
+///|
+/// Implements `command_buffer_command_failure_entity`.
+pub fn command_buffer_command_failure_entity(
+  failure : @ecs.CommandBufferCommandFailure,
+) -> @ecs.EntityId {
+  failure.entity
+}
+
+///|
+/// Implements `command_buffer_command_failure_component`.
+pub fn command_buffer_command_failure_component(
+  failure : @ecs.CommandBufferCommandFailure,
+) -> @ecs.ComponentTypeId {
+  failure.component
 }
 
 ///|
