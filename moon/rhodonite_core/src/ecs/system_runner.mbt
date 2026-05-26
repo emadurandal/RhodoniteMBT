@@ -518,7 +518,9 @@ pub fn SystemRunner::run_phase(
   ctx : SystemContext,
   phase : PhaseKey,
 ) -> Bool {
-  self.run_phase_report(world, ctx, phase).ok
+  self.run_phase_report_with_operation(
+    world, ctx, phase, "SystemRunner::run_phase",
+  ).ok
 }
 
 ///|
@@ -529,7 +531,21 @@ pub fn SystemRunner::run_phase_report(
   ctx : SystemContext,
   phase : PhaseKey,
 ) -> SystemRunReport {
-  world.assert_not_history_raw_mutation("SystemRunner::run_phase_report")
+  self.run_phase_report_with_operation(
+    world, ctx, phase, "SystemRunner::run_phase_report",
+  )
+}
+
+///|
+/// Runs one phase with a caller-specific raw-mutation guard operation label.
+fn SystemRunner::run_phase_report_with_operation(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  operation : String,
+) -> SystemRunReport {
+  world.assert_not_history_raw_mutation(operation)
   world.lock_component_registration()
   let batches = self.phase_batches(phase)
   let batch_reports : Array[SystemRunBatchReport] = []
