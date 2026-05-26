@@ -18,6 +18,7 @@ import {
 	createOrbitCameraBlobSyncCommandSystem,
 	createOrbitCameraTransformCommandSystem,
 	createOrbitOrthographicCameraDescFromYzPosition,
+	getF32,
 	readOrbitCameraControllerComponent,
 	registerCameraHomeTransformComponent,
 	registerCameraLensComponent,
@@ -45,6 +46,20 @@ const IDENTITY_MAT4 = new Float32Array([
 	0, 0, 1, 0,
 	0, 0, 0, 1,
 ]);
+
+function expectCameraRowValues(
+	world: World,
+	camera: ReturnType<World["createEntity"]>,
+	near: number,
+	aspect: number,
+	flags: number,
+): void {
+	const row = world.cameraGpuRowCopy(camera);
+	expect(row).not.toBeNull();
+	expect(getF32(row ?? new Uint8Array(), 268)).toBeCloseTo(near);
+	expect(getF32(row ?? new Uint8Array(), 276)).toBeCloseTo(aspect);
+	expect(getF32(row ?? new Uint8Array(), 284)).toBeCloseTo(flags);
+}
 
 function u32Bytes(values: number[]): Uint8Array {
 	const bytes = new Uint8Array(values.length * 4);
@@ -236,6 +251,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.hasComponent(camera, home)).toBe(true);
 		expect(world.hasComponent(camera, lens)).toBe(true);
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		expectCameraRowValues(world, camera, 0.1, 1, 0);
 
 		expect(history.undo(world)).toBe(true);
 		expect(history.redoLen()).toBe(1);
@@ -250,6 +266,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(history.undoLen()).toBe(1);
 		expect(world.hasComponent(camera, orbit)).toBe(true);
 		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+		expectCameraRowValues(world, camera, 0.1, 1, 0);
 		expect(world.drainCameraBlobWriteViews().length).toBeGreaterThan(0);
 	});
 
@@ -370,6 +387,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		).toBe(false);
 
 		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
 		expect(world.hasComponent(camera, orbit)).toBe(true);
 		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
 		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(false);
@@ -399,6 +417,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 			),
 		).toBe(false);
 		expect(globalHistory.undoLen()).toBe(0);
+		expect(globalHistory.redoLen()).toBe(0);
 		expect(globalWorld.hasComponent(globalCamera, globalWorld.globalTransformComponent())).toBe(true);
 		expect(globalWorld.hasComponent(globalCamera, globalWorld.orbitCameraControllerComponent())).toBe(false);
 		expect(globalWorld.hasComponent(globalCamera, globalWorld.cameraLensComponent())).toBe(false);
@@ -423,6 +442,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 			),
 		).toBe(false);
 		expect(cameraHistory.undoLen()).toBe(0);
+		expect(cameraHistory.redoLen()).toBe(0);
 		expect(cameraWorld.hasComponent(camera, cameraWorld.cameraComponent())).toBe(true);
 		expect(cameraWorld.hasComponent(camera, cameraWorld.orbitCameraControllerComponent())).toBe(false);
 		expect(cameraWorld.hasComponent(camera, cameraWorld.cameraLensComponent())).toBe(false);
@@ -448,6 +468,7 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 
 		history.setCameraMatrices = originalSetCameraMatrices;
 		expect(history.undoLen()).toBe(0);
+		expect(history.redoLen()).toBe(0);
 		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
 		expect(world.hasComponent(camera, world.globalTransformComponent())).toBe(false);
 		expect(world.hasComponent(camera, orbit)).toBe(false);
