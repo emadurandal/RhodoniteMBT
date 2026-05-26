@@ -210,6 +210,49 @@ fn system_run_report(
 }
 
 ///|
+/// Runs one system batch and returns false if any command-buffer apply fails.
+fn run_system_batch(
+  batch : SystemBatch,
+  world : World,
+  ctx : SystemContext,
+) -> Bool {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let commands = CommandBuffer::new_for_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let mut ok = true
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    if !command_buffers[i].apply() {
+      ok = false
+    }
+    world.exit_system_access(system_access)
+  }
+  ok
+}
+
+///|
 /// Runs one system batch and returns command-buffer apply diagnostics.
 fn run_system_batch_report(
   batch : SystemBatch,
@@ -254,6 +297,51 @@ fn run_system_batch_report(
     world.exit_system_access(system_access)
   }
   system_run_batch_report(batch_index, system_reports)
+}
+
+///|
+/// Runs one system batch with tracked command apply and returns false on any failure.
+fn run_system_batch_tracked(
+  batch : SystemBatch,
+  world : World,
+  ctx : SystemContext,
+  history : WorldHistory,
+) -> Bool {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let commands = CommandBuffer::new_for_history_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+      history,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let mut ok = true
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    if !command_buffers[i].apply_tracked(history) {
+      ok = false
+    }
+    world.exit_system_access(system_access)
+  }
+  ok
 }
 
 ///|
@@ -518,9 +606,7 @@ pub fn SystemRunner::run_phase(
   ctx : SystemContext,
   phase : PhaseKey,
 ) -> Bool {
-  self.run_phase_report_with_operation(
-    world, ctx, phase, "SystemRunner::run_phase",
-  ).ok
+  self.run_phase_with_operation(world, ctx, phase, "SystemRunner::run_phase")
 }
 
 ///|
@@ -534,6 +620,28 @@ pub fn SystemRunner::run_phase_report(
   self.run_phase_report_with_operation(
     world, ctx, phase, "SystemRunner::run_phase_report",
   )
+}
+
+///|
+/// Runs one phase with a caller-specific raw-mutation guard operation label.
+fn SystemRunner::run_phase_with_operation(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  operation : String,
+) -> Bool {
+  world.assert_not_history_raw_mutation(operation)
+  world.lock_component_registration()
+  let batches = self.phase_batches(phase)
+  let mut ok = true
+  for i = 0; i < batches.length(); i = i + 1 {
+    if !run_system_batch(batches[i], world, ctx) {
+      ok = false
+    }
+  }
+  world.unlock_component_registration()
+  ok
 }
 
 ///|
@@ -554,6 +662,27 @@ fn SystemRunner::run_phase_report_with_operation(
   }
   world.unlock_component_registration()
   system_run_report(phase, batch_reports)
+}
+
+///|
+/// Runs systems in one phase with tracked command buffers and no report allocation.
+fn SystemRunner::run_phase_tracked(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  history : WorldHistory,
+) -> Bool {
+  world.lock_component_registration()
+  let batches = self.phase_batches(phase)
+  let mut ok = true
+  for i = 0; i < batches.length(); i = i + 1 {
+    if !run_system_batch_tracked(batches[i], world, ctx, history) {
+      ok = false
+    }
+  }
+  world.unlock_component_registration()
+  ok
 }
 
 ///|

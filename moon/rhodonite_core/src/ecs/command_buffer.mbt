@@ -300,6 +300,122 @@ pub fn CommandBuffer::set_camera_matrices(
 }
 
 ///|
+/// Applies one queued command directly to the world.
+fn CommandBuffer::apply_command(
+  self : CommandBuffer,
+  command : WorldCommand,
+) -> Bool {
+  match command {
+    CreateEntity(entity) => self.world.finalize_reserved_entity(entity)
+    DestroyEntity(entity) => self.world.destroy_entity(entity)
+    AddComponent(entity, component) =>
+      self.world.add_component(entity, component)
+    AddComponentBytes(entity, component, bytes) =>
+      self.world.add_component_bytes(entity, component, bytes)
+    SetComponentBytes(entity, component, bytes) =>
+      self.world.set_component_bytes(entity, component, bytes)
+    RemoveComponent(entity, component) =>
+      self.world.remove_component(entity, component)
+    SetGlobalTransform(entity, matrix) =>
+      self.world.set_global_transform(entity, matrix)
+    SetGlobalTransformFormat(entity, format) =>
+      self.world.set_global_transform_format(entity, format)
+    SetCameraMatrices(
+      entity,
+      view,
+      proj,
+      near,
+      far,
+      aspect,
+      projection_kind,
+      flags
+    ) =>
+      self.world.set_camera_matrices(
+        entity, view, proj, near, far, aspect, projection_kind, flags,
+      )
+  }
+}
+
+///|
+/// Applies one queued command through tracked WorldHistory APIs.
+fn CommandBuffer::apply_tracked_command(
+  self : CommandBuffer,
+  history : WorldHistory,
+  command : WorldCommand,
+) -> Bool {
+  match command {
+    CreateEntity(entity) => history.finalize_reserved_entity(self.world, entity)
+    DestroyEntity(entity) => history.destroy_entity(self.world, entity)
+    AddComponent(entity, component) =>
+      history.add_component(self.world, entity, component)
+    AddComponentBytes(entity, component, bytes) =>
+      history.add_component_bytes(self.world, entity, component, bytes)
+    SetComponentBytes(entity, component, bytes) =>
+      history.set_component_bytes(self.world, entity, component, bytes)
+    RemoveComponent(entity, component) =>
+      history.remove_component(self.world, entity, component)
+    SetGlobalTransform(entity, matrix) =>
+      history.set_global_transform(self.world, entity, matrix)
+    SetGlobalTransformFormat(entity, format) =>
+      history.set_global_transform_format(self.world, entity, format)
+    SetCameraMatrices(
+      entity,
+      view,
+      proj,
+      near,
+      far,
+      aspect,
+      projection_kind,
+      flags
+    ) =>
+      history.set_camera_matrices(
+        self.world,
+        entity,
+        view,
+        proj,
+        near,
+        far,
+        aspect,
+        projection_kind,
+        flags,
+      )
+  }
+}
+
+///|
+/// Applies commands in insertion order and returns false if any command fails.
+fn CommandBuffer::apply(self : CommandBuffer) -> Bool {
+  let mut ok = true
+  for i = 0; i < self.commands.length(); i = i + 1 {
+    if !self.apply_command(self.commands[i]) {
+      ok = false
+    }
+  }
+  while self.commands.length() > 0 {
+    let _ = self.commands.pop()
+  }
+  ok
+}
+
+///|
+/// Applies commands through WorldHistory tracked APIs and returns false on any failure.
+fn CommandBuffer::apply_tracked(
+  self : CommandBuffer,
+  history : WorldHistory,
+) -> Bool {
+  let mut ok = true
+  for i = 0; i < self.commands.length(); i = i + 1 {
+    if !self.apply_tracked_command(history, self.commands[i]) {
+      ok = false
+    }
+  }
+  while self.commands.length() > 0 {
+    let _ = self.commands.pop()
+  }
+  ok
+}
+
+///|
 /// Applies commands in insertion order and returns a report for one system buffer.
 fn CommandBuffer::apply_report(
   self : CommandBuffer,
@@ -311,35 +427,7 @@ fn CommandBuffer::apply_report(
   let failures : Array[CommandBufferCommandFailure] = []
   for i = 0; i < self.commands.length(); i = i + 1 {
     let command = self.commands[i]
-    let command_ok = match command {
-      CreateEntity(entity) => self.world.finalize_reserved_entity(entity)
-      DestroyEntity(entity) => self.world.destroy_entity(entity)
-      AddComponent(entity, component) =>
-        self.world.add_component(entity, component)
-      AddComponentBytes(entity, component, bytes) =>
-        self.world.add_component_bytes(entity, component, bytes)
-      SetComponentBytes(entity, component, bytes) =>
-        self.world.set_component_bytes(entity, component, bytes)
-      RemoveComponent(entity, component) =>
-        self.world.remove_component(entity, component)
-      SetGlobalTransform(entity, matrix) =>
-        self.world.set_global_transform(entity, matrix)
-      SetGlobalTransformFormat(entity, format) =>
-        self.world.set_global_transform_format(entity, format)
-      SetCameraMatrices(
-        entity,
-        view,
-        proj,
-        near,
-        far,
-        aspect,
-        projection_kind,
-        flags
-      ) =>
-        self.world.set_camera_matrices(
-          entity, view, proj, near, far, aspect, projection_kind, flags,
-        )
-    }
+    let command_ok = self.apply_command(command)
     if command_ok {
       applied_command_count = applied_command_count + 1
     } else {
@@ -373,44 +461,7 @@ fn CommandBuffer::apply_tracked_report(
   let failures : Array[CommandBufferCommandFailure] = []
   for i = 0; i < self.commands.length(); i = i + 1 {
     let command = self.commands[i]
-    let command_ok = match command {
-      CreateEntity(entity) =>
-        history.finalize_reserved_entity(self.world, entity)
-      DestroyEntity(entity) => history.destroy_entity(self.world, entity)
-      AddComponent(entity, component) =>
-        history.add_component(self.world, entity, component)
-      AddComponentBytes(entity, component, bytes) =>
-        history.add_component_bytes(self.world, entity, component, bytes)
-      SetComponentBytes(entity, component, bytes) =>
-        history.set_component_bytes(self.world, entity, component, bytes)
-      RemoveComponent(entity, component) =>
-        history.remove_component(self.world, entity, component)
-      SetGlobalTransform(entity, matrix) =>
-        history.set_global_transform(self.world, entity, matrix)
-      SetGlobalTransformFormat(entity, format) =>
-        history.set_global_transform_format(self.world, entity, format)
-      SetCameraMatrices(
-        entity,
-        view,
-        proj,
-        near,
-        far,
-        aspect,
-        projection_kind,
-        flags
-      ) =>
-        history.set_camera_matrices(
-          self.world,
-          entity,
-          view,
-          proj,
-          near,
-          far,
-          aspect,
-          projection_kind,
-          flags,
-        )
-    }
+    let command_ok = self.apply_tracked_command(history, command)
     if command_ok {
       applied_command_count = applied_command_count + 1
     } else {
