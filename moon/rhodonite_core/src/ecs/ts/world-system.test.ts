@@ -129,6 +129,24 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(batches[1].systems()[0].structuralWrite()).toBe(true);
 	});
 
+	it("refreshes cached TS phase plans after adding systems", () => {
+		const phase = PhaseKey.new("ts/plan-cache");
+		const runner = SystemRunner.new();
+		runner.addSystem(System.new("first", phase, [], [], () => {}));
+
+		const before = runner.planPhase(phase);
+		expect(before.systemCount()).toBe(1);
+		expect(before.batches()[0].systems()[0].name()).toBe("first");
+
+		runner.addSystem(System.new("second", phase, [], [], () => {}));
+		const after = runner.planPhase(phase);
+		expect(after.systemCount()).toBe(2);
+		expect(after.batches()[0].systems().map((system) => system.name())).toEqual([
+			"first",
+			"second",
+		]);
+	});
+
 
 	it("exposes structural TS systems and tracked system phases", () => {
 		const world = World.new();

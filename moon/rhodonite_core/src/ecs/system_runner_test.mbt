@@ -375,6 +375,55 @@ test "SystemRunner::plan_phase returns empty and snapshot plans" {
 }
 
 ///|
+test "SystemRunner::plan_phase cache invalidates when systems are added" {
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("first", update_phase(), [], [], (_w, _c, _b) => ()),
+  )
+  let before = runner.plan_phase(update_phase())
+  assert_eq(before.system_count, 1)
+  assert_eq(before.batches.length(), 1)
+  assert_eq(before.batches[0].systems[0].name, "first")
+  runner.add_system(
+    System::new("second", update_phase(), [], [], (_w, _c, _b) => ()),
+  )
+  let after = runner.plan_phase(update_phase())
+  assert_eq(after.system_count, 2)
+  assert_eq(after.batches.length(), 1)
+  assert_eq(after.batches[0].systems.length(), 2)
+  assert_eq(after.batches[0].systems[1].name, "second")
+}
+
+///|
+test "SystemRunner phase batch cache stays isolated by phase and run path" {
+  let world = World::new()
+  let phase_a = PhaseKey::new("cache-phase-a")
+  let phase_b = PhaseKey::new("cache-phase-b")
+  let runner = SystemRunner::new()
+  let mut ran_a = 0
+  let mut ran_b = 0
+  runner.add_system(
+    System::new("phase-a", phase_a, [], [], (_w, _c, _b) => ran_a = ran_a + 1),
+  )
+  runner.add_system(
+    System::new("phase-b", phase_b, [], [], (_w, _c, _b) => ran_b = ran_b + 1),
+  )
+  let plan_a = runner.plan_phase(phase_a)
+  let plan_b = runner.plan_phase(phase_b)
+  assert_eq(plan_a.system_count, 1)
+  assert_eq(plan_a.batches[0].systems[0].name, "phase-a")
+  assert_eq(plan_b.system_count, 1)
+  assert_eq(plan_b.batches[0].systems[0].name, "phase-b")
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase_a),
+  )
+  assert_eq(ran_a, 1)
+  assert_eq(ran_b, 0)
+  let fresh_b = runner.plan_phase(phase_b)
+  assert_eq(fresh_b.batches[0].systems[0].name, "phase-b")
+}
+
+///|
 test "System writes declaration also permits reads during system runner execution" {
   let world = World::new()
   let qa = world.register_cpu_component("SystemWriteCanReadA", 4)

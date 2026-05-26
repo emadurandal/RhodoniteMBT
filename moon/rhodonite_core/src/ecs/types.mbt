@@ -357,6 +357,14 @@ priv struct SystemBatch {
 }
 
 ///|
+/// Cached private execution batches for one `SystemRunner` phase and generation.
+priv struct SystemPhaseBatchCache {
+  phase : PhaseKey
+  generation : Int
+  batches : Array[SystemBatch]
+}
+
+///|
 /// Read-only snapshot of one system in a planned phase batch.
 pub(all) struct SystemPlanSystem {
   runner_index : Int
@@ -387,6 +395,8 @@ pub(all) struct SystemPhasePlan {
 /// Phase-filtered ECS system runner. `World` stays focused on ECS storage and mutation.
 pub struct SystemRunner {
   priv systems : Array[System]
+  priv mut plan_generation : Int
+  priv mut phase_batch_cache : Array[SystemPhaseBatchCache]
 }
 
 ///|

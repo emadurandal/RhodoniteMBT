@@ -45,6 +45,7 @@
             <li>Entity/archetype structural mutation requires <code>structural_write</code>.</li>
             <li><code>CommandBuffer</code> validates component writes and structural writes at queue time.</li>
             <li>Component registration is locked while the system runner is executing.</li>
+            <li><code>SystemRunner</code> caches phase batches internally and invalidates them when systems are added; public plan results remain snapshots.</li>
           </ul>
 
           <h2>Builtin Packed Blobs</h2>
