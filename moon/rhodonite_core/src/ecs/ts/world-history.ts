@@ -756,7 +756,11 @@ export class WorldHistory {
 		}
 		try {
 			if (callback()) {
-				return this.commitTransaction();
+				if (this.commitTransaction()) {
+					return true;
+				}
+				this.cancelTransaction();
+				return false;
 			}
 			this.cancelTransactionReverting(world);
 			return false;

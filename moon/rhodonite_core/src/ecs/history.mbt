@@ -3564,7 +3564,14 @@ fn WorldHistory::finish_transaction_body(
 ) -> Bool {
   let ok = body()
   if ok {
-    self.commit_transaction()
+    if self.commit_transaction() {
+      true
+    } else {
+      let diagnostic = self.last_diagnostic()
+      ignore(self.cancel_transaction())
+      self.set_diagnostic(diagnostic)
+      false
+    }
   } else {
     ignore(self.cancel_transaction_reverting(world))
     false

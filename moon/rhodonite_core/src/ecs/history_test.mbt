@@ -810,6 +810,49 @@ test "WorldHistory callback-scoped transaction commits and reverts" {
     cancel_world.component_bytes(cancel_entity, cancel_component) ==
     Some(bytes4(1, 0, 0, 0)),
   )
+
+  let failed_commit_world = World::new()
+  let failed_commit_history = WorldHistory::new()
+  let failed_commit_component = failed_commit_world.register_cpu_component(
+    "HistoryScopedCommitFail", 4,
+  )
+  let failed_commit_entity = failed_commit_world.create_entity()
+  assert_true(
+    failed_commit_world.add_component_bytes(
+      failed_commit_entity,
+      failed_commit_component,
+      bytes4(1, 0, 0, 0),
+    ),
+  )
+  assert_true(
+    !failed_commit_history.with_transaction(
+      failed_commit_world,
+      "Scoped Commit Fail",
+      () => {
+        ignore(
+          failed_commit_history.set_component_bytes(
+            failed_commit_world,
+            failed_commit_entity,
+            failed_commit_component,
+            bytes4(2, 0, 0, 0),
+          ),
+        )
+        failed_commit_history.set_max_undo_records(0)
+        true
+      },
+    ),
+  )
+  assert_eq(failed_commit_history.last_diagnostic(), "recording_disabled")
+  assert_eq(failed_commit_history.undo_len(), 0)
+  assert_true(
+    failed_commit_world.component_bytes(
+      failed_commit_entity, failed_commit_component,
+    ) ==
+    Some(bytes4(2, 0, 0, 0)),
+  )
+  failed_commit_history.set_max_undo_records(1)
+  assert_true(failed_commit_history.begin_transaction("after cleanup"))
+  assert_true(failed_commit_history.cancel_transaction())
 }
 
 ///|

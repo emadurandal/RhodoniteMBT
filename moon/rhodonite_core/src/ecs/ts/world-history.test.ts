@@ -1158,6 +1158,29 @@ describe("ECS TypeScript wrapper: history", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(
 			new Uint8Array([1, 0, 0, 0]),
 		);
+
+		const failedCommitHistory = WorldHistory.new();
+		expect(
+			failedCommitHistory.withTransaction(world, "scoped commit fail", () => {
+				expect(
+					failedCommitHistory.setComponentBytes(
+						world,
+						entity,
+						cpu,
+						new Uint8Array([5, 0, 0, 0]),
+					),
+				).toBe(true);
+				failedCommitHistory.setMaxUndoRecords(0);
+				return true;
+			}),
+		).toBe(false);
+		expect(failedCommitHistory.undoLen()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([5, 0, 0, 0]),
+		);
+		failedCommitHistory.setMaxUndoRecords(1);
+		expect(failedCommitHistory.beginTransaction("after cleanup")).toBe(true);
+		expect(failedCommitHistory.cancelTransaction()).toBe(true);
 	});
 
 
