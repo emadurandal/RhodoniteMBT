@@ -1091,12 +1091,23 @@ fn run_camera_control_tracked_transaction(
   label : String,
   body : () -> Bool,
 ) -> Bool {
-  if history.with_transaction(world, label, body) {
-    return true
-  }
-  match history.last_diagnostic() {
-    "transaction_open" | "recording_disabled" => body()
-    _ => false
+  if !history.begin_transaction(label) {
+    match history.last_diagnostic() {
+      "transaction_open" | "recording_disabled" => body()
+      _ => false
+    }
+  } else {
+    if !body() {
+      ignore(history.cancel_transaction_reverting(world))
+      return false
+    }
+    if history.commit_transaction() {
+      true
+    } else {
+      let diagnostic = history.last_diagnostic()
+      ignore(history.cancel_transaction())
+      diagnostic == "recording_disabled"
+    }
   }
 }
 

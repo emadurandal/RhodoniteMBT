@@ -57,7 +57,7 @@
               <tr><td><code>spawn_batch</code></td><td>spawn された entity と初期化済み component row が batch として Undo / Redo されます。</td></tr>
               <tr><td><code>set_transform_trs</code>、<code>set_child_of</code></td><td>authoring transform と parent relationship row が復元されます。</td></tr>
               <tr><td><code>set_global_transform</code>、<code>set_global_transform_format</code>、<code>set_camera_matrices</code></td><td>blob-backed builtin の presence と logical row payload は専用 helper 経由で復元されます。</td></tr>
-              <tr><td>Tracked camera-control helper</td><td>orbit setup、lens、controller、home、transform sync、blob sync helper は editor step を undoable record にまとめます。単独の setup/sync helper は callback-scoped transaction を使い、既存の gesture transaction が開いている場合はそこへ合流します。</td></tr>
+              <tr><td>Tracked camera-control helper</td><td>orbit setup、lens、controller、home、transform sync、blob sync helper は editor step を undoable record にまとめます。単独の setup/sync helper は helper-owned transaction を開き、既存の gesture transaction が開いている場合はそこへ合流します。</td></tr>
             </tbody>
           </table>
 

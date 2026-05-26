@@ -1034,14 +1034,28 @@ function runTrackedCameraControlTransaction(
 	label: string,
 	callback: () => boolean,
 ): boolean {
-	if (history.withTransaction(world, label, callback)) {
-		return true;
+	if (!history.beginTransaction(label)) {
+		const diagnostic = history.lastDiagnostic();
+		if (diagnostic === "transaction_open" || diagnostic === "recording_disabled") {
+			return callback();
+		}
+		return false;
 	}
-	const diagnostic = history.lastDiagnostic();
-	if (diagnostic === "transaction_open" || diagnostic === "recording_disabled") {
-		return callback();
+	try {
+		if (!callback()) {
+			history.cancelTransactionReverting(world);
+			return false;
+		}
+		if (history.commitTransaction()) {
+			return true;
+		}
+		const diagnostic = history.lastDiagnostic();
+		history.cancelTransaction();
+		return diagnostic === "recording_disabled";
+	} catch (error) {
+		history.cancelTransactionReverting(world);
+		throw error;
 	}
-	return false;
 }
 
 function canSetupOrbitOrthographicCameraTracked(
