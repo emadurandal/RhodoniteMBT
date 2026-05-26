@@ -93,10 +93,11 @@ try {
 	const userDataDir = await fs.mkdtemp(
 		path.join(os.tmpdir(), "rhodonite-browser-interaction-"),
 	);
+	let browserStdout = "";
+	let browserStderr = "";
 	const browserArgs = [
-		"--enable-unsafe-webgpu",
-		"--ignore-gpu-blocklist",
-		"--disable-gpu-sandbox",
+		"--disable-dev-shm-usage",
+		"--no-sandbox",
 		"--disable-background-networking",
 		"--disable-component-update",
 		"--disable-sync",
@@ -114,36 +115,43 @@ try {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {
+		browserStdout = appendOutputTail(browserStdout, data);
 		if (verbose) {
 			process.stdout.write(data);
 		}
 	});
 	browserProcess.stderr.on("data", (data) => {
+		browserStderr = appendOutputTail(browserStderr, data);
 		if (verbose) {
 			process.stderr.write(data);
 		}
 	});
 	browserProcess.on("error", rejectResult);
+	browserProcess.on("exit", (code, signal) => {
+		rejectResult(
+			new Error(
+				`browser exited before reporting results (code=${code ?? "null"} signal=${signal ?? "null"})` +
+					formatBrowserDiagnostics(browserStdout, browserStderr),
+			),
+		);
+	});
 
 	const result = await withTimeout(
 		resultPromise,
 		45000,
 		"browser interaction regression timed out",
 	).catch((error) => {
-		if (error instanceof Error && error.message.includes("timed out")) {
-			return {
-				ok: false,
-				skipped: false,
-				results: [],
-				failures: [
-					{
-						name: "browser interaction regression",
-						message: error.message,
-					},
-				],
-			};
-		}
-		throw error;
+		return {
+			ok: false,
+			skipped: false,
+			results: [],
+			failures: [
+				{
+					name: "browser interaction regression",
+					message: formatBrowserFailure(error, browserStdout, browserStderr),
+				},
+			],
+		};
 	});
 	if (result.skipped) {
 		console.log(`interaction_regression(browser): SKIP ${result.reason}`);
@@ -175,8 +183,7 @@ try {
 
 async function assertDistExists() {
 	try {
-		await fs.access(path.join(distDir, "samples/html/ts-ecs-scene-graph.html"));
-		await fs.access(path.join(distDir, "samples/html/ts-ecs-scene-graph-undo-redo.html"));
+		await fs.access(path.join(distDir, "samples/html/ts-undo-redo-interaction.html"));
 	} catch {
 		throw new Error("dist samples are missing; run pnpm run build before interaction regression");
 	}
@@ -193,7 +200,7 @@ function createDistServer(resultEndpoint) {
 			}
 			let pathname = decodeURIComponent(requestUrl.pathname);
 			if (pathname === "/") {
-				pathname = "/samples/html/ts-ecs-scene-graph-undo-redo.html";
+				pathname = "/samples/html/ts-undo-redo-interaction.html";
 			}
 			const filePath = path.normalize(path.join(distDir, pathname));
 			if (!filePath.startsWith(distDir + path.sep)) {
@@ -246,25 +253,10 @@ function createHarnessHtml(resultEndpoint) {
 
       async function main() {
         await postStatus("loaded");
-        if (!navigator.gpu) {
-          await postResult({
-            ok: true,
-            skipped: true,
-            reason: "Browser WebGPU is unavailable",
-            results: [],
-            failures: [],
-          });
-          return;
-        }
-        await runTest("normal page has no undo redo controls", async () => {
-          const page = await loadPage("/samples/html/ts-ecs-scene-graph.html");
-          await delay(500);
-          assert(!page.doc.querySelector(".sample-controls"), "normal page unexpectedly created undo/redo controls");
-          page.destroy();
-        });
-        await runTest("undo redo production page shows controls", async () => {
+        await runTest("undo redo interaction page shows controls", async () => {
           const page = await loadUndoRedoPage();
           assertStatus(page, "undo=0 redo=0");
+          assertValue(page, "value=0");
           page.destroy();
         });
         for (const key of ["m", " ", "Enter"]) {
@@ -272,6 +264,7 @@ function createHarnessHtml(resultEndpoint) {
             const page = await loadUndoRedoPage();
             dispatchKey(page, { key });
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat move shortcut " + labelForKey(key) + " is ignored", async () => {
@@ -279,9 +272,24 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, { key, repeat: true });
             await delay(150);
             assertStatus(page, "undo=0 redo=0");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
+        await runTest("move after undo resumes from restored value", async () => {
+          const page = await loadUndoRedoPage();
+          dispatchKey(page, { key: "m" });
+          await waitForValue(page, "value=1");
+          dispatchKey(page, { key: "m" });
+          await waitForValue(page, "value=2");
+          dispatchKey(page, { key: "z", ctrlKey: true });
+          await waitForStatus(page, "undo=1 redo=1");
+          await waitForValue(page, "value=1");
+          dispatchKey(page, { key: "m" });
+          await waitForStatus(page, "undo=2 redo=0");
+          await waitForValue(page, "value=2");
+          page.destroy();
+        });
         for (const command of ["ctrl", "meta"]) {
           await runTest(command + "+z undoes", async () => {
             const page = await loadUndoRedoPage();
@@ -289,6 +297,7 @@ function createHarnessHtml(resultEndpoint) {
             await waitForStatus(page, "undo=1 redo=0");
             dispatchKey(page, commandEvent(command, { key: "z" }));
             await waitForStatus(page, "undo=0 redo=1");
+            await waitForValue(page, "value=0");
             page.destroy();
           });
           await runTest(command + "+shift+z redoes", async () => {
@@ -296,6 +305,7 @@ function createHarnessHtml(resultEndpoint) {
             await createRedoState(page);
             dispatchKey(page, commandEvent(command, { key: "z", shiftKey: true }));
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest(command + "+y redoes", async () => {
@@ -303,6 +313,7 @@ function createHarnessHtml(resultEndpoint) {
             await createRedoState(page);
             dispatchKey(page, commandEvent(command, { key: "y" }));
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat " + command + "+z is ignored", async () => {
@@ -312,6 +323,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "z", repeat: true }));
             await delay(150);
             assertStatus(page, "undo=1 redo=0");
+            assertValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat " + command + "+y is ignored", async () => {
@@ -320,6 +332,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "y", repeat: true }));
             await delay(150);
             assertStatus(page, "undo=0 redo=1");
+            assertValue(page, "value=0");
             page.destroy();
           });
           await runTest("repeat " + command + "+shift+z is ignored", async () => {
@@ -328,6 +341,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "z", shiftKey: true, repeat: true }));
             await delay(150);
             assertStatus(page, "undo=0 redo=1");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
@@ -337,6 +351,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, { key });
             await delay(150);
             assertStatus(page, "undo=0 redo=0");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
@@ -359,7 +374,7 @@ function createHarnessHtml(resultEndpoint) {
       }
 
       async function loadUndoRedoPage() {
-        const page = await loadPage("/samples/html/ts-ecs-scene-graph-undo-redo.html");
+        const page = await loadPage("/samples/html/ts-undo-redo-interaction.html");
         await waitFor(() => page.doc.querySelector(".sample-status"), 10000, "undo/redo controls did not appear");
         return page;
       }
@@ -385,8 +400,10 @@ function createHarnessHtml(resultEndpoint) {
       async function createRedoState(page) {
         dispatchKey(page, { key: "m" });
         await waitForStatus(page, "undo=1 redo=0");
+        await waitForValue(page, "value=1");
         dispatchKey(page, { key: "z", ctrlKey: true });
         await waitForStatus(page, "undo=0 redo=1");
+        await waitForValue(page, "value=0");
       }
 
       function dispatchKey(page, options) {
@@ -414,12 +431,24 @@ function createHarnessHtml(resultEndpoint) {
         await waitFor(() => statusText(page) === expected, 2000, "expected status " + expected + ", got " + statusText(page));
       }
 
+      async function waitForValue(page, expected) {
+        await waitFor(() => valueText(page) === expected, 2000, "expected value " + expected + ", got " + valueText(page));
+      }
+
       function assertStatus(page, expected) {
         assert(statusText(page) === expected, "expected status " + expected + ", got " + statusText(page));
       }
 
+      function assertValue(page, expected) {
+        assert(valueText(page) === expected, "expected value " + expected + ", got " + valueText(page));
+      }
+
       function statusText(page) {
         return page.doc.querySelector(".sample-status")?.textContent?.trim() ?? "";
+      }
+
+      function valueText(page) {
+        return page.doc.querySelector(".sample-value")?.textContent?.trim() ?? "";
       }
 
       function labelForKey(key) {
@@ -536,6 +565,30 @@ function withTimeout(promise, ms, message) {
 		timer = setTimeout(() => reject(new Error(message)), ms);
 	});
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function appendOutputTail(existing, data) {
+	const next = existing + data.toString();
+	return next.length > 8000 ? next.slice(next.length - 8000) : next;
+}
+
+function formatBrowserDiagnostics(stdout, stderr) {
+	const parts = [];
+	if (stderr.trim()) {
+		parts.push(`browser stderr:\n${stderr.trim()}`);
+	}
+	if (stdout.trim()) {
+		parts.push(`browser stdout:\n${stdout.trim()}`);
+	}
+	return parts.length === 0 ? "" : `\n${parts.join("\n")}`;
+}
+
+function formatBrowserFailure(error, stdout, stderr) {
+	const message = error instanceof Error ? error.message : String(error);
+	if (message.includes("browser stderr:") || message.includes("browser stdout:")) {
+		return message;
+	}
+	return message + formatBrowserDiagnostics(stdout, stderr);
 }
 
 function listen(server) {

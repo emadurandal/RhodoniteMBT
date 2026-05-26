@@ -6,11 +6,14 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install MoonBit
         run: |
@@ -29,3 +32,52 @@ jobs:
       - name: Check workspace (all targets)
         working-directory: ${{ github.workspace }}
         run: moon check --target all
+
+  browser-interaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: MoonBit version
+        run: moon version --all
+
+      - name: Moon update (registry index & deps)
+        working-directory: ${{ github.workspace }}
+        run: moon update
+
+      - name: Setup Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
+        with:
+          install-dependencies: true
+
+      - name: Chrome version
+        run: '"${{ steps.setup-chrome.outputs.chrome-path }}" --version'
+
+      - name: Core TypeScript tests
+        working-directory: ${{ github.workspace }}
+        run: pnpm run test:core:js
+
+      - name: Browser interaction regression
+        working-directory: ${{ github.workspace }}
+        env:
+          RHODONITE_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+          RHODONITE_BROWSER_INTERACTION_VERBOSE: "1"
+        run: pnpm run test:examples:interaction:browser

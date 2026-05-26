@@ -95,11 +95,14 @@ The TypeScript Undo/Redo variant also exposes buttons and common editor
 shortcuts: `Ctrl/Cmd+Z` for undo and `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` for
 redo.
 
-The production browser interaction wiring can be checked with:
+The production browser interaction wiring can be checked without WebGPU or
+golden image readback with:
 
 ```bash
 pnpm run test:examples:interaction:browser
 ```
+
+GitHub Actions runs this WebGPU-independent interaction regression as a PR gate.
 
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
 variants. The mass-cubes demos use the same packed transform ref path as the
