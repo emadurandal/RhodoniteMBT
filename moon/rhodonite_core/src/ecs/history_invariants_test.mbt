@@ -105,6 +105,52 @@ fn history_invariant_assert_camera_row(
 }
 
 ///|
+/// Builds the standard orbit orthographic camera descriptor used by invariant tests.
+fn history_invariant_orbit_desc() -> OrbitOrthographicCameraDesc {
+  OrbitOrthographicCameraDesc::new_yz_pitched(
+    0.38,
+    (2.0 : Float),
+    (5.6 : Float),
+    (0.1 : Float),
+    (50.0 : Float),
+    (1.0 : Float),
+    (3.8 : Float),
+  )
+}
+
+///|
+/// Asserts all camera-control setup components are present.
+fn history_invariant_assert_camera_setup_present(
+  world : World,
+  camera : EntityId,
+) -> Unit {
+  if !world.has_component(camera, world.transform_component()) ||
+    !world.has_component(camera, world.global_transform_component()) ||
+    !world.has_component(camera, world.orbit_camera_controller_component()) ||
+    !world.has_component(camera, world.camera_home_transform_component()) ||
+    !world.has_component(camera, world.camera_lens_component()) ||
+    !world.has_component(camera, world.camera_component()) {
+    abort("expected camera-control setup components")
+  }
+}
+
+///|
+/// Asserts all camera-control setup components are absent.
+fn history_invariant_assert_camera_setup_absent(
+  world : World,
+  camera : EntityId,
+) -> Unit {
+  if world.has_component(camera, world.transform_component()) ||
+    world.has_component(camera, world.global_transform_component()) ||
+    world.has_component(camera, world.orbit_camera_controller_component()) ||
+    world.has_component(camera, world.camera_home_transform_component()) ||
+    world.has_component(camera, world.camera_lens_component()) ||
+    world.has_component(camera, world.camera_component()) {
+    abort("expected camera-control setup component absence")
+  }
+}
+
+///|
 test "WorldHistory compound transaction preserves round-trip invariants" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -380,6 +426,234 @@ test "WorldHistory entity ids and blob rows survive create destroy round trips" 
     Some(bytes) => assert_eq(bytes.length(), @comp.camera_gpu_byte_stride())
     None => abort("expected restored Camera blob row")
   }
+}
+
+///|
+test "WorldHistory tracked query transaction preserves round-trip invariants" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryInvariantQueryCpu", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(
+    world.add_component_bytes(e0, cpu, history_invariant_bytes4(1, 0, 0, 0)),
+  )
+  assert_true(
+    world.add_component_bytes(e1, cpu, history_invariant_bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    world.add_component_bytes(e2, cpu, history_invariant_bytes4(3, 0, 0, 0)),
+  )
+  assert_true(history.begin_transaction("History Invariant Query Writes"))
+  Query::new([cpu]).for_each(world, row => {
+    if !row.write_tracked(history, cpu, bytes => bytes[0] = (4 : Byte)) {
+      abort("expected tracked query row write")
+    }
+  })
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    if !arch.write_column_tracked(history, cpu, col => col[0] = (5 : Byte)) {
+      abort("expected tracked column write")
+    }
+    if !arch.write_column_rows_tracked(history, cpu, [1, 2], (row, bytes) => {
+        bytes[0] = (row + 5).to_byte()
+      }) {
+      abort("expected tracked sparse row column write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_component_bytes(
+    world,
+    e0,
+    cpu,
+    history_invariant_bytes4(5, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e1,
+    cpu,
+    history_invariant_bytes4(6, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e2,
+    cpu,
+    history_invariant_bytes4(7, 0, 0, 0),
+  )
+  assert_true(history.undo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  history_invariant_assert_component_bytes(
+    world,
+    e0,
+    cpu,
+    history_invariant_bytes4(1, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e1,
+    cpu,
+    history_invariant_bytes4(2, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e2,
+    cpu,
+    history_invariant_bytes4(3, 0, 0, 0),
+  )
+  assert_true(history.redo(world))
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_component_bytes(
+    world,
+    e0,
+    cpu,
+    history_invariant_bytes4(5, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e1,
+    cpu,
+    history_invariant_bytes4(6, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e2,
+    cpu,
+    history_invariant_bytes4(7, 0, 0, 0),
+  )
+}
+
+///|
+test "WorldHistory bulk validation failures preserve world and stacks" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryInvariantBulkFailureCpu", 4)
+  let marker = world.register_cpu_component(
+    "HistoryInvariantBulkFailureMarker", 4,
+  )
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let missing = world.create_entity()
+  assert_true(
+    world.add_component_bytes(e0, cpu, history_invariant_bytes4(1, 0, 0, 0)),
+  )
+  assert_true(
+    world.add_component_bytes(e1, cpu, history_invariant_bytes4(2, 0, 0, 0)),
+  )
+  assert_true(
+    !history.set_component_bytes_many(world, cpu, [e0, e0], [
+      history_invariant_bytes4(3, 0, 0, 0),
+      history_invariant_bytes4(4, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_component_bytes(
+    world,
+    e0,
+    cpu,
+    history_invariant_bytes4(1, 0, 0, 0),
+  )
+  history_invariant_assert_component_bytes(
+    world,
+    e1,
+    cpu,
+    history_invariant_bytes4(2, 0, 0, 0),
+  )
+  assert_true(
+    !history.add_component_bytes_many(world, marker, [missing, missing], [
+      history_invariant_bytes4(5, 0, 0, 0),
+      history_invariant_bytes4(6, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_component_absent(world, missing, marker)
+  assert_true(
+    !history.set_component_bytes_many(world, cpu, [e0, missing], [
+      history_invariant_bytes4(7, 0, 0, 0),
+      history_invariant_bytes4(8, 0, 0, 0),
+    ]),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_component_bytes(
+    world,
+    e0,
+    cpu,
+    history_invariant_bytes4(1, 0, 0, 0),
+  )
+  history_invariant_assert_component_absent(world, missing, cpu)
+}
+
+///|
+test "WorldHistory tracked orbit camera setup preserves round-trip invariants" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(
+    setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      history_invariant_orbit_desc(),
+    ),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_camera_setup_present(world, camera)
+  history_invariant_assert_camera_row(
+    world,
+    camera,
+    (0.1 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(history.undo(world))
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 1)
+  history_invariant_assert_camera_setup_absent(world, camera)
+  assert_true(history.redo(world))
+  assert_eq(history.undo_len(), 1)
+  assert_eq(history.redo_len(), 0)
+  history_invariant_assert_camera_setup_present(world, camera)
+  history_invariant_assert_camera_row(
+    world,
+    camera,
+    (0.1 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+}
+
+///|
+test "WorldHistory failed tracked orbit camera setup preserves world and stacks" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  let orbit = world.orbit_camera_controller_component()
+  assert_true(add_orbit_camera_controller(world, camera, orbit, 0.0, 0.0))
+  assert_true(
+    !setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      history_invariant_orbit_desc(),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_eq(history.redo_len(), 0)
+  assert_true(world.has_component(camera, orbit))
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(!world.has_component(camera, world.global_transform_component()))
+  assert_true(
+    !world.has_component(camera, world.camera_home_transform_component()),
+  )
+  assert_true(!world.has_component(camera, world.camera_lens_component()))
+  assert_true(!world.has_component(camera, world.camera_component()))
 }
 
 ///|
