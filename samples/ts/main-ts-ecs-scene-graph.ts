@@ -446,8 +446,8 @@ export async function renderTsEcsSceneGraphUndoRedoBrowserSnapshot(): Promise<Ui
 	}
 }
 
-function runUndoRedoDemoFromModuleUrl(): boolean {
-	return new URL(import.meta.url).searchParams.get("undoRedo") === "1";
+function runUndoRedoDemoFromDocument(): boolean {
+	return document.body.dataset.rhodoniteUndoRedo === "1";
 }
 
 runBrowserWebGpuCanvasDemo({
@@ -456,7 +456,7 @@ runBrowserWebGpuCanvasDemo({
 			new PlatformConfig(canvas),
 			PlatformApp.defaultEngine((engine) => {
 				const demo = createDemoStateForEngine(engine);
-				if (runUndoRedoDemoFromModuleUrl()) {
+				if (runUndoRedoDemoFromDocument()) {
 					registerUndoRedoEngineHandlers(engine, {
 						demo,
 						history: WorldHistory.new(),
