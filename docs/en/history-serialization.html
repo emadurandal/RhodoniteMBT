@@ -136,7 +136,7 @@
           </table>
 
           <h2>Maintenance</h2>
-          <p>When changing archive semantics, update the in-memory export/import tests, TypeScript JSON helper tests, v1 golden or invalid fixtures, and this document together. If a change intentionally breaks the JSON compatibility surface, bump <code>format_version</code> and keep readers rejecting unsupported versions explicitly.</p>
+          <p>When changing archive semantics, update the in-memory export/import tests, TypeScript JSON helper tests, v1 golden or invalid fixtures, fixture manifest audit, and this document together. Adding or removing a history fixture must update the manifest in <code>world-history-serialization.test.ts</code> so unclassified fixtures fail CI. If a change intentionally breaks the JSON compatibility surface, bump <code>format_version</code> and keep readers rejecting unsupported versions explicitly.</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>

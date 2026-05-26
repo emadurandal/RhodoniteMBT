@@ -136,7 +136,7 @@
           </table>
 
           <h2>Maintenance</h2>
-          <p>archive semantics を変更する場合は、in-memory export/import test、TypeScript JSON helper test、v1 golden または invalid fixture、この文書を同時に更新します。JSON compatibility surface を意図的に破る場合は <code>format_version</code> を上げ、reader が未対応 version を明示的に reject する状態を保ちます。</p>
+          <p>archive semantics を変更する場合は、in-memory export/import test、TypeScript JSON helper test、v1 golden または invalid fixture、fixture manifest audit、この文書を同時に更新します。history fixture を追加または削除する場合は <code>world-history-serialization.test.ts</code> の manifest も更新し、未分類 fixture が CI で失敗する状態を保ちます。JSON compatibility surface を意図的に破る場合は <code>format_version</code> を上げ、reader が未対応 version を明示的に reject する状態を保ちます。</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>
