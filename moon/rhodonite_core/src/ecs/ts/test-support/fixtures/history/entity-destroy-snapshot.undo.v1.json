@@ -1,0 +1,31 @@
+{
+  "format_version": 1,
+  "record_count": 1,
+  "records": [
+    {
+      "label": "destroy_entity",
+      "delta_count": 1,
+      "deltas": [
+        {
+          "kind": "entity_destroyed",
+          "entity": { "index": 0, "generation": 0 },
+          "component": null,
+          "before": null,
+          "after": null,
+          "components": [
+            {
+              "component": {
+                "local_component": { "index": 7 },
+                "key": "com.example.TsHistoryGoldenDestroyStable",
+                "builtin": false,
+                "schema_version": null,
+                "schema_hash": null
+              },
+              "bytes_base64": "BwAAAA=="
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

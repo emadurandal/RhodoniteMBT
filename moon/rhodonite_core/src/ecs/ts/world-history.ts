@@ -160,6 +160,7 @@ import { SpawnBatchRow } from "./world-primitives.ts";
 import type {
 	HistoryDeltaKind,
 	HistoryDeltaSummary,
+	HistoryDiagnosticReason,
 	HistoryExport,
 	HistoryExportComponentIdentity,
 	HistoryExportComponentSnapshot,
@@ -700,8 +701,8 @@ export class WorldHistory {
 		);
 	}
 
-	lastDiagnostic(): string {
-		return world_history_last_diagnostic(this.inner);
+	lastDiagnostic(): HistoryDiagnosticReason {
+		return world_history_last_diagnostic(this.inner) as HistoryDiagnosticReason;
 	}
 
 	undoLabel(): string | null {

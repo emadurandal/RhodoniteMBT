@@ -1,0 +1,31 @@
+{
+  "format_version": 1,
+  "record_count": 1,
+  "records": [
+    {
+      "label": "set_component_bytes",
+      "delta_count": 1,
+      "deltas": [
+        {
+          "kind": "component_changed",
+          "entity": { "index": 0, "generation": 0 },
+          "component": {
+            "local_component": { "index": 7 },
+            "builtin": false,
+            "schema_version": "1",
+            "schema_hash": "sha256:ts-history-golden-stable"
+          },
+          "before": {
+            "global_transform_format": null,
+            "bytes_base64": "AQAAAA=="
+          },
+          "after": {
+            "global_transform_format": null,
+            "bytes_base64": "AgAAAA=="
+          },
+          "components": []
+        }
+      ]
+    }
+  ]
+}

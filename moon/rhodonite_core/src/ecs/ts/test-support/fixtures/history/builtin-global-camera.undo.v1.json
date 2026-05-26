@@ -1,0 +1,52 @@
+{
+  "format_version": 1,
+  "record_count": 1,
+  "records": [
+    {
+      "label": "TS builtin archive",
+      "delta_count": 2,
+      "deltas": [
+        {
+          "kind": "global_transform_changed",
+          "entity": { "index": 0, "generation": 0 },
+          "component": {
+            "local_component": { "index": 1 },
+            "key": "GlobalTransform",
+            "builtin": true,
+            "schema_version": null,
+            "schema_hash": null
+          },
+          "before": {
+            "global_transform_format": 0,
+            "bytes_base64": "AACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AAAAAAAAAEAAAAAAAAAAAAAAgD8AAEBA"
+          },
+          "after": {
+            "global_transform_format": 1,
+            "bytes_base64": "ADwAAAAAAEQAAAA8AAAARQAAAAAAPABG"
+          },
+          "components": []
+        },
+        {
+          "kind": "camera_changed",
+          "entity": { "index": 1, "generation": 0 },
+          "component": {
+            "local_component": { "index": 3 },
+            "key": "Camera",
+            "builtin": true,
+            "schema_version": null,
+            "schema_hash": null
+          },
+          "before": {
+            "global_transform_format": null,
+            "bytes_base64": "AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAM3MzD0AAEhCAACAPwAAgD8AAAAA"
+          },
+          "after": {
+            "global_transform_format": null,
+            "bytes_base64": "AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD4AAMhCAADAPwAAAAAAAABA"
+          },
+          "components": []
+        }
+      ]
+    }
+  ]
+}

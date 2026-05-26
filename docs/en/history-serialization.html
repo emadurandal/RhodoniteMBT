@@ -28,16 +28,16 @@
       <main class="content">
         <article class="doc">
           <h1>History Serialization</h1>
-          <p class="lead">This document defines the persistence boundary for <code>WorldHistory</code> export/import work. The current implementation exposes a draft in-memory archive shape; durable file encoding is not implemented yet.</p>
+          <p class="lead">This document defines the persistence boundary for <code>WorldHistory</code> export/import work. The current implementation exposes an in-memory archive model and a TypeScript JSON archive helper for editor/session persistence.</p>
 
           <h2>Status</h2>
           <ul>
-            <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return a draft in-memory archive when all retained records are eligible for serialization.</li>
+            <li><code>WorldHistory::export_undo_stack(world)</code> and <code>WorldHistory::export_redo_stack(world)</code> return an in-memory archive when all retained records are eligible for serialization.</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> and <code>WorldHistory::import_redo_stack(world, archive)</code> validate and replace the target stack from that archive without mutating the world.</li>
             <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> and <code>WorldHistory::validate_import_redo_stack(world, archive)</code> return dry-run import validation reports with record and delta locations.</li>
             <li>The TypeScript wrapper exposes <code>exportUndoStack</code>, <code>exportRedoStack</code>, <code>importUndoStack</code>, <code>importRedoStack</code>, <code>validateImportUndoStack</code>, and <code>validateImportRedoStack</code>. Payload bytes are copied to <code>Uint8Array</code> on export, and plain object archives can be rehydrated on import.</li>
-            <li>The TypeScript npm surface also exposes <code>encodeHistoryExportJson</code> and <code>decodeHistoryExportJson</code> for a JSON archive string format.</li>
-            <li>Import/export and JSON archive encoding use <code>format_version = 1</code>. MoonBit core still exposes the in-memory object model only; JSON encoding is implemented in TypeScript.</li>
+            <li>The TypeScript npm surface also exposes <code>encodeHistoryExportJson</code> and <code>decodeHistoryExportJson</code> for the JSON archive string format.</li>
+            <li>Import/export and JSON archive encoding use <code>format_version = 1</code>. The JSON field names and payload encoding are covered by v1 golden fixtures and are treated as the compatibility surface. MoonBit core still exposes the in-memory object model only; JSON encoding is implemented in TypeScript.</li>
             <li><code>undo_summary</code> and <code>redo_summary</code> are diagnostic views for retained in-memory records. They are not a serialized history archive or compatibility format.</li>
             <li>MoonBit enum layout, object layout, and internal variant names are not a stable file ABI.</li>
             <li>The serialized form is for editor/session persistence, not for replaying arbitrary runtime simulation or GPU resource state.</li>
@@ -101,9 +101,9 @@
             </tbody>
           </table>
 
-          <h2>JSON Archive MVP</h2>
+          <h2>JSON Archive v1</h2>
           <p><code>encodeHistoryExportJson</code> converts a TypeScript <code>HistoryExport</code> into a JSON string, and <code>decodeHistoryExportJson</code> validates that JSON string and returns a <code>HistoryExport</code> that can be passed to <code>importUndoStack</code> or <code>importRedoStack</code>. The JSON helpers preserve builtin logical payloads too, including GlobalTransform row bytes with <code>global_transform_format</code> and Camera row bytes.</p>
-          <p>The JSON decoder is only the wire-shape gate: it rejects malformed JSON, unsupported archive versions, missing required fields, unsupported delta kinds, invalid base64, and mismatched record or delta counts. Import validation remains the world-aware gate; it resolves component identity, validates payload applicability against the current world, and leaves the world, stacks, and <code>last_diagnostic</code> unchanged for dry-run validation.</p>
+          <p>The JSON decoder is the wire-shape gate: it rejects malformed JSON, unsupported archive versions, missing required fields, unsupported delta kinds, invalid base64, and mismatched record or delta counts. Import validation remains the world-aware gate; it resolves component identity, validates payload applicability against the current world, and leaves the world, stacks, and <code>last_diagnostic</code> unchanged for dry-run validation.</p>
           <table>
             <thead><tr><th>Field</th><th>JSON policy</th></tr></thead>
             <tbody>

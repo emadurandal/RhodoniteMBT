@@ -28,16 +28,16 @@
       <main class="content">
         <article class="doc">
           <h1>履歴シリアライズ</h1>
-          <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は draft の in-memory archive shape を公開していますが、永続 file encoding は未実装です。</p>
+          <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は in-memory archive model と editor/session persistence 用の TypeScript JSON archive helper を公開しています。</p>
 
           <h2>Status</h2>
           <ul>
-            <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に draft in-memory archive を返します。</li>
+            <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に in-memory archive を返します。</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>
             <li><code>WorldHistory::validate_import_undo_stack(world, archive)</code> と <code>WorldHistory::validate_import_redo_stack(world, archive)</code> は、record / delta 位置を含む dry-run import validation report を返します。</li>
             <li>TypeScript wrapper は <code>exportUndoStack</code>、<code>exportRedoStack</code>、<code>importUndoStack</code>、<code>importRedoStack</code>、<code>validateImportUndoStack</code>、<code>validateImportRedoStack</code> を公開します。export 時の payload bytes は <code>Uint8Array</code> に copy され、import 時は plain object archive も復元できます。</li>
             <li>TypeScript npm surface は JSON archive string format 用に <code>encodeHistoryExportJson</code> と <code>decodeHistoryExportJson</code> も公開します。</li>
-            <li>Import/export と JSON archive encoding は <code>format_version = 1</code> を使います。MoonBit core は in-memory object model のみを公開し、JSON encoding は TypeScript 側で実装します。</li>
+            <li>Import/export と JSON archive encoding は <code>format_version = 1</code> を使います。JSON field name と payload encoding は v1 golden fixture で固定し、compatibility surface として扱います。MoonBit core は in-memory object model のみを公開し、JSON encoding は TypeScript 側で実装します。</li>
             <li><code>undo_summary</code> と <code>redo_summary</code> は retained in-memory record の diagnostic view です。serialized history archive や compatibility format ではありません。</li>
             <li>MoonBit の enum layout、object layout、内部 variant 名は stable file ABI として扱いません。</li>
             <li>serialized form は editor/session persistence 向けです。任意の runtime simulation や GPU resource state の replay は対象にしません。</li>
@@ -101,7 +101,7 @@
             </tbody>
           </table>
 
-          <h2>JSON Archive MVP</h2>
+          <h2>JSON Archive v1</h2>
           <p><code>encodeHistoryExportJson</code> は TypeScript の <code>HistoryExport</code> を JSON string に変換します。<code>decodeHistoryExportJson</code> はその JSON string を検証し、<code>importUndoStack</code> / <code>importRedoStack</code> に渡せる <code>HistoryExport</code> を返します。JSON helper は builtin logical payload も保持します。GlobalTransform row bytes と <code>global_transform_format</code>、Camera row bytes が対象です。</p>
           <p>JSON decoder は wire shape の gate です。不正な JSON、未対応 archive version、必須 field 欠落、未対応 delta kind、不正 base64、record / delta count 不一致を reject します。world を見る検証は import validation の責務です。component identity の解決、current world に対する payload applicability の検証を行い、dry-run validation では world、stack、<code>last_diagnostic</code> を変更しません。</p>
           <table>

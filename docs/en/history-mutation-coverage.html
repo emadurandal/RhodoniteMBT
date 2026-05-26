@@ -30,6 +30,7 @@
           <h1>History Mutation Coverage</h1>
           <p class="lead">This page is the audit table for ECS mutation APIs and their Undo/Redo behavior. When adding a mutating API, update this page and add or extend the matching coverage test.</p>
           <p>The TypeScript wrapper follows the same classification as the MoonBit surface. Public wrapper methods should either delegate to the tracked API listed here, remain raw guarded, or be documented as intentionally untracked with matching TypeScript coverage when the wrapper adds behavior.</p>
+          <p>The TypeScript public wrapper surface is also checked by <code>history-mutation-coverage.test.ts</code>. If a method is added to <code>World</code>, <code>WorldHistory</code>, query rows, raw query archetypes, <code>SystemRunner</code>, or <code>CommandBuffer</code>, classify it in that audit as tracked, tracked callback, tracked command phase, raw guarded, intentionally untracked, read-only, or history-control.</p>
 
           <h2>Coverage Classes</h2>
           <table>
@@ -62,6 +63,7 @@
             <thead><tr><th>Surface</th><th>Undo/Redo status</th></tr></thead>
             <tbody>
               <tr><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code></td><td>Tracked callback APIs for row authoring. They delegate without history copies when recording is disabled.</td></tr>
+              <tr><td><code>QueryRow::write_transform3d_tracked</code>, <code>write_child_of_tracked</code>, <code>write_global_transform_tracked</code></td><td>Typed tracked QueryRow callbacks for builtin authoring rows. GlobalTransform records the logical matrix through <code>WorldHistory::set_global_transform</code>.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>Tracked callback API for full-column edits. It snapshots the column and records changed rows.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>Tracked callback API for sparse column edits when the caller already knows the candidate rows. It snapshots and records only those row views.</td></tr>
               <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods; if a later command fails, successful commands remain undoable.</td></tr>

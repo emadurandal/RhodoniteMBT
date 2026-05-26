@@ -172,6 +172,202 @@ test "QueryRow write_tracked works inside guarded transaction" {
 }
 
 ///|
+test "QueryRow typed tracked writers work inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let parent_before = world.create_entity()
+  let parent_after = world.create_entity()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (1.0 : Float),
+      (2.0 : Float),
+      (3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_child_of(entity, parent_before))
+  assert_true(
+    world.set_global_transform(
+      entity,
+      @m44.Matrix44::translation(
+        (1.0 : Float),
+        (2.0 : Float),
+        (3.0 : Float),
+        (1.0 : Float),
+        (0.0 : Float),
+      ),
+    ),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded typed query writers"),
+  )
+  Query::new([
+    world.transform_component(),
+    world.child_of_component(),
+    world.global_transform_component(),
+  ]).for_each(world, row => {
+    if !row.write_transform3d_tracked(history, transform => {
+        transform.write_position((4.0 : Float), (5.0 : Float), (6.0 : Float))
+      }) {
+      abort("expected guarded typed Transform3D write")
+    }
+    if !row.write_child_of_tracked(history, parent_after) {
+      abort("expected guarded typed ChildOf write")
+    }
+    if !row.write_global_transform_tracked(history, global => {
+        global.write_matrix(
+          @m44.Matrix44::translation(
+            (7.0 : Float),
+            (8.0 : Float),
+            (9.0 : Float),
+            (1.0 : Float),
+            (0.0 : Float),
+          ),
+        )
+      }) {
+      abort("expected guarded typed GlobalTransform write")
+    }
+  })
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  match world.get_transform(entity) {
+    Some(transform) => {
+      assert_eq(transform.position.x(), (4.0 : Float))
+      assert_eq(transform.position.y(), (5.0 : Float))
+      assert_eq(transform.position.z(), (6.0 : Float))
+    }
+    None => abort("expected written Transform3D")
+  }
+  assert_true(world.get_child_of(entity) == Some(parent_after))
+  match world.get_global_transform(entity) {
+    Some(matrix) => {
+      assert_eq(matrix.at(0, 3), (7.0 : Float))
+      assert_eq(matrix.at(1, 3), (8.0 : Float))
+      assert_eq(matrix.at(2, 3), (9.0 : Float))
+    }
+    None => abort("expected written GlobalTransform")
+  }
+  assert_true(history.undo(world))
+  match world.get_transform(entity) {
+    Some(transform) => {
+      assert_eq(transform.position.x(), (1.0 : Float))
+      assert_eq(transform.position.y(), (2.0 : Float))
+      assert_eq(transform.position.z(), (3.0 : Float))
+    }
+    None => abort("expected undone Transform3D")
+  }
+  assert_true(world.get_child_of(entity) == Some(parent_before))
+  match world.get_global_transform(entity) {
+    Some(matrix) => {
+      assert_eq(matrix.at(0, 3), (1.0 : Float))
+      assert_eq(matrix.at(1, 3), (2.0 : Float))
+      assert_eq(matrix.at(2, 3), (3.0 : Float))
+    }
+    None => abort("expected undone GlobalTransform")
+  }
+  assert_true(history.redo(world))
+  match world.get_transform(entity) {
+    Some(transform) => {
+      assert_eq(transform.position.x(), (4.0 : Float))
+      assert_eq(transform.position.y(), (5.0 : Float))
+      assert_eq(transform.position.z(), (6.0 : Float))
+    }
+    None => abort("expected redone Transform3D")
+  }
+  assert_true(world.get_child_of(entity) == Some(parent_after))
+  match world.get_global_transform(entity) {
+    Some(matrix) => {
+      assert_eq(matrix.at(0, 3), (7.0 : Float))
+      assert_eq(matrix.at(1, 3), (8.0 : Float))
+      assert_eq(matrix.at(2, 3), (9.0 : Float))
+    }
+    None => abort("expected redone GlobalTransform")
+  }
+}
+
+///|
+test "QueryRow typed tracked writers delegate when history disabled" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let parent_before = world.create_entity()
+  let parent_after = world.create_entity()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (1.0 : Float),
+      (2.0 : Float),
+      (3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_child_of(entity, parent_before))
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  history.set_max_undo_records(0)
+  Query::new([
+    world.transform_component(),
+    world.child_of_component(),
+    world.global_transform_component(),
+  ]).for_each(world, row => {
+    if !row.write_transform3d_tracked(history, transform => {
+        transform.write_position((10.0 : Float), (11.0 : Float), (12.0 : Float))
+      }) {
+      abort("expected delegated typed Transform3D write")
+    }
+    if !row.write_child_of_tracked(history, parent_after) {
+      abort("expected delegated typed ChildOf write")
+    }
+    if !row.write_global_transform_tracked(history, global => {
+        global.write_matrix(
+          @m44.Matrix44::translation(
+            (13.0 : Float),
+            (14.0 : Float),
+            (15.0 : Float),
+            (1.0 : Float),
+            (0.0 : Float),
+          ),
+        )
+      }) {
+      abort("expected delegated typed GlobalTransform write")
+    }
+  })
+  assert_eq(history.last_diagnostic(), "recording_disabled")
+  assert_eq(history.undo_len(), 0)
+  match world.get_transform(entity) {
+    Some(transform) => {
+      assert_eq(transform.position.x(), (10.0 : Float))
+      assert_eq(transform.position.y(), (11.0 : Float))
+      assert_eq(transform.position.z(), (12.0 : Float))
+    }
+    None => abort("expected delegated Transform3D")
+  }
+  assert_true(world.get_child_of(entity) == Some(parent_after))
+  match world.get_global_transform(entity) {
+    Some(matrix) => {
+      assert_eq(matrix.at(0, 3), (13.0 : Float))
+      assert_eq(matrix.at(1, 3), (14.0 : Float))
+      assert_eq(matrix.at(2, 3), (15.0 : Float))
+    }
+    None => abort("expected delegated GlobalTransform")
+  }
+}
+
+///|
 test "panic QueryRow raw write aborts inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -182,6 +378,77 @@ test "panic QueryRow raw write aborts inside guarded transaction" {
   assert_true(history.begin_guarded_transaction(world, "guarded raw query"))
   Query::new([cpu]).for_each(world, row => {
     row.write(cpu, bytes => bytes[0] = (2 : Byte))
+  })
+}
+
+///|
+test "panic QueryRow raw Transform3D writer aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      entity,
+      (1.0 : Float),
+      (2.0 : Float),
+      (3.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded raw transform row"),
+  )
+  Query::new([world.transform_component()]).for_each(world, row => {
+    row.write_transform3d(transform => {
+      transform.write_position((4.0 : Float), (5.0 : Float), (6.0 : Float))
+    })
+  })
+}
+
+///|
+test "panic QueryRow raw ChildOf writer aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let parent_before = world.create_entity()
+  let parent_after = world.create_entity()
+  let entity = world.create_entity()
+  assert_true(world.set_child_of(entity, parent_before))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(history.begin_guarded_transaction(world, "guarded raw child row"))
+  Query::new([world.child_of_component()]).for_each(world, row => {
+    row.write_child_of(parent_after)
+  })
+}
+
+///|
+test "panic QueryRow raw GlobalTransform writer aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let entity = world.create_entity()
+  assert_true(world.set_global_transform(entity, @m44.Matrix44F::identity()))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded raw global row"),
+  )
+  Query::new([world.global_transform_component()]).for_each(world, row => {
+    row.write_global_transform(global => {
+      global.write_matrix(
+        @m44.Matrix44::translation(
+          (1.0 : Float),
+          (2.0 : Float),
+          (3.0 : Float),
+          (1.0 : Float),
+          (0.0 : Float),
+        ),
+      )
+    })
   })
 }
 
