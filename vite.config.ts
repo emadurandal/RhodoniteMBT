@@ -27,6 +27,7 @@ export default defineConfig({
 				tsEcsSceneGraph: "samples/html/ts-ecs-scene-graph.html",
 				tsEcsSceneGraphUndoRedo:
 					"samples/html/ts-ecs-scene-graph-undo-redo.html",
+				tsUndoRedoInteraction: "samples/html/ts-undo-redo-interaction.html",
 				tsEcsMassCubes: "samples/html/ts-ecs-mass-cubes.html",
 				tsMultiSurfaceIndependentInput:
 					"samples/html/ts-multi-surface-independent-input.html",

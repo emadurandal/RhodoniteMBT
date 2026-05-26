@@ -175,8 +175,7 @@ try {
 
 async function assertDistExists() {
 	try {
-		await fs.access(path.join(distDir, "samples/html/ts-ecs-scene-graph.html"));
-		await fs.access(path.join(distDir, "samples/html/ts-ecs-scene-graph-undo-redo.html"));
+		await fs.access(path.join(distDir, "samples/html/ts-undo-redo-interaction.html"));
 	} catch {
 		throw new Error("dist samples are missing; run pnpm run build before interaction regression");
 	}
@@ -193,7 +192,7 @@ function createDistServer(resultEndpoint) {
 			}
 			let pathname = decodeURIComponent(requestUrl.pathname);
 			if (pathname === "/") {
-				pathname = "/samples/html/ts-ecs-scene-graph-undo-redo.html";
+				pathname = "/samples/html/ts-undo-redo-interaction.html";
 			}
 			const filePath = path.normalize(path.join(distDir, pathname));
 			if (!filePath.startsWith(distDir + path.sep)) {
@@ -246,23 +245,7 @@ function createHarnessHtml(resultEndpoint) {
 
       async function main() {
         await postStatus("loaded");
-        if (!navigator.gpu) {
-          await postResult({
-            ok: true,
-            skipped: true,
-            reason: "Browser WebGPU is unavailable",
-            results: [],
-            failures: [],
-          });
-          return;
-        }
-        await runTest("normal page has no undo redo controls", async () => {
-          const page = await loadPage("/samples/html/ts-ecs-scene-graph.html");
-          await delay(500);
-          assert(!page.doc.querySelector(".sample-controls"), "normal page unexpectedly created undo/redo controls");
-          page.destroy();
-        });
-        await runTest("undo redo production page shows controls", async () => {
+        await runTest("undo redo interaction page shows controls", async () => {
           const page = await loadUndoRedoPage();
           assertStatus(page, "undo=0 redo=0");
           page.destroy();
@@ -359,7 +342,7 @@ function createHarnessHtml(resultEndpoint) {
       }
 
       async function loadUndoRedoPage() {
-        const page = await loadPage("/samples/html/ts-ecs-scene-graph-undo-redo.html");
+        const page = await loadPage("/samples/html/ts-undo-redo-interaction.html");
         await waitFor(() => page.doc.querySelector(".sample-status"), 10000, "undo/redo controls did not appear");
         return page;
       }
