@@ -236,8 +236,19 @@ struct GlobalTransformBlobStore {
 
 ///|
 /// Packed `u32` backing store for builtin Camera GPU rows.
+#cfg(target="js")
 struct CameraBlobStore {
   store : PackedGpuBlobStore
+}
+
+///|
+/// Packed `u32` backing store for builtin Camera GPU rows.
+#cfg(not(target="js"))
+struct CameraBlobStore {
+  store : PackedGpuBlobStore
+  cache_valid : Array[Bool]
+  cache_word_offsets : Array[Int]
+  cache_words : Array[FixedArray[UInt]]
 }
 
 ///|
