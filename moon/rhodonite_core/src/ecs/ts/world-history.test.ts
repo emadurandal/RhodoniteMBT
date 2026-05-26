@@ -1293,6 +1293,13 @@ describe("ECS TypeScript wrapper: history", () => {
 				PhaseKey.new("ts/raw-run-phase-guard"),
 			),
 		).toThrow();
+		expect(() =>
+			SystemRunner.new().runPhaseReport(
+				world,
+				SystemContext.new(0.016, 1),
+				PhaseKey.new("ts/raw-run-phase-report-guard"),
+			),
+		).toThrow();
 		expect(
 			history.setComponentBytes(world, entity, cpu, new Uint8Array([2, 0, 0, 0])),
 		).toBe(true);

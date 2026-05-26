@@ -397,6 +397,53 @@ pub(all) struct SystemPhasePlan {
 }
 
 ///|
+/// Read-only diagnostic for one failed queued command during system phase apply.
+pub(all) struct CommandBufferCommandFailure {
+  command_index : Int
+  command_kind : String
+  reason : String
+  entity : EntityId
+  component : ComponentTypeId
+}
+
+///|
+/// Read-only execution report for one system's queued command buffer.
+pub(all) struct SystemRunSystemReport {
+  runner_index : Int
+  batch_index : Int
+  name : String
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  failures : Array[CommandBufferCommandFailure]
+}
+
+///|
+/// Read-only execution report for one conflict-free system batch.
+pub(all) struct SystemRunBatchReport {
+  index : Int
+  ok : Bool
+  system_count : Int
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  systems : Array[SystemRunSystemReport]
+}
+
+///|
+/// Read-only execution report for one `SystemRunner` phase run.
+pub(all) struct SystemRunReport {
+  phase : PhaseKey
+  ok : Bool
+  batch_count : Int
+  system_count : Int
+  queued_command_count : Int
+  applied_command_count : Int
+  failed_command_count : Int
+  batches : Array[SystemRunBatchReport]
+}
+
+///|
 /// Phase-filtered ECS system runner. `World` stays focused on ECS storage and mutation.
 pub struct SystemRunner {
   priv systems : Array[System]

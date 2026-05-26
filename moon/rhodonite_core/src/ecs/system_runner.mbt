@@ -136,7 +136,81 @@ fn system_batch_plan(batch : SystemBatch, batch_index : Int) -> SystemPlanBatch 
 }
 
 ///|
-/// Implements `run_system_batch`.
+/// Builds an empty phase execution report.
+fn empty_system_run_report(phase : PhaseKey, ok : Bool) -> SystemRunReport {
+  {
+    phase,
+    ok,
+    batch_count: 0,
+    system_count: 0,
+    queued_command_count: 0,
+    applied_command_count: 0,
+    failed_command_count: 0,
+    batches: [],
+  }
+}
+
+///|
+/// Aggregates one batch execution report from per-system command reports.
+fn system_run_batch_report(
+  batch_index : Int,
+  systems : Array[SystemRunSystemReport],
+) -> SystemRunBatchReport {
+  let mut queued_command_count = 0
+  let mut applied_command_count = 0
+  let mut failed_command_count = 0
+  for i = 0; i < systems.length(); i = i + 1 {
+    queued_command_count = queued_command_count +
+      systems[i].queued_command_count
+    applied_command_count = applied_command_count +
+      systems[i].applied_command_count
+    failed_command_count = failed_command_count +
+      systems[i].failed_command_count
+  }
+  {
+    index: batch_index,
+    ok: failed_command_count == 0,
+    system_count: systems.length(),
+    queued_command_count,
+    applied_command_count,
+    failed_command_count,
+    systems,
+  }
+}
+
+///|
+/// Aggregates one phase execution report from per-batch reports.
+fn system_run_report(
+  phase : PhaseKey,
+  batches : Array[SystemRunBatchReport],
+) -> SystemRunReport {
+  let mut system_count = 0
+  let mut queued_command_count = 0
+  let mut applied_command_count = 0
+  let mut failed_command_count = 0
+  for i = 0; i < batches.length(); i = i + 1 {
+    system_count = system_count + batches[i].system_count
+    queued_command_count = queued_command_count +
+      batches[i].queued_command_count
+    applied_command_count = applied_command_count +
+      batches[i].applied_command_count
+    failed_command_count = failed_command_count +
+      batches[i].failed_command_count
+  }
+  {
+    phase,
+    ok: failed_command_count == 0,
+    batch_count: batches.length(),
+    system_count,
+    queued_command_count,
+    applied_command_count,
+    failed_command_count,
+    batches,
+  }
+}
+
+///|
+/// Runs one system batch and returns false if any command-buffer apply fails.
 fn run_system_batch(
   batch : SystemBatch,
   world : World,
@@ -179,7 +253,54 @@ fn run_system_batch(
 }
 
 ///|
-/// Runs one system batch and applies queued commands through WorldHistory.
+/// Runs one system batch and returns command-buffer apply diagnostics.
+fn run_system_batch_report(
+  batch : SystemBatch,
+  world : World,
+  ctx : SystemContext,
+  batch_index : Int,
+) -> SystemRunBatchReport {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let commands = CommandBuffer::new_for_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let system_reports : Array[SystemRunSystemReport] = []
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    system_reports.push(
+      command_buffers[i].apply_report(
+        batch.systems[i].runner_index,
+        batch_index,
+      ),
+    )
+    world.exit_system_access(system_access)
+  }
+  system_run_batch_report(batch_index, system_reports)
+}
+
+///|
+/// Runs one system batch with tracked command apply and returns false on any failure.
 fn run_system_batch_tracked(
   batch : SystemBatch,
   world : World,
@@ -221,6 +342,56 @@ fn run_system_batch_tracked(
     world.exit_system_access(system_access)
   }
   ok
+}
+
+///|
+/// Runs one system batch with tracked command apply diagnostics.
+fn run_system_batch_tracked_report(
+  batch : SystemBatch,
+  world : World,
+  ctx : SystemContext,
+  history : WorldHistory,
+  batch_index : Int,
+) -> SystemRunBatchReport {
+  let command_buffers : Array[CommandBuffer] = []
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let commands = CommandBuffer::new_for_history_system(
+      world,
+      system.name,
+      system.writes,
+      system.structural_write,
+      history,
+    )
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    (system.run)(world, ctx, commands)
+    world.exit_system_access(system_access)
+    command_buffers.push(commands)
+  }
+  let system_reports : Array[SystemRunSystemReport] = []
+  for i = 0; i < command_buffers.length(); i = i + 1 {
+    let system = batch.systems[i].system
+    let system_access = world.enter_system_access(
+      system.name,
+      system.reads,
+      system.writes,
+      system.structural_write,
+    )
+    system_reports.push(
+      command_buffers[i].apply_tracked_report(
+        history,
+        batch.systems[i].runner_index,
+        batch_index,
+      ),
+    )
+    world.exit_system_access(system_access)
+  }
+  system_run_batch_report(batch_index, system_reports)
 }
 
 ///|
@@ -435,10 +606,35 @@ pub fn SystemRunner::run_phase(
   ctx : SystemContext,
   phase : PhaseKey,
 ) -> Bool {
-  world.assert_not_history_raw_mutation("SystemRunner::run_phase")
+  self.run_phase_with_operation(world, ctx, phase, "SystemRunner::run_phase")
+}
+
+///|
+/// Runs systems in one phase and returns command-buffer apply diagnostics.
+pub fn SystemRunner::run_phase_report(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+) -> SystemRunReport {
+  self.run_phase_report_with_operation(
+    world, ctx, phase, "SystemRunner::run_phase_report",
+  )
+}
+
+///|
+/// Runs one phase with a caller-specific raw-mutation guard operation label.
+fn SystemRunner::run_phase_with_operation(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  operation : String,
+) -> Bool {
+  world.assert_not_history_raw_mutation(operation)
   world.lock_component_registration()
-  let mut ok = true
   let batches = self.phase_batches(phase)
+  let mut ok = true
   for i = 0; i < batches.length(); i = i + 1 {
     if !run_system_batch(batches[i], world, ctx) {
       ok = false
@@ -449,7 +645,27 @@ pub fn SystemRunner::run_phase(
 }
 
 ///|
-/// Runs systems in one phase and records command-buffer mutations through WorldHistory.
+/// Runs one phase with a caller-specific raw-mutation guard operation label.
+fn SystemRunner::run_phase_report_with_operation(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  operation : String,
+) -> SystemRunReport {
+  world.assert_not_history_raw_mutation(operation)
+  world.lock_component_registration()
+  let batches = self.phase_batches(phase)
+  let batch_reports : Array[SystemRunBatchReport] = []
+  for i = 0; i < batches.length(); i = i + 1 {
+    batch_reports.push(run_system_batch_report(batches[i], world, ctx, i))
+  }
+  world.unlock_component_registration()
+  system_run_report(phase, batch_reports)
+}
+
+///|
+/// Runs systems in one phase with tracked command buffers and no report allocation.
 fn SystemRunner::run_phase_tracked(
   self : SystemRunner,
   world : World,
@@ -458,8 +674,8 @@ fn SystemRunner::run_phase_tracked(
   history : WorldHistory,
 ) -> Bool {
   world.lock_component_registration()
-  let mut ok = true
   let batches = self.phase_batches(phase)
+  let mut ok = true
   for i = 0; i < batches.length(); i = i + 1 {
     if !run_system_batch_tracked(batches[i], world, ctx, history) {
       ok = false
@@ -467,4 +683,25 @@ fn SystemRunner::run_phase_tracked(
   }
   world.unlock_component_registration()
   ok
+}
+
+///|
+/// Runs systems in one phase with tracked command-buffer diagnostics.
+fn SystemRunner::run_phase_tracked_report(
+  self : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  history : WorldHistory,
+) -> SystemRunReport {
+  world.lock_component_registration()
+  let batches = self.phase_batches(phase)
+  let batch_reports : Array[SystemRunBatchReport] = []
+  for i = 0; i < batches.length(); i = i + 1 {
+    batch_reports.push(
+      run_system_batch_tracked_report(batches[i], world, ctx, history, i),
+    )
+  }
+  world.unlock_component_registration()
+  system_run_report(phase, batch_reports)
 }

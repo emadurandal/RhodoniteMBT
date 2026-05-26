@@ -34,6 +34,10 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonSystemPhasePlan = object;
 	export type MoonSystemPlanBatch = object;
 	export type MoonSystemPlanSystem = object;
+	export type MoonSystemRunReport = object;
+	export type MoonSystemRunBatchReport = object;
+	export type MoonSystemRunSystemReport = object;
+	export type MoonCommandBufferCommandFailure = object;
 	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
@@ -1215,6 +1219,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		ctx: MoonSystemContext,
 		phase: MoonPhaseKey,
 	): MoonBool;
+	export function system_runner_run_phase_report(
+		runner: MoonSystemRunner,
+		world: MoonWorld,
+		ctx: MoonSystemContext,
+		phase: MoonPhaseKey,
+	): MoonSystemRunReport;
 	export function world_history_run_system_phase(
 		history: MoonWorldHistory,
 		runner: MoonSystemRunner,
@@ -1223,6 +1233,93 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		phase: MoonPhaseKey,
 		label: string,
 	): MoonBool;
+	export function world_history_run_system_phase_report(
+		history: MoonWorldHistory,
+		runner: MoonSystemRunner,
+		world: MoonWorld,
+		ctx: MoonSystemContext,
+		phase: MoonPhaseKey,
+		label: string,
+	): MoonSystemRunReport;
+	export function system_run_report_phase(
+		report: MoonSystemRunReport,
+	): MoonPhaseKey;
+	export function system_run_report_ok(report: MoonSystemRunReport): MoonBool;
+	export function system_run_report_batch_count(
+		report: MoonSystemRunReport,
+	): number;
+	export function system_run_report_system_count(
+		report: MoonSystemRunReport,
+	): number;
+	export function system_run_report_queued_command_count(
+		report: MoonSystemRunReport,
+	): number;
+	export function system_run_report_applied_command_count(
+		report: MoonSystemRunReport,
+	): number;
+	export function system_run_report_failed_command_count(
+		report: MoonSystemRunReport,
+	): number;
+	export function system_run_report_batches(
+		report: MoonSystemRunReport,
+	): MoonSystemRunBatchReport[];
+	export function system_run_batch_report_index(
+		report: MoonSystemRunBatchReport,
+	): number;
+	export function system_run_batch_report_ok(
+		report: MoonSystemRunBatchReport,
+	): MoonBool;
+	export function system_run_batch_report_system_count(
+		report: MoonSystemRunBatchReport,
+	): number;
+	export function system_run_batch_report_queued_command_count(
+		report: MoonSystemRunBatchReport,
+	): number;
+	export function system_run_batch_report_applied_command_count(
+		report: MoonSystemRunBatchReport,
+	): number;
+	export function system_run_batch_report_failed_command_count(
+		report: MoonSystemRunBatchReport,
+	): number;
+	export function system_run_batch_report_systems(
+		report: MoonSystemRunBatchReport,
+	): MoonSystemRunSystemReport[];
+	export function system_run_system_report_runner_index(
+		report: MoonSystemRunSystemReport,
+	): number;
+	export function system_run_system_report_batch_index(
+		report: MoonSystemRunSystemReport,
+	): number;
+	export function system_run_system_report_name(
+		report: MoonSystemRunSystemReport,
+	): string;
+	export function system_run_system_report_queued_command_count(
+		report: MoonSystemRunSystemReport,
+	): number;
+	export function system_run_system_report_applied_command_count(
+		report: MoonSystemRunSystemReport,
+	): number;
+	export function system_run_system_report_failed_command_count(
+		report: MoonSystemRunSystemReport,
+	): number;
+	export function system_run_system_report_failures(
+		report: MoonSystemRunSystemReport,
+	): MoonCommandBufferCommandFailure[];
+	export function command_buffer_command_failure_command_index(
+		failure: MoonCommandBufferCommandFailure,
+	): number;
+	export function command_buffer_command_failure_command_kind(
+		failure: MoonCommandBufferCommandFailure,
+	): string;
+	export function command_buffer_command_failure_reason(
+		failure: MoonCommandBufferCommandFailure,
+	): string;
+	export function command_buffer_command_failure_entity(
+		failure: MoonCommandBufferCommandFailure,
+	): MoonEntityId;
+	export function command_buffer_command_failure_component(
+		failure: MoonCommandBufferCommandFailure,
+	): MoonComponentTypeId;
 
 	export function gpu_layout_empty(stride: number): MoonGpuLayout;
 	export function gpu_layout_transform3d(): MoonGpuLayout;

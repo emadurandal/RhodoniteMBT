@@ -51,6 +51,48 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
 	});
 
+	it("reports TS system command-buffer execution results", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("TsSystemReportCpu", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		const missing = EntityId.new(entity.index() + 100, 0);
+		const phase = PhaseKey.new("ts/report");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newWithStructuralWrite("report-failure", phase, [], [cpu], (_world, _ctx, commands) => {
+				commands.setComponentBytes(entity, cpu, new Uint8Array([2, 0, 0, 0]));
+				commands.destroyEntity(missing);
+			}),
+		);
+
+		const report = runner.runPhaseReport(world, SystemContext.new(0.016, 1), phase);
+		expect(report.ok()).toBe(false);
+		expect(report.phase().name()).toBe("ts/report");
+		expect(report.batchCount()).toBe(1);
+		expect(report.systemCount()).toBe(1);
+		expect(report.queuedCommandCount()).toBe(2);
+		expect(report.appliedCommandCount()).toBe(1);
+		expect(report.failedCommandCount()).toBe(1);
+		const batch = report.batches()[0];
+		expect(batch.ok()).toBe(false);
+		expect(batch.index()).toBe(0);
+		const system = batch.systems()[0];
+		expect(system.runnerIndex()).toBe(0);
+		expect(system.batchIndex()).toBe(0);
+		expect(system.name()).toBe("report-failure");
+		expect(system.queuedCommandCount()).toBe(2);
+		expect(system.appliedCommandCount()).toBe(1);
+		expect(system.failedCommandCount()).toBe(1);
+		const failure = system.failures()[0];
+		expect(failure.commandIndex()).toBe(1);
+		expect(failure.commandKind()).toBe("destroy_entity");
+		expect(failure.reason()).toBe("apply_failed");
+		expect(failure.entity().index()).toBe(missing.index());
+		expect(failure.component().index()).toBe(-1);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([2, 0, 0, 0]));
+	});
+
 	it("plans TS system phases without executing callbacks", () => {
 		const world = World.new();
 		const a = world.registerCpuComponent("TsSystemPlanA", 4);
@@ -263,6 +305,48 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(history.undo(world)).toBe(true);
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(
 			new Uint8Array([1, 0, 0, 0]),
+		);
+	});
+
+	it("reports tracked TS system phase command failures", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsTrackedSystemReportCpu", 4);
+		const entity = world.createEntity();
+		const missing = EntityId.new(entity.index() + 100, 0);
+		expect(
+			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
+		).toBe(true);
+		const phase = PhaseKey.new("ts/tracked-report");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newWithStructuralWrite(
+				"tracked-report-failure",
+				phase,
+				[],
+				[cpu],
+				(_world, _ctx, commands) => {
+					commands.setComponentBytes(entity, cpu, new Uint8Array([2, 0, 0, 0]));
+					commands.destroyEntity(missing);
+				},
+			),
+		);
+
+		const report = history.runSystemPhaseReport(
+			runner,
+			world,
+			SystemContext.new(0.016, 1),
+			phase,
+			"tracked report failure",
+		);
+		expect(report.ok()).toBe(false);
+		expect(report.failedCommandCount()).toBe(1);
+		expect(report.batches()[0].systems()[0].failures()[0].commandKind()).toBe("destroy_entity");
+		expect(report.batches()[0].systems()[0].failures()[0].reason()).toBe("apply_failed");
+		expect(history.lastDiagnostic()).toBe("operation_failed");
+		expect(history.undoLen()).toBe(1);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
 		);
 	});
 

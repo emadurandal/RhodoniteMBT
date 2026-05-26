@@ -4456,6 +4456,38 @@ pub fn WorldHistory::run_system_phase(
 }
 
 ///|
+/// Runs one system phase with tracked command-buffer diagnostics.
+pub fn WorldHistory::run_system_phase_report(
+  self : WorldHistory,
+  runner : SystemRunner,
+  world : World,
+  ctx : SystemContext,
+  phase : PhaseKey,
+  label : String,
+) -> SystemRunReport {
+  if self.applying {
+    self.set_diagnostic("applying")
+    return empty_system_run_report(phase, false)
+  }
+  if !self.recording_enabled() {
+    let report = runner.run_phase_report(world, ctx, phase)
+    self.set_delegate_diagnostic(report.ok, "recording_disabled")
+    return report
+  }
+  let auto = self.begin_auto(label)
+  let forced_guard = self.force_guarded_world(world)
+  let report = runner.run_phase_tracked_report(world, ctx, phase, self)
+  if forced_guard && !self.raw_mutation_guard_enabled {
+    self.release_guard()
+  }
+  self.finish_auto(auto, true)
+  if !report.ok {
+    self.set_diagnostic("operation_failed")
+  }
+  report
+}
+
+///|
 /// Applies one delta in redo order.
 fn WorldHistory::apply_delta(
   self : WorldHistory,

@@ -111,6 +111,7 @@ import {
 	world_history_record_summary_payload_bytes,
 	world_history_remove_component,
 	world_history_run_system_phase,
+	world_history_run_system_phase_report,
 	world_history_serialization_component_report_component,
 	world_history_serialization_component_report_reason,
 	world_history_serialization_component_report_serializable,
@@ -155,6 +156,7 @@ import {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
 import type { PhaseKey, SystemContext, SystemRunner } from "./system.ts";
+import { SystemRunReport } from "./system.ts";
 import { bytesInput, moonBool } from "./views.ts";
 import type { World } from "./world-core.ts";
 import { SpawnBatchRow } from "./world-primitives.ts";
@@ -1035,6 +1037,25 @@ export class WorldHistory {
 	): boolean {
 		return moonBool(
 			world_history_run_system_phase(
+				this.inner,
+				runner.inner,
+				world.inner,
+				ctx.inner,
+				phase.inner,
+				label,
+			),
+		);
+	}
+
+	runSystemPhaseReport(
+		runner: SystemRunner,
+		world: World,
+		ctx: SystemContext,
+		phase: PhaseKey,
+		label: string,
+	): SystemRunReport {
+		return new SystemRunReport(
+			world_history_run_system_phase_report(
 				this.inner,
 				runner.inner,
 				world.inner,
