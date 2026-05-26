@@ -214,6 +214,59 @@ pub fn create_demo_state(
 }
 
 ///|
+/// Applies the deterministic Undo/Redo visual edit to one visible scene body.
+pub fn DemoState::apply_undo_redo_visual_edit(self : DemoState) -> Bool {
+  let world = self.scene.world()
+  let history = @ecs.WorldHistory::new()
+  let body = self.bodies[1]
+  let ok = history.with_transaction(world, "Scene Graph Visual Move", fn() {
+    history.set_transform_trs(
+      world,
+      body,
+      (1.15 : Float),
+      (0.0 : Float),
+      (1.65 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (0.36 : Float),
+      (0.36 : Float),
+      (0.36 : Float),
+    )
+  })
+  if !ok {
+    return false
+  }
+  if !history.undo(world) {
+    return false
+  }
+  if !history.redo(world) {
+    return false
+  }
+  self.scene.prepare_render_state()
+}
+
+///|
+/// Creates DemoState, applies the Undo/Redo visual edit, and registers rendering only.
+pub fn setup_undo_redo_visual_engine(engine : @app.Engine) -> Bool {
+  let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()
+  let demo_state = create_demo_state(
+    engine.main_scene(),
+    engine.renderer(),
+    engine.render_target_resources(),
+    context=Some(canvas_context),
+  )
+  if !demo_state.apply_undo_redo_visual_edit() {
+    return false
+  }
+  engine.on_scene_render(demo_state.scene, fn(_frame) {
+    render_current_frame(demo_state)
+  })
+  true
+}
+
+///|
 /// Creates DemoState and registers the sample engine handlers.
 pub fn setup_engine(engine : @app.Engine) -> Bool {
   let (_device, canvas_context, _format, _queue) = engine.gpu_context().get()

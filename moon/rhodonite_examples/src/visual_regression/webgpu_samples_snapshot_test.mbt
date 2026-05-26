@@ -47,9 +47,9 @@ fn assert_native_visual_sample(id : String) -> Unit raise {
 /// Implements `assert_native_visual_manifest_matches_test_blocks`.
 fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
   let samples = visual_samples_for_target("native")
-  if samples.length() != 5 {
+  if samples.length() != 6 {
     @test.fail(
-      "native visual regression manifest has \{samples.length()} samples, but MoonBit declares 5 native test blocks",
+      "native visual regression manifest has \{samples.length()} samples, but MoonBit declares 6 native test blocks",
     )
   }
   for i = 0; i < samples.length(); i = i + 1 {
@@ -57,6 +57,7 @@ fn assert_native_visual_manifest_matches_test_blocks() -> Unit raise {
       "basic-triangle"
       | "ondemand-triangle"
       | "ecs-scene-graph"
+      | "ecs-scene-graph-undo-redo"
       | "ecs-custom-component-color"
       | "ecs-mass-cubes" => ()
       id =>
@@ -83,6 +84,11 @@ test "visual WebGPU native ECS scene graph PNG golden" {
 }
 
 ///|
+test "visual WebGPU native ECS scene graph Undo Redo PNG golden" {
+  assert_native_visual_sample("ecs-scene-graph-undo-redo")
+}
+
+///|
 test "visual WebGPU native ECS custom component color PNG golden" {
   assert_native_visual_sample("ecs-custom-component-color")
 }
@@ -102,6 +108,10 @@ fn native_visual_platform_app(id : String) -> @sdl_app.PlatformApp raise {
       @sdl_app.PlatformApp::default_engine(@ondemand_triangle.setup_engine)
     "ecs-scene-graph" =>
       @sdl_app.PlatformApp::default_engine(@ecs_scene_graph.setup_engine)
+    "ecs-scene-graph-undo-redo" =>
+      @sdl_app.PlatformApp::default_engine(
+        @ecs_scene_graph.setup_undo_redo_visual_engine,
+      )
     "ecs-custom-component-color" =>
       @sdl_app.PlatformApp::default_engine(
         @ecs_custom_component_color.setup_engine,

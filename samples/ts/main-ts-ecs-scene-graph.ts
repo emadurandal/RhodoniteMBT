@@ -4,6 +4,7 @@
 import "./style.css";
 import {
 	World,
+	WorldHistory,
 	createOrbitOrthographicCameraDescFromYzPosition,
 	setupOrbitOrthographicCamera,
 	type EntityId,
@@ -220,6 +221,36 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	});
 }
 
+function applyUndoRedoVisualEdit(demo: DemoState): void {
+	const history = WorldHistory.new();
+	const ok = history.withTransaction(demo.world, "Scene Graph Visual Move", () =>
+		history.setTransformTrs(
+			demo.world,
+			demo.objects.earth,
+			1.15,
+			0,
+			1.65,
+			0,
+			0,
+			0,
+			1,
+			0.36,
+			0.36,
+			0.36,
+		)
+	);
+	if (!ok) {
+		throw new Error("Failed to apply tracked scene graph visual edit.");
+	}
+	if (!history.undo(demo.world)) {
+		throw new Error("Failed to undo scene graph visual edit.");
+	}
+	if (!history.redo(demo.world)) {
+		throw new Error("Failed to redo scene graph visual edit.");
+	}
+	demo.scene.prepareRenderState();
+}
+
 export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array> {
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
@@ -234,6 +265,31 @@ export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array
 	);
 	if (platform === undefined) {
 		throw new Error("TypeScript ECS scene graph platform failed to initialize.");
+	}
+	try {
+		return await readPresentedCanvasRgba8(canvas, platform.engine.queue);
+	} finally {
+		platform.dispose();
+	}
+}
+
+export async function renderTsEcsSceneGraphUndoRedoBrowserSnapshot(): Promise<Uint8Array> {
+	const canvas = document.createElement("canvas");
+	canvas.width = CANVAS_WIDTH;
+	canvas.height = CANVAS_HEIGHT;
+	const platform = await runPlatform(
+		new PlatformConfig(canvas),
+		PlatformApp.defaultEngine((engine) => {
+			const demo = createDemoStateForEngine(engine);
+			applyUndoRedoVisualEdit(demo);
+			engine.onSceneRender(demo.scene, () => {
+				renderCurrentFrame(demo);
+			});
+		}),
+		PlatformOptions.singleFrame(),
+	);
+	if (platform === undefined) {
+		throw new Error("TypeScript ECS scene graph Undo/Redo platform failed to initialize.");
 	}
 	try {
 		return await readPresentedCanvasRgba8(canvas, platform.engine.queue);

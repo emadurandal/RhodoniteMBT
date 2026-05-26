@@ -55,6 +55,7 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <h2>Manifest And Golden Files</h2>
           <p>test matrix は <a href="../../moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"><code>visual_samples.tsv</code></a> にあります。各 row は target、id、display name、PNG filename、<code>max_mismatch_rate</code>、<code>perceptual_threshold</code> を持ちます。</p>
           <p>golden PNG は <a href="../../moon/rhodonite_examples/src/visual_regression/__image_snapshots__/"><code>moon/rhodonite_examples/src/visual_regression/__image_snapshots__</code></a> に置きます。browser harness は MoonBit JS、WASM、WASM-GC、TypeScript host variants を含みます。</p>
+          <p>Undo/Redo coverage は dedicated scene graph sample として含めます。<code>ecs-scene-graph-undo-redo</code> は MoonBit browser / native Platform path を通り、<code>ts-ecs-scene-graph-undo-redo</code> は TypeScript browser wrapper path を検証します。</p>
 
           <h2>Comparison</h2>
           <ul>
