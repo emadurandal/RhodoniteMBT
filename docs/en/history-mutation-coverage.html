@@ -63,6 +63,7 @@
             <thead><tr><th>Surface</th><th>Undo/Redo status</th></tr></thead>
             <tbody>
               <tr><td><code>QueryRow::write_tracked</code>, <code>RawQueryRow::write_tracked</code></td><td>Tracked callback APIs for row authoring. They delegate without history copies when recording is disabled.</td></tr>
+              <tr><td><code>QueryRow::write_transform3d_tracked</code>, <code>write_child_of_tracked</code>, <code>write_global_transform_tracked</code></td><td>Typed tracked QueryRow callbacks for builtin authoring rows. GlobalTransform records the logical matrix through <code>WorldHistory::set_global_transform</code>.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>Tracked callback API for full-column edits. It snapshots the column and records changed rows.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>Tracked callback API for sparse column edits when the caller already knows the candidate rows. It snapshots and records only those row views.</td></tr>
               <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods; if a later command fails, successful commands remain undoable.</td></tr>

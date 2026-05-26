@@ -578,6 +578,19 @@ pub fn QueryRow::write_transform3d(
 }
 
 ///|
+/// Runs `f` with a mutable Transform3D row and records the change through `history`.
+pub fn QueryRow::write_transform3d_tracked(
+  self : QueryRow,
+  history : WorldHistory,
+  f : (@comp.Transform3DMutRow) -> Unit,
+) -> Bool {
+  let component = self.world.transform_component_id
+  self.write_tracked(history, component, bytes => {
+    f(@comp.Transform3DMutRow::from_component_mut_view(bytes))
+  })
+}
+
+///|
 /// Implements `QueryRow::read_child_of`.
 pub fn QueryRow::read_child_of(self : QueryRow) -> EntityId {
   let component = self.world.child_of_component_id
@@ -600,6 +613,20 @@ pub fn QueryRow::write_child_of(self : QueryRow, parent : EntityId) -> Unit {
     self.component_mut_view(component, "QueryRow::write_child_of"),
   )
   row.write_parent(parent.index, parent.generation)
+}
+
+///|
+/// Writes ChildOf through `history`.
+pub fn QueryRow::write_child_of_tracked(
+  self : QueryRow,
+  history : WorldHistory,
+  parent : EntityId,
+) -> Bool {
+  let component = self.world.child_of_component_id
+  self.write_tracked(history, component, bytes => {
+    let row = @comp.ChildOfMutRow::from_component_mut_view(bytes)
+    row.write_parent(parent.index, parent.generation)
+  })
 }
 
 ///|
@@ -638,6 +665,49 @@ pub fn QueryRow::write_global_transform(
   )
   let next = @comp.matrix44f_from_global_transform_gpu_bytes(row_bytes, format)
   ignore(self.world.set_global_transform(self.entity, next))
+}
+
+///|
+/// Runs `f` with a mutable GlobalTransform GPU row and records the logical matrix change through `history`.
+pub fn QueryRow::write_global_transform_tracked(
+  self : QueryRow,
+  history : WorldHistory,
+  f : (@comp.GlobalTransformGpuMutRow) -> Unit,
+) -> Bool {
+  let component = self.world.global_transform_component_id
+  ignore(
+    self.component_payload_index(
+      component, "QueryRow::write_global_transform_tracked",
+    ),
+  )
+  self.world.assert_system_component_write(
+    component, "QueryRow::write_global_transform_tracked",
+  )
+  let format = match self.world.global_transform_ref(self.entity) {
+    Some(gt_ref) => gt_ref.format
+    None => self.world.global_transform_default_format
+  }
+  let row_bytes = FixedArray::make(
+    @comp.global_transform_word_count(format) * 4,
+    (0 : Byte),
+  )
+  let current = match self.world.get_global_transform(self.entity) {
+    Some(m) => m
+    None => @m44.Matrix44F::identity()
+  }
+  @comp.matrix44f_write_global_transform_to_gpu_row(
+    current,
+    row_bytes.mut_view(start=0, end=row_bytes.length()),
+    format,
+  )
+  f(
+    @comp.GlobalTransformGpuMutRow::from_gpu_row_format(
+      row_bytes.mut_view(start=0, end=row_bytes.length()),
+      format,
+    ),
+  )
+  let next = @comp.matrix44f_from_global_transform_gpu_bytes(row_bytes, format)
+  history.set_global_transform(self.world, self.entity, next)
 }
 
 ///|

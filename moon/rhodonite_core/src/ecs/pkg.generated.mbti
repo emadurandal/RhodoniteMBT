@@ -217,9 +217,12 @@ pub fn QueryRow::read_child_of(Self) -> EntityId
 pub fn QueryRow::read_transform3d(Self) -> @components.Transform3DRow
 pub fn QueryRow::write(Self, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Unit
 pub fn QueryRow::write_child_of(Self, EntityId) -> Unit
+pub fn QueryRow::write_child_of_tracked(Self, WorldHistory, EntityId) -> Bool
 pub fn QueryRow::write_global_transform(Self, (@components.GlobalTransformGpuMutRow) -> Unit) -> Unit
+pub fn QueryRow::write_global_transform_tracked(Self, WorldHistory, (@components.GlobalTransformGpuMutRow) -> Unit) -> Bool
 pub fn QueryRow::write_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
 pub fn QueryRow::write_transform3d(Self, (@components.Transform3DMutRow) -> Unit) -> Unit
+pub fn QueryRow::write_transform3d_tracked(Self, WorldHistory, (@components.Transform3DMutRow) -> Unit) -> Bool
 
 pub struct RawPreparedQuery {
   // private fields
