@@ -293,6 +293,88 @@ test "System conflict helpers detect same-phase access overlaps" {
 }
 
 ///|
+test "SystemRunner::plan_phase exposes conflict-free execution batches" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemPlanA", 4)
+  let qb = world.register_cpu_component("SystemPlanB", 4)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("write-b", update_phase(), [], [qb], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("write-a", update_phase(), [], [qa], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("post", post_update_phase(), [], [], (_w, _c, _b) => ()),
+  )
+  let plan = runner.plan_phase(update_phase())
+  assert_true(plan.phase == update_phase())
+  assert_eq(plan.system_count, 3)
+  assert_eq(plan.batches.length(), 2)
+  assert_eq(plan.batches[0].index, 0)
+  assert_eq(plan.batches[0].systems.length(), 2)
+  assert_eq(plan.batches[0].systems[0].runner_index, 0)
+  assert_eq(plan.batches[0].systems[0].batch_index, 0)
+  assert_eq(plan.batches[0].systems[0].name, "read-a")
+  assert_true(plan.batches[0].systems[0].phase == update_phase())
+  assert_eq(plan.batches[0].systems[0].reads[0].index, qa.index)
+  assert_eq(plan.batches[0].systems[1].runner_index, 1)
+  assert_eq(plan.batches[0].systems[1].writes[0].index, qb.index)
+  assert_true(!plan.batches[0].systems[1].structural_write)
+  assert_eq(plan.batches[1].index, 1)
+  assert_eq(plan.batches[1].systems.length(), 1)
+  assert_eq(plan.batches[1].systems[0].runner_index, 2)
+  assert_eq(plan.batches[1].systems[0].name, "write-a")
+}
+
+///|
+test "SystemRunner::plan_phase isolates structural writes" {
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("before", update_phase(), [], [], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new_with_structural_write("structural", update_phase(), [], [], (
+      _w,
+      _c,
+      _b,
+    ) => ()),
+  )
+  runner.add_system(
+    System::new("after", update_phase(), [], [], (_w, _c, _b) => ()),
+  )
+  let plan = runner.plan_phase(update_phase())
+  assert_eq(plan.system_count, 3)
+  assert_eq(plan.batches.length(), 3)
+  assert_eq(plan.batches[0].systems[0].name, "before")
+  assert_eq(plan.batches[1].systems[0].name, "structural")
+  assert_true(plan.batches[1].systems[0].structural_write)
+  assert_eq(plan.batches[2].systems[0].name, "after")
+}
+
+///|
+test "SystemRunner::plan_phase returns empty and snapshot plans" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemPlanSnapshotA", 4)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("snapshot", update_phase(), [qa], [], (_w, _c, _b) => ()),
+  )
+  let empty = runner.plan_phase(post_update_phase())
+  assert_eq(empty.system_count, 0)
+  assert_eq(empty.batches.length(), 0)
+  let plan = runner.plan_phase(update_phase())
+  assert_eq(plan.system_count, 1)
+  assert_eq(plan.batches.length(), 1)
+  plan.batches[0].systems[0].reads[0] = ComponentTypeId::new(999)
+  let fresh = runner.plan_phase(update_phase())
+  assert_eq(fresh.batches[0].systems[0].reads[0].index, qa.index)
+}
+
+///|
 test "System writes declaration also permits reads during system runner execution" {
   let world = World::new()
   let qa = world.register_cpu_component("SystemWriteCanReadA", 4)

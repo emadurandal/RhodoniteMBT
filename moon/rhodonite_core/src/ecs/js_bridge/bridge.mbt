@@ -2217,6 +2217,99 @@ pub fn system_runner_has_parallel_access_conflicts(
 }
 
 ///|
+/// Implements `system_runner_plan_phase`.
+pub fn system_runner_plan_phase(
+  runner : @ecs.SystemRunner,
+  phase : @ecs.PhaseKey,
+) -> @ecs.SystemPhasePlan {
+  runner.plan_phase(phase)
+}
+
+///|
+/// Implements `system_phase_plan_phase`.
+pub fn system_phase_plan_phase(plan : @ecs.SystemPhasePlan) -> @ecs.PhaseKey {
+  plan.phase
+}
+
+///|
+/// Implements `system_phase_plan_system_count`.
+pub fn system_phase_plan_system_count(plan : @ecs.SystemPhasePlan) -> Int {
+  plan.system_count
+}
+
+///|
+/// Implements `system_phase_plan_batches`.
+pub fn system_phase_plan_batches(
+  plan : @ecs.SystemPhasePlan,
+) -> Array[@ecs.SystemPlanBatch] {
+  plan.batches
+}
+
+///|
+/// Implements `system_plan_batch_index`.
+pub fn system_plan_batch_index(batch : @ecs.SystemPlanBatch) -> Int {
+  batch.index
+}
+
+///|
+/// Implements `system_plan_batch_systems`.
+pub fn system_plan_batch_systems(
+  batch : @ecs.SystemPlanBatch,
+) -> Array[@ecs.SystemPlanSystem] {
+  batch.systems
+}
+
+///|
+/// Implements `system_plan_system_runner_index`.
+pub fn system_plan_system_runner_index(system : @ecs.SystemPlanSystem) -> Int {
+  system.runner_index
+}
+
+///|
+/// Implements `system_plan_system_batch_index`.
+pub fn system_plan_system_batch_index(system : @ecs.SystemPlanSystem) -> Int {
+  system.batch_index
+}
+
+///|
+/// Implements `system_plan_system_name`.
+pub fn system_plan_system_name(system : @ecs.SystemPlanSystem) -> String {
+  system.name
+}
+
+///|
+/// Implements `system_plan_system_phase`.
+pub fn system_plan_system_phase(
+  system : @ecs.SystemPlanSystem,
+) -> @ecs.PhaseKey {
+  system.phase
+}
+
+///|
+/// Implements `system_plan_system_reads`.
+pub fn system_plan_system_reads(
+  system : @ecs.SystemPlanSystem,
+) -> Array[@ecs.ComponentTypeId] {
+  system.reads
+}
+
+///|
+/// Implements `system_plan_system_writes`.
+pub fn system_plan_system_writes(
+  system : @ecs.SystemPlanSystem,
+) -> Array[@ecs.ComponentTypeId] {
+  system.writes
+}
+
+///|
+/// Implements `system_plan_system_structural_write`.
+pub fn system_plan_system_structural_write(
+  system : @ecs.SystemPlanSystem,
+) -> Bool {
+  system.structural_write
+}
+
+///|
 /// Implements `system_runner_run_phase`.
 pub fn system_runner_run_phase(
   runner : @ecs.SystemRunner,

@@ -31,6 +31,9 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonSystemContext = object;
 	export type MoonSystem = object;
 	export type MoonSystemRunner = object;
+	export type MoonSystemPhasePlan = object;
+	export type MoonSystemPlanBatch = object;
+	export type MoonSystemPlanSystem = object;
 	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
@@ -968,6 +971,42 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	): void;
 	export function system_runner_has_parallel_access_conflicts(
 		runner: MoonSystemRunner,
+	): MoonBool;
+	export function system_runner_plan_phase(
+		runner: MoonSystemRunner,
+		phase: MoonPhaseKey,
+	): MoonSystemPhasePlan;
+	export function system_phase_plan_phase(
+		plan: MoonSystemPhasePlan,
+	): MoonPhaseKey;
+	export function system_phase_plan_system_count(
+		plan: MoonSystemPhasePlan,
+	): number;
+	export function system_phase_plan_batches(
+		plan: MoonSystemPhasePlan,
+	): MoonSystemPlanBatch[];
+	export function system_plan_batch_index(batch: MoonSystemPlanBatch): number;
+	export function system_plan_batch_systems(
+		batch: MoonSystemPlanBatch,
+	): MoonSystemPlanSystem[];
+	export function system_plan_system_runner_index(
+		system: MoonSystemPlanSystem,
+	): number;
+	export function system_plan_system_batch_index(
+		system: MoonSystemPlanSystem,
+	): number;
+	export function system_plan_system_name(system: MoonSystemPlanSystem): string;
+	export function system_plan_system_phase(
+		system: MoonSystemPlanSystem,
+	): MoonPhaseKey;
+	export function system_plan_system_reads(
+		system: MoonSystemPlanSystem,
+	): MoonComponentTypeId[];
+	export function system_plan_system_writes(
+		system: MoonSystemPlanSystem,
+	): MoonComponentTypeId[];
+	export function system_plan_system_structural_write(
+		system: MoonSystemPlanSystem,
 	): MoonBool;
 	export function system_runner_run_phase(
 		runner: MoonSystemRunner,

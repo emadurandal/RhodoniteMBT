@@ -294,6 +294,27 @@ pub(all) struct SystemContext {
 }
 pub fn SystemContext::new(Float, Int) -> Self
 
+pub(all) struct SystemPhasePlan {
+  phase : PhaseKey
+  system_count : Int
+  batches : Array[SystemPlanBatch]
+}
+
+pub(all) struct SystemPlanBatch {
+  index : Int
+  systems : Array[SystemPlanSystem]
+}
+
+pub(all) struct SystemPlanSystem {
+  runner_index : Int
+  batch_index : Int
+  name : String
+  phase : PhaseKey
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  structural_write : Bool
+}
+
 pub struct SystemRunner {
   // private fields
 }
@@ -301,6 +322,7 @@ pub fn SystemRunner::add_system(Self, System) -> Unit
 pub fn SystemRunner::has_parallel_access_conflicts(Self) -> Bool
 pub fn SystemRunner::len(Self) -> Int
 pub fn SystemRunner::new() -> Self
+pub fn SystemRunner::plan_phase(Self, PhaseKey) -> SystemPhasePlan
 pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 
 pub struct World {

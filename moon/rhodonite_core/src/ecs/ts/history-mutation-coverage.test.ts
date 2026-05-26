@@ -237,7 +237,7 @@ const auditedSurfaces: readonly SurfaceAudit[] = [
 	surfaceAudit("SystemRunner", SystemRunner, {
 		raw_guarded: ["runPhase"],
 		intentionally_untracked: ["addSystem"],
-		read_only: ["len", "hasParallelAccessConflicts"],
+		read_only: ["len", "hasParallelAccessConflicts", "planPhase"],
 	}),
 	surfaceAudit("CommandBuffer", CommandBuffer, {
 		tracked_command_phase: [
@@ -416,7 +416,7 @@ const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 	moonBitSurfaceAudit("SystemRunner", {
 		raw_guarded: ["run_phase"],
 		intentionally_untracked: ["add_system"],
-		read_only: ["has_parallel_access_conflicts", "len", "new"],
+		read_only: ["has_parallel_access_conflicts", "len", "new", "plan_phase"],
 	}),
 	moonBitSurfaceAudit("CommandBuffer", {
 		tracked_command_phase: [

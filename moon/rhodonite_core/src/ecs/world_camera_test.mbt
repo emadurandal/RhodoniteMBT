@@ -228,6 +228,114 @@ test "builtin Camera view update still writes full row" {
 }
 
 ///|
+test "builtin Camera history restore refreshes input cache" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    history.set_camera_matrices(
+      world,
+      camera,
+      view,
+      proj,
+      (0.2 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(history.undo(world))
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(!world.has_camera_blob_write_views())
+  assert_eq(world.drain_camera_blob_write_views().length(), 0)
+}
+
+///|
+test "builtin Camera cache is replaced when freed slot is reused" {
+  let world = World::new()
+  let camera0 = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    world.set_camera_matrices(
+      camera0,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(world.remove_component(camera0, world.camera_component()))
+  ignore(world.drain_camera_blob_write_views())
+  let camera1 = world.create_entity()
+  assert_true(
+    world.set_camera_matrices(
+      camera1,
+      view,
+      proj,
+      (0.3 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  match world.camera_ref(camera1) {
+    Some(camera_ref) => assert_eq(camera_ref.word_offset, 0)
+    None => abort("expected reused camera ref")
+  }
+  assert_true(
+    world.set_camera_matrices(
+      camera1,
+      view,
+      proj,
+      (0.3 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(!world.has_camera_blob_write_views())
+  assert_eq(world.drain_camera_blob_write_views().length(), 0)
+}
+
+///|
 test "orbit camera reset restores home Transform3D" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()

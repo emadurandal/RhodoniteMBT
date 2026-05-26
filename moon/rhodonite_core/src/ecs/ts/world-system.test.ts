@@ -51,6 +51,84 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
 	});
 
+	it("plans TS system phases without executing callbacks", () => {
+		const world = World.new();
+		const a = world.registerCpuComponent("TsSystemPlanA", 4);
+		const b = world.registerCpuComponent("TsSystemPlanB", 4);
+		const phase = PhaseKey.new("ts/plan");
+		const otherPhase = PhaseKey.new("ts/plan-other");
+		const runner = SystemRunner.new();
+		let executed = false;
+
+		runner.addSystem(System.new("read-a", phase, [a], [], () => {
+			executed = true;
+		}));
+		runner.addSystem(System.new("write-b", phase, [], [b], () => {
+			executed = true;
+		}));
+		runner.addSystem(System.new("write-a", phase, [], [a], () => {
+			executed = true;
+		}));
+		runner.addSystem(System.new("other", otherPhase, [], [], () => {
+			executed = true;
+		}));
+
+		const empty = runner.planPhase(PhaseKey.new("ts/missing"));
+		expect(empty.phase().name()).toBe("ts/missing");
+		expect(empty.systemCount()).toBe(0);
+		expect(empty.batchCount()).toBe(0);
+		expect(empty.batches()).toEqual([]);
+
+		const plan = runner.planPhase(phase);
+		expect(executed).toBe(false);
+		expect(plan.phase().name()).toBe("ts/plan");
+		expect(plan.systemCount()).toBe(3);
+		expect(plan.batchCount()).toBe(2);
+		const batches = plan.batches();
+		expect(batches[0].index()).toBe(0);
+		expect(batches[1].index()).toBe(1);
+		const firstBatch = batches[0].systems();
+		expect(firstBatch.map((system) => system.name())).toEqual([
+			"read-a",
+			"write-b",
+		]);
+		expect(firstBatch[0].runnerIndex()).toBe(0);
+		expect(firstBatch[0].batchIndex()).toBe(0);
+		expect(firstBatch[0].phase().name()).toBe("ts/plan");
+		expect(firstBatch[0].reads().map((component) => component.index())).toEqual([
+			a.index(),
+		]);
+		expect(firstBatch[0].writes()).toEqual([]);
+		expect(firstBatch[0].structuralWrite()).toBe(false);
+		expect(firstBatch[1].runnerIndex()).toBe(1);
+		expect(firstBatch[1].writes().map((component) => component.index())).toEqual([
+			b.index(),
+		]);
+		const secondBatch = batches[1].systems();
+		expect(secondBatch).toHaveLength(1);
+		expect(secondBatch[0].name()).toBe("write-a");
+		expect(secondBatch[0].runnerIndex()).toBe(2);
+	});
+
+	it("plans structural TS systems as separate batches", () => {
+		const phase = PhaseKey.new("ts/plan-structural");
+		const runner = SystemRunner.new();
+		runner.addSystem(System.new("before", phase, [], [], () => {}));
+		runner.addSystem(
+			System.newWithStructuralWrite("structural", phase, [], [], () => {}),
+		);
+		runner.addSystem(System.new("after", phase, [], [], () => {}));
+
+		const batches = runner.planPhase(phase).batches();
+		expect(batches).toHaveLength(3);
+		expect(batches.map((batch) => batch.systems()[0].name())).toEqual([
+			"before",
+			"structural",
+			"after",
+		]);
+		expect(batches[1].systems()[0].structuralWrite()).toBe(true);
+	});
+
 
 	it("exposes structural TS systems and tracked system phases", () => {
 		const world = World.new();

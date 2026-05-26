@@ -37,10 +37,13 @@ fn system_access_conflicts(a : System, b : System) -> Bool {
 }
 
 ///|
-/// Implements `system_batch_conflicts_with`.
-fn system_batch_conflicts_with(batch : Array[System], system : System) -> Bool {
+/// Implements `scheduled_system_batch_conflicts_with`.
+fn scheduled_system_batch_conflicts_with(
+  batch : Array[ScheduledSystem],
+  system : System,
+) -> Bool {
   for i = 0; i < batch.length(); i = i + 1 {
-    if batch[i].conflicts_with(system) {
+    if batch[i].system.conflicts_with(system) {
       return true
     }
   }
@@ -48,15 +51,79 @@ fn system_batch_conflicts_with(batch : Array[System], system : System) -> Bool {
 }
 
 ///|
+/// Implements `copy_scheduled_system_array`.
+fn copy_scheduled_system_array(
+  src : Array[ScheduledSystem],
+) -> Array[ScheduledSystem] {
+  let out : Array[ScheduledSystem] = []
+  for i = 0; i < src.length(); i = i + 1 {
+    out.push(src[i])
+  }
+  out
+}
+
+///|
+/// Builds the conflict-free batches used by phase execution and planning.
+fn SystemRunner::build_phase_batches(
+  self : SystemRunner,
+  phase : PhaseKey,
+) -> Array[SystemBatch] {
+  let batches : Array[SystemBatch] = []
+  let mut batch : Array[ScheduledSystem] = []
+  for i = 0; i < self.systems.length(); i = i + 1 {
+    let system = self.systems[i]
+    if system.phase == phase {
+      if scheduled_system_batch_conflicts_with(batch, system) {
+        batches.push({ systems: copy_scheduled_system_array(batch) })
+        batch = []
+      }
+      batch.push({ runner_index: i, system })
+    }
+  }
+  if batch.length() > 0 {
+    batches.push({ systems: copy_scheduled_system_array(batch) })
+  }
+  batches
+}
+
+///|
+/// Builds a public snapshot for one scheduled system.
+fn scheduled_system_plan(
+  scheduled : ScheduledSystem,
+  batch_index : Int,
+) -> SystemPlanSystem {
+  let system = scheduled.system
+  {
+    runner_index: scheduled.runner_index,
+    batch_index,
+    name: system.name,
+    phase: system.phase,
+    reads: copy_component_array(system.reads),
+    writes: copy_component_array(system.writes),
+    structural_write: system.structural_write,
+  }
+}
+
+///|
+/// Builds a public snapshot for one execution batch.
+fn system_batch_plan(batch : SystemBatch, batch_index : Int) -> SystemPlanBatch {
+  let systems : Array[SystemPlanSystem] = []
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    systems.push(scheduled_system_plan(batch.systems[i], batch_index))
+  }
+  { index: batch_index, systems }
+}
+
+///|
 /// Implements `run_system_batch`.
 fn run_system_batch(
-  batch : Array[System],
+  batch : SystemBatch,
   world : World,
   ctx : SystemContext,
 ) -> Bool {
   let command_buffers : Array[CommandBuffer] = []
-  for i = 0; i < batch.length(); i = i + 1 {
-    let system = batch[i]
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
     let commands = CommandBuffer::new_for_system(
       world,
       system.name,
@@ -75,7 +142,7 @@ fn run_system_batch(
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch[i]
+    let system = batch.systems[i].system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
@@ -93,14 +160,14 @@ fn run_system_batch(
 ///|
 /// Runs one system batch and applies queued commands through WorldHistory.
 fn run_system_batch_tracked(
-  batch : Array[System],
+  batch : SystemBatch,
   world : World,
   ctx : SystemContext,
   history : WorldHistory,
 ) -> Bool {
   let command_buffers : Array[CommandBuffer] = []
-  for i = 0; i < batch.length(); i = i + 1 {
-    let system = batch[i]
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let system = batch.systems[i].system
     let commands = CommandBuffer::new_for_history_system(
       world,
       system.name,
@@ -120,7 +187,7 @@ fn run_system_batch_tracked(
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch[i]
+    let system = batch.systems[i].system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
@@ -283,6 +350,24 @@ pub fn SystemRunner::add_system(self : SystemRunner, system : System) -> Unit {
 }
 
 ///|
+/// Returns the conflict-free batches that `run_phase` would execute for `phase`.
+///
+/// The returned plan is a snapshot: mutating its arrays does not change the runner.
+pub fn SystemRunner::plan_phase(
+  self : SystemRunner,
+  phase : PhaseKey,
+) -> SystemPhasePlan {
+  let batches = self.build_phase_batches(phase)
+  let plan_batches : Array[SystemPlanBatch] = []
+  let mut system_count = 0
+  for i = 0; i < batches.length(); i = i + 1 {
+    system_count = system_count + batches[i].systems.length()
+    plan_batches.push(system_batch_plan(batches[i], i))
+  }
+  { phase, system_count, batches: plan_batches }
+}
+
+///|
 /// Reports whether any two systems in the same phase have read/write or write/write conflicts.
 ///
 /// `SystemRunner::run_phase` remains single-threaded and registration-ordered; this helper is a
@@ -329,27 +414,10 @@ pub fn SystemRunner::run_phase(
   world.assert_not_history_raw_mutation("SystemRunner::run_phase")
   world.lock_component_registration()
   let mut ok = true
-  let batch : Array[System] = []
-  for i = 0; i < self.systems.length(); i = i + 1 {
-    let system = self.systems[i]
-    if system.phase == phase {
-      if system_batch_conflicts_with(batch, system) {
-        if !run_system_batch(batch, world, ctx) {
-          ok = false
-        }
-        while batch.length() > 0 {
-          let _ = batch.pop()
-        }
-      }
-      batch.push(system)
-    }
-  }
-  if batch.length() > 0 {
-    if !run_system_batch(batch, world, ctx) {
+  let batches = self.build_phase_batches(phase)
+  for i = 0; i < batches.length(); i = i + 1 {
+    if !run_system_batch(batches[i], world, ctx) {
       ok = false
-    }
-    while batch.length() > 0 {
-      let _ = batch.pop()
     }
   }
   world.unlock_component_registration()
@@ -367,27 +435,10 @@ fn SystemRunner::run_phase_tracked(
 ) -> Bool {
   world.lock_component_registration()
   let mut ok = true
-  let batch : Array[System] = []
-  for i = 0; i < self.systems.length(); i = i + 1 {
-    let system = self.systems[i]
-    if system.phase == phase {
-      if system_batch_conflicts_with(batch, system) {
-        if !run_system_batch_tracked(batch, world, ctx, history) {
-          ok = false
-        }
-        while batch.length() > 0 {
-          let _ = batch.pop()
-        }
-      }
-      batch.push(system)
-    }
-  }
-  if batch.length() > 0 {
-    if !run_system_batch_tracked(batch, world, ctx, history) {
+  let batches = self.build_phase_batches(phase)
+  for i = 0; i < batches.length(); i = i + 1 {
+    if !run_system_batch_tracked(batches[i], world, ctx, history) {
       ok = false
-    }
-    while batch.length() > 0 {
-      let _ = batch.pop()
     }
   }
   world.unlock_component_registration()

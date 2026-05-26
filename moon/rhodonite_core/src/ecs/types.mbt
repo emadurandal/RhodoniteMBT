@@ -236,8 +236,19 @@ struct GlobalTransformBlobStore {
 
 ///|
 /// Packed `u32` backing store for builtin Camera GPU rows.
+#cfg(target="js")
 struct CameraBlobStore {
   store : PackedGpuBlobStore
+}
+
+///|
+/// Packed `u32` backing store for builtin Camera GPU rows.
+#cfg(not(target="js"))
+struct CameraBlobStore {
+  store : PackedGpuBlobStore
+  cache_valid : Array[Bool]
+  cache_word_offsets : Array[Int]
+  cache_words : Array[FixedArray[UInt]]
 }
 
 ///|
@@ -297,6 +308,46 @@ pub struct System {
   priv writes : Array[ComponentTypeId]
   priv structural_write : Bool
   priv run : (World, SystemContext, CommandBuffer) -> Unit
+}
+
+///|
+/// One scheduled system entry inside a private execution batch.
+priv struct ScheduledSystem {
+  runner_index : Int
+  system : System
+}
+
+///|
+/// Private execution batch built from one `SystemRunner` phase.
+priv struct SystemBatch {
+  systems : Array[ScheduledSystem]
+}
+
+///|
+/// Read-only snapshot of one system in a planned phase batch.
+pub(all) struct SystemPlanSystem {
+  runner_index : Int
+  batch_index : Int
+  name : String
+  phase : PhaseKey
+  reads : Array[ComponentTypeId]
+  writes : Array[ComponentTypeId]
+  structural_write : Bool
+}
+
+///|
+/// Read-only snapshot of one conflict-free planned system batch.
+pub(all) struct SystemPlanBatch {
+  index : Int
+  systems : Array[SystemPlanSystem]
+}
+
+///|
+/// Read-only snapshot of the batches `SystemRunner::run_phase` would execute for a phase.
+pub(all) struct SystemPhasePlan {
+  phase : PhaseKey
+  system_count : Int
+  batches : Array[SystemPlanBatch]
 }
 
 ///|

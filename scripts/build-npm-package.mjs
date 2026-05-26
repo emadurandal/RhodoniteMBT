@@ -157,7 +157,7 @@ function writeEntrypoints() {
       'export * from "./ecs/history-archive.js";',
       'export * from "./ecs/history-ui-state.js";',
       'export * from "./ecs/query.js";',
-      'export { CommandBuffer, System, SystemContext, SystemRunner, createTransformPropagationSystem } from "./ecs/system.js";',
+      'export { CommandBuffer, System, SystemContext, SystemPhasePlan, SystemPlanBatch, SystemPlanSystem, SystemRunner, createTransformPropagationSystem } from "./ecs/system.js";',
       'export type { SystemCallback } from "./ecs/system.js";',
       'export { PhaseKey as EcsPhaseKey } from "./ecs/system.js";',
       'export * from "./ecs/types.js";',
