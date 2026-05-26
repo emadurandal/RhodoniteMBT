@@ -205,6 +205,7 @@ pub fn PreparedQuery::refresh(Self, World) -> Self
 pub struct Query {
   // private fields
 }
+pub fn Query::component_index(Self, ComponentTypeId) -> Int
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::plan(Self, World) -> QueryPlan
@@ -214,6 +215,7 @@ pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 pub struct QueryCache {
   // private fields
 }
+pub fn QueryCache::component_index(Self, ComponentTypeId) -> Int
 pub fn QueryCache::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn QueryCache::new(Array[ComponentTypeId]) -> Self
 pub fn QueryCache::plan(Self, World) -> QueryPlan
@@ -240,15 +242,19 @@ pub struct QueryRow {
 }
 pub fn QueryRow::entity(Self) -> EntityId
 pub fn QueryRow::has(Self, ComponentTypeId) -> Bool
+pub fn QueryRow::has_at(Self, Int) -> Bool
 pub fn QueryRow::read(Self, ComponentTypeId, (ArrayView[Byte]) -> Unit) -> Unit
+pub fn QueryRow::read_at(Self, Int, (ArrayView[Byte]) -> Unit) -> Unit
 pub fn QueryRow::read_child_of(Self) -> EntityId
 pub fn QueryRow::read_transform3d(Self) -> @components.Transform3DRow
 pub fn QueryRow::write(Self, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Unit
+pub fn QueryRow::write_at(Self, Int, (MutArrayView[Byte]) -> Unit) -> Unit
 pub fn QueryRow::write_child_of(Self, EntityId) -> Unit
 pub fn QueryRow::write_child_of_tracked(Self, WorldHistory, EntityId) -> Bool
 pub fn QueryRow::write_global_transform(Self, (@components.GlobalTransformGpuMutRow) -> Unit) -> Unit
 pub fn QueryRow::write_global_transform_tracked(Self, WorldHistory, (@components.GlobalTransformGpuMutRow) -> Unit) -> Bool
 pub fn QueryRow::write_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
+pub fn QueryRow::write_tracked_at(Self, WorldHistory, Int, (MutArrayView[Byte]) -> Unit) -> Bool
 pub fn QueryRow::write_transform3d(Self, (@components.Transform3DMutRow) -> Unit) -> Unit
 pub fn QueryRow::write_transform3d_tracked(Self, WorldHistory, (@components.Transform3DMutRow) -> Unit) -> Bool
 
@@ -264,6 +270,7 @@ pub fn RawPreparedQuery::refresh(Self, World) -> Self
 pub struct RawQuery {
   // private fields
 }
+pub fn RawQuery::component_index(Self, ComponentTypeId) -> Int
 pub fn RawQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
 pub fn RawQuery::new(Array[ComponentTypeId]) -> Self
@@ -275,17 +282,24 @@ pub struct RawQueryArchetype {
   // private fields
 }
 pub fn RawQueryArchetype::component_stride(Self, ComponentTypeId) -> Int
+pub fn RawQueryArchetype::component_stride_at(Self, Int) -> Int
 pub fn RawQueryArchetype::entity(Self, Int) -> EntityId
 pub fn RawQueryArchetype::has(Self, ComponentTypeId) -> Bool
+pub fn RawQueryArchetype::has_at(Self, Int) -> Bool
 pub fn RawQueryArchetype::length(Self) -> Int
 pub fn RawQueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn RawQueryArchetype::read_column_at(Self, Int) -> ArrayView[Byte]
 pub fn RawQueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
+pub fn RawQueryArchetype::write_column_at(Self, Int) -> MutArrayView[Byte]
 pub fn RawQueryArchetype::write_column_rows_tracked(Self, WorldHistory, ComponentTypeId, Array[Int], (Int, MutArrayView[Byte]) -> Unit) -> Bool
+pub fn RawQueryArchetype::write_column_rows_tracked_at(Self, WorldHistory, Int, Array[Int], (Int, MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryArchetype::write_column_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
+pub fn RawQueryArchetype::write_column_tracked_at(Self, WorldHistory, Int, (MutArrayView[Byte]) -> Unit) -> Bool
 
 pub struct RawQueryCache {
   // private fields
 }
+pub fn RawQueryCache::component_index(Self, ComponentTypeId) -> Int
 pub fn RawQueryCache::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQueryCache::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
 pub fn RawQueryCache::new(Array[ComponentTypeId]) -> Self
@@ -298,9 +312,13 @@ pub struct RawQueryRow {
 }
 pub fn RawQueryRow::entity(Self) -> EntityId
 pub fn RawQueryRow::has(Self, ComponentTypeId) -> Bool
+pub fn RawQueryRow::has_at(Self, Int) -> Bool
 pub fn RawQueryRow::read_view(Self, ComponentTypeId) -> ArrayView[Byte]
+pub fn RawQueryRow::read_view_at(Self, Int) -> ArrayView[Byte]
 pub fn RawQueryRow::write_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
+pub fn RawQueryRow::write_tracked_at(Self, WorldHistory, Int, (MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryRow::write_view(Self, ComponentTypeId) -> MutArrayView[Byte]
+pub fn RawQueryRow::write_view_at(Self, Int) -> MutArrayView[Byte]
 
 pub(all) struct RegisteredComponent {
   id : ComponentTypeId

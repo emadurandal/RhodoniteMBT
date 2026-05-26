@@ -744,12 +744,28 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		required: MoonComponentTypeId[],
 	): MoonRawQueryCache;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
+	export function query_component_index(
+		query: MoonQuery,
+		component: MoonComponentTypeId,
+	): number;
 	export function query_cache_required_components(
 		cache: MoonQueryCache,
 	): MoonComponentTypeId[];
+	export function query_cache_component_index(
+		cache: MoonQueryCache,
+		component: MoonComponentTypeId,
+	): number;
 	export function raw_query_cache_required_components(
 		cache: MoonRawQueryCache,
 	): MoonComponentTypeId[];
+	export function raw_query_component_index(
+		query: MoonRawQuery,
+		component: MoonComponentTypeId,
+	): number;
+	export function raw_query_cache_component_index(
+		cache: MoonRawQueryCache,
+		component: MoonComponentTypeId,
+	): number;
 	export function query_for_each(
 		query: MoonQuery,
 		world: MoonWorld,
@@ -866,18 +882,33 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		row: MoonQueryRow,
 		component: MoonComponentTypeId,
 	): MoonBool;
+	export function query_row_has_at(row: MoonQueryRow, index: number): MoonBool;
 	export function raw_query_row_has(
 		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
+	): MoonBool;
+	export function raw_query_row_has_at(
+		row: MoonRawQueryRow,
+		index: number,
 	): MoonBool;
 	export function query_row_read(
 		row: MoonQueryRow,
 		component: MoonComponentTypeId,
 		f: (bytes: MoonByteView) => void,
 	): void;
+	export function query_row_read_at(
+		row: MoonQueryRow,
+		index: number,
+		f: (bytes: MoonByteView) => void,
+	): void;
 	export function query_row_write(
 		row: MoonQueryRow,
 		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): void;
+	export function query_row_write_at(
+		row: MoonQueryRow,
+		index: number,
 		f: (bytes: MoonByteView) => void,
 	): void;
 	export function query_row_write_tracked(
@@ -886,18 +917,38 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		component: MoonComponentTypeId,
 		f: (bytes: MoonByteView) => void,
 	): MoonBool;
+	export function query_row_write_tracked_at(
+		row: MoonQueryRow,
+		history: MoonWorldHistory,
+		index: number,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
 	export function raw_query_row_read_view(
 		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
+	): MoonByteView;
+	export function raw_query_row_read_view_at(
+		row: MoonRawQueryRow,
+		index: number,
 	): MoonByteView;
 	export function raw_query_row_write_view(
 		row: MoonRawQueryRow,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+	export function raw_query_row_write_view_at(
+		row: MoonRawQueryRow,
+		index: number,
+	): MoonByteView;
 	export function raw_query_row_write_tracked(
 		row: MoonRawQueryRow,
 		history: MoonWorldHistory,
 		component: MoonComponentTypeId,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
+	export function raw_query_row_write_tracked_at(
+		row: MoonRawQueryRow,
+		history: MoonWorldHistory,
+		index: number,
 		f: (bytes: MoonByteView) => void,
 	): MoonBool;
 	export function raw_query_archetype_length(
@@ -911,17 +962,33 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
 	): MoonBool;
+	export function raw_query_archetype_has_at(
+		archetype: MoonRawQueryArchetype,
+		index: number,
+	): MoonBool;
 	export function raw_query_archetype_component_stride(
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
+	): number;
+	export function raw_query_archetype_component_stride_at(
+		archetype: MoonRawQueryArchetype,
+		index: number,
 	): number;
 	export function raw_query_archetype_read_column(
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
 	): MoonByteView;
+	export function raw_query_archetype_read_column_at(
+		archetype: MoonRawQueryArchetype,
+		index: number,
+	): MoonByteView;
 	export function raw_query_archetype_write_column(
 		archetype: MoonRawQueryArchetype,
 		component: MoonComponentTypeId,
+	): MoonByteView;
+	export function raw_query_archetype_write_column_at(
+		archetype: MoonRawQueryArchetype,
+		index: number,
 	): MoonByteView;
 	export function raw_query_archetype_write_column_tracked(
 		archetype: MoonRawQueryArchetype,
@@ -929,10 +996,23 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		component: MoonComponentTypeId,
 		f: (bytes: MoonByteView) => void,
 	): MoonBool;
+	export function raw_query_archetype_write_column_tracked_at(
+		archetype: MoonRawQueryArchetype,
+		history: MoonWorldHistory,
+		index: number,
+		f: (bytes: MoonByteView) => void,
+	): MoonBool;
 	export function raw_query_archetype_write_column_rows_tracked(
 		archetype: MoonRawQueryArchetype,
 		history: MoonWorldHistory,
 		component: MoonComponentTypeId,
+		rows: number[],
+		f: (row: number, bytes: MoonByteView) => void,
+	): MoonBool;
+	export function raw_query_archetype_write_column_rows_tracked_at(
+		archetype: MoonRawQueryArchetype,
+		history: MoonWorldHistory,
+		index: number,
 		rows: number[],
 		f: (row: number, bytes: MoonByteView) => void,
 	): MoonBool;

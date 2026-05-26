@@ -462,4 +462,86 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(cache.plan(world).stale()).toBe(false);
 	});
 
+	it("uses pre-resolved query component indexes", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpuA = world.registerCpuComponent("QueryIndexTsA", 16);
+		const cpuB = world.registerCpuComponent("QueryIndexTsB", 16);
+		const query = Query.new([cpuA, cpuB]);
+		const cache = QueryCache.new([cpuA, cpuB]);
+		expect(query.componentIndex(cpuA)).toBe(0);
+		expect(query.componentIndex(cpuB)).toBe(1);
+		expect(cache.componentIndex(cpuB)).toBe(1);
+
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(entity, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		let readA = 0;
+		query.forEach(world, (row) => {
+			expect(row.hasAt(0)).toBe(true);
+			row.readAt(0, (bytes) => {
+				readA = bytes.getF32(0);
+			});
+			row.writeAt(1, (bytes) => bytes.setF32(0, 7));
+			expect(row.writeTrackedAt(history, 0, (bytes) => bytes.setF32(0, 5))).toBe(
+				true,
+			);
+		});
+		expect(readA).toBeCloseTo(1);
+		expect(getF32(world.componentBytesCopy(entity, cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(5);
+		expect(getF32(world.componentBytesCopy(entity, cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(7);
+		expect(() => query.componentIndex(world.registerCpuComponent("QueryIndexTsC", 16))).toThrow();
+	});
+
+	it("uses pre-resolved raw query component indexes", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpuA = world.registerCpuComponent("RawQueryIndexTsA", 16);
+		const cpuB = world.registerCpuComponent("RawQueryIndexTsB", 16);
+		const raw = RawQuery.new([cpuA, cpuB]);
+		const cache = RawQueryCache.new([cpuA, cpuB]);
+		expect(raw.componentIndex(cpuA)).toBe(0);
+		expect(raw.componentIndex(cpuB)).toBe(1);
+		expect(cache.componentIndex(cpuB)).toBe(1);
+
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(entity, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		raw.forEach(world, (row) => {
+			expect(row.hasAt(0)).toBe(true);
+			expect(row.readViewAt(0).getF32(0)).toBeCloseTo(1);
+			row.writeViewAt(1).setF32(0, 3);
+			expect(row.writeTrackedAt(history, 0, (bytes) => bytes.setF32(0, 4))).toBe(
+				true,
+			);
+		});
+		raw.forEachArchetype(world, (archetype) => {
+			expect(archetype.hasAt(1)).toBe(true);
+			expect(archetype.componentStrideAt(1)).toBe(16);
+			expect(archetype.readColumnAt(1).getF32(0)).toBeCloseTo(3);
+			archetype.writeColumnAt(1).setF32(0, 6);
+			expect(
+				archetype.writeColumnTrackedAt(history, 0, (bytes) => bytes.setF32(0, 8)),
+			).toBe(true);
+			expect(
+				archetype.writeColumnRowsTrackedAt(history, 0, [0], (_row, bytes) =>
+					bytes.setF32(0, 9),
+				),
+			).toBe(true);
+			expect(() => archetype.readColumnAt(-1)).toThrow();
+		});
+		expect(getF32(world.componentBytesCopy(entity, cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(9);
+		expect(getF32(world.componentBytesCopy(entity, cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(6);
+	});
+
 });

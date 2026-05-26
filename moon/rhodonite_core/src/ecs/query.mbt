@@ -56,9 +56,24 @@ pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
 }
 
 ///|
+/// Returns the callback payload index for a required component.
+pub fn Query::component_index(self : Query, component : ComponentTypeId) -> Int {
+  query_component_index(self.required, component, "Query::component_index")
+}
+
+///|
 /// Implements `RawQuery::required_components`.
 pub fn RawQuery::required_components(self : RawQuery) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
+}
+
+///|
+/// Returns the raw callback payload index for a required component.
+pub fn RawQuery::component_index(
+  self : RawQuery,
+  component : ComponentTypeId,
+) -> Int {
+  query_component_index(self.required, component, "RawQuery::component_index")
 }
 
 ///|
@@ -70,11 +85,48 @@ pub fn QueryCache::required_components(
 }
 
 ///|
+/// Returns the cached row query payload index for a required component.
+pub fn QueryCache::component_index(
+  self : QueryCache,
+  component : ComponentTypeId,
+) -> Int {
+  self.query.component_index(component)
+}
+
+///|
 /// Returns a copy of the cached raw query's required component ids.
 pub fn RawQueryCache::required_components(
   self : RawQueryCache,
 ) -> Array[ComponentTypeId] {
   self.query.required_components()
+}
+
+///|
+/// Returns the cached raw query payload index for a required component.
+pub fn RawQueryCache::component_index(
+  self : RawQueryCache,
+  component : ComponentTypeId,
+) -> Int {
+  self.query.component_index(component)
+}
+
+///|
+/// Returns the payload index for `component` or aborts with a setup error.
+fn query_component_index(
+  required : Array[ComponentTypeId],
+  component : ComponentTypeId,
+  operation : String,
+) -> Int {
+  let index = component_array_index_of(required, component)
+  if index < 0 {
+    abort(
+      operation +
+      ": " +
+      component_id_text(component) +
+      " is not part of this query required set.",
+    )
+  }
+  index
 }
 
 ///|
@@ -652,6 +704,13 @@ pub fn QueryRow::has(self : QueryRow, component : ComponentTypeId) -> Bool {
 }
 
 ///|
+/// Returns true after validating that `index` is a valid query payload slot.
+pub fn QueryRow::has_at(self : QueryRow, index : Int) -> Bool {
+  ignore(self.component_at_index(index, "QueryRow::has_at"))
+  true
+}
+
+///|
 /// Implements `RawQueryRow::entity`.
 pub fn RawQueryRow::entity(self : RawQueryRow) -> EntityId {
   self.entity
@@ -664,6 +723,30 @@ pub fn RawQueryRow::has(
   component : ComponentTypeId,
 ) -> Bool {
   component_array_index_of(self.components, component) >= 0
+}
+
+///|
+/// Returns true after validating that `index` is a valid raw query payload slot.
+pub fn RawQueryRow::has_at(self : RawQueryRow, index : Int) -> Bool {
+  self.as_query_row().has_at(index)
+}
+
+///|
+/// Returns the component id at `index` or aborts with an operation-specific message.
+fn QueryRow::component_at_index(
+  self : QueryRow,
+  index : Int,
+  operation : String,
+) -> ComponentTypeId {
+  if index < 0 || index >= self.components.length() {
+    abort(
+      operation +
+      ": payload index " +
+      index.to_string() +
+      " is outside this QueryRow required component range.",
+    )
+  }
+  self.components[index]
 }
 
 ///|
@@ -700,12 +783,12 @@ fn RawQueryRow::as_query_row(self : RawQueryRow) -> QueryRow {
 
 ///|
 /// Builds the requested read-only row view on demand without growing stores or marking dirty rows.
-fn QueryRow::component_view(
+fn QueryRow::component_view_at(
   self : QueryRow,
-  component : ComponentTypeId,
+  payload_index : Int,
   operation : String,
 ) -> ArrayView[Byte] {
-  let payload_index = self.component_payload_index(component, operation)
+  ignore(self.component_at_index(payload_index, operation))
   let access = self.accesses[payload_index]
   let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
   let base = self.row * access.stride
@@ -713,18 +796,43 @@ fn QueryRow::component_view(
 }
 
 ///|
+/// Builds the requested read-only row view after resolving the component id.
+fn QueryRow::component_view(
+  self : QueryRow,
+  component : ComponentTypeId,
+  operation : String,
+) -> ArrayView[Byte] {
+  self.component_view_at(
+    self.component_payload_index(component, operation),
+    operation,
+  )
+}
+
+///|
 /// Builds the requested mutable row view on demand.
+fn QueryRow::component_mut_view_at(
+  self : QueryRow,
+  payload_index : Int,
+  operation : String,
+) -> MutArrayView[Byte] {
+  ignore(self.component_at_index(payload_index, operation))
+  let access = self.accesses[payload_index]
+  let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
+  let base = self.row * access.stride
+  col.bytes.mut_view(start=base, end=base + access.stride)
+}
+
+///|
+/// Builds the requested mutable row view after resolving the component id.
 fn QueryRow::component_mut_view(
   self : QueryRow,
   component : ComponentTypeId,
   operation : String,
 ) -> MutArrayView[Byte] {
-  ignore(operation)
-  let payload_index = self.component_payload_index(component, operation)
-  let access = self.accesses[payload_index]
-  let col = self.world.archetypes[self.archetype_index].columns[access.column_index]
-  let base = self.row * access.stride
-  col.bytes.mut_view(start=base, end=base + access.stride)
+  self.component_mut_view_at(
+    self.component_payload_index(component, operation),
+    operation,
+  )
 }
 
 ///|
@@ -737,7 +845,24 @@ pub fn QueryRow::read(
   f : (ArrayView[Byte]) -> Unit,
 ) -> Unit {
   self.world.assert_system_component_read(component, "QueryRow::read")
-  f(self.component_view(component, "QueryRow::read"))
+  f(
+    self.component_view_at(
+      self.component_payload_index(component, "QueryRow::read"),
+      "QueryRow::read",
+    ),
+  )
+}
+
+///|
+/// Runs `f` with a closure-scoped read-only payload view for a pre-resolved payload index.
+pub fn QueryRow::read_at(
+  self : QueryRow,
+  index : Int,
+  f : (ArrayView[Byte]) -> Unit,
+) -> Unit {
+  let component = self.component_at_index(index, "QueryRow::read_at")
+  self.world.assert_system_component_read(component, "QueryRow::read_at")
+  f(self.component_view_at(index, "QueryRow::read_at"))
 }
 
 ///|
@@ -751,7 +876,25 @@ pub fn QueryRow::write(
 ) -> Unit {
   self.world.assert_not_history_raw_mutation("QueryRow::write")
   self.world.assert_system_component_write(component, "QueryRow::write")
-  f(self.component_mut_view(component, "QueryRow::write"))
+  f(
+    self.component_mut_view_at(
+      self.component_payload_index(component, "QueryRow::write"),
+      "QueryRow::write",
+    ),
+  )
+}
+
+///|
+/// Runs `f` with a closure-scoped mutable payload view for a pre-resolved payload index.
+pub fn QueryRow::write_at(
+  self : QueryRow,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  let component = self.component_at_index(index, "QueryRow::write_at")
+  self.world.assert_not_history_raw_mutation("QueryRow::write_at")
+  self.world.assert_system_component_write(component, "QueryRow::write_at")
+  f(self.component_mut_view_at(index, "QueryRow::write_at"))
 }
 
 ///|
@@ -765,9 +908,21 @@ pub fn QueryRow::write_tracked(
   component : ComponentTypeId,
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Bool {
-  ignore(self.component_payload_index(component, "QueryRow::write_tracked"))
+  let index = self.component_payload_index(component, "QueryRow::write_tracked")
+  self.write_tracked_at(history, index, f)
+}
+
+///|
+/// Runs `f` with a mutable payload view for a pre-resolved index and records one component change.
+pub fn QueryRow::write_tracked_at(
+  self : QueryRow,
+  history : WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let component = self.component_at_index(index, "QueryRow::write_tracked_at")
   if !history.recording_enabled() || history.applying {
-    self.write(component, f)
+    self.write_at(index, f)
     let reason = if !history.recording_enabled() {
       "recording_disabled"
     } else {
@@ -778,7 +933,7 @@ pub fn QueryRow::write_tracked(
   }
   if self.world.history_blob_ref_component(component) {
     history.begin_tracked_world_mutation(self.world)
-    self.write(component, f)
+    self.write_at(index, f)
     history.end_tracked_world_mutation(self.world)
     history.set_delegate_diagnostic(true, history_diagnostic_none())
     return true
@@ -792,8 +947,10 @@ pub fn QueryRow::write_tracked(
   }
   let auto = history.begin_auto("query_row_write")
   history.begin_tracked_world_mutation(self.world)
-  self.world.assert_system_component_write(component, "QueryRow::write_tracked")
-  f(self.component_mut_view(component, "QueryRow::write_tracked"))
+  self.world.assert_system_component_write(
+    component, "QueryRow::write_tracked_at",
+  )
+  f(self.component_mut_view_at(index, "QueryRow::write_tracked_at"))
   history.end_tracked_world_mutation(self.world)
   let ok = match self.world.component_bytes(self.entity, component) {
     Some(after) => {
@@ -815,8 +972,21 @@ pub fn RawQueryRow::read_view(
   component : ComponentTypeId,
 ) -> ArrayView[Byte] {
   let row = self.as_query_row()
+  let index = row.component_payload_index(component, "RawQueryRow::read_view")
   row.world.assert_system_component_read(component, "RawQueryRow::read_view")
-  row.component_view(component, "RawQueryRow::read_view")
+  row.component_view_at(index, "RawQueryRow::read_view")
+}
+
+///|
+/// Implements `RawQueryRow::read_view_at`.
+pub fn RawQueryRow::read_view_at(
+  self : RawQueryRow,
+  index : Int,
+) -> ArrayView[Byte] {
+  let row = self.as_query_row()
+  let component = row.component_at_index(index, "RawQueryRow::read_view_at")
+  row.world.assert_system_component_read(component, "RawQueryRow::read_view_at")
+  row.component_view_at(index, "RawQueryRow::read_view_at")
 }
 
 ///|
@@ -826,9 +996,25 @@ pub fn RawQueryRow::write_view(
   component : ComponentTypeId,
 ) -> MutArrayView[Byte] {
   let row = self.as_query_row()
+  let index = row.component_payload_index(component, "RawQueryRow::write_view")
   row.world.assert_not_history_raw_mutation("RawQueryRow::write_view")
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
-  row.component_mut_view(component, "RawQueryRow::write_view")
+  row.component_mut_view_at(index, "RawQueryRow::write_view")
+}
+
+///|
+/// Implements `RawQueryRow::write_view_at`.
+pub fn RawQueryRow::write_view_at(
+  self : RawQueryRow,
+  index : Int,
+) -> MutArrayView[Byte] {
+  let row = self.as_query_row()
+  let component = row.component_at_index(index, "RawQueryRow::write_view_at")
+  row.world.assert_not_history_raw_mutation("RawQueryRow::write_view_at")
+  row.world.assert_system_component_write(
+    component, "RawQueryRow::write_view_at",
+  )
+  row.component_mut_view_at(index, "RawQueryRow::write_view_at")
 }
 
 ///|
@@ -840,6 +1026,17 @@ pub fn RawQueryRow::write_tracked(
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Bool {
   self.as_query_row().write_tracked(history, component, f)
+}
+
+///|
+/// Runs `f` with a mutable payload view for a pre-resolved index and records one component change.
+pub fn RawQueryRow::write_tracked_at(
+  self : RawQueryRow,
+  history : WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  self.as_query_row().write_tracked_at(history, index, f)
 }
 
 ///|
@@ -1030,6 +1227,13 @@ pub fn RawQueryArchetype::has(
 }
 
 ///|
+/// Returns true after validating that `index` is a valid archetype payload slot.
+pub fn RawQueryArchetype::has_at(self : RawQueryArchetype, index : Int) -> Bool {
+  ignore(self.access_at_index(index, "RawQueryArchetype::has_at"))
+  true
+}
+
+///|
 /// Implements `RawQueryArchetype::component_stride`.
 pub fn RawQueryArchetype::component_stride(
   self : RawQueryArchetype,
@@ -1039,6 +1243,15 @@ pub fn RawQueryArchetype::component_stride(
     component, "RawQueryArchetype::component_stride",
   )
   self.accesses[index].stride
+}
+
+///|
+/// Implements `RawQueryArchetype::component_stride_at`.
+pub fn RawQueryArchetype::component_stride_at(
+  self : RawQueryArchetype,
+  index : Int,
+) -> Int {
+  self.access_at_index(index, "RawQueryArchetype::component_stride_at").stride
 }
 
 ///|
@@ -1053,6 +1266,24 @@ fn RawQueryArchetype::component_access_index(
     }
   }
   -1
+}
+
+///|
+/// Returns the component access at `index` or aborts with an operation-specific message.
+fn RawQueryArchetype::access_at_index(
+  self : RawQueryArchetype,
+  index : Int,
+  operation : String,
+) -> QueryArchetypeComponentAccess {
+  if index < 0 || index >= self.accesses.length() {
+    abort(
+      operation +
+      ": payload index " +
+      index.to_string() +
+      " is outside this RawQueryArchetype required component range.",
+    )
+  }
+  self.accesses[index]
 }
 
 ///|
@@ -1086,7 +1317,20 @@ pub fn RawQueryArchetype::read_column(
   let access_index = self.component_payload_index(
     component, "RawQueryArchetype::read_column",
   )
-  let access = self.accesses[access_index]
+  self.read_column_at(access_index)
+}
+
+///|
+/// Returns the contiguous CPU SoA column for a pre-resolved payload index.
+pub fn RawQueryArchetype::read_column_at(
+  self : RawQueryArchetype,
+  index : Int,
+) -> ArrayView[Byte] {
+  let access = self.access_at_index(index, "RawQueryArchetype::read_column_at")
+  self.world.assert_system_component_read(
+    access.component,
+    "RawQueryArchetype::read_column_at",
+  )
   let arch = self.world.archetypes[self.archetype_index]
   let col = arch.columns[access.column_index]
   let logical_end = arch.entities.length() * col.stride
@@ -1106,7 +1350,23 @@ pub fn RawQueryArchetype::write_column(
   let access_index = self.component_payload_index(
     component, "RawQueryArchetype::write_column",
   )
-  let access = self.accesses[access_index]
+  self.write_column_at(access_index)
+}
+
+///|
+/// Returns the contiguous mutable CPU SoA column for a pre-resolved payload index.
+pub fn RawQueryArchetype::write_column_at(
+  self : RawQueryArchetype,
+  index : Int,
+) -> MutArrayView[Byte] {
+  let access = self.access_at_index(index, "RawQueryArchetype::write_column_at")
+  self.world.assert_not_history_raw_mutation(
+    "RawQueryArchetype::write_column_at",
+  )
+  self.world.assert_system_component_write(
+    access.component,
+    "RawQueryArchetype::write_column_at",
+  )
   let arch = self.world.archetypes[self.archetype_index]
   let col = arch.columns[access.column_index]
   let logical_end = arch.entities.length() * col.stride
@@ -1127,8 +1387,23 @@ pub fn RawQueryArchetype::write_column_tracked(
   let access_index = self.component_payload_index(
     component, "RawQueryArchetype::write_column_tracked",
   )
+  self.write_column_tracked_at(history, access_index, f)
+}
+
+///|
+/// Runs `f` with a mutable column view for a pre-resolved index and records changed rows.
+pub fn RawQueryArchetype::write_column_tracked_at(
+  self : RawQueryArchetype,
+  history : WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::write_column_tracked_at",
+  )
+  let component = access.component
   if !history.recording_enabled() || history.applying {
-    f(self.write_column(component))
+    f(self.write_column_at(index))
     let reason = if !history.recording_enabled() {
       "recording_disabled"
     } else {
@@ -1139,12 +1414,11 @@ pub fn RawQueryArchetype::write_column_tracked(
   }
   if self.world.history_blob_ref_component(component) {
     history.begin_tracked_world_mutation(self.world)
-    f(self.write_column(component))
+    f(self.write_column_at(index))
     history.end_tracked_world_mutation(self.world)
     history.set_delegate_diagnostic(true, history_diagnostic_none())
     return true
   }
-  let access = self.accesses[access_index]
   let arch = self.world.archetypes[self.archetype_index]
   let col = arch.columns[access.column_index]
   let row_count = arch.entities.length()
@@ -1153,7 +1427,7 @@ pub fn RawQueryArchetype::write_column_tracked(
   let auto = history.begin_auto("raw_query_archetype_write_column")
   history.begin_tracked_world_mutation(self.world)
   self.world.assert_system_component_write(
-    component, "RawQueryArchetype::write_column_tracked",
+    component, "RawQueryArchetype::write_column_tracked_at",
   )
   f(col.bytes.mut_view(start=0, end=logical_end))
   history.end_tracked_world_mutation(self.world)
@@ -1197,7 +1471,22 @@ pub fn RawQueryArchetype::write_column_rows_tracked(
   let access_index = self.component_payload_index(
     component, "RawQueryArchetype::write_column_rows_tracked",
   )
-  let access = self.accesses[access_index]
+  self.write_column_rows_tracked_at(history, access_index, rows, f)
+}
+
+///|
+/// Runs `f` with mutable row views for known changed rows using a pre-resolved payload index.
+pub fn RawQueryArchetype::write_column_rows_tracked_at(
+  self : RawQueryArchetype,
+  history : WorldHistory,
+  index : Int,
+  rows : Array[Int],
+  f : (Int, MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::write_column_rows_tracked_at",
+  )
+  let component = access.component
   let arch = self.world.archetypes[self.archetype_index]
   let col = arch.columns[access.column_index]
   let row_count = arch.entities.length()
@@ -1206,7 +1495,7 @@ pub fn RawQueryArchetype::write_column_rows_tracked(
     return false
   }
   if !history.recording_enabled() || history.applying {
-    let column = self.write_column(component)
+    let column = self.write_column_at(index)
     for i = 0; i < rows.length(); i = i + 1 {
       let row = rows[i]
       let offset = row * col.stride
@@ -1222,7 +1511,7 @@ pub fn RawQueryArchetype::write_column_rows_tracked(
   }
   if self.world.history_blob_ref_component(component) {
     history.begin_tracked_world_mutation(self.world)
-    let column = self.write_column(component)
+    let column = self.write_column_at(index)
     for i = 0; i < rows.length(); i = i + 1 {
       let row = rows[i]
       let offset = row * col.stride
@@ -1235,7 +1524,7 @@ pub fn RawQueryArchetype::write_column_rows_tracked(
   let auto = history.begin_auto("raw_query_archetype_write_column_rows")
   history.begin_tracked_world_mutation(self.world)
   self.world.assert_system_component_write(
-    component, "RawQueryArchetype::write_column_rows_tracked",
+    component, "RawQueryArchetype::write_column_rows_tracked_at",
   )
   for i = 0; i < rows.length(); i = i + 1 {
     let row = rows[i]

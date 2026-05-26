@@ -1149,3 +1149,155 @@ test "RawQueryCache refreshes archetype plans" {
   cache.for_each(world, row => row_sum = row_sum + row.read_view(qa)[0].to_int())
   assert_eq(row_sum, 4)
 }
+
+///|
+test "Query component index APIs access row payloads" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryIndexA", 4)
+  let qb = world.register_cpu_component("QueryIndexB", 4)
+  let query = Query::new([qa, qb])
+  let cache = QueryCache::new([qa, qb])
+  assert_eq(query.component_index(qa), 0)
+  assert_eq(query.component_index(qb), 1)
+  assert_eq(cache.component_index(qb), 1)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(entity, qb, bytes4(2, 0, 0, 0)))
+  let mut has_a = false
+  let mut read_a = (0 : Byte)
+  query.for_each(world, row => {
+    has_a = row.has_at(0)
+    row.read_at(0, bytes => read_a = bytes[0])
+    row.write_at(1, bytes => bytes[0] = (7 : Byte))
+  })
+  assert_true(has_a)
+  assert_eq(read_a, (1 : Byte))
+  match world.component_bytes(entity, qb) {
+    Some(bytes) => assert_eq(bytes[0], (7 : Byte))
+    None => abort("expected QueryIndexB bytes")
+  }
+}
+
+///|
+test "QueryRow write_tracked_at records row changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("QueryIndexTrackedA", 4)
+  let query = Query::new([qa])
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  query.for_each(world, row => {
+    if !row.write_tracked_at(history, 0, bytes => bytes[0] = (9 : Byte)) {
+      abort("expected tracked index row write")
+    }
+  })
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  match world.component_bytes(entity, qa) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected QueryIndexTrackedA bytes")
+  }
+}
+
+///|
+test "Raw query index APIs access rows and archetype columns" {
+  let world = World::new()
+  let qa = world.register_cpu_component("RawQueryIndexA", 4)
+  let qb = world.register_cpu_component("RawQueryIndexB", 4)
+  let raw = RawQuery::new([qa, qb])
+  let cache = RawQueryCache::new([qa, qb])
+  assert_eq(raw.component_index(qa), 0)
+  assert_eq(raw.component_index(qb), 1)
+  assert_eq(cache.component_index(qb), 1)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  let mut row_has_a = false
+  let mut row_read_a = (0 : Byte)
+  raw.for_each(world, row => {
+    row_has_a = row.has_at(0)
+    row_read_a = row.read_view_at(0)[0]
+    row.write_view_at(1)[0] = (3 : Byte)
+  })
+  assert_true(row_has_a)
+  assert_eq(row_read_a, (1 : Byte))
+  let mut arch_has_b = false
+  let mut arch_stride_b = 0
+  let mut arch_read_b = (0 : Byte)
+  raw.for_each_archetype(world, arch => {
+    arch_has_b = arch.has_at(1)
+    arch_stride_b = arch.component_stride_at(1)
+    arch_read_b = arch.read_column_at(1)[0]
+    arch.write_column_at(1)[0] = (4 : Byte)
+  })
+  assert_true(arch_has_b)
+  assert_eq(arch_stride_b, 4)
+  assert_eq(arch_read_b, (3 : Byte))
+  match world.component_bytes(e0, qb) {
+    Some(bytes) => assert_eq(bytes[0], (4 : Byte))
+    None => abort("expected RawQueryIndexB bytes")
+  }
+}
+
+///|
+test "RawQueryArchetype tracked index writes record full and sparse column changes" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let qa = world.register_cpu_component("RawQueryIndexTrackedA", 4)
+  let raw = RawQuery::new([qa])
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qa, bytes4(2, 0, 0, 0)))
+  raw.for_each_archetype(world, arch => {
+    if !arch.write_column_tracked_at(history, 0, column => {
+        column[0] = (5 : Byte)
+      }) {
+      abort("expected tracked index column write")
+    }
+    if !arch.write_column_rows_tracked_at(history, 0, [1], (_row, bytes) => {
+        bytes[0] = (8 : Byte)
+      }) {
+      abort("expected tracked sparse index column write")
+    }
+  })
+  assert_eq(history.undo_len(), 2)
+  assert_true(history.undo(world))
+  match world.component_bytes(e1, qa) {
+    Some(bytes) => assert_eq(bytes[0], (2 : Byte))
+    None => abort("expected RawQueryIndexTrackedA row 1 bytes")
+  }
+  assert_true(history.undo(world))
+  match world.component_bytes(e0, qa) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected RawQueryIndexTrackedA row 0 bytes")
+  }
+}
+
+///|
+test "panic Query component_index aborts for missing component" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryIndexMissingA", 4)
+  let qb = world.register_cpu_component("QueryIndexMissingB", 4)
+  ignore(Query::new([qa]).component_index(qb))
+}
+
+///|
+test "panic QueryRow read_at aborts for out-of-range payload index" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryIndexInvalidA", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  Query::new([qa]).for_each(world, row => row.read_at(1, _bytes => ()))
+}
+
+///|
+test "panic RawQueryArchetype read_column_at aborts for negative payload index" {
+  let world = World::new()
+  let qa = world.register_cpu_component("RawQueryIndexInvalidA", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  RawQuery::new([qa]).for_each_archetype(world, arch => {
+    ignore(arch.read_column_at(-1))
+  })
+}
