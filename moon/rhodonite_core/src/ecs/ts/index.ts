@@ -4,6 +4,7 @@
 export * from "./global-transform-blob.ts";
 export * from "./camera-control.ts";
 export * from "./history-archive.ts";
+export * from "./history-ui-state.ts";
 export * from "./query.ts";
 export * from "./system.ts";
 export * from "./types.ts";

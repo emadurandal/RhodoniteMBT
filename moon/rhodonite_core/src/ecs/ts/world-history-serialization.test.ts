@@ -1,7 +1,7 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import {
 	ComponentTypeId,
 	EntityId,
@@ -37,7 +37,54 @@ function parseHistoryFixture(name: string): unknown {
 	return JSON.parse(readHistoryFixture(name));
 }
 
+const validHistoryFixtures = [
+	"stable-component-change.undo.v1.json",
+	"stable-component-change.redo.v1.json",
+	"entity-destroy-snapshot.undo.v1.json",
+	"builtin-global-camera.undo.v1.json",
+] as const;
+
+const invalidDecodeHistoryFixtures = [
+	{
+		name: "unsupported-format.v999.json",
+		expectedError: /unsupported format_version/,
+	},
+	{
+		name: "missing-component-key.v1.json",
+		expectedError: /component.key/,
+	},
+	{
+		name: "invalid-base64.v1.json",
+		expectedError: /base64/,
+	},
+] as const;
+
+function historyFixtureManifestNames(): string[] {
+	return [
+		...validHistoryFixtures,
+		...invalidDecodeHistoryFixtures.map((fixture) => fixture.name),
+	].sort();
+}
+
+function historyFixtureFileNames(): string[] {
+	return readdirSync(
+		new URL("./test-support/fixtures/history/", import.meta.url),
+	)
+		.filter((name) => name.endsWith(".json"))
+		.sort();
+}
+
 describe("ECS TypeScript wrapper: history-serialization", () => {
+	it("keeps v1 history fixture manifest in sync", () => {
+		expect(historyFixtureFileNames()).toEqual(historyFixtureManifestNames());
+	});
+
+	it("decodes every valid v1 history fixture", () => {
+		for (const name of validHistoryFixtures) {
+			expect(() => decodeHistoryExportJson(readHistoryFixture(name))).not.toThrow();
+		}
+	});
+
 	it("reports history serialization eligibility without exposing payloads", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
@@ -956,16 +1003,12 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		expect(getF32(cameraRow ?? new Uint8Array(), 280)).toBeCloseTo(1);
 	});
 
-	it("rejects invalid v1 history golden fixtures", () => {
-		expect(() =>
-			decodeHistoryExportJson(readHistoryFixture("unsupported-format.v999.json")),
-		).toThrow(/unsupported format_version/);
-		expect(() =>
-			decodeHistoryExportJson(readHistoryFixture("missing-component-key.v1.json")),
-		).toThrow(/component.key/);
-		expect(() =>
-			decodeHistoryExportJson(readHistoryFixture("invalid-base64.v1.json")),
-		).toThrow(/base64/);
+	it("rejects invalid history manifest fixtures", () => {
+		for (const fixture of invalidDecodeHistoryFixtures) {
+			expect(() =>
+				decodeHistoryExportJson(readHistoryFixture(fixture.name)),
+			).toThrow(fixture.expectedError);
+		}
 	});
 
 	it("encodes and decodes history archives as JSON", () => {

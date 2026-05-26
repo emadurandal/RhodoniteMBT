@@ -155,6 +155,7 @@ function writeEntrypoints() {
       'export * from "./ecs/global-transform-blob.js";',
       'export * from "./ecs/camera-control.js";',
       'export * from "./ecs/history-archive.js";',
+      'export * from "./ecs/history-ui-state.js";',
       'export * from "./ecs/query.js";',
       'export { CommandBuffer, System, SystemContext, SystemRunner, createTransformPropagationSystem } from "./ecs/system.js";',
       'export type { SystemCallback } from "./ecs/system.js";',

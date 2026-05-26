@@ -31,6 +31,8 @@
           <p class="lead">This page is the audit table for ECS mutation APIs and their Undo/Redo behavior. When adding a mutating API, update this page and add or extend the matching coverage test.</p>
           <p>The TypeScript wrapper follows the same classification as the MoonBit surface. Public wrapper methods should either delegate to the tracked API listed here, remain raw guarded, or be documented as intentionally untracked with matching TypeScript coverage when the wrapper adds behavior.</p>
           <p>The TypeScript public wrapper surface is also checked by <code>history-mutation-coverage.test.ts</code>. If a method is added to <code>World</code>, <code>WorldHistory</code>, query rows, raw query archetypes, <code>SystemRunner</code>, or <code>CommandBuffer</code>, classify it in that audit as tracked, tracked callback, tracked command phase, raw guarded, intentionally untracked, read-only, or history-control.</p>
+          <p>The same test audits the MoonBit public surface from <code>pkg.generated.mbti</code>. After adding or removing a public ECS method and refreshing interfaces with <code>moon info</code>, update the MoonBit ledger in that test so the method has an explicit history classification.</p>
+          <p>Tracked API parity is also audited across the MoonBit public surface, <code>js_bridge</code>, <code>ecs-bridge.d.ts</code>, and the TypeScript wrapper. When adding a tracked Undo/Redo API, update the bridge declaration, wrapper import, public wrapper method or mirror export, and parity ledger in the same change. MoonBit-only typed helpers must stay explicitly listed as MoonBit-only until they receive a TypeScript bridge.</p>
 
           <h2>Coverage Classes</h2>
           <table>

@@ -44,7 +44,7 @@
           </ul>
 
           <h2>Record Shape</h2>
-          <p>将来の history archive は undo stack と redo stack を ordered record として保存します。各 record は label、record-level metadata、ordered delta を持ちます。create 後に component を追加する transaction のように、delta の順序そのものが意味を持ちます。</p>
+          <p>v1 history archive は undo stack と redo stack を ordered record として保存します。各 record は label、record-level metadata、ordered delta を持ちます。create 後に component を追加する transaction のように、delta の順序そのものが意味を持ちます。</p>
           <table>
             <thead><tr><th>Field</th><th>Policy</th></tr></thead>
             <tbody>
@@ -72,7 +72,7 @@
           <p>User CPU component は byte-exact payload として扱います。before/after bytes は対応する component schema key と一緒に保存された場合だけ安全に replay できます。import validation は <code>component_by_stable_key</code> で登録済み component を解決し、<code>component_matches_identity</code> で照合します。指定された schema version/hash field は一致必須で、未指定の schema field は wildcard として扱います。schema が変わった場合、bytes を再解釈せず delta を reject します。</p>
           <p>Blob-backed builtin では CPU ref bytes を source of truth として永続化しません。<code>GlobalTransform</code> は logical matrix row と format metadata を保存します。<code>Camera</code> は logical camera GPU row payload と runtime helper に必要な camera metadata を保存します。import 時は現在の session の world が新しい blob row を割り当て、その payload を書き込み、有効な CPU ref component を作ります。</p>
 
-          <h2>Export MVP</h2>
+          <h2>Archive Export</h2>
           <p>現行 export API は、次に Undo / Redo される operation が先頭になる stack order で retained record を返します。先に <code>undo_serialization_report</code> / <code>redo_serialization_report</code> と同じ eligibility check を実行し、1 件でも serialization 不可の record があれば <code>None</code> / <code>null</code> を返します。この処理は history diagnostic や stack を変更しません。</p>
           <table>
             <thead><tr><th>Delta</th><th>Exported payload</th></tr></thead>
@@ -87,7 +87,7 @@
             </tbody>
           </table>
 
-          <h2>Import MVP</h2>
+          <h2>Archive Import</h2>
           <p>Import は同じ in-memory archive shape を読み込み、target stack だけを置き換えます。既存 record への append はせず、反対側 stack も clear しません。target world は archive が表す現在状態とすでに一致している必要があります。stack を置き換える前に、全 record をその world に対して検証します。target stack を置き換えるのは import 成功時だけで、失敗した import は target stack と world を変更しません。</p>
           <p>validation report API は同じ archive conversion と full-stack applicability check を実行しますが、history stack、world、<code>last_diagnostic</code> を変更しません。top-level / record-level / delta-level の各 report は <code>valid</code>、<code>reason</code>、archive order の index を返します。record index <code>0</code> は次に import される Undo / Redo operation です。delta index は、Undo validation が内部で逆順適用を検証する場合でも、元の archive order を指します。entity や component が current world から欠けている、または world が archive state からずれているなど、full-stack validation が失敗した場合、失敗した delta と、それ以降の未検証 record / delta report は <code>import_validation_failed</code> で invalid としてマークされます。</p>
           <table>
@@ -115,9 +115,28 @@
             </tbody>
           </table>
 
+          <h2>Compatibility Policy</h2>
+          <p>v1 JSON compatibility surface は <code>format_version = 1</code>、snake_case field name、対応 delta kind string、entity identity field、component identity field、<code>bytes_base64</code> payload encoding、<code>global_transform_format</code> のような builtin payload field です。JSON field や delta kind を追加する場合は、decoder、golden fixture、invalid fixture coverage、この文書を同じ変更で更新します。</p>
+          <p>in-memory archive object は現在の build における MoonBit / TypeScript API shape です。file ABI ではありません。MoonBit enum layout、object layout、内部 variant 名、local component index は、v1 JSON compatibility surface と import validation rule を維持する限り変更できます。</p>
+
           <h2>Replay Validation</h2>
           <p>import と replay は runtime undo/redo と同じ防御方針を使います。record 適用前に検証し、stale delta や schema mismatch を reject し、検証失敗時は stack を動かしません。byte budget と record count limit は runtime retention policy であり、archive compatibility policy ではありません。</p>
-          <p><code>undo_serialization_report</code> と <code>redo_serialization_report</code> は retained in-memory stack 向けの dry-run diagnostic です。payload bytes は export せず、file format も定義しません。各 report は全 record / delta を含み、serialization 可能かどうかと、<code>missing_stable_component_identity</code> や <code>unknown_component</code> などの失敗理由を返します。editor は export 実装前でも stable identity metadata が必要な component を表示できます。</p>
+          <p><code>undo_serialization_report</code> と <code>redo_serialization_report</code> は retained in-memory stack 向けの dry-run diagnostic です。payload bytes は export せず、JSON wire format も定義しません。各 report は全 record / delta を含み、serialization 可能かどうかと、<code>missing_stable_component_identity</code> や <code>unknown_component</code> などの失敗理由を返します。editor は export を試みる前に stable identity metadata が必要な component を表示できます。</p>
+
+          <h2>Test Coverage</h2>
+          <table>
+            <thead><tr><th>Behavior</th><th>Coverage</th></tr></thead>
+            <tbody>
+              <tr><td>Serialization report</td><td>MoonBit と TypeScript の test が retained-stack eligibility、missing stable component identity、unknown component、payload-free diagnostic を cover します。</td></tr>
+              <tr><td>Archive export/import</td><td>MoonBit と TypeScript の test が stable component change、redo stack、entity destroy snapshot、builtin GlobalTransform / Camera payload を cover します。</td></tr>
+              <tr><td>Import validation</td><td>MoonBit と TypeScript の test が dry-run validation、unsupported format、identity mismatch、invalid payload、stale-world replay failure、失敗 import 後に world/stack が変わらないことを cover します。</td></tr>
+              <tr><td>JSON encode/decode</td><td>TypeScript test が JSON round trip、不正 JSON、unsupported version、必須 field 欠落、unknown delta kind、不正 base64、record/delta count mismatch を cover します。</td></tr>
+              <tr><td>v1 compatibility fixture</td><td>TypeScript golden fixture が stable component archive、entity destroy snapshot、builtin GlobalTransform / Camera archive、invalid fixture rejection を cover します。</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Maintenance</h2>
+          <p>archive semantics を変更する場合は、in-memory export/import test、TypeScript JSON helper test、v1 golden または invalid fixture、fixture manifest audit、この文書を同時に更新します。history fixture を追加または削除する場合は <code>world-history-serialization.test.ts</code> の manifest も更新し、未分類 fixture が CI で失敗する状態を保ちます。JSON compatibility surface を意図的に破る場合は <code>format_version</code> を上げ、reader が未対応 version を明示的に reject する状態を保ちます。</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>

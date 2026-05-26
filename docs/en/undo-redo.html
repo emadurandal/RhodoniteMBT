@@ -95,9 +95,11 @@ ignore(history.commit_transaction())</code></pre>
               <tr><td>Tracked mutations</td><td><code>set_component_bytes</code>, <code>add_component_bytes_many</code>, <code>set_global_transform</code>, <code>set_camera_matrices</code></td><td><code>setComponentBytes</code>, <code>addComponentBytesMany</code>, <code>setGlobalTransform</code>, <code>setCameraMatrices</code></td></tr>
               <tr><td>Tracked query callbacks</td><td><code>QueryRow::write_tracked</code>, typed <code>QueryRow::*_tracked</code>, <code>RawQueryRow::write_tracked</code>, <code>RawQueryArchetype::write_column_tracked</code>, <code>RawQueryArchetype::write_column_rows_tracked</code></td><td><code>row.writeTracked</code>, <code>rawRow.writeTracked</code>, <code>archetype.writeColumnTracked</code>, <code>archetype.writeColumnRowsTracked</code></td></tr>
               <tr><td>Tracked system phases</td><td><code>run_system_phase</code></td><td><code>runSystemPhase</code></td></tr>
+              <tr><td>Editor UI state</td><td>Use <code>undo_label</code>, <code>redo_label</code>, summaries, byte counts, and diagnostics directly</td><td><code>historyEditorState</code></td></tr>
               <tr><td>Serialization</td><td><code>undo_serialization_report</code>, <code>export_undo_stack</code>, <code>import_undo_stack</code>, <code>validate_import_undo_stack</code></td><td><code>undoSerializationReport</code>, <code>exportUndoStack</code>, <code>importUndoStack</code>, <code>validateImportUndoStack</code></td></tr>
             </tbody>
           </table>
+          <p><code>historyEditorState(history)</code> is a TypeScript-only convenience helper for editor chrome. It derives undo/redo enabled state, display text, counts, retained bytes, the next record summary, and a UI-oriented warning from <code>WorldHistory</code> without changing the underlying history state.</p>
 
           <h2>Mutation API Coverage</h2>
           <p>Mutation surface ownership is tracked in <a href="./history-mutation-coverage.html">History Mutation Coverage</a>. When adding a new mutating API, update that audit table and add or extend the matching coverage test so the API is explicitly classified as tracked, raw guarded, or intentionally untracked.</p>
@@ -132,6 +134,7 @@ ignore(history.commit_transaction())</code></pre>
             </tbody>
           </table>
           <p><code>undo_summary</code> and <code>redo_summary</code> expose payload-free record summaries for editor UI and debug panels; they are not archive records. The TypeScript wrapper mirrors these as <code>undoSummary()</code> and <code>redoSummary()</code>. Summaries are ordered with the next operation first and include labels, delta kinds, affected entity/component ids, component counts, before/after presence flags, and payload byte counts without exposing retained payload bytes. Builtin changes appear as <code>global_transform_changed</code> and <code>camera_changed</code>; <code>payloadBytes</code> is diagnostic metadata for memory estimates, not the payload itself.</p>
+          <p>For TypeScript editor UI, <code>historyEditorState(history)</code> combines <code>canUndo()</code>, <code>canRedo()</code>, labels, summaries, byte counts, and <code>lastDiagnostic()</code> into a read-only view. It keeps the raw diagnostic code and also maps user-visible outcomes such as stale records, byte-limit drops, trimming, disabled recording, and import failures into <code>warningKind</code> / <code>warningText</code>. Flow-only states such as an empty undo stack are left as disabled commands, not warnings.</p>
 
           <h2>Labels</h2>
           <p>Transaction labels are UI metadata. <code>undo_label</code> and <code>redo_label</code> return the label for the next available undo or redo record, so editor UI can present commands such as <code>Undo Move Entity</code>. Labels do not affect world state, transaction ordering, or delta application.</p>
