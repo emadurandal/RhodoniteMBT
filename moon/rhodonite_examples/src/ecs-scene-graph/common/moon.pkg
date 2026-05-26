@@ -1,6 +1,7 @@
 import {
   "emadurandal/rhodonite/app" @app,
   "emadurandal/rhodonite_core/ecs" @ecs,
+  "emadurandal/rhodonite_core/input" @input,
   "emadurandal/rhodonite_core/math/matrix44" @m44,
   "emadurandal/rhodonite_webgpu/webgpu" @wgpu,
   "moonbitlang/core/math" @math,

@@ -846,6 +846,12 @@ fn sdl_key_code_from_keyboard_event(
 }
 
 ///|
+/// Converts SDL key modifier bits into the engine's normalized modifier state.
+fn input_modifiers_from_sdl_keymod(mod : @lib.SDL_Keymod) -> @input.Modifiers {
+  @input.Modifiers::new(mod.shift(), mod.ctrl(), mod.alt(), mod.meta())
+}
+
+///|
 /// Queues one keyboard event from SDL into the engine input state.
 fn enqueue_sdl_keyboard_event(
   input : @input.InputState,
@@ -853,13 +859,11 @@ fn enqueue_sdl_keyboard_event(
 ) -> Unit {
   let key_event : @lib.SDL_KeyboardEvent = @lib.unsafe_from_sdl_event(event)
   let key = sdl_key_code_from_keyboard_event(key_event)
+  let modifiers = input_modifiers_from_sdl_keymod(key_event.mod)
   match event.get_type() {
     SDL_EVENT_KEY_DOWN =>
-      input.enqueue_event(
-        KeyDown(key, @input.Modifiers::none(), key_event.repeat),
-      )
-    SDL_EVENT_KEY_UP =>
-      input.enqueue_event(KeyUp(key, @input.Modifiers::none()))
+      input.enqueue_event(KeyDown(key, modifiers, key_event.repeat))
+    SDL_EVENT_KEY_UP => input.enqueue_event(KeyUp(key, modifiers))
     _ => ()
   }
 }

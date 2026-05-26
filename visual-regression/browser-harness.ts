@@ -53,6 +53,7 @@ type SnapshotModule = {
 	render_basic_triangle_browser_snapshot: () => Promise<unknown>;
 	render_ondemand_triangle_browser_snapshot: () => Promise<unknown>;
 	render_ecs_scene_graph_browser_snapshot: () => Promise<unknown>;
+	render_ecs_scene_graph_undo_redo_browser_snapshot: () => Promise<unknown>;
 	render_ecs_custom_component_color_browser_snapshot: () => Promise<unknown>;
 	render_ecs_mass_cubes_browser_snapshot: () => Promise<unknown>;
 };
@@ -67,6 +68,7 @@ type TsMassCubesModule = {
 
 type TsEcsSceneGraphModule = {
 	renderTsEcsSceneGraphBrowserSnapshot: () => Promise<unknown>;
+	renderTsEcsSceneGraphUndoRedoBrowserSnapshot: () => Promise<unknown>;
 };
 
 type TsOndemandTriangleModule = {
@@ -287,6 +289,13 @@ async function createSampleRenderRegistry(
 				),
 		],
 		[
+			"ecs-scene-graph-undo-redo",
+			async () =>
+				toUint8Array(
+					await snapshotModule.render_ecs_scene_graph_undo_redo_browser_snapshot(),
+				),
+		],
+		[
 			"ecs-custom-component-color",
 			async () =>
 				toUint8Array(
@@ -315,6 +324,13 @@ async function createSampleRenderRegistry(
 			async () =>
 				toUint8Array(
 					await tsSceneGraphModule.renderTsEcsSceneGraphBrowserSnapshot(),
+				),
+		],
+		[
+			"ts-ecs-scene-graph-undo-redo",
+			async () =>
+				toUint8Array(
+					await tsSceneGraphModule.renderTsEcsSceneGraphUndoRedoBrowserSnapshot(),
 				),
 		],
 		[

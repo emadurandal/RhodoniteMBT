@@ -68,10 +68,15 @@ pnpm install
 pnpm run dev:js:basic-triangle
 pnpm run dev:js:ondemand-triangle
 pnpm run dev:js:ecs-scene-graph
+pnpm run dev:js:ecs-scene-graph-undo-redo
 pnpm run dev:js:ecs-custom-component-color
 pnpm run dev:js:multi-surface-independent-input
 pnpm run dev:js:ecs-mass-cubes
 ```
+
+The `ecs-scene-graph-undo-redo` browser demo uses `M`, `Space`, or `Enter` to
+apply a tracked move, `Ctrl/Cmd+Z` to undo, and `Ctrl/Cmd+Shift+Z` or
+`Ctrl/Cmd+Y` to redo.
 
 The browser demos also include TypeScript-only WebGPU DemoState paths using the
 ECS TypeScript wrapper, multi-surface runtime, and TypeScript-only on-demand
@@ -79,11 +84,16 @@ triangle:
 
 ```bash
 pnpm run dev:js:ts-ecs-scene-graph
+pnpm run dev:js:ts-ecs-scene-graph-undo-redo
 pnpm run dev:js:ts-ecs-custom-component-color
 pnpm run dev:js:ts-ecs-mass-cubes
 pnpm run dev:js:ts-multi-surface-independent-input
 pnpm run dev:js:ts-ondemand-triangle
 ```
+
+The TypeScript Undo/Redo variant also exposes buttons and common editor
+shortcuts: `Ctrl/Cmd+Z` for undo and `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` for
+redo.
 
 The ECS mass-cubes sample also has MoonBit `wasm` and `wasm-gc` browser
 variants. The mass-cubes demos use the same packed transform ref path as the
@@ -117,10 +127,15 @@ pnpm install
 pnpm run dev:native:basic-triangle
 pnpm run dev:native:ondemand-triangle
 pnpm run dev:native:ecs-scene-graph
+pnpm run dev:native:ecs-scene-graph-undo-redo
 pnpm run dev:native:ecs-custom-component-color
 pnpm run dev:native:multi-surface-independent-input
 pnpm run dev:native:ecs-mass-cubes
 ```
+
+The native Undo/Redo scene graph demo uses the same `M` / `Space` / `Enter`,
+`Ctrl/Cmd+Z`, and `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` controls as the MoonBit
+browser demo.
 
 The native demo scripts use `moon run --target native --release` from
 [`moon/rhodonite_examples`](moon/rhodonite_examples), so no manual `_build`

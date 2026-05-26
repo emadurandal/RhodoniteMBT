@@ -111,10 +111,30 @@ async fn render_ecs_scene_graph_browser_snapshot_async() -> Bytes raise Error {
 }
 
 ///|
+/// Renders the MoonBit ECS scene graph Undo/Redo browser sample.
+async fn render_ecs_scene_graph_undo_redo_browser_snapshot_async() -> Bytes raise Error {
+  render_browser_platform_sample(
+    @app_browser.PlatformApp::default_engine(
+      @ecs_scene_graph.setup_undo_redo_visual_engine,
+    ),
+  )
+}
+
+///|
 /// Implements `render_ecs_scene_graph_browser_snapshot`.
 pub fn render_ecs_scene_graph_browser_snapshot() -> @js_async.Promise[Bytes] {
   @js_async.Promise::from_async(() => {
     render_ecs_scene_graph_browser_snapshot_async()
+  })
+}
+
+///|
+/// Implements `render_ecs_scene_graph_undo_redo_browser_snapshot`.
+pub fn render_ecs_scene_graph_undo_redo_browser_snapshot() -> @js_async.Promise[
+  Bytes,
+] {
+  @js_async.Promise::from_async(() => {
+    render_ecs_scene_graph_undo_redo_browser_snapshot_async()
   })
 }
 

@@ -4,7 +4,9 @@
 import "./style.css";
 import {
 	World,
+	WorldHistory,
 	createOrbitOrthographicCameraDescFromYzPosition,
+	historyEditorState,
 	setupOrbitOrthographicCamera,
 	type EntityId,
 } from "../../moon/rhodonite_core/src/ecs/ts/index.ts";
@@ -47,6 +49,20 @@ type DemoState = {
 	readonly scene: Scene<World, EntityId>;
 	readonly world: World;
 	readonly objects: DemoObjects;
+};
+
+type UndoRedoControls = {
+	readonly move: HTMLButtonElement;
+	readonly undo: HTMLButtonElement;
+	readonly redo: HTMLButtonElement;
+	readonly status: HTMLElement;
+};
+
+type UndoRedoDemoState = {
+	readonly demo: DemoState;
+	readonly history: WorldHistory;
+	editIndex: number;
+	controls?: UndoRedoControls;
 };
 
 function identity(): Float32Array {
@@ -220,6 +236,169 @@ function registerEngineHandlers(engine: Engine, demo: DemoState): void {
 	});
 }
 
+function applyTrackedMove(state: UndoRedoDemoState): boolean {
+	const nextIndex = state.editIndex + 1;
+	const offset = (nextIndex % 4) * 0.35;
+	const ok = state.history.withTransaction(state.demo.world, `Move Earth ${nextIndex}`, () =>
+		state.history.setTransformTrs(
+			state.demo.world,
+			state.demo.objects.earth,
+			1.15 + offset,
+			0,
+			1.65,
+			0,
+			0,
+			0,
+			1,
+			0.36,
+			0.36,
+			0.36,
+		)
+	);
+	if (ok) {
+		state.editIndex = nextIndex;
+		state.demo.scene.prepareRenderState();
+		state.demo.engine.requestRender("undo-redo");
+	}
+	return ok;
+}
+
+function undoTrackedMove(state: UndoRedoDemoState): boolean {
+	const ok = state.history.undo(state.demo.world);
+	if (ok) {
+		state.demo.scene.prepareRenderState();
+		state.demo.engine.requestRender("undo-redo");
+	}
+	return ok;
+}
+
+function redoTrackedMove(state: UndoRedoDemoState): boolean {
+	const ok = state.history.redo(state.demo.world);
+	if (ok) {
+		state.demo.scene.prepareRenderState();
+		state.demo.engine.requestRender("undo-redo");
+	}
+	return ok;
+}
+
+function createUndoRedoControls(state: UndoRedoDemoState): UndoRedoControls {
+	const controls = document.createElement("div");
+	controls.className = "sample-controls";
+	const move = document.createElement("button");
+	move.type = "button";
+	move.textContent = "Move Earth";
+	const undo = document.createElement("button");
+	undo.type = "button";
+	const redo = document.createElement("button");
+	redo.type = "button";
+	const status = document.createElement("p");
+	status.className = "sample-status";
+	controls.append(move, undo, redo, status);
+	const app = document.querySelector("#app");
+	const canvas = document.querySelector("#webgpu-canvas");
+	if (app && canvas) {
+		app.insertBefore(controls, canvas);
+	} else {
+		document.body.append(controls);
+	}
+	move.addEventListener("click", () => {
+		applyTrackedMove(state);
+		refreshUndoRedoControls(state);
+	});
+	undo.addEventListener("click", () => {
+		undoTrackedMove(state);
+		refreshUndoRedoControls(state);
+	});
+	redo.addEventListener("click", () => {
+		redoTrackedMove(state);
+		refreshUndoRedoControls(state);
+	});
+	return { move, undo, redo, status };
+}
+
+function refreshUndoRedoControls(state: UndoRedoDemoState): void {
+	const controls = state.controls;
+	if (!controls) {
+		return;
+	}
+	const editorState = historyEditorState(state.history);
+	controls.undo.disabled = !editorState.undo.canRun;
+	controls.redo.disabled = !editorState.redo.canRun;
+	controls.undo.textContent = editorState.undo.text;
+	controls.redo.textContent = editorState.redo.text;
+	controls.status.textContent =
+		`undo=${editorState.undo.count} redo=${editorState.redo.count}`;
+}
+
+function installUndoRedoKeyboardShortcuts(state: UndoRedoDemoState): void {
+	window.addEventListener("keydown", (event) => {
+		const key = event.key.toLowerCase();
+		const command = event.ctrlKey || event.metaKey;
+		const moveKey = key === "m" || key === " " || key === "enter";
+		const undoRedoKey = command && (key === "z" || key === "y");
+		if (event.repeat) {
+			if (undoRedoKey || (!command && moveKey)) {
+				event.preventDefault();
+			}
+			return;
+		}
+		let handled = false;
+		if (command && key === "z" && !event.shiftKey) {
+			undoTrackedMove(state);
+			handled = true;
+		} else if ((command && key === "z" && event.shiftKey) || (command && key === "y")) {
+			redoTrackedMove(state);
+			handled = true;
+		} else if (!command && moveKey) {
+			applyTrackedMove(state);
+			handled = true;
+		}
+		if (handled) {
+			event.preventDefault();
+			refreshUndoRedoControls(state);
+		}
+	});
+}
+
+function registerUndoRedoEngineHandlers(engine: Engine, state: UndoRedoDemoState): void {
+	state.controls = createUndoRedoControls(state);
+	refreshUndoRedoControls(state);
+	installUndoRedoKeyboardShortcuts(state);
+	engine.onSceneRender(state.demo.scene, () => {
+		renderCurrentFrame(state.demo);
+	});
+}
+
+function applyLegacyUndoRedoVisualEdit(demo: DemoState): void {
+	const history = WorldHistory.new();
+	const ok = history.withTransaction(demo.world, "Scene Graph Visual Move", () =>
+		history.setTransformTrs(
+			demo.world,
+			demo.objects.earth,
+			1.15,
+			0,
+			1.65,
+			0,
+			0,
+			0,
+			1,
+			0.36,
+			0.36,
+			0.36,
+		)
+	);
+	if (!ok) {
+		throw new Error("Failed to apply tracked scene graph visual edit.");
+	}
+	if (!history.undo(demo.world)) {
+		throw new Error("Failed to undo scene graph visual edit.");
+	}
+	if (!history.redo(demo.world)) {
+		throw new Error("Failed to redo scene graph visual edit.");
+	}
+	demo.scene.prepareRenderState();
+}
+
 export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array> {
 	const canvas = document.createElement("canvas");
 	canvas.width = CANVAS_WIDTH;
@@ -242,13 +421,50 @@ export async function renderTsEcsSceneGraphBrowserSnapshot(): Promise<Uint8Array
 	}
 }
 
+export async function renderTsEcsSceneGraphUndoRedoBrowserSnapshot(): Promise<Uint8Array> {
+	const canvas = document.createElement("canvas");
+	canvas.width = CANVAS_WIDTH;
+	canvas.height = CANVAS_HEIGHT;
+	const platform = await runPlatform(
+		new PlatformConfig(canvas),
+		PlatformApp.defaultEngine((engine) => {
+			const demo = createDemoStateForEngine(engine);
+			applyLegacyUndoRedoVisualEdit(demo);
+			engine.onSceneRender(demo.scene, () => {
+				renderCurrentFrame(demo);
+			});
+		}),
+		PlatformOptions.singleFrame(),
+	);
+	if (platform === undefined) {
+		throw new Error("TypeScript ECS scene graph Undo/Redo platform failed to initialize.");
+	}
+	try {
+		return await readPresentedCanvasRgba8(canvas, platform.engine.queue);
+	} finally {
+		platform.dispose();
+	}
+}
+
+function runUndoRedoDemoFromDocument(): boolean {
+	return document.body.dataset.rhodoniteUndoRedo === "1";
+}
+
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
 		await runPlatform(
 			new PlatformConfig(canvas),
 			PlatformApp.defaultEngine((engine) => {
 				const demo = createDemoStateForEngine(engine);
-				registerEngineHandlers(engine, demo);
+				if (runUndoRedoDemoFromDocument()) {
+					registerUndoRedoEngineHandlers(engine, {
+						demo,
+						history: WorldHistory.new(),
+						editIndex: 0,
+					});
+				} else {
+					registerEngineHandlers(engine, demo);
+				}
 			}),
 			PlatformOptions.interactive(),
 		);

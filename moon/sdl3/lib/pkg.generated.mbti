@@ -2382,6 +2382,10 @@ pub struct SDL_KeyboardEvent {
 pub struct SDL_Keycode(UInt) derive(Eq, @debug.Debug)
 
 pub struct SDL_Keymod(UInt16) derive(Eq)
+pub fn SDL_Keymod::alt(Self) -> Bool
+pub fn SDL_Keymod::ctrl(Self) -> Bool
+pub fn SDL_Keymod::meta(Self) -> Bool
+pub fn SDL_Keymod::shift(Self) -> Bool
 
 pub(all) enum SDL_LogCategory {
   SDL_LOG_CATEGORY_APPLICATION

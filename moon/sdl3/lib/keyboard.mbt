@@ -38,6 +38,36 @@ pub struct SDL_Keycode(UInt) derive(Eq, Debug)
 pub struct SDL_Keymod(UInt16) derive(Eq)
 
 ///|
+/// Reports whether any bits in `mask` are present in this key modifier set.
+fn SDL_Keymod::contains_mask(self : SDL_Keymod, mask : UInt) -> Bool {
+  (self.0.to_uint() & mask) != 0U
+}
+
+///|
+/// Reports whether either Shift key is active.
+pub fn SDL_Keymod::shift(self : SDL_Keymod) -> Bool {
+  self.contains_mask(0x0003U)
+}
+
+///|
+/// Reports whether either Control key is active.
+pub fn SDL_Keymod::ctrl(self : SDL_Keymod) -> Bool {
+  self.contains_mask(0x00C0U)
+}
+
+///|
+/// Reports whether either Alt key is active.
+pub fn SDL_Keymod::alt(self : SDL_Keymod) -> Bool {
+  self.contains_mask(0x0300U)
+}
+
+///|
+/// Reports whether either GUI / command key is active.
+pub fn SDL_Keymod::meta(self : SDL_Keymod) -> Bool {
+  self.contains_mask(0x0C00U)
+}
+
+///|
 /// This is a unique ID for a keyboard for the time it is connected to the
 /// system, and is never reused for the lifetime of the application.
 /// 
