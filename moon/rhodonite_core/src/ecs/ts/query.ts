@@ -4,6 +4,8 @@
 import type {
 	MoonPreparedQuery,
 	MoonQuery,
+	MoonQueryPlan,
+	MoonQueryPlanArchetype,
 	MoonQueryRow,
 	MoonRawPreparedQuery,
 	MoonRawQuery,
@@ -14,8 +16,19 @@ import type {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	prepared_query_for_each,
+	prepared_query_plan,
 	query_for_each,
 	query_new,
+	query_plan,
+	query_plan_archetype_index,
+	query_plan_archetype_row_count,
+	query_plan_archetype_version,
+	query_plan_archetypes,
+	query_plan_candidate_archetype_count,
+	query_plan_matched_archetype_count,
+	query_plan_matched_row_count,
+	query_plan_required_components,
+	query_plan_stale,
 	query_prepare,
 	query_required_components,
 	query_row_entity,
@@ -25,6 +38,7 @@ import {
 	query_row_write_tracked,
 	raw_prepared_query_for_each,
 	raw_prepared_query_for_each_archetype,
+	raw_prepared_query_plan,
 	raw_query_archetype_component_stride,
 	raw_query_archetype_entity,
 	raw_query_archetype_has,
@@ -36,6 +50,7 @@ import {
 	raw_query_for_each,
 	raw_query_for_each_archetype,
 	raw_query_new,
+	raw_query_plan,
 	raw_query_prepare,
 	raw_query_row_entity,
 	raw_query_row_has,
@@ -70,6 +85,10 @@ export class Query {
 	prepare(world: { readonly inner: MoonWorld }): PreparedQuery {
 		return new PreparedQuery(query_prepare(this.inner, world.inner));
 	}
+
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(query_plan(this.inner, world.inner));
+	}
 }
 
 export class PreparedQuery {
@@ -82,6 +101,66 @@ export class PreparedQuery {
 	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
 		prepared_query_for_each(this.inner, world.inner, (row) =>
 			f(new QueryRow(row)),
+		);
+	}
+
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(prepared_query_plan(this.inner, world.inner));
+	}
+}
+
+export class QueryPlanArchetype {
+	readonly inner: MoonQueryPlanArchetype;
+
+	constructor(inner: MoonQueryPlanArchetype) {
+		this.inner = inner;
+	}
+
+	index(): number {
+		return query_plan_archetype_index(this.inner);
+	}
+
+	rowCount(): number {
+		return query_plan_archetype_row_count(this.inner);
+	}
+}
+
+export class QueryPlan {
+	readonly inner: MoonQueryPlan;
+
+	constructor(inner: MoonQueryPlan) {
+		this.inner = inner;
+	}
+
+	requiredComponents(): ComponentTypeId[] {
+		return query_plan_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	archetypeVersion(): number {
+		return query_plan_archetype_version(this.inner);
+	}
+
+	candidateArchetypeCount(): number {
+		return query_plan_candidate_archetype_count(this.inner);
+	}
+
+	matchedArchetypeCount(): number {
+		return query_plan_matched_archetype_count(this.inner);
+	}
+
+	matchedRowCount(): number {
+		return query_plan_matched_row_count(this.inner);
+	}
+
+	stale(): boolean {
+		return moonBool(query_plan_stale(this.inner));
+	}
+
+	archetypes(): QueryPlanArchetype[] {
+		return query_plan_archetypes(this.inner).map(
+			(archetype) => new QueryPlanArchetype(archetype),
 		);
 	}
 }
@@ -105,6 +184,10 @@ export class RawQuery {
 		return new RawPreparedQuery(raw_query_prepare(this.inner, world.inner));
 	}
 
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(raw_query_plan(this.inner, world.inner));
+	}
+
 	forEachArchetype(
 		world: { readonly inner: MoonWorld },
 		f: (archetype: RawQueryArchetype) => void,
@@ -126,6 +209,10 @@ export class RawPreparedQuery {
 		raw_prepared_query_for_each(this.inner, world.inner, (row) =>
 			f(new RawQueryRow(row)),
 		);
+	}
+
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(raw_prepared_query_plan(this.inner, world.inner));
 	}
 
 	forEachArchetype(

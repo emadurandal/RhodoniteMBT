@@ -59,8 +59,9 @@ flowchart LR
               <tr><td><code>EntityId</code></td><td>stable index + generation。destroy/reuse 後の stale handle を拒否する。</td></tr>
               <tr><td><code>ComponentTypeId</code></td><td>registry id。archetype signature と query descriptor に使う。</td></tr>
               <tr><td><code>World</code></td><td>entities、archetypes、component registry、builtin blob stores を所有する。</td></tr>
-              <tr><td><code>Query</code> / <code>RawQuery</code></td><td>row iteration と archetype column iteration。</td></tr>
-              <tr><td><code>PreparedQuery</code> / <code>RawPreparedQuery</code></td><td>matched archetype plan を cache する optimization handle。snapshot ではない。</td></tr>
+              <tr><td><code>Query</code> / <code>RawQuery</code></td><td>row iteration、archetype column iteration、read-only plan diagnostics。</td></tr>
+              <tr><td><code>QueryPlan</code></td><td>required components、candidate archetypes、matched archetypes、matched rows、prepared-plan stale state の read-only snapshot。</td></tr>
+              <tr><td><code>PreparedQuery</code> / <code>RawPreparedQuery</code></td><td>matched archetype plan を cache する optimization handle。snapshot ではなく、現在の diagnostic plan も公開できる。</td></tr>
               <tr><td><code>SystemRunner</code></td><td>phase で filter される system set。access declaration、command buffer flush、実行計画 snapshot の境界。</td></tr>
               <tr><td><code>GpuWriteView</code></td><td>builtin blob backing bytes を借用する upload slice。byte offset と length は変更された subrange だけを指す場合がある。</td></tr>
             </tbody>
@@ -91,12 +92,13 @@ sequenceDiagram
   C->>W: apply after callback/system boundary
           </div>
           <p><code>QueryRow::read</code> / <code>write</code> は closure の中だけ row bytes を貸し出します。<code>RawQuery::for_each_archetype</code> は hot loop 向けに contiguous column view を返します。query callback 中の直接構造変更や payload setter は guard されるため、構造変更は <code>CommandBuffer</code> に積みます。</p>
+          <p><code>Query::plan</code>、<code>RawQuery::plan</code>、<code>PreparedQuery::plan</code>、<code>RawPreparedQuery::plan</code> は callback を実行せずに <code>QueryPlan</code> snapshot を返します。prepared plan は cached archetype version が stale かを示し、stale な診断結果は iteration が使うものと同じ current world の plan として再構築されます。</p>
 
           <h2>System Access Rules</h2>
           <table>
             <thead><tr><th>Operation</th><th>Required declaration</th></tr></thead>
             <tbody>
-              <tr><td><code>has_component</code>、<code>component_bytes</code>、query prepare/iteration</td><td><code>reads</code> または <code>writes</code></td></tr>
+              <tr><td><code>has_component</code>、<code>component_bytes</code>、query plan/prepare/iteration</td><td><code>reads</code> または <code>writes</code></td></tr>
               <tr><td><code>set_component_bytes</code>、query row writes、column writes</td><td><code>writes</code></td></tr>
               <tr><td><code>create_entity</code>、<code>destroy_entity</code>、<code>add_component*</code>、<code>remove_component</code>、<code>reserve_batch_capacity</code>、<code>spawn_batch</code></td><td><code>structural_write</code> と対象 component の <code>writes</code></td></tr>
               <tr><td>builtin blob resize event drain</td><td><code>structural_write</code></td></tr>
@@ -117,6 +119,7 @@ sequenceDiagram
 
           <h2>TypeScript Wrapper</h2>
           <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> は CPU-only ECS surface、<code>ChildOf</code> parent links、query、spawn batch、system scheduling、camera-control bytes、GlobalTransform と Camera blob row helper、builtin blob upload helpers を mirrored API として提供します。npm consumer は <code>rhodonite-mbt/ecs</code> から import します。</p>
+          <p>query wrapper は <code>QueryPlan</code> と <code>QueryPlanArchetype</code> を公開します。<code>query.plan(world)</code> または <code>prepared.plan(world)</code> で、callback を実行せずに candidate count、matched row count、matched archetype row count、prepared-plan staleness を確認できます。</p>
           <p>wrapper は <code>PhaseKey</code>、<code>SystemContext</code>、<code>System</code>、<code>SystemRunner</code>、callback 内で使う <code>CommandBuffer</code> を公開します。system は <code>reads</code>、<code>writes</code>、必要なら structural write permission を宣言して作り、<code>SystemRunner.runPhase(world, ctx, phase)</code> で実行します。<code>SystemRunner.planPhase(phase)</code> は同じ greedy batching rule で、実行せずに <code>SystemPhasePlan</code> / <code>SystemPlanBatch</code> / <code>SystemPlanSystem</code> snapshot を返します。command-buffer mutation を undo/redo に記録する場合は <code>WorldHistory.runSystemPhase(..., label)</code> を使います。</p>
           <p>npm root entrypoint では app scheduler の string <code>PhaseKey</code> を <code>PhaseKey</code> として維持し、ECS wrapper class は <code>EcsPhaseKey</code> でも export します。<code>rhodonite-mbt/ecs</code> subpath では ECS class を <code>PhaseKey</code> として export します。</p>
 

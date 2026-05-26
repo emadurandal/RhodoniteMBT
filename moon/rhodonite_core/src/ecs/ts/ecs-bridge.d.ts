@@ -37,6 +37,8 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
+	export type MoonQueryPlan = object;
+	export type MoonQueryPlanArchetype = object;
 	export type MoonPreparedQuery = object;
 	export type MoonRawPreparedQuery = object;
 	export type MoonQueryRow = object;
@@ -747,10 +749,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		f: (row: MoonRawQueryRow) => void,
 	): void;
 	export function query_prepare(query: MoonQuery, world: MoonWorld): MoonPreparedQuery;
+	export function query_plan(query: MoonQuery, world: MoonWorld): MoonQueryPlan;
 	export function raw_query_prepare(
 		query: MoonRawQuery,
 		world: MoonWorld,
 	): MoonRawPreparedQuery;
+	export function raw_query_plan(query: MoonRawQuery, world: MoonWorld): MoonQueryPlan;
 	export function raw_query_for_each_archetype(
 		query: MoonRawQuery,
 		world: MoonWorld,
@@ -761,16 +765,45 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		f: (archetype: MoonRawQueryArchetype) => void,
 	): void;
+	export function raw_prepared_query_plan(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+	): MoonQueryPlan;
 	export function prepared_query_for_each(
 		query: MoonPreparedQuery,
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
+	export function prepared_query_plan(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+	): MoonQueryPlan;
 	export function raw_prepared_query_for_each(
 		query: MoonRawPreparedQuery,
 		world: MoonWorld,
 		f: (row: MoonRawQueryRow) => void,
 	): void;
+	export function query_plan_required_components(
+		plan: MoonQueryPlan,
+	): MoonComponentTypeId[];
+	export function query_plan_archetype_version(plan: MoonQueryPlan): number;
+	export function query_plan_candidate_archetype_count(
+		plan: MoonQueryPlan,
+	): number;
+	export function query_plan_matched_archetype_count(
+		plan: MoonQueryPlan,
+	): number;
+	export function query_plan_matched_row_count(plan: MoonQueryPlan): number;
+	export function query_plan_stale(plan: MoonQueryPlan): MoonBool;
+	export function query_plan_archetypes(
+		plan: MoonQueryPlan,
+	): MoonQueryPlanArchetype[];
+	export function query_plan_archetype_index(
+		archetype: MoonQueryPlanArchetype,
+	): number;
+	export function query_plan_archetype_row_count(
+		archetype: MoonQueryPlanArchetype,
+	): number;
 	export function query_row_entity(row: MoonQueryRow): MoonEntityId;
 	export function raw_query_row_entity(row: MoonRawQueryRow): MoonEntityId;
 	export function query_row_has(

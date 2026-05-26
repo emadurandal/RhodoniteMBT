@@ -119,6 +119,25 @@ pub struct RawQuery {
 }
 
 ///|
+/// One matched archetype entry inside a read-only query plan snapshot.
+pub(all) struct QueryPlanArchetype {
+  archetype_index : Int
+  row_count : Int
+}
+
+///|
+/// Read-only diagnostic snapshot for a query plan against one world's current archetype layout.
+pub(all) struct QueryPlan {
+  required : Array[ComponentTypeId]
+  archetype_version : Int
+  candidate_archetype_count : Int
+  matched_archetype_count : Int
+  matched_row_count : Int
+  stale : Bool
+  archetypes : Array[QueryPlanArchetype]
+}
+
+///|
 /// Cached row plan for repeated high-level iteration over the same query.
 pub struct PreparedQuery {
   priv required : Array[ComponentTypeId]
