@@ -1175,6 +1175,7 @@ describe("ECS TypeScript wrapper: history", () => {
 			}),
 		).toBe(false);
 		expect(failedCommitHistory.undoLen()).toBe(0);
+		expect(failedCommitHistory.lastDiagnostic()).toBe("recording_disabled");
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(
 			new Uint8Array([5, 0, 0, 0]),
 		);

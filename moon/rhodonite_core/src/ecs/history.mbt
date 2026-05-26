@@ -3520,6 +3520,17 @@ pub fn WorldHistory::cancel_transaction(self : WorldHistory) -> Bool {
 }
 
 ///|
+/// Cancels the active transaction while preserving the current diagnostic.
+pub fn WorldHistory::cancel_transaction_preserving_diagnostic(
+  self : WorldHistory,
+) -> Bool {
+  let diagnostic = self.last_diagnostic()
+  let ok = self.cancel_transaction()
+  self.set_diagnostic(diagnostic)
+  ok
+}
+
+///|
 /// Cancels the active transaction and reverts deltas already applied in that transaction.
 pub fn WorldHistory::cancel_transaction_reverting(
   self : WorldHistory,
@@ -3567,9 +3578,7 @@ fn WorldHistory::finish_transaction_body(
     if self.commit_transaction() {
       true
     } else {
-      let diagnostic = self.last_diagnostic()
-      ignore(self.cancel_transaction())
-      self.set_diagnostic(diagnostic)
+      ignore(self.cancel_transaction_preserving_diagnostic())
       false
     }
   } else {

@@ -173,6 +173,7 @@ options(
         "world_history_begin_guarded_transaction",
         "world_history_commit_transaction",
         "world_history_cancel_transaction",
+        "world_history_cancel_transaction_preserving_diagnostic",
         "world_history_cancel_transaction_reverting",
         "world_history_can_undo",
         "world_history_can_redo",

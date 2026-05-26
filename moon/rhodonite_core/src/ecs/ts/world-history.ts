@@ -30,6 +30,7 @@ import {
 	world_history_can_redo,
 	world_history_can_undo,
 	world_history_cancel_transaction,
+	world_history_cancel_transaction_preserving_diagnostic,
 	world_history_cancel_transaction_reverting,
 	world_history_clear,
 	world_history_commit_transaction,
@@ -759,7 +760,7 @@ export class WorldHistory {
 				if (this.commitTransaction()) {
 					return true;
 				}
-				this.cancelTransaction();
+				world_history_cancel_transaction_preserving_diagnostic(this.inner);
 				return false;
 			}
 			this.cancelTransactionReverting(world);

@@ -389,6 +389,7 @@ pub fn WorldHistory::begin_transaction(Self, String) -> Bool
 pub fn WorldHistory::can_redo(Self) -> Bool
 pub fn WorldHistory::can_undo(Self) -> Bool
 pub fn WorldHistory::cancel_transaction(Self) -> Bool
+pub fn WorldHistory::cancel_transaction_preserving_diagnostic(Self) -> Bool
 pub fn WorldHistory::cancel_transaction_reverting(Self, World) -> Bool
 pub fn WorldHistory::clear(Self) -> Unit
 pub fn WorldHistory::commit_transaction(Self) -> Bool

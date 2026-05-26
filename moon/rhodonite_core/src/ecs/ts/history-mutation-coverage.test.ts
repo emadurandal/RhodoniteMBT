@@ -367,6 +367,7 @@ const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 			"begin_guarded_transaction",
 			"begin_transaction",
 			"cancel_transaction",
+			"cancel_transaction_preserving_diagnostic",
 			"cancel_transaction_reverting",
 			"clear",
 			"commit_transaction",
