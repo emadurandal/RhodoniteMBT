@@ -16,25 +16,86 @@ fn component_array_index_of(
 }
 
 ///|
-/// Builds a query descriptor and rejects duplicate component ids up front.
-pub fn Query::new(required : Array[ComponentTypeId]) -> Query {
+/// Returns true when two component arrays contain at least one shared id.
+fn component_arrays_overlap(
+  a : Array[ComponentTypeId],
+  b : Array[ComponentTypeId],
+) -> Bool {
+  for i = 0; i < a.length(); i = i + 1 {
+    if component_array_contains(b, a[i]) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Validates required/excluded component sets before query construction.
+fn assert_query_component_sets_valid(
+  required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
+  operation : String,
+) -> Unit {
   if component_array_has_duplicates(required) {
     abort(
-      "Query::new: duplicate required component. Hint: pass each ComponentTypeId at most once; use QueryRow::read or write with the component id instead of requesting the same row multiple times.",
+      operation +
+      ": duplicate required component. Hint: pass each ComponentTypeId at most once; use QueryRow::read or write with the component id instead of requesting the same row multiple times.",
     )
   }
-  { required: copy_component_array(required) }
+  if component_array_has_duplicates(excluded) {
+    abort(
+      operation +
+      ": duplicate excluded component. Hint: pass each excluded ComponentTypeId at most once.",
+    )
+  }
+  if component_arrays_overlap(required, excluded) {
+    abort(
+      operation +
+      ": required and excluded component sets overlap. Hint: a component cannot be both required and filtered out.",
+    )
+  }
+}
+
+///|
+/// Builds a query descriptor and rejects duplicate component ids up front.
+pub fn Query::new(required : Array[ComponentTypeId]) -> Query {
+  Query::new_with_excluded(required, [])
+}
+
+///|
+/// Builds a query descriptor with a `Without`-style excluded component filter.
+pub fn Query::new_with_excluded(
+  required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
+) -> Query {
+  assert_query_component_sets_valid(
+    required, excluded, "Query::new_with_excluded",
+  )
+  {
+    required: copy_component_array(required),
+    excluded: copy_component_array(excluded),
+  }
 }
 
 ///|
 /// Builds a raw query descriptor and rejects duplicate component ids up front.
 pub fn RawQuery::new(required : Array[ComponentTypeId]) -> RawQuery {
-  if component_array_has_duplicates(required) {
-    abort(
-      "RawQuery::new: duplicate required component. Hint: pass each ComponentTypeId at most once.",
-    )
+  RawQuery::new_with_excluded(required, [])
+}
+
+///|
+/// Builds a raw query descriptor with a `Without`-style excluded component filter.
+pub fn RawQuery::new_with_excluded(
+  required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
+) -> RawQuery {
+  assert_query_component_sets_valid(
+    required, excluded, "RawQuery::new_with_excluded",
+  )
+  {
+    required: copy_component_array(required),
+    excluded: copy_component_array(excluded),
   }
-  { required: copy_component_array(required) }
 }
 
 ///|
@@ -44,15 +105,39 @@ pub fn QueryCache::new(required : Array[ComponentTypeId]) -> QueryCache {
 }
 
 ///|
+/// Builds a caller-owned row query cache with an excluded component filter.
+pub fn QueryCache::new_with_excluded(
+  required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
+) -> QueryCache {
+  { query: Query::new_with_excluded(required, excluded), prepared: None }
+}
+
+///|
 /// Builds a caller-owned raw query cache for repeated byte-view iteration of the same required set.
 pub fn RawQueryCache::new(required : Array[ComponentTypeId]) -> RawQueryCache {
   { query: RawQuery::new(required), prepared: None }
 }
 
 ///|
+/// Builds a caller-owned raw query cache with an excluded component filter.
+pub fn RawQueryCache::new_with_excluded(
+  required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
+) -> RawQueryCache {
+  { query: RawQuery::new_with_excluded(required, excluded), prepared: None }
+}
+
+///|
 /// Returns a copy of the required component ids in callback payload order.
 pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
+}
+
+///|
+/// Returns a copy of the component ids filtered out by this query.
+pub fn Query::excluded_components(self : Query) -> Array[ComponentTypeId] {
+  copy_component_array(self.excluded)
 }
 
 ///|
@@ -65,6 +150,12 @@ pub fn Query::component_index(self : Query, component : ComponentTypeId) -> Int 
 /// Implements `RawQuery::required_components`.
 pub fn RawQuery::required_components(self : RawQuery) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
+}
+
+///|
+/// Returns a copy of the component ids filtered out by this raw query.
+pub fn RawQuery::excluded_components(self : RawQuery) -> Array[ComponentTypeId] {
+  copy_component_array(self.excluded)
 }
 
 ///|
@@ -85,6 +176,14 @@ pub fn QueryCache::required_components(
 }
 
 ///|
+/// Returns a copy of the cached row query's excluded component ids.
+pub fn QueryCache::excluded_components(
+  self : QueryCache,
+) -> Array[ComponentTypeId] {
+  self.query.excluded_components()
+}
+
+///|
 /// Returns the cached row query payload index for a required component.
 pub fn QueryCache::component_index(
   self : QueryCache,
@@ -99,6 +198,14 @@ pub fn RawQueryCache::required_components(
   self : RawQueryCache,
 ) -> Array[ComponentTypeId] {
   self.query.required_components()
+}
+
+///|
+/// Returns a copy of the cached raw query's excluded component ids.
+pub fn RawQueryCache::excluded_components(
+  self : RawQueryCache,
+) -> Array[ComponentTypeId] {
+  self.query.excluded_components()
 }
 
 ///|
@@ -137,6 +244,7 @@ fn Query::assert_registered_components(
   operation : String,
 ) -> Unit {
   assert_query_components_registered(self.required, world, operation)
+  assert_query_components_registered(self.excluded, world, operation)
 }
 
 ///|
@@ -194,26 +302,26 @@ fn query_archetype_accesses(
 /// Implements `query_matches_archetype`.
 fn query_matches_archetype(
   required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
   world : World,
   archetype_index : Int,
 ) -> Bool {
+  let sig = world.archetypes[archetype_index].components
+  for i = 0; i < excluded.length(); i = i + 1 {
+    if component_array_contains(sig, excluded[i]) {
+      return false
+    }
+  }
   let required_len = required.length()
   if required_len == 0 {
     false
   } else if required_len == 1 {
-    component_array_contains(
-      world.archetypes[archetype_index].components,
-      required[0],
-    )
+    component_array_contains(sig, required[0])
   } else if required_len == 2 {
-    let sig = world.archetypes[archetype_index].components
     component_array_contains(sig, required[0]) &&
     component_array_contains(sig, required[1])
   } else {
-    component_array_contains_all(
-      world.archetypes[archetype_index].components,
-      required,
-    )
+    component_array_contains_all(sig, required)
   }
 }
 
@@ -221,6 +329,7 @@ fn query_matches_archetype(
 /// Implements `build_prepared_query_archetypes`.
 fn build_prepared_query_archetypes(
   required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
   world : World,
   operation : String,
 ) -> Array[PreparedQueryArchetype] {
@@ -229,7 +338,7 @@ fn build_prepared_query_archetypes(
     let candidates = world.query_candidate_archetypes(required)
     for i = 0; i < candidates.length(); i = i + 1 {
       let ai = candidates[i]
-      if query_matches_archetype(required, world, ai) {
+      if query_matches_archetype(required, excluded, world, ai) {
         prepared_archetypes.push({
           archetype_index: ai,
           accesses: query_archetype_accesses(required, world, ai, operation),
@@ -274,6 +383,7 @@ fn query_candidate_archetype_count(
 /// Builds a public query plan snapshot from a prepared internal plan.
 fn build_query_plan_from_prepared_archetypes(
   required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
   world : World,
   archetypes : Array[PreparedQueryArchetype],
   stale : Bool,
@@ -283,6 +393,7 @@ fn build_query_plan_from_prepared_archetypes(
   )
   {
     required: copy_component_array(required),
+    excluded: copy_component_array(excluded),
     archetype_version: world.archetype_version,
     candidate_archetype_count: query_candidate_archetype_count(required, world),
     matched_archetype_count: plan_archetypes.length(),
@@ -296,14 +407,16 @@ fn build_query_plan_from_prepared_archetypes(
 /// Builds a public query plan snapshot from the current world layout.
 fn build_query_plan(
   required : Array[ComponentTypeId],
+  excluded : Array[ComponentTypeId],
   world : World,
   operation : String,
   stale : Bool,
 ) -> QueryPlan {
   build_query_plan_from_prepared_archetypes(
     required,
+    excluded,
     world,
-    build_prepared_query_archetypes(required, world, operation),
+    build_prepared_query_archetypes(required, excluded, world, operation),
     stale,
   )
 }
@@ -315,9 +428,11 @@ pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
   self.assert_registered_components(world, "Query::prepare")
   {
     required: copy_component_array(self.required),
+    excluded: copy_component_array(self.excluded),
     archetype_version: world.archetype_version,
     archetypes: build_prepared_query_archetypes(
       self.required,
+      self.excluded,
       world,
       "Query::prepare",
     ),
@@ -329,7 +444,7 @@ pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
 pub fn Query::plan(self : Query, world : World) -> QueryPlan {
   world.assert_system_components_read(self.required, "Query::plan")
   self.assert_registered_components(world, "Query::plan")
-  build_query_plan(self.required, world, "Query::plan", false)
+  build_query_plan(self.required, self.excluded, world, "Query::plan", false)
 }
 
 ///|
@@ -337,11 +452,14 @@ pub fn Query::plan(self : Query, world : World) -> QueryPlan {
 pub fn RawQuery::prepare(self : RawQuery, world : World) -> RawPreparedQuery {
   world.assert_system_components_read(self.required, "RawQuery::prepare")
   assert_query_components_registered(self.required, world, "RawQuery::prepare")
+  assert_query_components_registered(self.excluded, world, "RawQuery::prepare")
   {
     required: copy_component_array(self.required),
+    excluded: copy_component_array(self.excluded),
     archetype_version: world.archetype_version,
     archetypes: build_prepared_query_archetypes(
       self.required,
+      self.excluded,
       world,
       "RawQuery::prepare",
     ),
@@ -353,7 +471,8 @@ pub fn RawQuery::prepare(self : RawQuery, world : World) -> RawPreparedQuery {
 pub fn RawQuery::plan(self : RawQuery, world : World) -> QueryPlan {
   world.assert_system_components_read(self.required, "RawQuery::plan")
   assert_query_components_registered(self.required, world, "RawQuery::plan")
-  build_query_plan(self.required, world, "RawQuery::plan", false)
+  assert_query_components_registered(self.excluded, world, "RawQuery::plan")
+  build_query_plan(self.required, self.excluded, world, "RawQuery::plan", false)
 }
 
 ///|
@@ -488,10 +607,15 @@ pub fn PreparedQuery::for_each(
   f : (QueryRow) -> Unit,
 ) -> Unit {
   world.assert_system_components_read(self.required, "PreparedQuery::for_each")
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "PreparedQuery::for_each",
+  )
   let plan = if self.archetype_version == world.archetype_version {
     self
   } else {
-    Query::new(self.required).prepare(world)
+    Query::new_with_excluded(self.required, self.excluded).prepare(world)
   }
   if plan.required.length() == 0 {
     return
@@ -525,12 +649,24 @@ pub fn PreparedQuery::plan(self : PreparedQuery, world : World) -> QueryPlan {
     world,
     "PreparedQuery::plan",
   )
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "PreparedQuery::plan",
+  )
   let stale = self.archetype_version != world.archetype_version
   if stale {
-    build_query_plan(self.required, world, "PreparedQuery::plan", true)
+    build_query_plan(
+      self.required,
+      self.excluded,
+      world,
+      "PreparedQuery::plan",
+      true,
+    )
   } else {
     build_query_plan_from_prepared_archetypes(
       self.required,
+      self.excluded,
       world,
       self.archetypes,
       false,
@@ -556,8 +692,13 @@ pub fn PreparedQuery::refresh(
     world,
     "PreparedQuery::refresh",
   )
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "PreparedQuery::refresh",
+  )
   if self.is_stale(world) {
-    Query::new(self.required).prepare(world)
+    Query::new_with_excluded(self.required, self.excluded).prepare(world)
   } else {
     self
   }
@@ -574,13 +715,18 @@ pub fn RawPreparedQuery::for_each(
   let plan = if self.archetype_version == world.archetype_version {
     self
   } else {
-    RawQuery::new(self.required).prepare(world)
+    RawQuery::new_with_excluded(self.required, self.excluded).prepare(world)
   }
   if plan.required.length() == 0 {
     return
   }
   world.assert_system_components_read(
     plan.required,
+    "RawPreparedQuery::for_each",
+  )
+  assert_query_components_registered(
+    plan.excluded,
+    world,
     "RawPreparedQuery::for_each",
   )
   world.query_depth = world.query_depth + 1
@@ -615,12 +761,24 @@ pub fn RawPreparedQuery::plan(
     world,
     "RawPreparedQuery::plan",
   )
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "RawPreparedQuery::plan",
+  )
   let stale = self.archetype_version != world.archetype_version
   if stale {
-    build_query_plan(self.required, world, "RawPreparedQuery::plan", true)
+    build_query_plan(
+      self.required,
+      self.excluded,
+      world,
+      "RawPreparedQuery::plan",
+      true,
+    )
   } else {
     build_query_plan_from_prepared_archetypes(
       self.required,
+      self.excluded,
       world,
       self.archetypes,
       false,
@@ -652,8 +810,13 @@ pub fn RawPreparedQuery::refresh(
     world,
     "RawPreparedQuery::refresh",
   )
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "RawPreparedQuery::refresh",
+  )
   if self.is_stale(world) {
-    RawQuery::new(self.required).prepare(world)
+    RawQuery::new_with_excluded(self.required, self.excluded).prepare(world)
   } else {
     self
   }
@@ -671,10 +834,15 @@ pub fn RawPreparedQuery::for_each_archetype(
     self.required,
     "RawPreparedQuery::for_each_archetype",
   )
+  assert_query_components_registered(
+    self.excluded,
+    world,
+    "RawPreparedQuery::for_each_archetype",
+  )
   let plan = if self.archetype_version == world.archetype_version {
     self
   } else {
-    RawQuery::new(self.required).prepare(world)
+    RawQuery::new_with_excluded(self.required, self.excluded).prepare(world)
   }
   if plan.required.length() == 0 {
     return

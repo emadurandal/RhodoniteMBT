@@ -23,19 +23,24 @@ import {
 	prepared_query_refresh,
 	query_component_index,
 	query_cache_component_index,
+	query_cache_excluded_components,
 	query_cache_for_each,
 	query_cache_new,
+	query_cache_new_with_excluded,
 	query_cache_plan,
 	query_cache_refresh,
 	query_cache_required_components,
+	query_excluded_components,
 	query_for_each,
 	query_new,
+	query_new_with_excluded,
 	query_plan,
 	query_plan_archetype_index,
 	query_plan_archetype_row_count,
 	query_plan_archetype_version,
 	query_plan_archetypes,
 	query_plan_candidate_archetype_count,
+	query_plan_excluded_components,
 	query_plan_matched_archetype_count,
 	query_plan_matched_row_count,
 	query_plan_required_components,
@@ -58,7 +63,9 @@ import {
 	raw_prepared_query_refresh,
 	raw_query_cache_for_each,
 	raw_query_cache_for_each_archetype,
+	raw_query_cache_excluded_components,
 	raw_query_cache_new,
+	raw_query_cache_new_with_excluded,
 	raw_query_cache_plan,
 	raw_query_cache_refresh,
 	raw_query_cache_required_components,
@@ -78,11 +85,14 @@ import {
 	raw_query_archetype_write_column_tracked,
 	raw_query_archetype_write_column_tracked_at,
 	raw_query_component_index,
+	raw_query_excluded_components,
 	raw_query_for_each,
 	raw_query_for_each_archetype,
 	raw_query_new,
+	raw_query_new_with_excluded,
 	raw_query_plan,
 	raw_query_prepare,
+	raw_query_required_components,
 	raw_query_row_entity,
 	raw_query_row_has,
 	raw_query_row_has_at,
@@ -107,8 +117,26 @@ export class Query {
 		return new Query(query_new(required.map((component) => component.inner)));
 	}
 
+	static newWithExcluded(
+		required: ComponentTypeId[],
+		excluded: ComponentTypeId[],
+	): Query {
+		return new Query(
+			query_new_with_excluded(
+				required.map((component) => component.inner),
+				excluded.map((component) => component.inner),
+			),
+		);
+	}
+
 	requiredComponents(): ComponentTypeId[] {
 		return query_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	excludedComponents(): ComponentTypeId[] {
+		return query_excluded_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
 	}
@@ -143,8 +171,26 @@ export class QueryCache {
 		);
 	}
 
+	static newWithExcluded(
+		required: ComponentTypeId[],
+		excluded: ComponentTypeId[],
+	): QueryCache {
+		return new QueryCache(
+			query_cache_new_with_excluded(
+				required.map((component) => component.inner),
+				excluded.map((component) => component.inner),
+			),
+		);
+	}
+
 	requiredComponents(): ComponentTypeId[] {
 		return query_cache_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	excludedComponents(): ComponentTypeId[] {
+		return query_cache_excluded_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
 	}
@@ -223,6 +269,12 @@ export class QueryPlan {
 		);
 	}
 
+	excludedComponents(): ComponentTypeId[] {
+		return query_plan_excluded_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
 	archetypeVersion(): number {
 		return query_plan_archetype_version(this.inner);
 	}
@@ -259,6 +311,30 @@ export class RawQuery {
 
 	static new(required: ComponentTypeId[]): RawQuery {
 		return new RawQuery(raw_query_new(required.map((component) => component.inner)));
+	}
+
+	static newWithExcluded(
+		required: ComponentTypeId[],
+		excluded: ComponentTypeId[],
+	): RawQuery {
+		return new RawQuery(
+			raw_query_new_with_excluded(
+				required.map((component) => component.inner),
+				excluded.map((component) => component.inner),
+			),
+		);
+	}
+
+	requiredComponents(): ComponentTypeId[] {
+		return raw_query_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	excludedComponents(): ComponentTypeId[] {
+		return raw_query_excluded_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
 	}
 
 	componentIndex(component: ComponentTypeId): number {
@@ -300,8 +376,26 @@ export class RawQueryCache {
 		);
 	}
 
+	static newWithExcluded(
+		required: ComponentTypeId[],
+		excluded: ComponentTypeId[],
+	): RawQueryCache {
+		return new RawQueryCache(
+			raw_query_cache_new_with_excluded(
+				required.map((component) => component.inner),
+				excluded.map((component) => component.inner),
+			),
+		);
+	}
+
 	requiredComponents(): ComponentTypeId[] {
 		return raw_query_cache_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	excludedComponents(): ComponentTypeId[] {
+		return raw_query_cache_excluded_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
 	}

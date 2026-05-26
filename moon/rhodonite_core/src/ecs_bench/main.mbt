@@ -473,6 +473,53 @@ fn make_many_archetype_query_world(
 }
 
 ///|
+/// Implements `make_many_archetype_without_query_world`.
+fn make_many_archetype_without_query_world(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+  let world = @ecs.World::new()
+  let target = world.register_cpu_component(
+    "BenchManyArchetypeWithoutTarget", 4,
+  )
+  let excluded = world.register_cpu_component(
+    "BenchManyArchetypeWithoutExcluded", 4,
+  )
+  let markers : Array[@ecs.ComponentTypeId] = []
+  for i = 0; i < 4; i = i + 1 {
+    markers.push(
+      world.register_cpu_component(
+        "BenchManyArchetypeWithoutMarker" + i.to_string(),
+        4,
+      ),
+    )
+  }
+  let signature_count = many_archetype_signature_count()
+  for signature = 0; signature < signature_count; signature = signature + 1 {
+    let extra_rows = if signature < count % signature_count { 1 } else { 0 }
+    let rows = count / signature_count + extra_rows
+    if rows > 0 {
+      let components : Array[@ecs.ComponentTypeId] = [target]
+      if signature % 2 == 1 {
+        components.push(excluded)
+      }
+      let mut mask = 1
+      for bit = 0; bit < markers.length(); bit = bit + 1 {
+        if signature / mask % 2 == 1 {
+          components.push(markers[bit])
+        }
+        mask = mask * 2
+      }
+      ignore(
+        world.spawn_batch(components, rows, fn(i, _entity, row) {
+          row.write(target, bytes => bytes[0] = (signature + i).to_byte())
+        }),
+      )
+    }
+  }
+  (world, target, excluded, signature_count)
+}
+
+///|
 /// Implements `query_plan_checksum`.
 fn query_plan_checksum(plan : @ecs.QueryPlan) -> Int {
   let mut checksum = plan.candidate_archetype_count +
@@ -487,6 +534,62 @@ fn query_plan_checksum(plan : @ecs.QueryPlan) -> Int {
     checksum = checksum + 1
   }
   checksum
+}
+
+///|
+/// Implements `bench_query_many_archetypes_without_plan`.
+fn bench_query_many_archetypes_without_plan(count : Int) -> BenchSample {
+  let (world, target, excluded, _) = make_many_archetype_without_query_world(
+    count,
+  )
+  let q = @ecs.Query::new_with_excluded([target], [excluded])
+  let started = monotonic_ms()
+  let plan = q.plan(world)
+  report(
+    "query_many_archetypes_without_plan",
+    count,
+    started,
+    query_plan_checksum(plan),
+  )
+}
+
+///|
+/// Implements `bench_query_many_archetypes_without_row`.
+fn bench_query_many_archetypes_without_row(count : Int) -> BenchSample {
+  let (world, target, excluded, _) = make_many_archetype_without_query_world(
+    count,
+  )
+  let q = @ecs.Query::new_with_excluded([target], [excluded])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each(world, row => {
+    row.write(target, bytes => {
+      bytes[0] = (bytes[0].to_int() + 1).to_byte()
+      checksum = checksum + bytes[0].to_int()
+    })
+  })
+  report("query_many_archetypes_without_row", count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_many_archetypes_without_archetype`.
+fn bench_query_many_archetypes_without_archetype(count : Int) -> BenchSample {
+  let (world, target, excluded, _) = make_many_archetype_without_query_world(
+    count,
+  )
+  let q = @ecs.RawQuery::new_with_excluded([target], [excluded])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(target)
+    let col = arch.write_column(target)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let base = row * stride
+      col[base] = (col[base].to_int() + 1).to_byte()
+      checksum = checksum + col[base].to_int()
+    }
+  })
+  report("query_many_archetypes_without_archetype", count, started, checksum)
 }
 
 ///|
@@ -1697,6 +1800,15 @@ fn run_suite(count : Int) -> Unit {
   run_case("query_many_archetypes_row", count, bench_query_many_archetypes_row)
   run_case(
     "query_many_archetypes_archetype", count, bench_query_many_archetypes_archetype,
+  )
+  run_case(
+    "query_many_archetypes_without_plan", count, bench_query_many_archetypes_without_plan,
+  )
+  run_case(
+    "query_many_archetypes_without_row", count, bench_query_many_archetypes_without_row,
+  )
+  run_case(
+    "query_many_archetypes_without_archetype", count, bench_query_many_archetypes_without_archetype,
   )
   run_case(
     "prepared_query_many_archetypes_reuse", count, bench_prepared_query_many_archetypes_reuse,

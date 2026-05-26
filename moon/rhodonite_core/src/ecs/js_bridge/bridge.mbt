@@ -1672,9 +1672,27 @@ pub fn query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.Query {
 }
 
 ///|
+/// Implements `query_new_with_excluded`.
+pub fn query_new_with_excluded(
+  required : Array[@ecs.ComponentTypeId],
+  excluded : Array[@ecs.ComponentTypeId],
+) -> @ecs.Query {
+  @ecs.Query::new_with_excluded(required, excluded)
+}
+
+///|
 /// Implements `raw_query_new`.
 pub fn raw_query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.RawQuery {
   @ecs.RawQuery::new(required)
+}
+
+///|
+/// Implements `raw_query_new_with_excluded`.
+pub fn raw_query_new_with_excluded(
+  required : Array[@ecs.ComponentTypeId],
+  excluded : Array[@ecs.ComponentTypeId],
+) -> @ecs.RawQuery {
+  @ecs.RawQuery::new_with_excluded(required, excluded)
 }
 
 ///|
@@ -1686,6 +1704,15 @@ pub fn query_cache_new(
 }
 
 ///|
+/// Implements `query_cache_new_with_excluded`.
+pub fn query_cache_new_with_excluded(
+  required : Array[@ecs.ComponentTypeId],
+  excluded : Array[@ecs.ComponentTypeId],
+) -> @ecs.QueryCache {
+  @ecs.QueryCache::new_with_excluded(required, excluded)
+}
+
+///|
 /// Implements `raw_query_cache_new`.
 pub fn raw_query_cache_new(
   required : Array[@ecs.ComponentTypeId],
@@ -1694,11 +1721,28 @@ pub fn raw_query_cache_new(
 }
 
 ///|
+/// Implements `raw_query_cache_new_with_excluded`.
+pub fn raw_query_cache_new_with_excluded(
+  required : Array[@ecs.ComponentTypeId],
+  excluded : Array[@ecs.ComponentTypeId],
+) -> @ecs.RawQueryCache {
+  @ecs.RawQueryCache::new_with_excluded(required, excluded)
+}
+
+///|
 /// Implements `query_required_components`.
 pub fn query_required_components(
   query : @ecs.Query,
 ) -> Array[@ecs.ComponentTypeId] {
   query.required_components()
+}
+
+///|
+/// Implements `query_excluded_components`.
+pub fn query_excluded_components(
+  query : @ecs.Query,
+) -> Array[@ecs.ComponentTypeId] {
+  query.excluded_components()
 }
 
 ///|
@@ -1719,6 +1763,14 @@ pub fn query_cache_required_components(
 }
 
 ///|
+/// Implements `query_cache_excluded_components`.
+pub fn query_cache_excluded_components(
+  cache : @ecs.QueryCache,
+) -> Array[@ecs.ComponentTypeId] {
+  cache.excluded_components()
+}
+
+///|
 /// Implements `query_cache_component_index`.
 pub fn query_cache_component_index(
   cache : @ecs.QueryCache,
@@ -1733,6 +1785,30 @@ pub fn raw_query_cache_required_components(
   cache : @ecs.RawQueryCache,
 ) -> Array[@ecs.ComponentTypeId] {
   cache.required_components()
+}
+
+///|
+/// Implements `raw_query_cache_excluded_components`.
+pub fn raw_query_cache_excluded_components(
+  cache : @ecs.RawQueryCache,
+) -> Array[@ecs.ComponentTypeId] {
+  cache.excluded_components()
+}
+
+///|
+/// Implements `raw_query_required_components`.
+pub fn raw_query_required_components(
+  query : @ecs.RawQuery,
+) -> Array[@ecs.ComponentTypeId] {
+  query.required_components()
+}
+
+///|
+/// Implements `raw_query_excluded_components`.
+pub fn raw_query_excluded_components(
+  query : @ecs.RawQuery,
+) -> Array[@ecs.ComponentTypeId] {
+  query.excluded_components()
 }
 
 ///|
@@ -1969,6 +2045,14 @@ pub fn query_plan_required_components(
   plan : @ecs.QueryPlan,
 ) -> Array[@ecs.ComponentTypeId] {
   plan.required
+}
+
+///|
+/// Implements `query_plan_excluded_components`.
+pub fn query_plan_excluded_components(
+  plan : @ecs.QueryPlan,
+) -> Array[@ecs.ComponentTypeId] {
+  plan.excluded
 }
 
 ///|
