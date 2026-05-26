@@ -60,7 +60,7 @@ flowchart LR
               <tr><td><code>World</code></td><td>Owns entities, archetypes, the registry, and builtin blob stores.</td></tr>
               <tr><td><code>Query</code> / <code>RawQuery</code></td><td>Row iteration, archetype-column iteration, and read-only plan diagnostics.</td></tr>
               <tr><td><code>QueryPlan</code></td><td>A read-only snapshot of required components, candidate archetypes, matched archetypes, matched rows, and prepared-plan staleness.</td></tr>
-              <tr><td><code>PreparedQuery</code></td><td>A reusable plan cache, not a snapshot. It rebuilds when archetype versions change, and can expose the current diagnostic plan.</td></tr>
+              <tr><td><code>PreparedQuery</code></td><td>A reusable plan cache, not a snapshot. It can report staleness, refresh against the current world, and expose the current diagnostic plan.</td></tr>
               <tr><td><code>SystemRunner</code></td><td>Phase-filtered system set with access guards, command buffer boundaries, and execution-plan snapshots.</td></tr>
               <tr><td><code>GpuWriteView</code></td><td>Borrowed upload slice from builtin blob backing storage; byte offset and length may cover only the changed subrange.</td></tr>
             </tbody>
@@ -79,11 +79,11 @@ flowchart LR
 
           <h2>Queries And Mutation</h2>
           <p><code>QueryRow::read</code> and <code>write</code> lend row bytes only inside the closure. <code>RawQuery::for_each_archetype</code> returns contiguous column views for hot loops. Direct structural mutation and payload setters are guarded while query callbacks are active; queue structural changes through <code>CommandBuffer</code>.</p>
-          <p><code>Query::plan</code>, <code>RawQuery::plan</code>, <code>PreparedQuery::plan</code>, and <code>RawPreparedQuery::plan</code> return <code>QueryPlan</code> snapshots without running callbacks. Prepared plans report whether their cached archetype version is stale; stale diagnostics are rebuilt against the current world, matching the plan that iteration would use.</p>
+          <p><code>Query::plan</code>, <code>RawQuery::plan</code>, <code>PreparedQuery::plan</code>, and <code>RawPreparedQuery::plan</code> return <code>QueryPlan</code> snapshots without running callbacks. Prepared plans report whether their cached archetype version is stale; stale diagnostics are rebuilt against the current world, matching the plan that iteration would use. Use <code>PreparedQuery::is_stale</code> for a lightweight version check and <code>refresh</code> when the caller wants to keep a rebuilt prepared plan for repeated reuse.</p>
           <table>
             <thead><tr><th>Operation</th><th>Required declaration</th></tr></thead>
             <tbody>
-              <tr><td>reads, query plan/prepare/iteration</td><td><code>reads</code> or <code>writes</code></td></tr>
+              <tr><td>reads, query plan/prepare/refresh/iteration</td><td><code>reads</code> or <code>writes</code></td></tr>
               <tr><td>payload writes and row/column writes</td><td><code>writes</code></td></tr>
               <tr><td>entity/component structural changes, reserve, spawn batch</td><td><code>structural_write</code> plus relevant component <code>writes</code></td></tr>
               <tr><td>builtin blob resize event drains</td><td><code>structural_write</code></td></tr>
@@ -96,7 +96,7 @@ flowchart LR
 
           <h2>TypeScript Wrapper</h2>
           <p><a href="../../moon/rhodonite_core/src/ecs/ts/"><code>moon/rhodonite_core/src/ecs/ts</code></a> mirrors the CPU-only ECS surface, <code>ChildOf</code> parent links, query APIs, spawn batch, system scheduling, camera-control byte layouts, GlobalTransform and Camera blob row helpers, and builtin blob upload helpers. npm users import it from <code>rhodonite-mbt/ecs</code>.</p>
-          <p>The query wrappers expose <code>QueryPlan</code> and <code>QueryPlanArchetype</code>. Use <code>query.plan(world)</code> or <code>prepared.plan(world)</code> to inspect candidate counts, matched row counts, matched archetype row counts, and prepared-plan staleness without executing query callbacks.</p>
+          <p>The query wrappers expose <code>QueryPlan</code> and <code>QueryPlanArchetype</code>. Use <code>query.plan(world)</code> or <code>prepared.plan(world)</code> to inspect candidate counts, matched row counts, matched archetype row counts, and prepared-plan staleness without executing query callbacks. Use <code>prepared.isStale(world)</code> for a cheap check, then keep the result of <code>prepared.refresh(world)</code> before repeated iteration.</p>
           <p>The wrapper exposes <code>PhaseKey</code>, <code>SystemContext</code>, <code>System</code>, <code>SystemRunner</code>, and the callback-only <code>CommandBuffer</code>. Construct systems with declared <code>reads</code>, <code>writes</code>, and optional structural write permission, then call <code>SystemRunner.runPhase(world, ctx, phase)</code>. <code>SystemRunner.planPhase(phase)</code> uses the same greedy batching rule and returns a <code>SystemPhasePlan</code> / <code>SystemPlanBatch</code> / <code>SystemPlanSystem</code> snapshot without executing callbacks. Use <code>WorldHistory.runSystemPhase(..., label)</code> when command-buffer mutations must be recorded for undo/redo.</p>
           <p>The root npm entrypoint keeps the app scheduler's string <code>PhaseKey</code> as <code>PhaseKey</code>; the ECS wrapper class is also available there as <code>EcsPhaseKey</code>. The <code>rhodonite-mbt/ecs</code> subpath exports the ECS class as <code>PhaseKey</code>.</p>
 

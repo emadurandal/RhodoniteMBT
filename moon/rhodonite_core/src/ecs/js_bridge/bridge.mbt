@@ -1768,6 +1768,24 @@ pub fn raw_prepared_query_plan(
 }
 
 ///|
+/// Implements `raw_prepared_query_is_stale`.
+pub fn raw_prepared_query_is_stale(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+) -> Bool {
+  query.is_stale(world)
+}
+
+///|
+/// Implements `raw_prepared_query_refresh`.
+pub fn raw_prepared_query_refresh(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+) -> @ecs.RawPreparedQuery {
+  query.refresh(world)
+}
+
+///|
 /// Implements `prepared_query_for_each`.
 pub fn prepared_query_for_each(
   query : @ecs.PreparedQuery,
@@ -1794,6 +1812,24 @@ pub fn prepared_query_plan(
   world : @ecs.World,
 ) -> @ecs.QueryPlan {
   query.plan(world)
+}
+
+///|
+/// Implements `prepared_query_is_stale`.
+pub fn prepared_query_is_stale(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+) -> Bool {
+  query.is_stale(world)
+}
+
+///|
+/// Implements `prepared_query_refresh`.
+pub fn prepared_query_refresh(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+) -> @ecs.PreparedQuery {
+  query.refresh(world)
 }
 
 ///|
