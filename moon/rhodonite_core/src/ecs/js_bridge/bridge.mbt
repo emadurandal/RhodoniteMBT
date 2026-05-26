@@ -1702,6 +1702,15 @@ pub fn query_required_components(
 }
 
 ///|
+/// Implements `query_component_index`.
+pub fn query_component_index(
+  query : @ecs.Query,
+  component : @ecs.ComponentTypeId,
+) -> Int {
+  query.component_index(component)
+}
+
+///|
 /// Implements `query_cache_required_components`.
 pub fn query_cache_required_components(
   cache : @ecs.QueryCache,
@@ -1710,11 +1719,38 @@ pub fn query_cache_required_components(
 }
 
 ///|
+/// Implements `query_cache_component_index`.
+pub fn query_cache_component_index(
+  cache : @ecs.QueryCache,
+  component : @ecs.ComponentTypeId,
+) -> Int {
+  cache.component_index(component)
+}
+
+///|
 /// Implements `raw_query_cache_required_components`.
 pub fn raw_query_cache_required_components(
   cache : @ecs.RawQueryCache,
 ) -> Array[@ecs.ComponentTypeId] {
   cache.required_components()
+}
+
+///|
+/// Implements `raw_query_component_index`.
+pub fn raw_query_component_index(
+  query : @ecs.RawQuery,
+  component : @ecs.ComponentTypeId,
+) -> Int {
+  query.component_index(component)
+}
+
+///|
+/// Implements `raw_query_cache_component_index`.
+pub fn raw_query_cache_component_index(
+  cache : @ecs.RawQueryCache,
+  component : @ecs.ComponentTypeId,
+) -> Int {
+  cache.component_index(component)
 }
 
 ///|
@@ -2009,12 +2045,24 @@ pub fn query_row_has(
 }
 
 ///|
+/// Implements `query_row_has_at`.
+pub fn query_row_has_at(row : @ecs.QueryRow, index : Int) -> Bool {
+  row.has_at(index)
+}
+
+///|
 /// Implements `raw_query_row_has`.
 pub fn raw_query_row_has(
   row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> Bool {
   row.has(component)
+}
+
+///|
+/// Implements `raw_query_row_has_at`.
+pub fn raw_query_row_has_at(row : @ecs.RawQueryRow, index : Int) -> Bool {
+  row.has_at(index)
 }
 
 ///|
@@ -2027,12 +2075,30 @@ pub fn raw_query_row_read_view(
 }
 
 ///|
+/// Implements `raw_query_row_read_view_at`.
+pub fn raw_query_row_read_view_at(
+  row : @ecs.RawQueryRow,
+  index : Int,
+) -> ArrayView[Byte] {
+  row.read_view_at(index)
+}
+
+///|
 /// Implements `raw_query_row_write_view`.
 pub fn raw_query_row_write_view(
   row : @ecs.RawQueryRow,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   row.write_view(component)
+}
+
+///|
+/// Implements `raw_query_row_write_view_at`.
+pub fn raw_query_row_write_view_at(
+  row : @ecs.RawQueryRow,
+  index : Int,
+) -> MutArrayView[Byte] {
+  row.write_view_at(index)
 }
 
 ///|
@@ -2047,6 +2113,17 @@ pub fn raw_query_row_write_tracked(
 }
 
 ///|
+/// Implements `raw_query_row_write_tracked_at`.
+pub fn raw_query_row_write_tracked_at(
+  row : @ecs.RawQueryRow,
+  history : @ecs.WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  row.write_tracked_at(history, index, f)
+}
+
+///|
 /// Implements `query_row_read`.
 pub fn query_row_read(
   row : @ecs.QueryRow,
@@ -2054,6 +2131,16 @@ pub fn query_row_read(
   f : (ArrayView[Byte]) -> Unit,
 ) -> Unit {
   row.read(component, f)
+}
+
+///|
+/// Implements `query_row_read_at`.
+pub fn query_row_read_at(
+  row : @ecs.QueryRow,
+  index : Int,
+  f : (ArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.read_at(index, f)
 }
 
 ///|
@@ -2067,6 +2154,16 @@ pub fn query_row_write(
 }
 
 ///|
+/// Implements `query_row_write_at`.
+pub fn query_row_write_at(
+  row : @ecs.QueryRow,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  row.write_at(index, f)
+}
+
+///|
 /// Implements `query_row_write_tracked`.
 pub fn query_row_write_tracked(
   row : @ecs.QueryRow,
@@ -2075,6 +2172,17 @@ pub fn query_row_write_tracked(
   f : (MutArrayView[Byte]) -> Unit,
 ) -> Bool {
   row.write_tracked(history, component, f)
+}
+
+///|
+/// Implements `query_row_write_tracked_at`.
+pub fn query_row_write_tracked_at(
+  row : @ecs.QueryRow,
+  history : @ecs.WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  row.write_tracked_at(history, index, f)
 }
 
 ///|
@@ -2102,12 +2210,30 @@ pub fn raw_query_archetype_has(
 }
 
 ///|
+/// Implements `raw_query_archetype_has_at`.
+pub fn raw_query_archetype_has_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+) -> Bool {
+  arch.has_at(index)
+}
+
+///|
 /// Implements `raw_query_archetype_component_stride`.
 pub fn raw_query_archetype_component_stride(
   arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> Int {
   arch.component_stride(component)
+}
+
+///|
+/// Implements `raw_query_archetype_component_stride_at`.
+pub fn raw_query_archetype_component_stride_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+) -> Int {
+  arch.component_stride_at(index)
 }
 
 ///|
@@ -2120,12 +2246,30 @@ pub fn raw_query_archetype_read_column(
 }
 
 ///|
+/// Implements `raw_query_archetype_read_column_at`.
+pub fn raw_query_archetype_read_column_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+) -> ArrayView[Byte] {
+  arch.read_column_at(index)
+}
+
+///|
 /// Implements `raw_query_archetype_write_column`.
 pub fn raw_query_archetype_write_column(
   arch : @ecs.RawQueryArchetype,
   component : @ecs.ComponentTypeId,
 ) -> MutArrayView[Byte] {
   arch.write_column(component)
+}
+
+///|
+/// Implements `raw_query_archetype_write_column_at`.
+pub fn raw_query_archetype_write_column_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+) -> MutArrayView[Byte] {
+  arch.write_column_at(index)
 }
 
 ///|
@@ -2140,6 +2284,17 @@ pub fn raw_query_archetype_write_column_tracked(
 }
 
 ///|
+/// Implements `raw_query_archetype_write_column_tracked_at`.
+pub fn raw_query_archetype_write_column_tracked_at(
+  arch : @ecs.RawQueryArchetype,
+  history : @ecs.WorldHistory,
+  index : Int,
+  f : (MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  arch.write_column_tracked_at(history, index, f)
+}
+
+///|
 /// Implements `raw_query_archetype_write_column_rows_tracked`.
 pub fn raw_query_archetype_write_column_rows_tracked(
   arch : @ecs.RawQueryArchetype,
@@ -2149,6 +2304,18 @@ pub fn raw_query_archetype_write_column_rows_tracked(
   f : (Int, MutArrayView[Byte]) -> Unit,
 ) -> Bool {
   arch.write_column_rows_tracked(history, component, rows, f)
+}
+
+///|
+/// Implements `raw_query_archetype_write_column_rows_tracked_at`.
+pub fn raw_query_archetype_write_column_rows_tracked_at(
+  arch : @ecs.RawQueryArchetype,
+  history : @ecs.WorldHistory,
+  index : Int,
+  rows : Array[Int],
+  f : (Int, MutArrayView[Byte]) -> Unit,
+) -> Bool {
+  arch.write_column_rows_tracked_at(history, index, rows, f)
 }
 
 ///|

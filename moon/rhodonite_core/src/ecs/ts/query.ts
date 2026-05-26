@@ -21,6 +21,8 @@ import {
 	prepared_query_is_stale,
 	prepared_query_plan,
 	prepared_query_refresh,
+	query_component_index,
+	query_cache_component_index,
 	query_cache_for_each,
 	query_cache_new,
 	query_cache_plan,
@@ -42,9 +44,13 @@ import {
 	query_required_components,
 	query_row_entity,
 	query_row_has,
+	query_row_has_at,
 	query_row_read,
+	query_row_read_at,
 	query_row_write,
+	query_row_write_at,
 	query_row_write_tracked,
+	query_row_write_tracked_at,
 	raw_prepared_query_for_each,
 	raw_prepared_query_for_each_archetype,
 	raw_prepared_query_is_stale,
@@ -56,14 +62,22 @@ import {
 	raw_query_cache_plan,
 	raw_query_cache_refresh,
 	raw_query_cache_required_components,
+	raw_query_cache_component_index,
 	raw_query_archetype_component_stride,
+	raw_query_archetype_component_stride_at,
 	raw_query_archetype_entity,
 	raw_query_archetype_has,
+	raw_query_archetype_has_at,
 	raw_query_archetype_length,
 	raw_query_archetype_read_column,
+	raw_query_archetype_read_column_at,
 	raw_query_archetype_write_column,
+	raw_query_archetype_write_column_at,
 	raw_query_archetype_write_column_rows_tracked,
+	raw_query_archetype_write_column_rows_tracked_at,
 	raw_query_archetype_write_column_tracked,
+	raw_query_archetype_write_column_tracked_at,
+	raw_query_component_index,
 	raw_query_for_each,
 	raw_query_for_each_archetype,
 	raw_query_new,
@@ -71,9 +85,13 @@ import {
 	raw_query_prepare,
 	raw_query_row_entity,
 	raw_query_row_has,
+	raw_query_row_has_at,
 	raw_query_row_read_view,
+	raw_query_row_read_view_at,
 	raw_query_row_write_view,
+	raw_query_row_write_view_at,
 	raw_query_row_write_tracked,
+	raw_query_row_write_tracked_at,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
 import { ByteView, byteView, moonBool } from "./views.ts";
@@ -93,6 +111,10 @@ export class Query {
 		return query_required_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
+	}
+
+	componentIndex(component: ComponentTypeId): number {
+		return query_component_index(this.inner, component.inner);
 	}
 
 	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
@@ -125,6 +147,10 @@ export class QueryCache {
 		return query_cache_required_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
+	}
+
+	componentIndex(component: ComponentTypeId): number {
+		return query_cache_component_index(this.inner, component.inner);
 	}
 
 	plan(world: { readonly inner: MoonWorld }): QueryPlan {
@@ -235,6 +261,10 @@ export class RawQuery {
 		return new RawQuery(raw_query_new(required.map((component) => component.inner)));
 	}
 
+	componentIndex(component: ComponentTypeId): number {
+		return raw_query_component_index(this.inner, component.inner);
+	}
+
 	forEach(world: { readonly inner: MoonWorld }, f: (row: RawQueryRow) => void): void {
 		raw_query_for_each(this.inner, world.inner, (row) => f(new RawQueryRow(row)));
 	}
@@ -274,6 +304,10 @@ export class RawQueryCache {
 		return raw_query_cache_required_components(this.inner).map(
 			(component) => new ComponentTypeId(component),
 		);
+	}
+
+	componentIndex(component: ComponentTypeId): number {
+		return raw_query_cache_component_index(this.inner, component.inner);
 	}
 
 	plan(world: { readonly inner: MoonWorld }): QueryPlan {
@@ -350,12 +384,24 @@ export class QueryRow {
 		return moonBool(query_row_has(this.inner, component.inner));
 	}
 
+	hasAt(index: number): boolean {
+		return moonBool(query_row_has_at(this.inner, index));
+	}
+
 	read(component: ComponentTypeId, f: (bytes: ByteView) => void): void {
 		query_row_read(this.inner, component.inner, (bytes) => f(byteView(bytes)));
 	}
 
+	readAt(index: number, f: (bytes: ByteView) => void): void {
+		query_row_read_at(this.inner, index, (bytes) => f(byteView(bytes)));
+	}
+
 	write(component: ComponentTypeId, f: (bytes: ByteView) => void): void {
 		query_row_write(this.inner, component.inner, (bytes) => f(byteView(bytes)));
+	}
+
+	writeAt(index: number, f: (bytes: ByteView) => void): void {
+		query_row_write_at(this.inner, index, (bytes) => f(byteView(bytes)));
 	}
 
 	writeTracked(
@@ -365,6 +411,18 @@ export class QueryRow {
 	): boolean {
 		return moonBool(
 			query_row_write_tracked(this.inner, history.inner, component.inner, (bytes) =>
+				f(byteView(bytes)),
+			),
+		);
+	}
+
+	writeTrackedAt(
+		history: { readonly inner: MoonWorldHistory },
+		index: number,
+		f: (bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			query_row_write_tracked_at(this.inner, history.inner, index, (bytes) =>
 				f(byteView(bytes)),
 			),
 		);
@@ -386,12 +444,24 @@ export class RawQueryRow {
 		return moonBool(raw_query_row_has(this.inner, component.inner));
 	}
 
+	hasAt(index: number): boolean {
+		return moonBool(raw_query_row_has_at(this.inner, index));
+	}
+
 	readView(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_row_read_view(this.inner, component.inner));
 	}
 
+	readViewAt(index: number): ByteView {
+		return byteView(raw_query_row_read_view_at(this.inner, index));
+	}
+
 	writeView(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_row_write_view(this.inner, component.inner));
+	}
+
+	writeViewAt(index: number): ByteView {
+		return byteView(raw_query_row_write_view_at(this.inner, index));
 	}
 
 	writeTracked(
@@ -401,6 +471,18 @@ export class RawQueryRow {
 	): boolean {
 		return moonBool(
 			raw_query_row_write_tracked(this.inner, history.inner, component.inner, (bytes) =>
+				f(byteView(bytes)),
+			),
+		);
+	}
+
+	writeTrackedAt(
+		history: { readonly inner: MoonWorldHistory },
+		index: number,
+		f: (bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			raw_query_row_write_tracked_at(this.inner, history.inner, index, (bytes) =>
 				f(byteView(bytes)),
 			),
 		);
@@ -426,16 +508,32 @@ export class RawQueryArchetype {
 		return moonBool(raw_query_archetype_has(this.inner, component.inner));
 	}
 
+	hasAt(index: number): boolean {
+		return moonBool(raw_query_archetype_has_at(this.inner, index));
+	}
+
 	componentStride(component: ComponentTypeId): number {
 		return raw_query_archetype_component_stride(this.inner, component.inner);
+	}
+
+	componentStrideAt(index: number): number {
+		return raw_query_archetype_component_stride_at(this.inner, index);
 	}
 
 	readColumn(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_archetype_read_column(this.inner, component.inner));
 	}
 
+	readColumnAt(index: number): ByteView {
+		return byteView(raw_query_archetype_read_column_at(this.inner, index));
+	}
+
 	writeColumn(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_archetype_write_column(this.inner, component.inner));
+	}
+
+	writeColumnAt(index: number): ByteView {
+		return byteView(raw_query_archetype_write_column_at(this.inner, index));
 	}
 
 	writeColumnTracked(
@@ -453,6 +551,21 @@ export class RawQueryArchetype {
 		);
 	}
 
+	writeColumnTrackedAt(
+		history: { readonly inner: MoonWorldHistory },
+		index: number,
+		f: (bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			raw_query_archetype_write_column_tracked_at(
+				this.inner,
+				history.inner,
+				index,
+				(bytes) => f(byteView(bytes)),
+			),
+		);
+	}
+
 	writeColumnRowsTracked(
 		history: { readonly inner: MoonWorldHistory },
 		component: ComponentTypeId,
@@ -464,6 +577,23 @@ export class RawQueryArchetype {
 				this.inner,
 				history.inner,
 				component.inner,
+				rows,
+				(row, bytes) => f(row, byteView(bytes)),
+			),
+		);
+	}
+
+	writeColumnRowsTrackedAt(
+		history: { readonly inner: MoonWorldHistory },
+		index: number,
+		rows: number[],
+		f: (row: number, bytes: ByteView) => void,
+	): boolean {
+		return moonBool(
+			raw_query_archetype_write_column_rows_tracked_at(
+				this.inner,
+				history.inner,
+				index,
 				rows,
 				(row, bytes) => f(row, byteView(bytes)),
 			),

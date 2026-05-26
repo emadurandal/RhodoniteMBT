@@ -33,6 +33,7 @@
 
           <h2>Query View Lifetime</h2>
           <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。view を外へ逃がさない API 形状にしているため、system 実行順や将来の並列化に向けた最低限の境界を保ちます。</p>
+          <p>index-based query accessor は required component order を payload index として使います。これは hot-loop helper であり、別種の lifetime handle ではありません。component-id accessor と同じ access guard を維持します。</p>
           <p><code>RawQueryArchetype::write_column</code> は archetype column 全体の mutable view を貸し出す untracked expert API です。同一 component の重複 mutable view を避けるため、query required set の duplicate check に依存します。full-column write を undo/redo tracking したい場合は <code>RawQueryArchetype::write_column_tracked</code> を使います。呼び出し側が変更候補の sparse column rows を知っている場合は <code>RawQueryArchetype::write_column_rows_tracked</code> を使います。</p>
           <p><code>QueryPlan</code> は diagnostic snapshot であり、borrow や ownership handle ではありません。required component ids と matched archetype row counts を copy するため、row/column view の lifetime を延ばさずに query shape を確認できます。</p>
           <p><code>PreparedQuery</code> と <code>RawPreparedQuery</code> は immutable lifecycle handle です。<code>is_stale</code> は version check のみで、<code>refresh</code> は繰り返し再利用する前に呼び出し側が保持し直す current prepared plan value を返します。</p>
