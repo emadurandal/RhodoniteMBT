@@ -3557,6 +3557,22 @@ pub fn WorldHistory::cancel_transaction_reverting(
 
 ///|
 /// Runs `body` inside a helper-owned transaction, reverting applied deltas on `false`.
+fn WorldHistory::finish_transaction_body(
+  self : WorldHistory,
+  world : World,
+  body : () -> Bool,
+) -> Bool {
+  let ok = body()
+  if ok {
+    self.commit_transaction()
+  } else {
+    ignore(self.cancel_transaction_reverting(world))
+    false
+  }
+}
+
+///|
+/// Runs `body` inside a helper-owned transaction, reverting applied deltas on `false`.
 pub fn WorldHistory::with_transaction(
   self : WorldHistory,
   world : World,
@@ -3566,13 +3582,7 @@ pub fn WorldHistory::with_transaction(
   if !self.begin_transaction(label) {
     return false
   }
-  let ok = body()
-  if ok {
-    self.commit_transaction()
-  } else {
-    ignore(self.cancel_transaction_reverting(world))
-    false
-  }
+  self.finish_transaction_body(world, body)
 }
 
 ///|
@@ -3586,13 +3596,7 @@ pub fn WorldHistory::with_guarded_transaction(
   if !self.begin_guarded_transaction(world, label) {
     return false
   }
-  let ok = body()
-  if ok {
-    self.commit_transaction()
-  } else {
-    ignore(self.cancel_transaction_reverting(world))
-    false
-  }
+  self.finish_transaction_body(world, body)
 }
 
 ///|
