@@ -49,6 +49,82 @@ fn GlobalTransformBlobStore::write_matrix(
 }
 
 ///|
+/// Implements `GlobalTransformBlobStore::row_word_matches`.
+fn GlobalTransformBlobStore::row_word_matches(
+  self : GlobalTransformBlobStore,
+  byte_offset : Int,
+  expected : UInt,
+) -> Bool {
+  @writes.get_u32_le(self.store.bytes, byte_offset) == expected
+}
+
+///|
+/// Implements `GlobalTransformBlobStore::matrix_matches`.
+fn GlobalTransformBlobStore::matrix_matches(
+  self : GlobalTransformBlobStore,
+  format : @comp.GlobalTransformGpuFormat,
+  word_offset : Int,
+  matrix : @m44.Matrix44F,
+) -> Bool {
+  let words = @comp.global_transform_word_count(format)
+  let byte_offset = word_offset * 4
+  if word_offset < 0 || byte_offset + words * 4 > self.store.bytes.length() {
+    return false
+  }
+  let d = matrix.data
+  match format {
+    Affine3x4F32 =>
+      self.row_word_matches(byte_offset + 0, d[0].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 4, d[4].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 8, d[8].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 12, d[12].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 16, d[1].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 20, d[5].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 24, d[9].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 28, d[13].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 32, d[2].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 36, d[6].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 40, d[10].reinterpret_as_uint()) &&
+      self.row_word_matches(byte_offset + 44, d[14].reinterpret_as_uint())
+    Affine3x4F16 => {
+      let w0 = @comp.global_transform_f32_to_f16_bits(d[0]) |
+        (@comp.global_transform_f32_to_f16_bits(d[4]) << 16)
+      let w1 = @comp.global_transform_f32_to_f16_bits(d[8]) |
+        (@comp.global_transform_f32_to_f16_bits(d[12]) << 16)
+      let w2 = @comp.global_transform_f32_to_f16_bits(d[1]) |
+        (@comp.global_transform_f32_to_f16_bits(d[5]) << 16)
+      let w3 = @comp.global_transform_f32_to_f16_bits(d[9]) |
+        (@comp.global_transform_f32_to_f16_bits(d[13]) << 16)
+      let w4 = @comp.global_transform_f32_to_f16_bits(d[2]) |
+        (@comp.global_transform_f32_to_f16_bits(d[6]) << 16)
+      let w5 = @comp.global_transform_f32_to_f16_bits(d[10]) |
+        (@comp.global_transform_f32_to_f16_bits(d[14]) << 16)
+      self.row_word_matches(byte_offset + 0, w0) &&
+      self.row_word_matches(byte_offset + 4, w1) &&
+      self.row_word_matches(byte_offset + 8, w2) &&
+      self.row_word_matches(byte_offset + 12, w3) &&
+      self.row_word_matches(byte_offset + 16, w4) &&
+      self.row_word_matches(byte_offset + 20, w5)
+    }
+  }
+}
+
+///|
+/// Writes one GlobalTransform row only when the encoded GPU payload changes.
+fn GlobalTransformBlobStore::write_matrix_if_changed(
+  self : GlobalTransformBlobStore,
+  format : @comp.GlobalTransformGpuFormat,
+  word_offset : Int,
+  matrix : @m44.Matrix44F,
+) -> Bool {
+  if self.matrix_matches(format, word_offset, matrix) {
+    return false
+  }
+  self.write_matrix(format, word_offset, matrix)
+  true
+}
+
+///|
 /// Implements `GlobalTransformBlobStore::read_matrix`.
 fn GlobalTransformBlobStore::read_matrix(
   self : GlobalTransformBlobStore,
@@ -105,6 +181,14 @@ fn GlobalTransformBlobStore::write_word_range_views(
   write : (MutArrayView[Byte]) -> Unit,
 ) -> Array[GpuWriteView] {
   self.store.write_word_range_views(first_word, word_count, write)
+}
+
+///|
+/// Implements `GlobalTransformBlobStore::has_write_views`.
+fn GlobalTransformBlobStore::has_write_views(
+  self : GlobalTransformBlobStore,
+) -> Bool {
+  self.store.has_dirty_words()
 }
 
 ///|

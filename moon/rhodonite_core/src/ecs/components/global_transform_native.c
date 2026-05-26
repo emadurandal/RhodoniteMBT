@@ -19,6 +19,12 @@ static uint32_t rhodonite_f32_bits(float value) {
 }
 
 static inline uint32_t rhodonite_global_transform_f32_to_f16_bits_impl(float value) {
+#if defined(__aarch64__) || defined(__ARM_FEATURE_FP16_SCALAR_ARITHMETIC)
+  __fp16 half = (__fp16)value;
+  uint16_t half_bits;
+  memcpy(&half_bits, &half, sizeof(half_bits));
+  return (uint32_t)half_bits;
+#else
   uint32_t bits = rhodonite_f32_bits(value);
   uint32_t sign = (bits >> 16) & 0x8000u;
   uint32_t mant = bits & 0x007fffffu;
@@ -51,6 +57,7 @@ static inline uint32_t rhodonite_global_transform_f32_to_f16_bits_impl(float val
     half += 1u;
   }
   return half;
+#endif
 }
 
 uint32_t rhodonite_global_transform_f32_to_f16_bits(float value) {

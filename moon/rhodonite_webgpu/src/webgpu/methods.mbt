@@ -436,6 +436,9 @@ pub fn GPUQueue::drain_and_upload_global_transform_writes(
   buffer : GPUBuffer,
   world : @ecs.World,
 ) -> Unit {
+  if !world.has_global_transform_blob_write_views() {
+    return
+  }
   self.upload_global_transform_writes(
     buffer,
     world.drain_global_transform_blob_write_views(),
@@ -466,6 +469,9 @@ pub fn GPUQueue::drain_and_upload_camera_writes(
   buffer : GPUBuffer,
   world : @ecs.World,
 ) -> Unit {
+  if !world.has_camera_blob_write_views() {
+    return
+  }
   self.upload_camera_writes(buffer, world.drain_camera_blob_write_views())
 }
 

@@ -336,7 +336,9 @@ pub fn World::global_transform_blob_word_capacity(Self) -> Int
 pub fn World::global_transform_component(Self) -> ComponentTypeId
 pub fn World::global_transform_gpu_format(Self) -> @components.GlobalTransformGpuFormat
 pub fn World::global_transform_ref(Self, EntityId) -> GlobalTransformRef?
+pub fn World::has_camera_blob_write_views(Self) -> Bool
 pub fn World::has_component(Self, EntityId, ComponentTypeId) -> Bool
+pub fn World::has_global_transform_blob_write_views(Self) -> Bool
 pub fn World::is_alive(Self, EntityId) -> Bool
 pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self

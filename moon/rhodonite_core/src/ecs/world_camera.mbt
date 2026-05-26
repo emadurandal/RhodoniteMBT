@@ -103,15 +103,17 @@ pub fn World::set_camera_matrices(
   } else {
     match self.camera_ref(entity) {
       Some(camera_ref) => {
-        self.camera_blob.write_matrices(
-          camera_ref.word_offset,
-          view,
-          proj,
-          near,
-          far,
-          aspect,
-          projection_kind,
-          flags,
+        ignore(
+          self.camera_blob.write_matrices_if_changed(
+            camera_ref.word_offset,
+            view,
+            proj,
+            near,
+            far,
+            aspect,
+            projection_kind,
+            flags,
+          ),
         )
         true
       }
@@ -167,6 +169,14 @@ pub fn World::drain_camera_blob_write_views(
   let id = self.camera_component_id
   self.assert_system_component_write(id, "World::drain_camera_blob_write_views")
   self.camera_blob.drain_write_views()
+}
+
+///|
+/// Reports whether the Camera packed blob has queued GPU write views.
+pub fn World::has_camera_blob_write_views(self : World) -> Bool {
+  let id = self.camera_component_id
+  self.assert_system_component_write(id, "World::has_camera_blob_write_views")
+  self.camera_blob.has_write_views()
 }
 
 ///|
@@ -229,15 +239,17 @@ pub fn World::update_camera_views_from_global_transforms(self : World) -> Unit {
             let aspect = @comp.get_gpu_f32(bytes, 276)
             let projection_kind = @comp.get_gpu_f32(bytes, 280)
             let flags = @comp.get_gpu_f32(bytes, 284)
-            self.camera_blob.write_matrices(
-              camera_ref.word_offset,
-              view,
-              proj,
-              near,
-              far,
-              aspect,
-              projection_kind,
-              flags,
+            ignore(
+              self.camera_blob.write_matrices_if_changed(
+                camera_ref.word_offset,
+                view,
+                proj,
+                near,
+                far,
+                aspect,
+                projection_kind,
+                flags,
+              ),
             )
           }
           None => ()

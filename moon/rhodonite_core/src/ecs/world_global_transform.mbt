@@ -115,10 +115,12 @@ pub fn World::set_global_transform(
   } else {
     match self.global_transform_ref(entity) {
       Some(gt_ref) => {
-        self.global_transform_blob.write_matrix(
-          gt_ref.format,
-          gt_ref.word_offset,
-          m,
+        ignore(
+          self.global_transform_blob.write_matrix_if_changed(
+            gt_ref.format,
+            gt_ref.word_offset,
+            m,
+          ),
         )
         true
       }
@@ -205,6 +207,16 @@ pub fn World::drain_global_transform_blob_write_views(
     gt, "World::drain_global_transform_blob_write_views",
   )
   self.global_transform_blob.drain_write_views()
+}
+
+///|
+/// Reports whether the GlobalTransform packed blob has queued GPU write views.
+pub fn World::has_global_transform_blob_write_views(self : World) -> Bool {
+  let gt = self.global_transform_component_id
+  self.assert_system_component_write(
+    gt, "World::has_global_transform_blob_write_views",
+  )
+  self.global_transform_blob.has_write_views()
 }
 
 ///|
@@ -499,10 +511,12 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
     Some(m) =>
       match self.global_transform_ref(entity) {
         Some(gt_ref) => {
-          self.global_transform_blob.write_matrix(
-            gt_ref.format,
-            gt_ref.word_offset,
-            m,
+          ignore(
+            self.global_transform_blob.write_matrix_if_changed(
+              gt_ref.format,
+              gt_ref.word_offset,
+              m,
+            ),
           )
           true
         }

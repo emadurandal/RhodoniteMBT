@@ -16,6 +16,34 @@ test "GlobalTransform identity roundtrip and GPU drain" {
 }
 
 ///|
+test "GlobalTransform identical set skips duplicate blob write" {
+  let world = World::new()
+  let entity = world.create_entity()
+  let matrix = @m44.Matrix44::translation(
+    (1.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, matrix))
+  ignore(world.drain_global_transform_blob_write_views())
+  assert_true(world.set_global_transform(entity, matrix))
+  assert_true(!world.has_global_transform_blob_write_views())
+  assert_eq(world.drain_global_transform_blob_write_views().length(), 0)
+  let changed = @m44.Matrix44::translation(
+    (4.0 : Float),
+    (2.0 : Float),
+    (3.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+  assert_true(world.set_global_transform(entity, changed))
+  assert_true(world.has_global_transform_blob_write_views())
+  assert_eq(world.drain_global_transform_blob_write_views().length(), 1)
+}
+
+///|
 test "GlobalTransform unreadable ref returns none and does not reformat" {
   let world = World::new()
   let entity = world.create_entity()
