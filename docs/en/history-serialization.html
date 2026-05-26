@@ -44,7 +44,7 @@
           </ul>
 
           <h2>Record Shape</h2>
-          <p>A future history archive should store undo and redo stacks as ordered records. Each record should contain a label, record-level metadata, and ordered deltas. The order of deltas is semantic because dependent transactions such as create-then-add-component must replay in the same sequence.</p>
+          <p>A v1 history archive stores undo and redo stacks as ordered records. Each record contains a label, record-level metadata, and ordered deltas. The order of deltas is semantic because dependent transactions such as create-then-add-component must replay in the same sequence.</p>
           <table>
             <thead><tr><th>Field</th><th>Policy</th></tr></thead>
             <tbody>
@@ -69,10 +69,10 @@
           </table>
 
           <h2>Payloads</h2>
-          <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. Import validation resolves the registered component by <code>component_by_stable_key</code> and uses <code>component_matches_identity</code>; specified schema version/hash fields must match, while unspecified schema fields are treated as wildcards. If the schema changed, import should reject those deltas rather than reinterpret bytes.</p>
-          <p>Blob-backed builtins must not persist CPU ref bytes as the source of truth. <code>GlobalTransform</code> should persist its logical matrix row and format metadata. <code>Camera</code> should persist the logical camera GPU row payload and camera metadata needed by the runtime helper. On import, the world allocates fresh blob rows and writes those payloads, producing valid CPU ref components for the current session.</p>
+          <p>User CPU components are byte-exact payloads. Their before/after bytes are safe to persist only together with a matching component schema key. Import validation resolves the registered component by <code>component_by_stable_key</code> and uses <code>component_matches_identity</code>; specified schema version/hash fields must match, while unspecified schema fields are treated as wildcards. If the schema changed, import rejects those deltas rather than reinterpreting bytes.</p>
+          <p>Blob-backed builtins do not persist CPU ref bytes as the source of truth. <code>GlobalTransform</code> persists its logical matrix row and format metadata. <code>Camera</code> persists the logical camera GPU row payload and camera metadata needed by the runtime helper. On import, the world allocates fresh blob rows and writes those payloads, producing valid CPU ref components for the current session.</p>
 
-          <h2>Export MVP</h2>
+          <h2>Archive Export</h2>
           <p>The current export API returns retained records in stack order with the next undo or redo operation first. It first runs the same eligibility checks as <code>undo_serialization_report</code> / <code>redo_serialization_report</code>; if any record is not serializable, export returns <code>None</code> / <code>null</code> and does not mutate history diagnostics or stacks.</p>
           <table>
             <thead><tr><th>Delta</th><th>Exported payload</th></tr></thead>
@@ -87,7 +87,7 @@
             </tbody>
           </table>
 
-          <h2>Import MVP</h2>
+          <h2>Archive Import</h2>
           <p>Import consumes the same in-memory archive shape and replaces only the target stack. It does not append to existing records and does not clear the opposite stack. The target world must already be in the current state represented by the archive; import validates the full stack against that world before replacing anything. Only a successful import replaces the target stack; failed imports leave the target stack and world unchanged.</p>
           <p>The validation report APIs run the same archive conversion and full-stack applicability checks without changing history stacks, the world, or <code>last_diagnostic</code>. Top-level, record-level, and delta-level reports expose <code>valid</code>, <code>reason</code>, and archive-order indexes. Record index <code>0</code> is the next imported undo or redo operation; delta indexes refer to the original archive order even when undo validation checks deltas in reverse application order. When full-stack validation fails, such as when an entity or component is missing from the current world or the world has drifted from the archive state, the failing delta and any later unvalidated record or delta reports are marked invalid with <code>import_validation_failed</code>.</p>
           <table>
@@ -115,9 +115,28 @@
             </tbody>
           </table>
 
+          <h2>Compatibility Policy</h2>
+          <p>The v1 JSON compatibility surface is <code>format_version = 1</code>, snake_case field names, supported delta kind strings, entity identity fields, component identity fields, <code>bytes_base64</code> payload encoding, and builtin payload fields such as <code>global_transform_format</code>. Adding a JSON field or delta kind requires updating the decoder, golden fixtures, invalid fixture coverage, and this document in the same change.</p>
+          <p>The in-memory archive objects are the MoonBit and TypeScript API shape for the current build. They are not a file ABI: MoonBit enum layout, object layout, internal variant names, and local component indexes may change as long as the v1 JSON compatibility surface and import validation rules remain intact.</p>
+
           <h2>Replay Validation</h2>
-          <p>Import and replay should apply the same defensive posture as runtime undo/redo: validate each record before applying it, reject stale or schema-mismatched deltas, and leave stacks unchanged when validation fails. Byte budgets and record count limits remain runtime retention policy; they do not define archive compatibility.</p>
-          <p><code>undo_serialization_report</code> and <code>redo_serialization_report</code> are dry-run diagnostics for the retained in-memory stacks. They do not export payload bytes or define a file format. Each report includes every record and delta, marks whether it is serializable, and explains failures such as <code>missing_stable_component_identity</code> or <code>unknown_component</code> so editors can show which components need stable identity metadata before export is implemented.</p>
+          <p>Import and replay apply the same defensive posture as runtime undo/redo: validate each record before applying it, reject stale or schema-mismatched deltas, and leave stacks unchanged when validation fails. Byte budgets and record count limits remain runtime retention policy; they do not define archive compatibility.</p>
+          <p><code>undo_serialization_report</code> and <code>redo_serialization_report</code> are dry-run diagnostics for the retained in-memory stacks. They do not export payload bytes or define the JSON wire format. Each report includes every record and delta, marks whether it is serializable, and explains failures such as <code>missing_stable_component_identity</code> or <code>unknown_component</code> so editors can show which components need stable identity metadata before export is attempted.</p>
+
+          <h2>Test Coverage</h2>
+          <table>
+            <thead><tr><th>Behavior</th><th>Coverage</th></tr></thead>
+            <tbody>
+              <tr><td>Serialization reports</td><td>MoonBit and TypeScript tests cover retained-stack eligibility, missing stable component identity, unknown components, and payload-free diagnostics.</td></tr>
+              <tr><td>Archive export/import</td><td>MoonBit and TypeScript tests cover stable component changes, redo stacks, entity destroy snapshots, and builtin GlobalTransform / Camera payloads.</td></tr>
+              <tr><td>Import validation</td><td>MoonBit and TypeScript tests cover dry-run validation, unsupported formats, identity mismatches, invalid payloads, stale-world replay failures, and unchanged world/stack state after failed imports.</td></tr>
+              <tr><td>JSON encode/decode</td><td>TypeScript tests cover JSON round trips, malformed JSON, unsupported versions, missing required fields, unknown delta kinds, invalid base64, and record/delta count mismatches.</td></tr>
+              <tr><td>v1 compatibility fixtures</td><td>TypeScript golden fixtures cover stable component archives, entity destroy snapshots, builtin GlobalTransform / Camera archives, and invalid fixture rejection.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Maintenance</h2>
+          <p>When changing archive semantics, update the in-memory export/import tests, TypeScript JSON helper tests, v1 golden or invalid fixtures, and this document together. If a change intentionally breaks the JSON compatibility surface, bump <code>format_version</code> and keep readers rejecting unsupported versions explicitly.</p>
 
           <h2>Out Of Scope For V1</h2>
           <ul>
