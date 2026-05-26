@@ -115,10 +115,12 @@ pub fn World::set_global_transform(
   } else {
     match self.global_transform_ref(entity) {
       Some(gt_ref) => {
-        self.global_transform_blob.write_matrix(
-          gt_ref.format,
-          gt_ref.word_offset,
-          m,
+        ignore(
+          self.global_transform_blob.write_matrix_if_changed(
+            gt_ref.format,
+            gt_ref.word_offset,
+            m,
+          ),
         )
         true
       }
@@ -509,10 +511,12 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
     Some(m) =>
       match self.global_transform_ref(entity) {
         Some(gt_ref) => {
-          self.global_transform_blob.write_matrix(
-            gt_ref.format,
-            gt_ref.word_offset,
-            m,
+          ignore(
+            self.global_transform_blob.write_matrix_if_changed(
+              gt_ref.format,
+              gt_ref.word_offset,
+              m,
+            ),
           )
           true
         }

@@ -47,7 +47,7 @@ flowchart LR
           <ul>
             <li>User-registered component は <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> として登録され、payload は archetype ごとの <code>ComponentColumn</code> に <code>row * stride</code> で packed されます。stable identity metadata は runtime では任意で、将来の history serialization 向けに <code>component_by_stable_key</code> / <code>component_matches_identity</code> で解決できます。</li>
             <li><code>GlobalTransform</code> と <code>Camera</code> は CPU row に小さな ref を置き、matrix bytes は専用 blob store に置きます。</li>
-            <li><code>has_global_transform_blob_write_views</code> と <code>has_camera_blob_write_views</code> は packed blob store に upload slice が queued されているかを返します。renderer は write がない frame の空 drain を避けられますが、write があるときの upload 内容は変わりません。</li>
+            <li><code>has_global_transform_blob_write_views</code> と <code>has_camera_blob_write_views</code> は packed blob store に upload slice が queued されているかを返します。renderer は write がない frame の空 drain を避けられますが、write があるときの upload 内容は変わりません。builtin setter は encoded GlobalTransform payload または Camera inputs が変わっていない場合、重複する upload slice を queue しません。</li>
             <li>CPU column は固定長 buffer を backing storage とし、capacity 拡張時は buffer を差し替えます。JS backend で byte 単位の <code>Array.push</code> hot path を避けます。</li>
             <li><code>reserve_batch_capacity</code> と <code>spawn_batch</code> は大量 spawn 時の archetype capacity 拡張を制御する API です。</li>
           </ul>

@@ -61,6 +61,55 @@ test "builtin Camera stores matrices in packed camera blob" {
 }
 
 ///|
+test "builtin Camera identical set skips duplicate blob write" {
+  let world = World::new()
+  let camera = world.create_entity()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (100.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(!world.has_camera_blob_write_views())
+  assert_eq(world.drain_camera_blob_write_views().length(), 0)
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      view,
+      proj,
+      (0.1 : Float),
+      (200.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(world.has_camera_blob_write_views())
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
 test "orbit camera reset restores home Transform3D" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()
