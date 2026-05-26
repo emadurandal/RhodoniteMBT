@@ -206,8 +206,10 @@ pub struct Query {
   // private fields
 }
 pub fn Query::component_index(Self, ComponentTypeId) -> Int
+pub fn Query::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
+pub fn Query::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn Query::plan(Self, World) -> QueryPlan
 pub fn Query::prepare(Self, World) -> PreparedQuery
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
@@ -216,14 +218,17 @@ pub struct QueryCache {
   // private fields
 }
 pub fn QueryCache::component_index(Self, ComponentTypeId) -> Int
+pub fn QueryCache::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn QueryCache::for_each(Self, World, (QueryRow) -> Unit) -> Unit
 pub fn QueryCache::new(Array[ComponentTypeId]) -> Self
+pub fn QueryCache::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn QueryCache::plan(Self, World) -> QueryPlan
 pub fn QueryCache::refresh(Self, World) -> Unit
 pub fn QueryCache::required_components(Self) -> Array[ComponentTypeId]
 
 pub(all) struct QueryPlan {
   required : Array[ComponentTypeId]
+  excluded : Array[ComponentTypeId]
   archetype_version : Int
   candidate_archetype_count : Int
   matched_archetype_count : Int
@@ -271,9 +276,11 @@ pub struct RawQuery {
   // private fields
 }
 pub fn RawQuery::component_index(Self, ComponentTypeId) -> Int
+pub fn RawQuery::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn RawQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
 pub fn RawQuery::new(Array[ComponentTypeId]) -> Self
+pub fn RawQuery::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn RawQuery::plan(Self, World) -> QueryPlan
 pub fn RawQuery::prepare(Self, World) -> RawPreparedQuery
 pub fn RawQuery::required_components(Self) -> Array[ComponentTypeId]
@@ -300,9 +307,11 @@ pub struct RawQueryCache {
   // private fields
 }
 pub fn RawQueryCache::component_index(Self, ComponentTypeId) -> Int
+pub fn RawQueryCache::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn RawQueryCache::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQueryCache::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
 pub fn RawQueryCache::new(Array[ComponentTypeId]) -> Self
+pub fn RawQueryCache::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn RawQueryCache::plan(Self, World) -> QueryPlan
 pub fn RawQueryCache::refresh(Self, World) -> Unit
 pub fn RawQueryCache::required_components(Self) -> Array[ComponentTypeId]

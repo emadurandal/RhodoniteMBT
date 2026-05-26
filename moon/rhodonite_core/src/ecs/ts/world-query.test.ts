@@ -427,6 +427,50 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(cache.plan(world).matchedRowCount()).toBe(2);
 	});
 
+	it("filters query rows with excluded components", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("QueryWithoutTsA", 16);
+		const cpuB = world.registerCpuComponent("QueryWithoutTsB", 16);
+		const cpuC = world.registerCpuComponent("QueryWithoutTsC", 16);
+		const query = Query.newWithExcluded([cpuA, cpuB], [cpuC]);
+		expect(query.excludedComponents().map((component) => component.index())).toEqual([
+			cpuC.index(),
+		]);
+
+		const e0 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e0, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuB, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuC, f32Bytes([5, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		const plan = query.plan(world);
+		expect(plan.excludedComponents().map((component) => component.index())).toEqual([
+			cpuC.index(),
+		]);
+		expect(plan.candidateArchetypeCount()).toBe(2);
+		expect(plan.matchedRowCount()).toBe(1);
+		let rows = 0;
+		query.forEach(world, (row) => {
+			rows += 1;
+			expect(row.entity().index()).toBe(e0.index());
+			expect(row.has(cpuC)).toBe(false);
+		});
+		expect(rows).toBe(1);
+		expect(() => query.componentIndex(cpuC)).toThrow();
+	});
+
 	it("reuses and refreshes raw query cache archetype plans", () => {
 		const world = World.new();
 		const cpuA = world.registerCpuComponent("RawQueryCacheTsA", 16);
@@ -460,6 +504,42 @@ describe("ECS TypeScript wrapper: query", () => {
 		});
 		expect(rows).toBe(2);
 		expect(cache.plan(world).stale()).toBe(false);
+	});
+
+	it("filters raw query archetypes with excluded components", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("RawQueryWithoutTsA", 16);
+		const cpuB = world.registerCpuComponent("RawQueryWithoutTsB", 16);
+		const cpuC = world.registerCpuComponent("RawQueryWithoutTsC", 16);
+		const cache = RawQueryCache.newWithExcluded([cpuA, cpuB], [cpuC]);
+		expect(cache.excludedComponents().map((component) => component.index())).toEqual([
+			cpuC.index(),
+		]);
+
+		const e0 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e0, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuB, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuC, f32Bytes([5, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		let rows = 0;
+		cache.forEachArchetype(world, (archetype) => {
+			rows += archetype.length();
+		});
+		expect(rows).toBe(1);
+		expect(cache.plan(world).matchedRowCount()).toBe(1);
 	});
 
 	it("uses pre-resolved query component indexes", () => {

@@ -107,15 +107,17 @@ pub(all) struct PackedGpuBlobResizeEvent {
 pub type GlobalTransformBlobResizeEvent = PackedGpuBlobResizeEvent
 
 ///|
-/// Thin query descriptor for system-style iteration over a fixed `required` component set.
+/// Thin query descriptor for system-style iteration over a fixed required component set and optional excluded component filter.
 pub struct Query {
   priv required : Array[ComponentTypeId]
+  priv excluded : Array[ComponentTypeId]
 }
 
 ///|
-/// Raw query descriptor for expert byte-view iteration over a fixed `required` component set.
+/// Raw query descriptor for expert byte-view iteration over a fixed required component set and optional excluded component filter.
 pub struct RawQuery {
   priv required : Array[ComponentTypeId]
+  priv excluded : Array[ComponentTypeId]
 }
 
 ///|
@@ -143,6 +145,7 @@ pub(all) struct QueryPlanArchetype {
 /// Read-only diagnostic snapshot for a query plan against one world's current archetype layout.
 pub(all) struct QueryPlan {
   required : Array[ComponentTypeId]
+  excluded : Array[ComponentTypeId]
   archetype_version : Int
   candidate_archetype_count : Int
   matched_archetype_count : Int
@@ -155,6 +158,7 @@ pub(all) struct QueryPlan {
 /// Cached row plan for repeated high-level iteration over the same query.
 pub struct PreparedQuery {
   priv required : Array[ComponentTypeId]
+  priv excluded : Array[ComponentTypeId]
   priv archetype_version : Int
   priv archetypes : Array[PreparedQueryArchetype]
 }
@@ -163,6 +167,7 @@ pub struct PreparedQuery {
 /// Cached raw archetype-column plan for repeated expert iteration over the same query.
 pub struct RawPreparedQuery {
   priv required : Array[ComponentTypeId]
+  priv excluded : Array[ComponentTypeId]
   priv archetype_version : Int
   priv archetypes : Array[PreparedQueryArchetype]
 }

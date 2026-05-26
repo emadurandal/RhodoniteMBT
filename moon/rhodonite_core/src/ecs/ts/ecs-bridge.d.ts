@@ -738,12 +738,29 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	): void;
 
 	export function query_new(required: MoonComponentTypeId[]): MoonQuery;
+	export function query_new_with_excluded(
+		required: MoonComponentTypeId[],
+		excluded: MoonComponentTypeId[],
+	): MoonQuery;
 	export function raw_query_new(required: MoonComponentTypeId[]): MoonRawQuery;
+	export function raw_query_new_with_excluded(
+		required: MoonComponentTypeId[],
+		excluded: MoonComponentTypeId[],
+	): MoonRawQuery;
 	export function query_cache_new(required: MoonComponentTypeId[]): MoonQueryCache;
+	export function query_cache_new_with_excluded(
+		required: MoonComponentTypeId[],
+		excluded: MoonComponentTypeId[],
+	): MoonQueryCache;
 	export function raw_query_cache_new(
 		required: MoonComponentTypeId[],
 	): MoonRawQueryCache;
+	export function raw_query_cache_new_with_excluded(
+		required: MoonComponentTypeId[],
+		excluded: MoonComponentTypeId[],
+	): MoonRawQueryCache;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
+	export function query_excluded_components(query: MoonQuery): MoonComponentTypeId[];
 	export function query_component_index(
 		query: MoonQuery,
 		component: MoonComponentTypeId,
@@ -751,11 +768,23 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function query_cache_required_components(
 		cache: MoonQueryCache,
 	): MoonComponentTypeId[];
+	export function query_cache_excluded_components(
+		cache: MoonQueryCache,
+	): MoonComponentTypeId[];
 	export function query_cache_component_index(
 		cache: MoonQueryCache,
 		component: MoonComponentTypeId,
 	): number;
+	export function raw_query_required_components(
+		query: MoonRawQuery,
+	): MoonComponentTypeId[];
+	export function raw_query_excluded_components(
+		query: MoonRawQuery,
+	): MoonComponentTypeId[];
 	export function raw_query_cache_required_components(
+		cache: MoonRawQueryCache,
+	): MoonComponentTypeId[];
+	export function raw_query_cache_excluded_components(
 		cache: MoonRawQueryCache,
 	): MoonComponentTypeId[];
 	export function raw_query_component_index(
@@ -856,6 +885,9 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		f: (row: MoonRawQueryRow) => void,
 	): void;
 	export function query_plan_required_components(
+		plan: MoonQueryPlan,
+	): MoonComponentTypeId[];
+	export function query_plan_excluded_components(
 		plan: MoonQueryPlan,
 	): MoonComponentTypeId[];
 	export function query_plan_archetype_version(plan: MoonQueryPlan): number;
