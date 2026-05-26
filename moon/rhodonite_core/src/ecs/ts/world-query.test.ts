@@ -265,4 +265,64 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(sum).toBeCloseTo(4);
 	});
 
+	it("exposes query plan diagnostics", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("PlanTsA", 16);
+		const cpuB = world.registerCpuComponent("PlanTsB", 16);
+		const both = world.createEntity();
+		const onlyA = world.createEntity();
+		expect(world.addComponentBytes(both, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(both, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(onlyA, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		const plan = Query.new([cpuA, cpuB]).plan(world);
+		expect(plan.requiredComponents().map((component) => component.index())).toEqual([
+			cpuA.index(),
+			cpuB.index(),
+		]);
+		expect(plan.candidateArchetypeCount()).toBe(1);
+		expect(plan.matchedArchetypeCount()).toBe(1);
+		expect(plan.matchedRowCount()).toBe(1);
+		expect(plan.stale()).toBe(false);
+		expect(plan.archetypes()).toHaveLength(1);
+		expect(plan.archetypes()[0]?.rowCount()).toBe(1);
+
+		const rawPlan = RawQuery.new([cpuA]).plan(world);
+		expect(rawPlan.candidateArchetypeCount()).toBe(2);
+		expect(rawPlan.matchedArchetypeCount()).toBe(2);
+		expect(rawPlan.matchedRowCount()).toBe(2);
+	});
+
+	it("reports stale prepared query plan diagnostics", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("PreparedPlanTsA", 16);
+		const cpuB = world.registerCpuComponent("PreparedPlanTsB", 16);
+		const prepared = Query.new([cpuA, cpuB]).prepare(world);
+		expect(prepared.plan(world).stale()).toBe(false);
+
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(entity, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+
+		const stalePlan = prepared.plan(world);
+		expect(stalePlan.stale()).toBe(true);
+		expect(stalePlan.candidateArchetypeCount()).toBe(1);
+		expect(stalePlan.matchedArchetypeCount()).toBe(1);
+		expect(stalePlan.matchedRowCount()).toBe(1);
+		expect(stalePlan.archetypes()[0]?.rowCount()).toBe(1);
+
+		const rawPrepared = RawQuery.new([cpuA, cpuB]).prepare(world);
+		expect(rawPrepared.plan(world).stale()).toBe(false);
+	});
+
 });

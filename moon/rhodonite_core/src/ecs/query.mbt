@@ -161,6 +161,74 @@ fn build_prepared_query_archetypes(
 }
 
 ///|
+/// Builds public matched-archetype entries from a prepared internal plan.
+fn query_plan_archetypes(
+  archetypes : Array[PreparedQueryArchetype],
+  world : World,
+) -> (Array[QueryPlanArchetype], Int) {
+  let out : Array[QueryPlanArchetype] = []
+  let mut matched_row_count = 0
+  for i = 0; i < archetypes.length(); i = i + 1 {
+    let ai = archetypes[i].archetype_index
+    let row_count = world.archetypes[ai].entities.length()
+    out.push({ archetype_index: ai, row_count })
+    matched_row_count = matched_row_count + row_count
+  }
+  (out, matched_row_count)
+}
+
+///|
+/// Counts the candidate archetypes for a registered required component set.
+fn query_candidate_archetype_count(
+  required : Array[ComponentTypeId],
+  world : World,
+) -> Int {
+  if required.length() == 0 {
+    0
+  } else {
+    world.query_candidate_archetypes(required).length()
+  }
+}
+
+///|
+/// Builds a public query plan snapshot from a prepared internal plan.
+fn build_query_plan_from_prepared_archetypes(
+  required : Array[ComponentTypeId],
+  world : World,
+  archetypes : Array[PreparedQueryArchetype],
+  stale : Bool,
+) -> QueryPlan {
+  let (plan_archetypes, matched_row_count) = query_plan_archetypes(
+    archetypes, world,
+  )
+  {
+    required: copy_component_array(required),
+    archetype_version: world.archetype_version,
+    candidate_archetype_count: query_candidate_archetype_count(required, world),
+    matched_archetype_count: plan_archetypes.length(),
+    matched_row_count,
+    stale,
+    archetypes: plan_archetypes,
+  }
+}
+
+///|
+/// Builds a public query plan snapshot from the current world layout.
+fn build_query_plan(
+  required : Array[ComponentTypeId],
+  world : World,
+  operation : String,
+  stale : Bool,
+) -> QueryPlan {
+  build_query_plan_from_prepared_archetypes(
+    required,
+    world,
+    build_prepared_query_archetypes(required, world, operation),
+    stale,
+  )
+}
+
+///|
 /// Precomputes matched archetypes and component access metadata for repeated chunk iteration.
 pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
   world.assert_system_components_read(self.required, "Query::prepare")
@@ -177,6 +245,14 @@ pub fn Query::prepare(self : Query, world : World) -> PreparedQuery {
 }
 
 ///|
+/// Returns a read-only diagnostic snapshot of the query plan for the current world layout.
+pub fn Query::plan(self : Query, world : World) -> QueryPlan {
+  world.assert_system_components_read(self.required, "Query::plan")
+  self.assert_registered_components(world, "Query::plan")
+  build_query_plan(self.required, world, "Query::plan", false)
+}
+
+///|
 /// Precomputes matched archetypes and component access metadata for repeated raw iteration.
 pub fn RawQuery::prepare(self : RawQuery, world : World) -> RawPreparedQuery {
   world.assert_system_components_read(self.required, "RawQuery::prepare")
@@ -190,6 +266,14 @@ pub fn RawQuery::prepare(self : RawQuery, world : World) -> RawPreparedQuery {
       "RawQuery::prepare",
     ),
   }
+}
+
+///|
+/// Returns a read-only diagnostic snapshot of the raw query plan for the current world layout.
+pub fn RawQuery::plan(self : RawQuery, world : World) -> QueryPlan {
+  world.assert_system_components_read(self.required, "RawQuery::plan")
+  assert_query_components_registered(self.required, world, "RawQuery::plan")
+  build_query_plan(self.required, world, "RawQuery::plan", false)
 }
 
 ///|
@@ -273,6 +357,28 @@ pub fn PreparedQuery::for_each(
 }
 
 ///|
+/// Returns a read-only diagnostic snapshot of this prepared query against `world`.
+pub fn PreparedQuery::plan(self : PreparedQuery, world : World) -> QueryPlan {
+  world.assert_system_components_read(self.required, "PreparedQuery::plan")
+  assert_query_components_registered(
+    self.required,
+    world,
+    "PreparedQuery::plan",
+  )
+  let stale = self.archetype_version != world.archetype_version
+  if stale {
+    build_query_plan(self.required, world, "PreparedQuery::plan", true)
+  } else {
+    build_query_plan_from_prepared_archetypes(
+      self.required,
+      world,
+      self.archetypes,
+      false,
+    )
+  }
+}
+
+///|
 /// Runs a prepared raw query with row callbacks. If structural changes made the plan stale,
 /// it rebuilds once before iteration.
 pub fn RawPreparedQuery::for_each(
@@ -310,6 +416,31 @@ pub fn RawPreparedQuery::for_each(
     }
   }
   world.query_depth = world.query_depth - 1
+}
+
+///|
+/// Returns a read-only diagnostic snapshot of this prepared raw query against `world`.
+pub fn RawPreparedQuery::plan(
+  self : RawPreparedQuery,
+  world : World,
+) -> QueryPlan {
+  world.assert_system_components_read(self.required, "RawPreparedQuery::plan")
+  assert_query_components_registered(
+    self.required,
+    world,
+    "RawPreparedQuery::plan",
+  )
+  let stale = self.archetype_version != world.archetype_version
+  if stale {
+    build_query_plan(self.required, world, "RawPreparedQuery::plan", true)
+  } else {
+    build_query_plan_from_prepared_archetypes(
+      self.required,
+      world,
+      self.archetypes,
+      false,
+    )
+  }
 }
 
 ///|

@@ -1715,12 +1715,27 @@ pub fn query_prepare(
 }
 
 ///|
+/// Implements `query_plan`.
+pub fn query_plan(query : @ecs.Query, world : @ecs.World) -> @ecs.QueryPlan {
+  query.plan(world)
+}
+
+///|
 /// Implements `raw_query_prepare`.
 pub fn raw_query_prepare(
   query : @ecs.RawQuery,
   world : @ecs.World,
 ) -> @ecs.RawPreparedQuery {
   query.prepare(world)
+}
+
+///|
+/// Implements `raw_query_plan`.
+pub fn raw_query_plan(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+) -> @ecs.QueryPlan {
+  query.plan(world)
 }
 
 ///|
@@ -1744,6 +1759,15 @@ pub fn raw_prepared_query_for_each_archetype(
 }
 
 ///|
+/// Implements `raw_prepared_query_plan`.
+pub fn raw_prepared_query_plan(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+) -> @ecs.QueryPlan {
+  query.plan(world)
+}
+
+///|
 /// Implements `prepared_query_for_each`.
 pub fn prepared_query_for_each(
   query : @ecs.PreparedQuery,
@@ -1761,6 +1785,75 @@ pub fn raw_prepared_query_for_each(
   f : (@ecs.RawQueryRow) -> Unit,
 ) -> Unit {
   query.for_each(world, f)
+}
+
+///|
+/// Implements `prepared_query_plan`.
+pub fn prepared_query_plan(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+) -> @ecs.QueryPlan {
+  query.plan(world)
+}
+
+///|
+/// Implements `query_plan_required_components`.
+pub fn query_plan_required_components(
+  plan : @ecs.QueryPlan,
+) -> Array[@ecs.ComponentTypeId] {
+  plan.required
+}
+
+///|
+/// Implements `query_plan_archetype_version`.
+pub fn query_plan_archetype_version(plan : @ecs.QueryPlan) -> Int {
+  plan.archetype_version
+}
+
+///|
+/// Implements `query_plan_candidate_archetype_count`.
+pub fn query_plan_candidate_archetype_count(plan : @ecs.QueryPlan) -> Int {
+  plan.candidate_archetype_count
+}
+
+///|
+/// Implements `query_plan_matched_archetype_count`.
+pub fn query_plan_matched_archetype_count(plan : @ecs.QueryPlan) -> Int {
+  plan.matched_archetype_count
+}
+
+///|
+/// Implements `query_plan_matched_row_count`.
+pub fn query_plan_matched_row_count(plan : @ecs.QueryPlan) -> Int {
+  plan.matched_row_count
+}
+
+///|
+/// Implements `query_plan_stale`.
+pub fn query_plan_stale(plan : @ecs.QueryPlan) -> Bool {
+  plan.stale
+}
+
+///|
+/// Implements `query_plan_archetypes`.
+pub fn query_plan_archetypes(
+  plan : @ecs.QueryPlan,
+) -> Array[@ecs.QueryPlanArchetype] {
+  plan.archetypes
+}
+
+///|
+/// Implements `query_plan_archetype_index`.
+pub fn query_plan_archetype_index(archetype : @ecs.QueryPlanArchetype) -> Int {
+  archetype.archetype_index
+}
+
+///|
+/// Implements `query_plan_archetype_row_count`.
+pub fn query_plan_archetype_row_count(
+  archetype : @ecs.QueryPlanArchetype,
+) -> Int {
+  archetype.row_count
 }
 
 ///|

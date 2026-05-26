@@ -31,6 +31,34 @@ test "Query for_each matches supersets and skips empty required" {
 }
 
 ///|
+test "Query plan exposes matched archetypes and row counts" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryPlanA", 4)
+  let qb = world.register_cpu_component("QueryPlanB", 4)
+  let e_both = world.create_entity()
+  assert_true(world.add_component_bytes(e_both, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e_both, qb, bytes4(2, 0, 0, 0)))
+  let e_only_a = world.create_entity()
+  assert_true(world.add_component_bytes(e_only_a, qa, bytes4(3, 0, 0, 0)))
+  let plan = Query::new([qa, qb]).plan(world)
+  assert_eq(plan.required.length(), 2)
+  assert_eq(plan.candidate_archetype_count, 1)
+  assert_eq(plan.matched_archetype_count, 1)
+  assert_eq(plan.matched_row_count, 1)
+  assert_false(plan.stale)
+  assert_eq(plan.archetypes.length(), 1)
+  assert_eq(plan.archetypes[0].row_count, 1)
+  let raw_plan = RawQuery::new([qa]).plan(world)
+  assert_eq(raw_plan.candidate_archetype_count, 2)
+  assert_eq(raw_plan.matched_archetype_count, 2)
+  assert_eq(raw_plan.matched_row_count, 2)
+  let empty_plan = Query::new([]).plan(world)
+  assert_eq(empty_plan.candidate_archetype_count, 0)
+  assert_eq(empty_plan.matched_archetype_count, 0)
+  assert_eq(empty_plan.matched_row_count, 0)
+}
+
+///|
 test "Query for_each wraps required row iteration" {
   let world = World::new()
   let qa = world.register_cpu_component("QueryHelperA", 4)
@@ -946,6 +974,26 @@ test "RawPreparedQuery rebuilds after structural changes create matching archety
 }
 
 ///|
+test "RawPreparedQuery plan reports stale rebuild diagnostics" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryPlanA", 4)
+  let qb = world.register_cpu_component("PreparedQueryPlanB", 4)
+  let prepared = RawQuery::new([qa, qb]).prepare(world)
+  let current_plan = prepared.plan(world)
+  assert_false(current_plan.stale)
+  assert_eq(current_plan.matched_archetype_count, 0)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e, qb, bytes4(2, 0, 0, 0)))
+  let stale_plan = prepared.plan(world)
+  assert_true(stale_plan.stale)
+  assert_eq(stale_plan.candidate_archetype_count, 1)
+  assert_eq(stale_plan.matched_archetype_count, 1)
+  assert_eq(stale_plan.matched_row_count, 1)
+  assert_eq(stale_plan.archetypes[0].row_count, 1)
+}
+
+///|
 test "PreparedQuery for_each rebuilds stale row plan" {
   let world = World::new()
   let qa = world.register_cpu_component("PreparedQueryRowA", 4)
@@ -960,4 +1008,28 @@ test "PreparedQuery for_each rebuilds stale row plan" {
     row.read(qb, bytes => sum = sum + bytes[0].to_int())
   })
   assert_eq(sum, 7)
+}
+
+///|
+test "PreparedQuery plan reports current and stale row diagnostics" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryRowPlanA", 4)
+  let qb = world.register_cpu_component("PreparedQueryRowPlanB", 4)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(4, 0, 0, 0)))
+  let prepared = Query::new([qa, qb]).prepare(world)
+  let current_plan = prepared.plan(world)
+  assert_false(current_plan.stale)
+  assert_eq(current_plan.matched_archetype_count, 1)
+  assert_eq(current_plan.matched_row_count, 1)
+  let qc = world.register_cpu_component("PreparedQueryRowPlanC", 4)
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(5, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(6, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qc, bytes4(7, 0, 0, 0)))
+  let stale_plan = prepared.plan(world)
+  assert_true(stale_plan.stale)
+  assert_eq(stale_plan.matched_archetype_count, 2)
+  assert_eq(stale_plan.matched_row_count, 2)
 }
