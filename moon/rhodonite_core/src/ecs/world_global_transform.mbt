@@ -97,34 +97,33 @@ pub fn World::set_global_transform(
   self.assert_not_history_raw_mutation("World::set_global_transform")
   let id = self.global_transform_component_id
   self.assert_system_component_write(id, "World::set_global_transform")
-  if !self.has_component(entity, id) {
-    if !self.can_add_missing_component_from_setter(
-        id, "World::set_global_transform",
-      ) {
-      return false
+  match self.global_transform_ref_unchecked(entity) {
+    Some(gt_ref) => {
+      ignore(
+        self.global_transform_blob.write_matrix_if_changed(
+          gt_ref.format,
+          gt_ref.word_offset,
+          m,
+        ),
+      )
+      true
     }
-    let gt_ref = self.alloc_global_transform_ref(
-      self.global_transform_default_format,
-      m,
-    )
-    self.add_component_bytes(
-      entity,
-      id,
-      @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset),
-    )
-  } else {
-    match self.global_transform_ref(entity) {
-      Some(gt_ref) => {
-        ignore(
-          self.global_transform_blob.write_matrix_if_changed(
-            gt_ref.format,
-            gt_ref.word_offset,
-            m,
-          ),
-        )
-        true
+    None => {
+      if !self.is_alive(entity) ||
+        !self.can_add_missing_component_from_setter(
+          id, "World::set_global_transform",
+        ) {
+        return false
       }
-      None => false
+      let gt_ref = self.alloc_global_transform_ref(
+        self.global_transform_default_format,
+        m,
+      )
+      self.add_component_bytes(
+        entity,
+        id,
+        @comp.global_transform_ref_bytes(gt_ref.format, gt_ref.word_offset),
+      )
     }
   }
 }

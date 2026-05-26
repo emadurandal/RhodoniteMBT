@@ -47,7 +47,7 @@ flowchart LR
           <ul>
             <li>User components are registered as <code>RegisteredComponent { id, name, cpu_stride, stable_key, schema_version, schema_hash }</code> and packed into per-archetype <code>ComponentColumn</code> buffers. Stable identity metadata is optional at runtime and can be resolved with <code>component_by_stable_key</code> / <code>component_matches_identity</code> for future history serialization.</li>
             <li><code>GlobalTransform</code> and <code>Camera</code> store small CPU refs in rows; their matrix bytes live in dedicated blob stores.</li>
-            <li><code>has_global_transform_blob_write_views</code> and <code>has_camera_blob_write_views</code> report whether those packed blob stores currently have queued upload slices, so renderers can skip empty drains without changing what gets uploaded when writes exist. Builtin setters skip queuing duplicate slices when the encoded GlobalTransform payload or Camera inputs are unchanged.</li>
+            <li><code>has_global_transform_blob_write_views</code> and <code>has_camera_blob_write_views</code> report whether those packed blob stores currently have queued upload slices, so renderers can skip empty drains without changing what gets uploaded when writes exist. Builtin setters skip queuing duplicate slices when the encoded GlobalTransform payload or Camera inputs are unchanged; Camera scalar-only updates may return a smaller partial-row <code>GpuWriteView</code>.</li>
             <li>CPU columns grow by replacing fixed backing buffers instead of appending bytes one at a time, which avoids large JS <code>Array.push</code> hot paths.</li>
             <li><code>reserve_batch_capacity</code> and <code>spawn_batch</code> control archetype capacity for large spawn batches.</li>
           </ul>
@@ -61,7 +61,7 @@ flowchart LR
               <tr><td><code>Query</code> / <code>RawQuery</code></td><td>Row iteration and archetype-column iteration.</td></tr>
               <tr><td><code>PreparedQuery</code></td><td>A reusable plan cache, not a snapshot. It rebuilds when archetype versions change.</td></tr>
               <tr><td><code>SystemRunner</code></td><td>Phase-filtered system set with access guards and command buffer boundaries.</td></tr>
-              <tr><td><code>GpuWriteView</code></td><td>Borrowed upload slice from builtin blob backing storage.</td></tr>
+              <tr><td><code>GpuWriteView</code></td><td>Borrowed upload slice from builtin blob backing storage; byte offset and length may cover only the changed subrange.</td></tr>
             </tbody>
           </table>
 

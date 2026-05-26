@@ -162,7 +162,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Performance</h2>
           <p>The main cost of undo/redo is copying before/after component bytes and allocating history records. When history is disabled, tracked query callbacks delegate to the raw write path and do not copy bytes or retain deltas. Keep runtime systems and animation on untracked APIs, and use transactions to collapse editor gestures such as drag operations into one record.</p>
-          <p>Use <code>pnpm run bench:ecs:js</code> or <code>pnpm run bench:ecs:native</code> to compare history overhead on the ECS benchmark. The output includes raw component writes, disabled and enabled <code>WorldHistory::set_component_bytes</code>, guarded transactions, tracked query row callbacks, full/no-op/sparse raw and tracked archetype column callbacks, changed-row tracked column callbacks, and raw versus tracked command-buffer phases.</p>
+          <p>Use <code>pnpm run bench:ecs:js</code>, <code>pnpm run bench:ecs:native</code>, or <code>pnpm run bench:ecs:all -- --json-out /tmp/ecs-bench.jsonl</code> to compare ECS benchmark paths. Each case runs one warmup and five measured samples, prints min/median/max timing, and emits <code>ecs_bench_result</code> JSONL rows for native/js comparisons. The suite covers query paths, builtin transform/blob writes, unchanged setter fast paths, system-runner command-buffer phases, and history overhead.</p>
         </article>
       </main>
     </div>

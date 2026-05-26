@@ -6,4 +6,5 @@ import {
 
 options(
   "is-main": true,
+  "native-stub": [ "ecs_bench_time_native.c" ],
 )
