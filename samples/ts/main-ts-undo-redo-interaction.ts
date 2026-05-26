@@ -18,7 +18,7 @@ type InteractionState = {
 	readonly history: WorldHistory;
 	readonly component: ComponentTypeId;
 	readonly entity: EntityId;
-	editIndex: number;
+	readonly valueStatus: HTMLElement;
 };
 
 function createInteractionState(): InteractionState {
@@ -34,7 +34,7 @@ function createInteractionState(): InteractionState {
 		history,
 		component,
 		entity,
-		editIndex: 0,
+		valueStatus: createValueStatus(),
 	};
 }
 
@@ -42,8 +42,24 @@ function valueBytes(value: number): Uint8Array {
 	return new Uint8Array([value & 0xff, 0, 0, 0]);
 }
 
+function readValue(state: InteractionState): number {
+	return state.world.componentBytesCopy(state.entity, state.component)?.[0] ?? 0;
+}
+
+function createValueStatus(): HTMLElement {
+	const status = document.createElement("p");
+	status.className = "sample-value";
+	status.textContent = "value=0";
+	document.querySelector("#app")?.append(status);
+	return status;
+}
+
+function refreshValueStatus(state: InteractionState): void {
+	state.valueStatus.textContent = `value=${readValue(state)}`;
+}
+
 function applyTrackedMove(state: InteractionState): boolean {
-	const nextIndex = state.editIndex + 1;
+	const nextIndex = readValue(state) + 1;
 	const ok = state.history.withTransaction(
 		state.world,
 		`Interaction Move ${nextIndex}`,
@@ -56,7 +72,7 @@ function applyTrackedMove(state: InteractionState): boolean {
 			),
 	);
 	if (ok) {
-		state.editIndex = nextIndex;
+		refreshValueStatus(state);
 	}
 	return ok;
 }
@@ -66,8 +82,20 @@ function main(): void {
 	const controlState = {
 		history: state.history,
 		move: () => applyTrackedMove(state),
-		undo: () => state.history.undo(state.world),
-		redo: () => state.history.redo(state.world),
+		undo: () => {
+			const ok = state.history.undo(state.world);
+			if (ok) {
+				refreshValueStatus(state);
+			}
+			return ok;
+		},
+		redo: () => {
+			const ok = state.history.redo(state.world);
+			if (ok) {
+				refreshValueStatus(state);
+			}
+			return ok;
+		},
 	};
 	createUndoRedoControls(controlState, {
 		parent: document.querySelector("#app"),

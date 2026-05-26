@@ -248,6 +248,7 @@ function createHarnessHtml(resultEndpoint) {
         await runTest("undo redo interaction page shows controls", async () => {
           const page = await loadUndoRedoPage();
           assertStatus(page, "undo=0 redo=0");
+          assertValue(page, "value=0");
           page.destroy();
         });
         for (const key of ["m", " ", "Enter"]) {
@@ -255,6 +256,7 @@ function createHarnessHtml(resultEndpoint) {
             const page = await loadUndoRedoPage();
             dispatchKey(page, { key });
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat move shortcut " + labelForKey(key) + " is ignored", async () => {
@@ -262,9 +264,24 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, { key, repeat: true });
             await delay(150);
             assertStatus(page, "undo=0 redo=0");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
+        await runTest("move after undo resumes from restored value", async () => {
+          const page = await loadUndoRedoPage();
+          dispatchKey(page, { key: "m" });
+          await waitForValue(page, "value=1");
+          dispatchKey(page, { key: "m" });
+          await waitForValue(page, "value=2");
+          dispatchKey(page, { key: "z", ctrlKey: true });
+          await waitForStatus(page, "undo=1 redo=1");
+          await waitForValue(page, "value=1");
+          dispatchKey(page, { key: "m" });
+          await waitForStatus(page, "undo=2 redo=0");
+          await waitForValue(page, "value=2");
+          page.destroy();
+        });
         for (const command of ["ctrl", "meta"]) {
           await runTest(command + "+z undoes", async () => {
             const page = await loadUndoRedoPage();
@@ -272,6 +289,7 @@ function createHarnessHtml(resultEndpoint) {
             await waitForStatus(page, "undo=1 redo=0");
             dispatchKey(page, commandEvent(command, { key: "z" }));
             await waitForStatus(page, "undo=0 redo=1");
+            await waitForValue(page, "value=0");
             page.destroy();
           });
           await runTest(command + "+shift+z redoes", async () => {
@@ -279,6 +297,7 @@ function createHarnessHtml(resultEndpoint) {
             await createRedoState(page);
             dispatchKey(page, commandEvent(command, { key: "z", shiftKey: true }));
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest(command + "+y redoes", async () => {
@@ -286,6 +305,7 @@ function createHarnessHtml(resultEndpoint) {
             await createRedoState(page);
             dispatchKey(page, commandEvent(command, { key: "y" }));
             await waitForStatus(page, "undo=1 redo=0");
+            await waitForValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat " + command + "+z is ignored", async () => {
@@ -295,6 +315,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "z", repeat: true }));
             await delay(150);
             assertStatus(page, "undo=1 redo=0");
+            assertValue(page, "value=1");
             page.destroy();
           });
           await runTest("repeat " + command + "+y is ignored", async () => {
@@ -303,6 +324,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "y", repeat: true }));
             await delay(150);
             assertStatus(page, "undo=0 redo=1");
+            assertValue(page, "value=0");
             page.destroy();
           });
           await runTest("repeat " + command + "+shift+z is ignored", async () => {
@@ -311,6 +333,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, commandEvent(command, { key: "z", shiftKey: true, repeat: true }));
             await delay(150);
             assertStatus(page, "undo=0 redo=1");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
@@ -320,6 +343,7 @@ function createHarnessHtml(resultEndpoint) {
             dispatchKey(page, { key });
             await delay(150);
             assertStatus(page, "undo=0 redo=0");
+            assertValue(page, "value=0");
             page.destroy();
           });
         }
@@ -368,8 +392,10 @@ function createHarnessHtml(resultEndpoint) {
       async function createRedoState(page) {
         dispatchKey(page, { key: "m" });
         await waitForStatus(page, "undo=1 redo=0");
+        await waitForValue(page, "value=1");
         dispatchKey(page, { key: "z", ctrlKey: true });
         await waitForStatus(page, "undo=0 redo=1");
+        await waitForValue(page, "value=0");
       }
 
       function dispatchKey(page, options) {
@@ -397,12 +423,24 @@ function createHarnessHtml(resultEndpoint) {
         await waitFor(() => statusText(page) === expected, 2000, "expected status " + expected + ", got " + statusText(page));
       }
 
+      async function waitForValue(page, expected) {
+        await waitFor(() => valueText(page) === expected, 2000, "expected value " + expected + ", got " + valueText(page));
+      }
+
       function assertStatus(page, expected) {
         assert(statusText(page) === expected, "expected status " + expected + ", got " + statusText(page));
       }
 
+      function assertValue(page, expected) {
+        assert(valueText(page) === expected, "expected value " + expected + ", got " + valueText(page));
+      }
+
       function statusText(page) {
         return page.doc.querySelector(".sample-status")?.textContent?.trim() ?? "";
+      }
+
+      function valueText(page) {
+        return page.doc.querySelector(".sample-value")?.textContent?.trim() ?? "";
       }
 
       function labelForKey(key) {
