@@ -1084,21 +1084,19 @@ pub fn setup_orbit_orthographic_camera(
 }
 
 ///|
-/// Finishes a tracked camera-control transaction opened by a helper.
-fn finish_camera_control_tracked_transaction(
+/// Runs a camera-control edit in a helper-owned transaction when possible.
+fn run_camera_control_tracked_transaction(
   history : WorldHistory,
   world : World,
-  opened : Bool,
-  ok : Bool,
+  label : String,
+  body : () -> Bool,
 ) -> Bool {
-  if !opened {
-    return ok
+  if history.with_transaction(world, label, body) {
+    return true
   }
-  if ok {
-    history.commit_transaction()
-  } else {
-    ignore(history.cancel_transaction_reverting(world))
-    false
+  match history.last_diagnostic() {
+    "transaction_open" | "recording_disabled" => body()
+    _ => false
   }
 }
 
@@ -1137,17 +1135,13 @@ fn can_sync_orbit_camera_transform_tracked(
 }
 
 ///|
-/// Sets up an orbit orthographic camera through WorldHistory as one operation when possible.
-pub fn setup_orbit_orthographic_camera_tracked(
+/// Applies tracked orbit orthographic setup steps inside the active transaction.
+fn setup_orbit_orthographic_camera_tracked_body(
   history : WorldHistory,
   world : World,
   camera : EntityId,
   desc : OrbitOrthographicCameraDesc,
 ) -> Bool {
-  if !can_setup_orbit_orthographic_camera_tracked(world, camera) {
-    return false
-  }
-  let opened = history.begin_transaction("setup_orbit_orthographic_camera")
   let (px, py, pz, qx, qy, qz, qw) = orbit_camera_desc_trs(desc)
   let local_matrix = @comp.Transform3D::local_matrix_from_component_view(
     @comp.transform3d_trs_bytes(
@@ -1165,67 +1159,84 @@ pub fn setup_orbit_orthographic_camera_tracked(
   )
   let view = match local_matrix.inverse() {
     Some(view) => view
-    None =>
-      return finish_camera_control_tracked_transaction(
-        history, world, opened, false,
-      )
+    None => return false
   }
-  let ok = history.set_transform_trs(
-      world,
-      camera,
-      px,
-      py,
-      pz,
-      qx,
-      qy,
-      qz,
-      qw,
-      (1.0 : Float),
-      (1.0 : Float),
-      (1.0 : Float),
-    ) &&
-    history.set_global_transform(world, camera, local_matrix) &&
-    add_orbit_camera_controller_with_pose_tracked(
-      history,
-      world,
-      camera,
-      world.orbit_camera_controller_component(),
-      desc.yaw,
-      desc.pitch,
-      desc.pan_x,
-      desc.pan_y,
-      desc.dolly,
-      desc.distance,
-    ) &&
-    set_camera_home_from_current_transform_tracked(
-      history,
-      world,
-      camera,
-      world.camera_home_transform_component(),
-    ) &&
-    add_camera_lens_orthographic_tracked(
-      history,
-      world,
-      camera,
-      world.camera_lens_component(),
-      desc.near,
-      desc.far,
-      desc.aspect,
-      desc.ortho_half_height,
-      desc.flags,
-    ) &&
-    history.set_camera_matrices(
-      world,
-      camera,
-      view,
-      orbit_orthographic_camera_desc_projection(desc),
-      desc.near,
-      desc.far,
-      desc.aspect,
-      camera_projection_orthographic(),
-      desc.flags,
-    )
-  finish_camera_control_tracked_transaction(history, world, opened, ok)
+  history.set_transform_trs(
+    world,
+    camera,
+    px,
+    py,
+    pz,
+    qx,
+    qy,
+    qz,
+    qw,
+    (1.0 : Float),
+    (1.0 : Float),
+    (1.0 : Float),
+  ) &&
+  history.set_global_transform(world, camera, local_matrix) &&
+  add_orbit_camera_controller_with_pose_tracked(
+    history,
+    world,
+    camera,
+    world.orbit_camera_controller_component(),
+    desc.yaw,
+    desc.pitch,
+    desc.pan_x,
+    desc.pan_y,
+    desc.dolly,
+    desc.distance,
+  ) &&
+  set_camera_home_from_current_transform_tracked(
+    history,
+    world,
+    camera,
+    world.camera_home_transform_component(),
+  ) &&
+  add_camera_lens_orthographic_tracked(
+    history,
+    world,
+    camera,
+    world.camera_lens_component(),
+    desc.near,
+    desc.far,
+    desc.aspect,
+    desc.ortho_half_height,
+    desc.flags,
+  ) &&
+  history.set_camera_matrices(
+    world,
+    camera,
+    view,
+    orbit_orthographic_camera_desc_projection(desc),
+    desc.near,
+    desc.far,
+    desc.aspect,
+    camera_projection_orthographic(),
+    desc.flags,
+  )
+}
+
+///|
+/// Sets up an orbit orthographic camera through WorldHistory as one operation when possible.
+pub fn setup_orbit_orthographic_camera_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  desc : OrbitOrthographicCameraDesc,
+) -> Bool {
+  if !can_setup_orbit_orthographic_camera_tracked(world, camera) {
+    return false
+  }
+  run_camera_control_tracked_transaction(
+    history,
+    world,
+    "setup_orbit_orthographic_camera",
+    () => {
+      setup_orbit_orthographic_camera_tracked_body(history, world, camera, desc)
+    },
+  )
 }
 
 ///|
@@ -1467,39 +1478,28 @@ pub fn sync_orbit_camera_blob_component_tracked(
 }
 
 ///|
-/// Writes Transform3D and GlobalTransform from orbit state through WorldHistory.
-pub fn sync_orbit_camera_transform_component_tracked(
+/// Applies tracked Transform3D and GlobalTransform sync inside the active transaction.
+fn sync_orbit_camera_transform_component_tracked_body(
   history : WorldHistory,
   world : World,
   camera : EntityId,
   orbit_component : ComponentTypeId,
   home_component : ComponentTypeId,
 ) -> Bool {
-  let opened = history.begin_transaction(
-    "sync_orbit_camera_transform_component",
-  )
   let orbit_row = match world.component_bytes(camera, orbit_component) {
     Some(bytes) => bytes
-    None =>
-      return finish_camera_control_tracked_transaction(
-        history, world, opened, false,
-      )
+    None => return false
   }
   let (yaw, pitch, pan_x, pan_y, _dolly, distance, reset_requested) = orbit_camera_pose_from_controller_view(
     orbit_row[:],
   )
-  let ok = if reset_requested {
+  if reset_requested {
     let home_row = match world.component_bytes(camera, home_component) {
       Some(bytes) => bytes
-      None =>
-        return finish_camera_control_tracked_transaction(
-          history, world, opened, false,
-        )
+      None => return false
     }
     if !can_sync_orbit_camera_transform_tracked(world, camera, reset_requested) {
-      return finish_camera_control_tracked_transaction(
-        history, world, opened, false,
-      )
+      return false
     }
     let next_orbit = orbit_row
     reset_orbit_camera_controller_view(
@@ -1519,9 +1519,7 @@ pub fn sync_orbit_camera_transform_component_tracked(
     )
   } else {
     if !can_sync_orbit_camera_transform_tracked(world, camera, reset_requested) {
-      return finish_camera_control_tracked_transaction(
-        history, world, opened, false,
-      )
+      return false
     }
     let (qx0, qy0, qz0, qw0) = quat_y(-yaw.to_double())
     let (qx1, qy1, qz1, qw1) = quat_x(-pitch.to_double())
@@ -1568,7 +1566,27 @@ pub fn sync_orbit_camera_transform_component_tracked(
     ) &&
     history.set_global_transform(world, camera, local_matrix)
   }
-  finish_camera_control_tracked_transaction(history, world, opened, ok)
+}
+
+///|
+/// Writes Transform3D and GlobalTransform from orbit state through WorldHistory.
+pub fn sync_orbit_camera_transform_component_tracked(
+  history : WorldHistory,
+  world : World,
+  camera : EntityId,
+  orbit_component : ComponentTypeId,
+  home_component : ComponentTypeId,
+) -> Bool {
+  run_camera_control_tracked_transaction(
+    history,
+    world,
+    "sync_orbit_camera_transform_component",
+    () => {
+      sync_orbit_camera_transform_component_tracked_body(
+        history, world, camera, orbit_component, home_component,
+      )
+    },
+  )
 }
 
 ///|

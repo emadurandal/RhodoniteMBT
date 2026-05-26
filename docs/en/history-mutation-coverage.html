@@ -57,7 +57,7 @@
               <tr><td><code>spawn_batch</code></td><td>Spawned entities and initialized component rows undo and redo as a batch.</td></tr>
               <tr><td><code>set_transform_trs</code>, <code>set_child_of</code></td><td>Authoring transform and parent relationship rows are restored.</td></tr>
               <tr><td><code>set_global_transform</code>, <code>set_global_transform_format</code>, <code>set_camera_matrices</code></td><td>Blob-backed builtin presence and logical row payloads are restored through dedicated helpers.</td></tr>
-              <tr><td>Tracked camera-control helpers</td><td>Orbit setup, lens, controller, home, transform sync, and blob sync helpers group editor steps into undoable records.</td></tr>
+              <tr><td>Tracked camera-control helpers</td><td>Orbit setup, lens, controller, home, transform sync, and blob sync helpers group editor steps into undoable records. Standalone setup/sync helpers use callback-scoped transactions and join an existing gesture transaction when one is open.</td></tr>
             </tbody>
           </table>
 
