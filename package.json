@@ -44,6 +44,7 @@
     "test:examples:visual:update:browser": "node scripts/run-visual-regression.mjs browser --update",
     "test:examples:visual:update": "node scripts/run-visual-regression.mjs all --update",
     "bench:ecs": "bash scripts/run-ecs-bench.sh",
+    "bench:ecs:all": "bash scripts/run-ecs-bench.sh all",
     "bench:ecs:js": "bash scripts/run-ecs-bench.sh js",
     "bench:ecs:native": "bash scripts/run-ecs-bench.sh native",
     "bench:ecs:wasm": "bash scripts/run-ecs-bench.sh wasm-gc",

@@ -8,7 +8,7 @@ extern "js" fn monotonic_ms() -> Double =
 
 ///|
 #cfg(target="native")
-extern "C" fn c_clock() -> Int = "clock"
+extern "C" fn native_monotonic_ms() -> Double = "rhodonite_ecs_bench_monotonic_ms"
 
 ///|
 
@@ -16,7 +16,7 @@ extern "C" fn c_clock() -> Int = "clock"
 /// Implements `monotonic_ms`.
 #cfg(target="native")
 fn monotonic_ms() -> Double {
-  c_clock().to_double() / 1000.0
+  native_monotonic_ms()
 }
 
 ///|
@@ -51,17 +51,25 @@ fn grid_xz_for_index(idx : Int, per_side : Int) -> (Float, Float) {
 }
 
 ///|
-/// Implements `make_world`.
-fn make_world(
+/// Implements `make_world_entities`.
+fn make_world_entities(
   count : Int,
-) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+) -> (
+  @ecs.World,
+  @ecs.ComponentTypeId,
+  @ecs.ComponentTypeId,
+  Int,
+  Array[@ecs.EntityId],
+) {
   let world = @ecs.World::new()
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let per_side = grid_side_len(count)
   let id = @m44.Matrix44F::identity()
+  let entities : Array[@ecs.EntityId] = []
   for i = 0; i < count; i = i + 1 {
     let e = world.create_entity()
+    entities.push(e)
     let (x, z) = grid_xz_for_index(i, per_side)
     ignore(
       world.set_transform_trs(
@@ -81,19 +89,39 @@ fn make_world(
     ignore(world.set_global_transform(e, id))
   }
   let _ = world.drain_global_transform_blob_write_views()
+  (world, tf, gt, per_side, entities)
+}
+
+///|
+/// Implements `make_world`.
+fn make_world(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+  let (world, tf, gt, per_side, _) = make_world_entities(count)
   (world, tf, gt, per_side)
 }
 
 ///|
-/// Implements `make_world_batch`.
-fn make_world_batch(
+/// Implements `make_world_batch_entities`.
+fn make_world_batch_entities(
   count : Int,
-) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+) -> (
+  @ecs.World,
+  @ecs.ComponentTypeId,
+  @ecs.ComponentTypeId,
+  Int,
+  Array[@ecs.EntityId],
+) {
   let world = @ecs.World::new()
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let per_side = grid_side_len(count)
-  let _ = world.spawn_transform_global_batch(count, fn(i, _e, tf_row, _gt_row) {
+  let entities = world.spawn_transform_global_batch(count, fn(
+    i,
+    _e,
+    tf_row,
+    _gt_row,
+  ) {
     let (x, z) = grid_xz_for_index(i, per_side)
     @comp.Transform3D::write_trs_to_component_mut_view(
       tf_row,
@@ -110,6 +138,15 @@ fn make_world_batch(
     )
   })
   let _ = world.drain_global_transform_blob_write_views()
+  (world, tf, gt, per_side, entities)
+}
+
+///|
+/// Implements `make_world_batch`.
+fn make_world_batch(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
+  let (world, tf, gt, per_side, _) = make_world_batch_entities(count)
   (world, tf, gt, per_side)
 }
 
@@ -152,23 +189,147 @@ fn make_component_world(
 }
 
 ///|
-/// Implements `report`.
-fn report(name : String, count : Int, started : Double, checksum : Int) -> Unit {
-  let elapsed = monotonic_ms() - started
+/// One measured benchmark sample.
+priv struct BenchSample {
+  elapsed_ms : Double
+  checksum : Int
+}
+
+///|
+/// Implements `bench_warmup_runs`.
+fn bench_warmup_runs() -> Int {
+  1
+}
+
+///|
+/// Implements `bench_measured_runs`.
+fn bench_measured_runs() -> Int {
+  5
+}
+
+///|
+/// Implements `bench_schema_version`.
+fn bench_schema_version() -> Int {
+  1
+}
+
+///|
+/// Implements `bench_sample`.
+fn bench_sample(started : Double, checksum : Int) -> BenchSample {
+  { elapsed_ms: monotonic_ms() - started, checksum }
+}
+
+///|
+/// Implements `sorted_times`.
+fn sorted_times(times : FixedArray[Double], count : Int) -> FixedArray[Double] {
+  let out = FixedArray::make(count, 0.0)
+  for i = 0; i < count; i = i + 1 {
+    out[i] = times[i]
+  }
+  for i = 0; i < count; i = i + 1 {
+    for j = i + 1; j < count; j = j + 1 {
+      if out[j] < out[i] {
+        let tmp = out[i]
+        out[i] = out[j]
+        out[j] = tmp
+      }
+    }
+  }
+  out
+}
+
+///|
+/// Implements `report_measurement`.
+fn report_measurement(
+  name : String,
+  count : Int,
+  times : FixedArray[Double],
+  checksum : Int,
+) -> Unit {
+  let runs = times.length()
+  let sorted = sorted_times(times, runs)
+  let min_ms = sorted[0]
+  let median_ms = sorted[runs / 2]
+  let max_ms = sorted[runs - 1]
+  let ns_per_item = if count > 0 {
+    median_ms * 1000000.0 / count.to_double()
+  } else {
+    0.0
+  }
   println(
     name +
     " count=" +
     count.to_string() +
-    " elapsed_ms=" +
-    elapsed.to_string() +
+    " runs=" +
+    runs.to_string() +
+    " min_ms=" +
+    min_ms.to_string() +
+    " median_ms=" +
+    median_ms.to_string() +
+    " max_ms=" +
+    max_ms.to_string() +
+    " ns_per_item=" +
+    ns_per_item.to_string() +
     " checksum=" +
     checksum.to_string(),
+  )
+  println(
+    "ecs_bench_result " +
+    "{\"schema\":" +
+    bench_schema_version().to_string() +
+    ",\"case\":\"" +
+    name +
+    "\",\"count\":" +
+    count.to_string() +
+    ",\"runs\":" +
+    runs.to_string() +
+    ",\"min_ms\":" +
+    min_ms.to_string() +
+    ",\"median_ms\":" +
+    median_ms.to_string() +
+    ",\"max_ms\":" +
+    max_ms.to_string() +
+    ",\"ns_per_item\":" +
+    ns_per_item.to_string() +
+    ",\"checksum\":" +
+    checksum.to_string() +
+    "}",
   )
 }
 
 ///|
+/// Implements `run_case`.
+fn run_case(name : String, count : Int, measure : (Int) -> BenchSample) -> Unit {
+  for warmup = 0; warmup < bench_warmup_runs(); warmup = warmup + 1 {
+    ignore(measure(count))
+  }
+  let runs = bench_measured_runs()
+  let times = FixedArray::make(runs, 0.0)
+  let mut checksum = 0
+  for i = 0; i < runs; i = i + 1 {
+    let sample = measure(count)
+    times[i] = sample.elapsed_ms
+    checksum = sample.checksum
+  }
+  report_measurement(name, count, times, checksum)
+}
+
+///|
+/// Implements `report`.
+fn report(
+  name : String,
+  count : Int,
+  started : Double,
+  checksum : Int,
+) -> BenchSample {
+  ignore(name)
+  ignore(count)
+  bench_sample(started, checksum)
+}
+
+///|
 /// Implements `bench_query_row`.
-fn bench_query_row(count : Int) -> Unit {
+fn bench_query_row(count : Int) -> BenchSample {
   let (world, tf, _, per_side) = make_world(count)
   let q = @ecs.Query::new([tf])
   let started = monotonic_ms()
@@ -191,7 +352,7 @@ fn bench_query_row(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_query_archetype`.
-fn bench_query_archetype(count : Int) -> Unit {
+fn bench_query_archetype(count : Int) -> BenchSample {
   let (world, tf, _, per_side) = make_world(count)
   let q = @ecs.RawQuery::new([tf])
   let started = monotonic_ms()
@@ -217,7 +378,7 @@ fn bench_query_archetype(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_builtin_positions`.
-fn bench_builtin_positions(count : Int) -> Unit {
+fn bench_builtin_positions(count : Int) -> BenchSample {
   let (world, _, _, per_side) = make_world(count)
   let started = monotonic_ms()
   let mut checksum = 0
@@ -232,7 +393,7 @@ fn bench_builtin_positions(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_global_and_drain`.
-fn bench_global_and_drain(count : Int) -> Unit {
+fn bench_global_and_drain(count : Int) -> BenchSample {
   let (world, _, _gt, _) = make_world(count)
   let started = monotonic_ms()
   world.update_global_transforms_from_transforms()
@@ -246,7 +407,7 @@ fn bench_global_and_drain(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_global_and_drain_views`.
-fn bench_global_and_drain_views(count : Int) -> Unit {
+fn bench_global_and_drain_views(count : Int) -> BenchSample {
   let (world, _, _gt, _) = make_world_batch(count)
   let started = monotonic_ms()
   world.update_global_transforms_from_transforms()
@@ -259,8 +420,248 @@ fn bench_global_and_drain_views(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_matrix_for_index`.
+fn bench_matrix_for_index(idx : Int) -> @m44.Matrix44F {
+  @m44.Matrix44::translation(
+    Float::from_double(idx.to_double() * 0.001),
+    Float::from_double(idx.to_double() * 0.002),
+    Float::from_double(idx.to_double() * -0.001),
+    (1.0 : Float),
+    (0.0 : Float),
+  )
+}
+
+///|
+/// Implements `bench_affine_values_for_index`.
+fn bench_affine_values_for_index(
+  idx : Int,
+) -> (
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+  Float,
+) {
+  (
+    (1.0 : Float),
+    (0.0 : Float),
+    (0.0 : Float),
+    Float::from_double(idx.to_double() * 0.001),
+    (0.0 : Float),
+    (1.0 : Float),
+    (0.0 : Float),
+    Float::from_double(idx.to_double() * 0.002),
+    (0.0 : Float),
+    (0.0 : Float),
+    (1.0 : Float),
+    Float::from_double(idx.to_double() * -0.001),
+  )
+}
+
+///|
+/// Implements `make_global_blob_bench_world`.
+fn make_global_blob_bench_world(
+  count : Int,
+) -> (
+  @ecs.World,
+  FixedArray[Byte],
+  @ecs.GlobalTransformUploadRange,
+  @ecs.GlobalTransformDenseLayout?,
+) {
+  let (world, _, _, _, entities) = make_world_batch_entities(count)
+  let refs = world.extract_global_transform_refs(entities)
+  let dense = @ecs.detect_dense_global_transform_layout(refs, count)
+  let range = @ecs.compute_global_transform_upload_range(refs, count, dense)
+  (world, refs, range, dense)
+}
+
+///|
+/// Implements `bench_global_transform_dense_range_write`.
+fn bench_global_transform_dense_range_write(count : Int) -> BenchSample {
+  let (world, _, range, dense) = make_global_blob_bench_world(count)
+  let layout = match dense {
+    Some(layout) => layout
+    None => abort("expected dense GlobalTransform layout")
+  }
+  let started = monotonic_ms()
+  let writes = world.write_global_transform_blob_range_views(
+    range.first_word,
+    range.word_count,
+    fn(bytes) {
+      for i = 0; i < count; i = i + 1 {
+        let byte_start = (i * layout.words_per_entity - range.first_word) * 4
+        let byte_end = byte_start + layout.words_per_entity * 4
+        @comp.matrix44f_write_global_transform_to_gpu_row(
+          bench_matrix_for_index(i),
+          bytes.mut_view(start=byte_start, end=byte_end),
+          layout.format,
+        )
+      }
+    },
+  )
+  let mut uploaded = 0
+  for i = 0; i < writes.length(); i = i + 1 {
+    uploaded = uploaded + writes[i].bytes.length()
+  }
+  report("global_transform_dense_range_write", count, started, uploaded)
+}
+
+///|
+/// Implements `bench_global_transform_by_refs_write`.
+fn bench_global_transform_by_refs_write(count : Int) -> BenchSample {
+  let (world, refs, range, dense) = make_global_blob_bench_world(count)
+  let started = monotonic_ms()
+  let writes = world.write_global_transform_blob_range_by_refs(
+    refs,
+    count,
+    range,
+    dense,
+    fn(writer) {
+      for i = 0; i < count; i = i + 1 {
+        let (m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23) = bench_affine_values_for_index(
+          i,
+        )
+        writer.set_affine3x4_at(
+          i, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23,
+        )
+      }
+    },
+  )
+  let mut uploaded = 0
+  for i = 0; i < writes.length(); i = i + 1 {
+    uploaded = uploaded + writes[i].bytes.length()
+  }
+  report("global_transform_by_refs_write", count, started, uploaded)
+}
+
+///|
+/// Implements `bench_set_global_transform_changed`.
+fn bench_set_global_transform_changed(count : Int) -> BenchSample {
+  let (world, _, _, _, entities) = make_world_entities(count)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if world.set_global_transform(entities[i], bench_matrix_for_index(i)) {
+      checksum = checksum + entities[i].gpu_index()
+    }
+  }
+  if world.has_global_transform_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("set_global_transform_changed", count, started, checksum)
+}
+
+///|
+/// Implements `bench_set_global_transform_unchanged`.
+fn bench_set_global_transform_unchanged(count : Int) -> BenchSample {
+  let (world, _, _, _, entities) = make_world_entities(count)
+  let identity = @m44.Matrix44F::identity()
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if world.set_global_transform(entities[i], identity) {
+      checksum = checksum + entities[i].gpu_index()
+    }
+  }
+  if world.has_global_transform_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("set_global_transform_unchanged", count, started, checksum)
+}
+
+///|
+/// Implements `make_camera_world`.
+fn make_camera_world(count : Int) -> (@ecs.World, Array[@ecs.EntityId]) {
+  let world = @ecs.World::new()
+  let entities : Array[@ecs.EntityId] = []
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  for i = 0; i < count; i = i + 1 {
+    let entity = world.create_entity()
+    entities.push(entity)
+    ignore(
+      world.set_camera_matrices(
+        entity,
+        view,
+        proj,
+        (0.1 : Float),
+        (100.0 : Float),
+        (1.0 : Float),
+        @ecs.camera_projection_orthographic(),
+        (0.0 : Float),
+      ),
+    )
+  }
+  ignore(world.drain_camera_blob_write_views())
+  (world, entities)
+}
+
+///|
+/// Implements `bench_set_camera_matrices_changed`.
+fn bench_set_camera_matrices_changed(count : Int) -> BenchSample {
+  let (world, entities) = make_camera_world(count)
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if world.set_camera_matrices(
+        entities[i],
+        view,
+        proj,
+        (0.1 : Float),
+        (200.0 : Float),
+        (1.0 : Float),
+        @ecs.camera_projection_orthographic(),
+        (0.0 : Float),
+      ) {
+      checksum = checksum + entities[i].gpu_index()
+    }
+  }
+  if world.has_camera_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("set_camera_matrices_changed", count, started, checksum)
+}
+
+///|
+/// Implements `bench_set_camera_matrices_unchanged`.
+fn bench_set_camera_matrices_unchanged(count : Int) -> BenchSample {
+  let (world, entities) = make_camera_world(count)
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < entities.length(); i = i + 1 {
+    if world.set_camera_matrices(
+        entities[i],
+        view,
+        proj,
+        (0.1 : Float),
+        (100.0 : Float),
+        (1.0 : Float),
+        @ecs.camera_projection_orthographic(),
+        (0.0 : Float),
+      ) {
+      checksum = checksum + entities[i].gpu_index()
+    }
+  }
+  if world.has_camera_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("set_camera_matrices_unchanged", count, started, checksum)
+}
+
+///|
 /// Implements `bench_make_world_batch`.
-fn bench_make_world_batch(count : Int) -> Unit {
+fn bench_make_world_batch(count : Int) -> BenchSample {
   let started = monotonic_ms()
   let (_, _, _, _) = make_world_batch(count)
   report("make_world_batch", count, started, count)
@@ -268,7 +669,7 @@ fn bench_make_world_batch(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_raw_set_component_bytes`.
-fn bench_history_raw_set_component_bytes(count : Int) -> Unit {
+fn bench_history_raw_set_component_bytes(count : Int) -> BenchSample {
   let (world, component, entities) = make_component_world(count)
   let started = monotonic_ms()
   let mut checksum = 0
@@ -283,7 +684,7 @@ fn bench_history_raw_set_component_bytes(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_disabled_set_component_bytes`.
-fn bench_history_disabled_set_component_bytes(count : Int) -> Unit {
+fn bench_history_disabled_set_component_bytes(count : Int) -> BenchSample {
   let (world, component, entities) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   history.set_enabled(false)
@@ -310,7 +711,9 @@ fn bench_history_disabled_set_component_bytes(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_enabled_transaction_set_component_bytes`.
-fn bench_history_enabled_transaction_set_component_bytes(count : Int) -> Unit {
+fn bench_history_enabled_transaction_set_component_bytes(
+  count : Int,
+) -> BenchSample {
   let (world, component, entities) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   if !history.begin_transaction("bench set bytes") {
@@ -342,7 +745,9 @@ fn bench_history_enabled_transaction_set_component_bytes(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_guarded_transaction_set_component_bytes`.
-fn bench_history_guarded_transaction_set_component_bytes(count : Int) -> Unit {
+fn bench_history_guarded_transaction_set_component_bytes(
+  count : Int,
+) -> BenchSample {
   let (world, component, entities) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   history.set_raw_mutation_guard_enabled(true)
@@ -375,7 +780,7 @@ fn bench_history_guarded_transaction_set_component_bytes(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_query_row_tracked_disabled`.
-fn bench_history_query_row_tracked_disabled(count : Int) -> Unit {
+fn bench_history_query_row_tracked_disabled(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   history.set_enabled(false)
@@ -401,7 +806,7 @@ fn bench_history_query_row_tracked_disabled(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_query_row_tracked_enabled`.
-fn bench_history_query_row_tracked_enabled(count : Int) -> Unit {
+fn bench_history_query_row_tracked_enabled(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.Query::new([component])
@@ -432,7 +837,7 @@ fn bench_history_query_row_tracked_enabled(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_tracked_disabled`.
-fn bench_history_archetype_column_tracked_disabled(count : Int) -> Unit {
+fn bench_history_archetype_column_tracked_disabled(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   history.set_enabled(false)
@@ -464,7 +869,7 @@ fn bench_history_archetype_column_tracked_disabled(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_tracked_enabled`.
-fn bench_history_archetype_column_tracked_enabled(count : Int) -> Unit {
+fn bench_history_archetype_column_tracked_enabled(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.RawQuery::new([component])
@@ -501,7 +906,7 @@ fn bench_history_archetype_column_tracked_enabled(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_raw_noop`.
-fn bench_history_archetype_column_raw_noop(count : Int) -> Unit {
+fn bench_history_archetype_column_raw_noop(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let query = @ecs.RawQuery::new([component])
   let started = monotonic_ms()
@@ -515,7 +920,7 @@ fn bench_history_archetype_column_raw_noop(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_tracked_noop`.
-fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
+fn bench_history_archetype_column_tracked_noop(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.RawQuery::new([component])
@@ -538,7 +943,7 @@ fn bench_history_archetype_column_tracked_noop(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_rows_tracked_noop`.
-fn bench_history_archetype_column_rows_tracked_noop(count : Int) -> Unit {
+fn bench_history_archetype_column_rows_tracked_noop(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.RawQuery::new([component])
@@ -562,7 +967,7 @@ fn bench_history_archetype_column_rows_tracked_noop(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_raw_sparse`.
-fn bench_history_archetype_column_raw_sparse(count : Int) -> Unit {
+fn bench_history_archetype_column_raw_sparse(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let query = @ecs.RawQuery::new([component])
   let started = monotonic_ms()
@@ -586,7 +991,7 @@ fn bench_history_archetype_column_raw_sparse(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_tracked_sparse`.
-fn bench_history_archetype_column_tracked_sparse(count : Int) -> Unit {
+fn bench_history_archetype_column_tracked_sparse(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.RawQuery::new([component])
@@ -625,7 +1030,9 @@ fn bench_history_archetype_column_tracked_sparse(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_archetype_column_rows_tracked_sparse`.
-fn bench_history_archetype_column_rows_tracked_sparse(count : Int) -> Unit {
+fn bench_history_archetype_column_rows_tracked_sparse(
+  count : Int,
+) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let query = @ecs.RawQuery::new([component])
@@ -662,7 +1069,7 @@ fn bench_history_archetype_column_rows_tracked_sparse(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_command_raw_phase`.
-fn bench_history_command_raw_phase(count : Int) -> Unit {
+fn bench_history_command_raw_phase(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let phase = @ecs.PhaseKey::new("history-command-raw-bench")
   let query = @ecs.Query::new([component])
@@ -698,7 +1105,7 @@ fn bench_history_command_raw_phase(count : Int) -> Unit {
 
 ///|
 /// Implements `bench_history_command_tracked_phase`.
-fn bench_history_command_tracked_phase(count : Int) -> Unit {
+fn bench_history_command_tracked_phase(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
   let history = @ecs.WorldHistory::new()
   let phase = @ecs.PhaseKey::new("history-command-tracked-bench")
@@ -741,44 +1148,160 @@ fn bench_history_command_tracked_phase(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `bench_system_runner_phase_empty`.
+fn bench_system_runner_phase_empty(count : Int) -> BenchSample {
+  let world = @ecs.World::new()
+  let other_phase = @ecs.PhaseKey::new("system-runner-empty-other")
+  let phase = @ecs.PhaseKey::new("system-runner-empty-target")
+  let runner = @ecs.SystemRunner::new()
+  runner.add_system(
+    @ecs.System::new("system-runner-empty-noop", other_phase, [], [], (
+      _world,
+      _ctx,
+      _commands,
+    ) => ()),
+  )
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for i = 0; i < count; i = i + 1 {
+    if runner.run_phase(
+        world,
+        @ecs.SystemContext::new((0.016 : Float), i),
+        phase,
+      ) {
+      checksum = checksum + 1
+    }
+  }
+  report("system_runner_phase_empty", count, started, checksum)
+}
+
+///|
+/// Implements `bench_system_runner_phase_command_buffer`.
+fn bench_system_runner_phase_command_buffer(count : Int) -> BenchSample {
+  let (world, component, _) = make_component_world(count)
+  let phase = @ecs.PhaseKey::new("system-runner-command-buffer-bench")
+  let query = @ecs.Query::new([component])
+  let runner = @ecs.SystemRunner::new()
+  let mut checksum = 0
+  runner.add_system(
+    @ecs.System::new(
+      "system-runner-command-buffer-write",
+      phase,
+      [],
+      [component],
+      (system_world, _ctx, commands) => {
+        query.for_each(system_world, row => {
+          let idx = row.entity().gpu_index()
+          commands.set_component_bytes(
+            row.entity(),
+            component,
+            bench_bytes4(idx + 181),
+          )
+          checksum = checksum + idx
+        })
+      },
+    ),
+  )
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected system runner command buffer phase")
+  }
+  report("system_runner_phase_command_buffer", count, started, checksum)
+}
+
+///|
 /// Implements `run_history_suite`.
 fn run_history_suite(count : Int) -> Unit {
-  bench_history_raw_set_component_bytes(count)
-  bench_history_disabled_set_component_bytes(count)
-  bench_history_enabled_transaction_set_component_bytes(count)
-  bench_history_guarded_transaction_set_component_bytes(count)
-  bench_history_query_row_tracked_disabled(count)
-  bench_history_query_row_tracked_enabled(count)
-  bench_history_archetype_column_tracked_disabled(count)
-  bench_history_archetype_column_tracked_enabled(count)
-  bench_history_archetype_column_raw_noop(count)
-  bench_history_archetype_column_tracked_noop(count)
-  bench_history_archetype_column_rows_tracked_noop(count)
-  bench_history_archetype_column_raw_sparse(count)
-  bench_history_archetype_column_tracked_sparse(count)
-  bench_history_archetype_column_rows_tracked_sparse(count)
-  bench_history_command_raw_phase(count)
-  bench_history_command_tracked_phase(count)
+  run_case(
+    "history_raw_set_component_bytes", count, bench_history_raw_set_component_bytes,
+  )
+  run_case(
+    "history_disabled_set_component_bytes", count, bench_history_disabled_set_component_bytes,
+  )
+  run_case(
+    "history_enabled_transaction_set_component_bytes", count, bench_history_enabled_transaction_set_component_bytes,
+  )
+  run_case(
+    "history_guarded_transaction_set_component_bytes", count, bench_history_guarded_transaction_set_component_bytes,
+  )
+  run_case(
+    "history_query_row_tracked_disabled", count, bench_history_query_row_tracked_disabled,
+  )
+  run_case(
+    "history_query_row_tracked_enabled", count, bench_history_query_row_tracked_enabled,
+  )
+  run_case(
+    "history_archetype_column_tracked_disabled", count, bench_history_archetype_column_tracked_disabled,
+  )
+  run_case(
+    "history_archetype_column_tracked_enabled", count, bench_history_archetype_column_tracked_enabled,
+  )
+  run_case(
+    "history_archetype_column_raw_noop", count, bench_history_archetype_column_raw_noop,
+  )
+  run_case(
+    "history_archetype_column_tracked_noop", count, bench_history_archetype_column_tracked_noop,
+  )
+  run_case(
+    "history_archetype_column_rows_tracked_noop", count, bench_history_archetype_column_rows_tracked_noop,
+  )
+  run_case(
+    "history_archetype_column_raw_sparse", count, bench_history_archetype_column_raw_sparse,
+  )
+  run_case(
+    "history_archetype_column_tracked_sparse", count, bench_history_archetype_column_tracked_sparse,
+  )
+  run_case(
+    "history_archetype_column_rows_tracked_sparse", count, bench_history_archetype_column_rows_tracked_sparse,
+  )
+  run_case("history_command_raw_phase", count, bench_history_command_raw_phase)
+  run_case(
+    "history_command_tracked_phase", count, bench_history_command_tracked_phase,
+  )
 }
 
 ///|
 /// Implements `run_suite`.
 fn run_suite(count : Int) -> Unit {
-  bench_query_row(count)
-  bench_query_archetype(count)
-  bench_builtin_positions(count)
-  bench_global_and_drain(count)
-  bench_global_and_drain_views(count)
-  bench_make_world_batch(count)
+  run_case("query_row", count, bench_query_row)
+  run_case("query_archetype", count, bench_query_archetype)
+  run_case("builtin_positions", count, bench_builtin_positions)
+  run_case("global_transform_drain", count, bench_global_and_drain)
+  run_case("global_transform_drain_views", count, bench_global_and_drain_views)
+  run_case(
+    "global_transform_dense_range_write", count, bench_global_transform_dense_range_write,
+  )
+  run_case(
+    "global_transform_by_refs_write", count, bench_global_transform_by_refs_write,
+  )
+  run_case(
+    "set_global_transform_changed", count, bench_set_global_transform_changed,
+  )
+  run_case(
+    "set_global_transform_unchanged", count, bench_set_global_transform_unchanged,
+  )
+  run_case(
+    "set_camera_matrices_changed", count, bench_set_camera_matrices_changed,
+  )
+  run_case(
+    "set_camera_matrices_unchanged", count, bench_set_camera_matrices_unchanged,
+  )
+  run_case("make_world_batch", count, bench_make_world_batch)
+  run_case("system_runner_phase_empty", count, bench_system_runner_phase_empty)
+  run_case(
+    "system_runner_phase_command_buffer", count, bench_system_runner_phase_command_buffer,
+  )
   run_history_suite(count)
 }
 
 ///|
-/// Implements `main {`.
+/// Runs the fixed ECS microbench suite.
 fn main {
-  println(
-    "ecs_bench: QueryRow vs archetype vs builtin transform and history paths",
-  )
+  println("ecs_bench: fixed ECS microbench suite (warmup=1 measured=5)")
   run_suite(1000)
   run_suite(10000)
 }
