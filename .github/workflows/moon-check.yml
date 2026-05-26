@@ -62,6 +62,8 @@ jobs:
       - name: Setup Chrome
         id: setup-chrome
         uses: browser-actions/setup-chrome@v1
+        with:
+          install-dependencies: true
 
       - name: Chrome version
         run: '"${{ steps.setup-chrome.outputs.chrome-path }}" --version'
@@ -74,4 +76,5 @@ jobs:
         working-directory: ${{ github.workspace }}
         env:
           RHODONITE_BROWSER: ${{ steps.setup-chrome.outputs.chrome-path }}
+          RHODONITE_BROWSER_INTERACTION_VERBOSE: "1"
         run: pnpm run test:examples:interaction:browser

@@ -93,10 +93,11 @@ try {
 	const userDataDir = await fs.mkdtemp(
 		path.join(os.tmpdir(), "rhodonite-browser-interaction-"),
 	);
+	let browserStdout = "";
+	let browserStderr = "";
 	const browserArgs = [
-		"--enable-unsafe-webgpu",
-		"--ignore-gpu-blocklist",
-		"--disable-gpu-sandbox",
+		"--disable-dev-shm-usage",
+		"--no-sandbox",
 		"--disable-background-networking",
 		"--disable-component-update",
 		"--disable-sync",
@@ -114,36 +115,43 @@ try {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {
+		browserStdout = appendOutputTail(browserStdout, data);
 		if (verbose) {
 			process.stdout.write(data);
 		}
 	});
 	browserProcess.stderr.on("data", (data) => {
+		browserStderr = appendOutputTail(browserStderr, data);
 		if (verbose) {
 			process.stderr.write(data);
 		}
 	});
 	browserProcess.on("error", rejectResult);
+	browserProcess.on("exit", (code, signal) => {
+		rejectResult(
+			new Error(
+				`browser exited before reporting results (code=${code ?? "null"} signal=${signal ?? "null"})` +
+					formatBrowserDiagnostics(browserStdout, browserStderr),
+			),
+		);
+	});
 
 	const result = await withTimeout(
 		resultPromise,
 		45000,
 		"browser interaction regression timed out",
 	).catch((error) => {
-		if (error instanceof Error && error.message.includes("timed out")) {
-			return {
-				ok: false,
-				skipped: false,
-				results: [],
-				failures: [
-					{
-						name: "browser interaction regression",
-						message: error.message,
-					},
-				],
-			};
-		}
-		throw error;
+		return {
+			ok: false,
+			skipped: false,
+			results: [],
+			failures: [
+				{
+					name: "browser interaction regression",
+					message: formatBrowserFailure(error, browserStdout, browserStderr),
+				},
+			],
+		};
 	});
 	if (result.skipped) {
 		console.log(`interaction_regression(browser): SKIP ${result.reason}`);
@@ -557,6 +565,30 @@ function withTimeout(promise, ms, message) {
 		timer = setTimeout(() => reject(new Error(message)), ms);
 	});
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function appendOutputTail(existing, data) {
+	const next = existing + data.toString();
+	return next.length > 8000 ? next.slice(next.length - 8000) : next;
+}
+
+function formatBrowserDiagnostics(stdout, stderr) {
+	const parts = [];
+	if (stderr.trim()) {
+		parts.push(`browser stderr:\n${stderr.trim()}`);
+	}
+	if (stdout.trim()) {
+		parts.push(`browser stdout:\n${stdout.trim()}`);
+	}
+	return parts.length === 0 ? "" : `\n${parts.join("\n")}`;
+}
+
+function formatBrowserFailure(error, stdout, stderr) {
+	const message = error instanceof Error ? error.message : String(error);
+	if (message.includes("browser stderr:") || message.includes("browser stdout:")) {
+		return message;
+	}
+	return message + formatBrowserDiagnostics(stdout, stderr);
 }
 
 function listen(server) {
