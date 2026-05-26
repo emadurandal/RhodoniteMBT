@@ -3520,6 +3520,17 @@ pub fn WorldHistory::cancel_transaction(self : WorldHistory) -> Bool {
 }
 
 ///|
+/// Cancels the active transaction while preserving the current diagnostic.
+pub fn WorldHistory::cancel_transaction_preserving_diagnostic(
+  self : WorldHistory,
+) -> Bool {
+  let diagnostic = self.last_diagnostic()
+  let ok = self.cancel_transaction()
+  self.set_diagnostic(diagnostic)
+  ok
+}
+
+///|
 /// Cancels the active transaction and reverts deltas already applied in that transaction.
 pub fn WorldHistory::cancel_transaction_reverting(
   self : WorldHistory,
@@ -3553,6 +3564,55 @@ pub fn WorldHistory::cancel_transaction_reverting(
     self.clear_diagnostic()
     true
   }
+}
+
+///|
+/// Runs `body` inside a helper-owned transaction, reverting applied deltas on `false`.
+fn WorldHistory::finish_transaction_body(
+  self : WorldHistory,
+  world : World,
+  body : () -> Bool,
+) -> Bool {
+  let ok = body()
+  if ok {
+    if self.commit_transaction() {
+      true
+    } else {
+      ignore(self.cancel_transaction_preserving_diagnostic())
+      false
+    }
+  } else {
+    ignore(self.cancel_transaction_reverting(world))
+    false
+  }
+}
+
+///|
+/// Runs `body` inside a helper-owned transaction, reverting applied deltas on `false`.
+pub fn WorldHistory::with_transaction(
+  self : WorldHistory,
+  world : World,
+  label : String,
+  body : () -> Bool,
+) -> Bool {
+  if !self.begin_transaction(label) {
+    return false
+  }
+  self.finish_transaction_body(world, body)
+}
+
+///|
+/// Runs `body` inside a helper-owned guarded transaction.
+pub fn WorldHistory::with_guarded_transaction(
+  self : WorldHistory,
+  world : World,
+  label : String,
+  body : () -> Bool,
+) -> Bool {
+  if !self.begin_guarded_transaction(world, label) {
+    return false
+  }
+  self.finish_transaction_body(world, body)
 }
 
 ///|

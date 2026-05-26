@@ -389,6 +389,7 @@ pub fn WorldHistory::begin_transaction(Self, String) -> Bool
 pub fn WorldHistory::can_redo(Self) -> Bool
 pub fn WorldHistory::can_undo(Self) -> Bool
 pub fn WorldHistory::cancel_transaction(Self) -> Bool
+pub fn WorldHistory::cancel_transaction_preserving_diagnostic(Self) -> Bool
 pub fn WorldHistory::cancel_transaction_reverting(Self, World) -> Bool
 pub fn WorldHistory::clear(Self) -> Unit
 pub fn WorldHistory::commit_transaction(Self) -> Bool
@@ -433,6 +434,8 @@ pub fn WorldHistory::undo_serialization_report(Self, World) -> WorldHistorySeria
 pub fn WorldHistory::undo_summary(Self) -> Array[WorldHistoryRecordSummary]
 pub fn WorldHistory::validate_import_redo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
 pub fn WorldHistory::validate_import_undo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
+pub fn WorldHistory::with_guarded_transaction(Self, World, String, () -> Bool) -> Bool
+pub fn WorldHistory::with_transaction(Self, World, String, () -> Bool) -> Bool
 
 pub(all) struct WorldHistoryDeltaSummary {
   kind : String

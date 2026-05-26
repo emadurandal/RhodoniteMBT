@@ -1393,6 +1393,14 @@ pub fn world_history_cancel_transaction(history : @ecs.WorldHistory) -> Bool {
 }
 
 ///|
+/// Implements `world_history_cancel_transaction_preserving_diagnostic`.
+pub fn world_history_cancel_transaction_preserving_diagnostic(
+  history : @ecs.WorldHistory,
+) -> Bool {
+  history.cancel_transaction_preserving_diagnostic()
+}
+
+///|
 /// Implements `world_history_cancel_transaction_reverting`.
 pub fn world_history_cancel_transaction_reverting(
   history : @ecs.WorldHistory,

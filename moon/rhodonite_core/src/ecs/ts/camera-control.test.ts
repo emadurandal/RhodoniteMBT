@@ -253,6 +253,97 @@ describe("OrbitCameraController TypeScript wrapper", () => {
 		expect(world.drainCameraBlobWriteViews().length).toBeGreaterThan(0);
 	});
 
+	it("joins open transactions for tracked camera setup", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+
+		expect(history.beginTransaction("camera setup group")).toBe(true);
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(true);
+		expect(history.commitTransaction()).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(history.undo(world)).toBe(true);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(false);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(false);
+	});
+
+	it("delegates tracked camera setup while history is disabled", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		history.setEnabled(false);
+
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(true);
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(camera, world.transformComponent())).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+	});
+
+	it("does not rerun tracked camera setup after commit disables recording", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const camera = world.createEntity();
+		const originalCommit = history.commitTransaction.bind(history);
+		let commitCalls = 0;
+		history.commitTransaction = () => {
+			commitCalls += 1;
+			history.setEnabled(false);
+			return originalCommit();
+		};
+
+		expect(
+			setupOrbitOrthographicCameraTracked(
+				history,
+				world,
+				camera,
+				createOrbitOrthographicCameraDescFromYzPosition(
+					0.38,
+					2,
+					5.6,
+					0.1,
+					50,
+					1,
+					3.8,
+				),
+			),
+		).toBe(true);
+		expect(commitCalls).toBe(1);
+		expect(history.undoLen()).toBe(0);
+		expect(world.hasComponent(camera, world.orbitCameraControllerComponent())).toBe(true);
+		expect(world.hasComponent(camera, world.cameraLensComponent())).toBe(true);
+		expect(world.hasComponent(camera, world.cameraComponent())).toBe(true);
+	});
+
 	it("rejects tracked camera setup without leaving partial state", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

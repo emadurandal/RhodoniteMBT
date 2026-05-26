@@ -43,6 +43,7 @@
               <tr><td>Tracked command phase</td><td>system が command を queue し、<code>WorldHistory::run_system_phase</code> が tracked API 経由で適用します。</td><td>queued command が phase label の 1 件の undoable record になること。</td></tr>
               <tr><td>Raw guarded</td><td>意図的に history を通しませんが、guarded transaction 中は abort します。</td><td>guarded transaction で panic / throw する coverage test を持つこと。</td></tr>
               <tr><td>Intentionally untracked</td><td>derived runtime data、registration metadata、readback plumbing を更新します。</td><td>history 対象外である理由を docs に書くこと。</td></tr>
+              <tr><td>History-control</td><td>component data を直接変更せず、history state や tracked operation の scope を制御します。</td><td>commit、cancel、disabled、nested case の control-flow test を持つこと。</td></tr>
             </tbody>
           </table>
 
@@ -56,7 +57,7 @@
               <tr><td><code>spawn_batch</code></td><td>spawn された entity と初期化済み component row が batch として Undo / Redo されます。</td></tr>
               <tr><td><code>set_transform_trs</code>、<code>set_child_of</code></td><td>authoring transform と parent relationship row が復元されます。</td></tr>
               <tr><td><code>set_global_transform</code>、<code>set_global_transform_format</code>、<code>set_camera_matrices</code></td><td>blob-backed builtin の presence と logical row payload は専用 helper 経由で復元されます。</td></tr>
-              <tr><td>Tracked camera-control helper</td><td>orbit setup、lens、controller、home、transform sync、blob sync helper は editor step を undoable record にまとめます。</td></tr>
+              <tr><td>Tracked camera-control helper</td><td>orbit setup、lens、controller、home、transform sync、blob sync helper は editor step を undoable record にまとめます。単独の setup/sync helper は helper-owned transaction を開き、既存の gesture transaction が開いている場合はそこへ合流します。</td></tr>
             </tbody>
           </table>
 
@@ -69,6 +70,7 @@
               <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>full-column edit 用の tracked callback API です。column を snapshot し、変更された row だけを記録します。</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>呼び出し側が候補 row を知っている sparse column edit 用の tracked callback API です。指定 row view だけを snapshot して記録します。</td></tr>
               <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>editor system 用の tracked command path です。対応 command は該当する history method に dispatch されます。後続 command が失敗しても、成功済み command は undo 可能なまま残ります。</td></tr>
+              <tr><td><code>WorldHistory::with_transaction</code>、<code>with_guarded_transaction</code></td><td>helper が所有する editor action 用の history-control callback helper です。<code>true</code> の場合だけ commit し、それ以外は適用済み tracked delta を戻します。</td></tr>
               <tr><td>Raw <code>QueryRow::write</code>、<code>RawQueryRow::write_view</code>、<code>RawQueryArchetype::write_column</code></td><td>Raw guarded です。untracked であり、guarded history transaction 中は abort します。</td></tr>
               <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded です。history が必要な command-buffer edit では <code>WorldHistory::run_system_phase</code> を使います。</td></tr>
             </tbody>

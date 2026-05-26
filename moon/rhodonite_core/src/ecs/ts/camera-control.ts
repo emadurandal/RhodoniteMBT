@@ -1028,20 +1028,34 @@ export function setupOrbitOrthographicCamera(
 	);
 }
 
-function finishTrackedCameraControlTransaction(
+function runTrackedCameraControlTransaction(
 	history: WorldHistory,
 	world: World,
-	opened: boolean,
-	ok: boolean,
+	label: string,
+	callback: () => boolean,
 ): boolean {
-	if (!opened) {
-		return ok;
+	if (!history.beginTransaction(label)) {
+		const diagnostic = history.lastDiagnostic();
+		if (diagnostic === "transaction_open" || diagnostic === "recording_disabled") {
+			return callback();
+		}
+		return false;
 	}
-	if (ok) {
-		return history.commitTransaction();
+	try {
+		if (!callback()) {
+			history.cancelTransactionReverting(world);
+			return false;
+		}
+		if (history.commitTransaction()) {
+			return true;
+		}
+		const diagnostic = history.lastDiagnostic();
+		history.cancelTransaction();
+		return diagnostic === "recording_disabled";
+	} catch (error) {
+		history.cancelTransactionReverting(world);
+		throw error;
 	}
-	history.cancelTransactionReverting(world);
-	return false;
 }
 
 function canSetupOrbitOrthographicCameraTracked(
@@ -1068,14 +1082,27 @@ export function setupOrbitOrthographicCameraTracked(
 	if (!canSetupOrbitOrthographicCameraTracked(world, camera)) {
 		return false;
 	}
-	const opened = history.beginTransaction("setupOrbitOrthographicCamera");
+	return runTrackedCameraControlTransaction(
+		history,
+		world,
+		"setupOrbitOrthographicCamera",
+		() => setupOrbitOrthographicCameraTrackedBody(history, world, camera, desc),
+	);
+}
+
+function setupOrbitOrthographicCameraTrackedBody(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	desc: OrbitOrthographicCameraDesc,
+): boolean {
 	const { px, py, pz, qx, qy, qz, qw } = orbitOrthographicCameraDescTrs(desc);
 	const local = localMatrixFromTrs(px, py, pz, qx, qy, qz, qw, 1, 1, 1);
 	const view = mat4Inverse(local);
 	if (view === null) {
-		return finishTrackedCameraControlTransaction(history, world, opened, false);
+		return false;
 	}
-	const ok =
+	return (
 		history.setTransformTrs(
 			world,
 			camera,
@@ -1135,8 +1162,8 @@ export function setupOrbitOrthographicCameraTracked(
 			desc.aspect,
 			CAMERA_PROJECTION_ORTHOGRAPHIC,
 			desc.flags,
-		);
-	return finishTrackedCameraControlTransaction(history, world, opened, ok);
+		)
+	);
 }
 
 function perspectiveProjection(
@@ -1350,16 +1377,38 @@ export function syncOrbitCameraTransformComponentTracked(
 	orbitComponent: ComponentTypeId,
 	homeComponent: ComponentTypeId,
 ): void {
-	const opened = history.beginTransaction("syncOrbitCameraTransformComponent");
+	if (
+		!runTrackedCameraControlTransaction(
+			history,
+			world,
+			"syncOrbitCameraTransformComponent",
+			() =>
+				syncOrbitCameraTransformComponentTrackedBody(
+					history,
+					world,
+					camera,
+					orbitComponent,
+					homeComponent,
+				),
+		)
+	) {
+		throw new Error("Failed to update camera Transform3D.");
+	}
+}
+
+function syncOrbitCameraTransformComponentTrackedBody(
+	history: WorldHistory,
+	world: World,
+	camera: EntityId,
+	orbitComponent: ComponentTypeId,
+	homeComponent: ComponentTypeId,
+): boolean {
 	const pose = readOrbitCameraPoseComponent(world, camera, orbitComponent);
 	if (
 		pose.resetRequested &&
 		!world.hasComponent(camera, world.transformComponent())
 	) {
-		if (opened) {
-			history.cancelTransactionReverting(world);
-		}
-		throw new Error("Failed to update camera Transform3D.");
+		return false;
 	}
 	let ok = true;
 	if (pose.resetRequested) {
@@ -1431,9 +1480,7 @@ export function syncOrbitCameraTransformComponentTracked(
 				localMatrixFromTrs(px, py, pz, q[0], q[1], q[2], q[3], 1, 1, 1),
 			);
 	}
-	if (!finishTrackedCameraControlTransaction(history, world, opened, ok)) {
-		throw new Error("Failed to update camera Transform3D.");
-	}
+	return ok;
 }
 
 export function updateOrbitCameraControllerFromMouseFrame(

@@ -456,6 +456,62 @@ test "tracked setup orbit orthographic camera undoes and redoes as one operation
 }
 
 ///|
+test "tracked setup orbit orthographic camera joins open transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  assert_true(history.begin_transaction("camera setup group"))
+  assert_true(
+    setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.38,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  assert_true(history.commit_transaction())
+  assert_eq(history.undo_len(), 1)
+  assert_true(history.undo(world))
+  assert_true(!world.has_component(camera, world.transform_component()))
+  assert_true(!world.has_component(camera, world.camera_component()))
+}
+
+///|
+test "tracked setup orbit orthographic camera delegates while history disabled" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let camera = world.create_entity()
+  history.set_enabled(false)
+  assert_true(
+    setup_orbit_orthographic_camera_tracked(
+      history,
+      world,
+      camera,
+      OrbitOrthographicCameraDesc::new_yz_pitched(
+        0.38,
+        (2.0 : Float),
+        (5.6 : Float),
+        (0.1 : Float),
+        (50.0 : Float),
+        (1.0 : Float),
+        (3.8 : Float),
+      ),
+    ),
+  )
+  assert_eq(history.undo_len(), 0)
+  assert_true(world.has_component(camera, world.transform_component()))
+  assert_true(world.has_component(camera, world.camera_component()))
+}
+
+///|
 test "tracked setup orbit orthographic camera rejects existing controller without partial state" {
   let world = World::new()
   let history = WorldHistory::new()
