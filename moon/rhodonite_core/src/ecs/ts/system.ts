@@ -6,6 +6,9 @@ import type {
 	MoonPhaseKey,
 	MoonSystem,
 	MoonSystemContext,
+	MoonSystemPhasePlan,
+	MoonSystemPlanBatch,
+	MoonSystemPlanSystem,
 	MoonSystemRunner,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
@@ -37,10 +40,23 @@ import {
 	system_runner_has_parallel_access_conflicts,
 	system_runner_len,
 	system_runner_new,
+	system_runner_plan_phase,
 	system_runner_run_phase,
 	system_structural_write,
 	system_writes,
 	system_name,
+	system_phase_plan_batches,
+	system_phase_plan_phase,
+	system_phase_plan_system_count,
+	system_plan_batch_index,
+	system_plan_batch_systems,
+	system_plan_system_batch_index,
+	system_plan_system_name,
+	system_plan_system_phase,
+	system_plan_system_reads,
+	system_plan_system_runner_index,
+	system_plan_system_structural_write,
+	system_plan_system_writes,
 	transform_propagation_system,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
@@ -260,6 +276,90 @@ export class System {
 	}
 }
 
+export class SystemPlanSystem {
+	readonly inner: MoonSystemPlanSystem;
+
+	constructor(inner: MoonSystemPlanSystem) {
+		this.inner = inner;
+	}
+
+	runnerIndex(): number {
+		return system_plan_system_runner_index(this.inner);
+	}
+
+	batchIndex(): number {
+		return system_plan_system_batch_index(this.inner);
+	}
+
+	name(): string {
+		return system_plan_system_name(this.inner);
+	}
+
+	phase(): PhaseKey {
+		return new PhaseKey(system_plan_system_phase(this.inner));
+	}
+
+	reads(): ComponentTypeId[] {
+		return system_plan_system_reads(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	writes(): ComponentTypeId[] {
+		return system_plan_system_writes(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	structuralWrite(): boolean {
+		return moonBool(system_plan_system_structural_write(this.inner));
+	}
+}
+
+export class SystemPlanBatch {
+	readonly inner: MoonSystemPlanBatch;
+
+	constructor(inner: MoonSystemPlanBatch) {
+		this.inner = inner;
+	}
+
+	index(): number {
+		return system_plan_batch_index(this.inner);
+	}
+
+	systems(): SystemPlanSystem[] {
+		return system_plan_batch_systems(this.inner).map(
+			(system) => new SystemPlanSystem(system),
+		);
+	}
+}
+
+export class SystemPhasePlan {
+	readonly inner: MoonSystemPhasePlan;
+
+	constructor(inner: MoonSystemPhasePlan) {
+		this.inner = inner;
+	}
+
+	phase(): PhaseKey {
+		return new PhaseKey(system_phase_plan_phase(this.inner));
+	}
+
+	systemCount(): number {
+		return system_phase_plan_system_count(this.inner);
+	}
+
+	batchCount(): number {
+		return system_phase_plan_batches(this.inner).length;
+	}
+
+	batches(): SystemPlanBatch[] {
+		return system_phase_plan_batches(this.inner).map(
+			(batch) => new SystemPlanBatch(batch),
+		);
+	}
+}
+
 export class SystemRunner {
 	readonly inner: MoonSystemRunner;
 
@@ -281,6 +381,10 @@ export class SystemRunner {
 
 	hasParallelAccessConflicts(): boolean {
 		return moonBool(system_runner_has_parallel_access_conflicts(this.inner));
+	}
+
+	planPhase(phase: PhaseKey): SystemPhasePlan {
+		return new SystemPhasePlan(system_runner_plan_phase(this.inner, phase.inner));
 	}
 
 	runPhase(world: World, ctx: SystemContext, phase: PhaseKey): boolean {
