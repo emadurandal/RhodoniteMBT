@@ -22,7 +22,11 @@ export default defineConfig({
 				basicTriangle: "samples/html/basic-triangle.html",
 				ecsMassCubes: "samples/html/ecs-mass-cubes.html",
 				ecsSceneGraph: "samples/html/ecs-scene-graph.html",
+				ecsSceneGraphUndoRedo: "samples/html/ecs-scene-graph-undo-redo.html",
 				ondemandTriangle: "samples/html/ondemand-triangle.html",
+				tsEcsSceneGraph: "samples/html/ts-ecs-scene-graph.html",
+				tsEcsSceneGraphUndoRedo:
+					"samples/html/ts-ecs-scene-graph-undo-redo.html",
 				tsEcsMassCubes: "samples/html/ts-ecs-mass-cubes.html",
 				tsMultiSurfaceIndependentInput:
 					"samples/html/ts-multi-surface-independent-input.html",

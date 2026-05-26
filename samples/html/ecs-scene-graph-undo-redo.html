@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoonBit WebGPU — ecs-scene-graph Undo/Redo</title>
+  </head>
+  <body>
+    <div id="app">
+      <h1>MoonBit WebGPU ecs-scene-graph Undo/Redo</h1>
+      <p>
+        <code>WorldHistory::with_transaction</code> で地球を移動し、Undo してから Redo
+        した状態を描画するサンプル。
+      </p>
+      <canvas id="webgpu-canvas" width="800" height="600"></canvas>
+    </div>
+    <script type="module" src="/samples/ts/main-ecs-scene-graph-undo-redo.ts"></script>
+  </body>
+</html>

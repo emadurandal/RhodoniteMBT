@@ -68,6 +68,7 @@ pnpm install
 pnpm run dev:js:basic-triangle
 pnpm run dev:js:ondemand-triangle
 pnpm run dev:js:ecs-scene-graph
+pnpm run dev:js:ecs-scene-graph-undo-redo
 pnpm run dev:js:ecs-custom-component-color
 pnpm run dev:js:multi-surface-independent-input
 pnpm run dev:js:ecs-mass-cubes
@@ -79,6 +80,7 @@ triangle:
 
 ```bash
 pnpm run dev:js:ts-ecs-scene-graph
+pnpm run dev:js:ts-ecs-scene-graph-undo-redo
 pnpm run dev:js:ts-ecs-custom-component-color
 pnpm run dev:js:ts-ecs-mass-cubes
 pnpm run dev:js:ts-multi-surface-independent-input
@@ -117,6 +119,7 @@ pnpm install
 pnpm run dev:native:basic-triangle
 pnpm run dev:native:ondemand-triangle
 pnpm run dev:native:ecs-scene-graph
+pnpm run dev:native:ecs-scene-graph-undo-redo
 pnpm run dev:native:ecs-custom-component-color
 pnpm run dev:native:multi-surface-independent-input
 pnpm run dev:native:ecs-mass-cubes

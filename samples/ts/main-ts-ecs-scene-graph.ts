@@ -298,13 +298,24 @@ export async function renderTsEcsSceneGraphUndoRedoBrowserSnapshot(): Promise<Ui
 	}
 }
 
+function runUndoRedoDemoFromModuleUrl(): boolean {
+	return new URL(import.meta.url).searchParams.get("undoRedo") === "1";
+}
+
 runBrowserWebGpuCanvasDemo({
 	initialize: async (canvas) => {
 		await runPlatform(
 			new PlatformConfig(canvas),
 			PlatformApp.defaultEngine((engine) => {
 				const demo = createDemoStateForEngine(engine);
-				registerEngineHandlers(engine, demo);
+				if (runUndoRedoDemoFromModuleUrl()) {
+					applyUndoRedoVisualEdit(demo);
+					engine.onSceneRender(demo.scene, () => {
+						renderCurrentFrame(demo);
+					});
+				} else {
+					registerEngineHandlers(engine, demo);
+				}
 			}),
 			PlatformOptions.interactive(),
 		);
