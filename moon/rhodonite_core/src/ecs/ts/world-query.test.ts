@@ -7,7 +7,9 @@ import {
 	GpuLayout,
 	PhaseKey,
 	Query,
+	QueryCache,
 	RawQuery,
+	RawQueryCache,
 	System,
 	SystemContext,
 	SystemRunner,
@@ -380,6 +382,84 @@ describe("ECS TypeScript wrapper: query", () => {
 			rows += archetype.length();
 		});
 		expect(rows).toBe(1);
+	});
+
+	it("reuses and refreshes query cache row plans", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("QueryCacheTsA", 16);
+		const cpuB = world.registerCpuComponent("QueryCacheTsB", 16);
+		const cache = QueryCache.new([cpuA, cpuB]);
+		expect(cache.requiredComponents().map((component) => component.index())).toEqual([
+			cpuA.index(),
+			cpuB.index(),
+		]);
+
+		const e0 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e0, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		let sum = 0;
+		cache.forEach(world, (row) => {
+			row.read(cpuA, (bytes) => {
+				sum += bytes.getF32(0);
+			});
+		});
+		expect(sum).toBeCloseTo(1);
+		expect(cache.plan(world).stale()).toBe(false);
+
+		const cpuC = world.registerCpuComponent("QueryCacheTsC", 16);
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuB, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuC, f32Bytes([5, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(cache.plan(world).stale()).toBe(true);
+		cache.refresh(world);
+		expect(cache.plan(world).stale()).toBe(false);
+		expect(cache.plan(world).matchedRowCount()).toBe(2);
+	});
+
+	it("reuses and refreshes raw query cache archetype plans", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("RawQueryCacheTsA", 16);
+		const cpuB = world.registerCpuComponent("RawQueryCacheTsB", 16);
+		const cache = RawQueryCache.new([cpuA, cpuB]);
+		const e0 = world.createEntity();
+		expect(world.addComponentBytes(e0, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e0, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		cache.refresh(world);
+		expect(cache.plan(world).matchedRowCount()).toBe(1);
+
+		const cpuC = world.registerCpuComponent("RawQueryCacheTsC", 16);
+		const e1 = world.createEntity();
+		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuB, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(e1, cpuC, f32Bytes([5, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(cache.plan(world).stale()).toBe(true);
+		let rows = 0;
+		cache.forEachArchetype(world, (archetype) => {
+			rows += archetype.length();
+		});
+		expect(rows).toBe(2);
+		expect(cache.plan(world).stale()).toBe(false);
 	});
 
 });

@@ -617,6 +617,67 @@ fn bench_prepared_query_many_archetypes_refresh_then_reuse(
 }
 
 ///|
+/// Implements `bench_query_cache_many_archetypes_reuse`.
+fn bench_query_cache_many_archetypes_reuse(count : Int) -> BenchSample {
+  let (world, target, _) = make_many_archetype_query_world(count)
+  let cache = @ecs.QueryCache::new([target])
+  cache.refresh(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  cache.for_each(world, row => {
+    row.read(target, bytes => checksum = checksum + bytes[0].to_int())
+  })
+  report("query_cache_many_archetypes_reuse", count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_cache_many_archetypes_refresh_after_structural_change`.
+fn bench_query_cache_many_archetypes_refresh_after_structural_change(
+  count : Int,
+) -> BenchSample {
+  let (world, target, _) = make_many_archetype_query_world(count)
+  let cache = @ecs.QueryCache::new([target])
+  cache.refresh(world)
+  let extra = world.register_cpu_component("BenchQueryCacheExtra", 4)
+  ignore(
+    world.spawn_batch([target, extra], 1, fn(_i, _entity, row) {
+      row.write(target, bytes => bytes[0] = (7 : Byte))
+    }),
+  )
+  let started = monotonic_ms()
+  let mut checksum = 0
+  cache.for_each(world, row => {
+    row.read(target, bytes => checksum = checksum + bytes[0].to_int())
+  })
+  report(
+    "query_cache_many_archetypes_refresh_after_structural_change", count, started,
+    checksum,
+  )
+}
+
+///|
+/// Implements `bench_raw_query_cache_many_archetypes_archetype_reuse`.
+fn bench_raw_query_cache_many_archetypes_archetype_reuse(
+  count : Int,
+) -> BenchSample {
+  let (world, target, _) = make_many_archetype_query_world(count)
+  let cache = @ecs.RawQueryCache::new([target])
+  cache.refresh(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  cache.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(target)
+    let col = arch.read_column(target)
+    for row = 0; row < arch.length(); row = row + 1 {
+      checksum = checksum + col[row * stride].to_int()
+    }
+  })
+  report(
+    "raw_query_cache_many_archetypes_archetype_reuse", count, started, checksum,
+  )
+}
+
+///|
 /// Implements `bench_builtin_positions`.
 fn bench_builtin_positions(count : Int) -> BenchSample {
   let (world, _, _, per_side) = make_world(count)
@@ -1536,6 +1597,15 @@ fn run_suite(count : Int) -> Unit {
   )
   run_case(
     "prepared_query_many_archetypes_refresh_then_reuse", count, bench_prepared_query_many_archetypes_refresh_then_reuse,
+  )
+  run_case(
+    "query_cache_many_archetypes_reuse", count, bench_query_cache_many_archetypes_reuse,
+  )
+  run_case(
+    "query_cache_many_archetypes_refresh_after_structural_change", count, bench_query_cache_many_archetypes_refresh_after_structural_change,
+  )
+  run_case(
+    "raw_query_cache_many_archetypes_archetype_reuse", count, bench_raw_query_cache_many_archetypes_archetype_reuse,
   )
   run_case("builtin_positions", count, bench_builtin_positions)
   run_case("global_transform_drain", count, bench_global_and_drain)

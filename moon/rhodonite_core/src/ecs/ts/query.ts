@@ -4,11 +4,13 @@
 import type {
 	MoonPreparedQuery,
 	MoonQuery,
+	MoonQueryCache,
 	MoonQueryPlan,
 	MoonQueryPlanArchetype,
 	MoonQueryRow,
 	MoonRawPreparedQuery,
 	MoonRawQuery,
+	MoonRawQueryCache,
 	MoonRawQueryArchetype,
 	MoonRawQueryRow,
 	MoonWorld,
@@ -19,6 +21,11 @@ import {
 	prepared_query_is_stale,
 	prepared_query_plan,
 	prepared_query_refresh,
+	query_cache_for_each,
+	query_cache_new,
+	query_cache_plan,
+	query_cache_refresh,
+	query_cache_required_components,
 	query_for_each,
 	query_new,
 	query_plan,
@@ -43,6 +50,12 @@ import {
 	raw_prepared_query_is_stale,
 	raw_prepared_query_plan,
 	raw_prepared_query_refresh,
+	raw_query_cache_for_each,
+	raw_query_cache_for_each_archetype,
+	raw_query_cache_new,
+	raw_query_cache_plan,
+	raw_query_cache_refresh,
+	raw_query_cache_required_components,
 	raw_query_archetype_component_stride,
 	raw_query_archetype_entity,
 	raw_query_archetype_has,
@@ -92,6 +105,40 @@ export class Query {
 
 	plan(world: { readonly inner: MoonWorld }): QueryPlan {
 		return new QueryPlan(query_plan(this.inner, world.inner));
+	}
+}
+
+export class QueryCache {
+	readonly inner: MoonQueryCache;
+
+	constructor(inner: MoonQueryCache) {
+		this.inner = inner;
+	}
+
+	static new(required: ComponentTypeId[]): QueryCache {
+		return new QueryCache(
+			query_cache_new(required.map((component) => component.inner)),
+		);
+	}
+
+	requiredComponents(): ComponentTypeId[] {
+		return query_cache_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(query_cache_plan(this.inner, world.inner));
+	}
+
+	refresh(world: { readonly inner: MoonWorld }): void {
+		query_cache_refresh(this.inner, world.inner);
+	}
+
+	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
+		query_cache_for_each(this.inner, world.inner, (row) =>
+			f(new QueryRow(row)),
+		);
 	}
 }
 
@@ -205,6 +252,49 @@ export class RawQuery {
 		f: (archetype: RawQueryArchetype) => void,
 	): void {
 		raw_query_for_each_archetype(this.inner, world.inner, (archetype) =>
+			f(new RawQueryArchetype(archetype)),
+		);
+	}
+}
+
+export class RawQueryCache {
+	readonly inner: MoonRawQueryCache;
+
+	constructor(inner: MoonRawQueryCache) {
+		this.inner = inner;
+	}
+
+	static new(required: ComponentTypeId[]): RawQueryCache {
+		return new RawQueryCache(
+			raw_query_cache_new(required.map((component) => component.inner)),
+		);
+	}
+
+	requiredComponents(): ComponentTypeId[] {
+		return raw_query_cache_required_components(this.inner).map(
+			(component) => new ComponentTypeId(component),
+		);
+	}
+
+	plan(world: { readonly inner: MoonWorld }): QueryPlan {
+		return new QueryPlan(raw_query_cache_plan(this.inner, world.inner));
+	}
+
+	refresh(world: { readonly inner: MoonWorld }): void {
+		raw_query_cache_refresh(this.inner, world.inner);
+	}
+
+	forEach(world: { readonly inner: MoonWorld }, f: (row: RawQueryRow) => void): void {
+		raw_query_cache_for_each(this.inner, world.inner, (row) =>
+			f(new RawQueryRow(row)),
+		);
+	}
+
+	forEachArchetype(
+		world: { readonly inner: MoonWorld },
+		f: (archetype: RawQueryArchetype) => void,
+	): void {
+		raw_query_cache_for_each_archetype(this.inner, world.inner, (archetype) =>
 			f(new RawQueryArchetype(archetype)),
 		);
 	}

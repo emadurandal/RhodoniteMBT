@@ -211,6 +211,15 @@ pub fn Query::plan(Self, World) -> QueryPlan
 pub fn Query::prepare(Self, World) -> PreparedQuery
 pub fn Query::required_components(Self) -> Array[ComponentTypeId]
 
+pub struct QueryCache {
+  // private fields
+}
+pub fn QueryCache::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn QueryCache::new(Array[ComponentTypeId]) -> Self
+pub fn QueryCache::plan(Self, World) -> QueryPlan
+pub fn QueryCache::refresh(Self, World) -> Unit
+pub fn QueryCache::required_components(Self) -> Array[ComponentTypeId]
+
 pub(all) struct QueryPlan {
   required : Array[ComponentTypeId]
   archetype_version : Int
@@ -273,6 +282,16 @@ pub fn RawQueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
 pub fn RawQueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
 pub fn RawQueryArchetype::write_column_rows_tracked(Self, WorldHistory, ComponentTypeId, Array[Int], (Int, MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryArchetype::write_column_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool
+
+pub struct RawQueryCache {
+  // private fields
+}
+pub fn RawQueryCache::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
+pub fn RawQueryCache::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+pub fn RawQueryCache::new(Array[ComponentTypeId]) -> Self
+pub fn RawQueryCache::plan(Self, World) -> QueryPlan
+pub fn RawQueryCache::refresh(Self, World) -> Unit
+pub fn RawQueryCache::required_components(Self) -> Array[ComponentTypeId]
 
 pub struct RawQueryRow {
   // private fields

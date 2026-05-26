@@ -72,7 +72,7 @@
               <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>editor system 用の tracked command path です。対応 command は該当する history method に dispatch されます。後続 command が失敗しても、成功済み command は undo 可能なまま残ります。</td></tr>
               <tr><td><code>WorldHistory::with_transaction</code>、<code>with_guarded_transaction</code></td><td>helper が所有する editor action 用の history-control callback helper です。<code>true</code> の場合だけ commit し、それ以外は適用済み tracked delta を戻します。</td></tr>
               <tr><td>Raw <code>QueryRow::write</code>、<code>RawQueryRow::write_view</code>、<code>RawQueryArchetype::write_column</code></td><td>Raw guarded です。untracked であり、guarded history transaction 中は abort します。</td></tr>
-              <tr><td><code>Query::plan</code>、<code>RawQuery::plan</code>、<code>PreparedQuery::plan</code>、<code>RawPreparedQuery::plan</code>、prepared-query の <code>is_stale</code> / <code>refresh</code></td><td>Read-only diagnostics と lifecycle helper です。callback を実行せず、history も変更せずに query matching metadata を公開または更新します。</td></tr>
+              <tr><td><code>Query::plan</code>、<code>RawQuery::plan</code>、prepared-query/cache の <code>plan</code>、<code>is_stale</code> / <code>refresh</code></td><td>Read-only diagnostics と lifecycle helper です。callback を実行せず、history も変更せずに query matching metadata を公開または更新します。cache iteration は wrapped query API と同じ row / column write rules に従います。</td></tr>
               <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded です。history が必要な command-buffer edit では <code>WorldHistory::run_system_phase</code> を使います。<code>SystemRunner::plan_phase</code> / <code>SystemRunner.planPhase</code> は実行せずに batch snapshot を返す read-only API です。</td></tr>
             </tbody>
           </table>
