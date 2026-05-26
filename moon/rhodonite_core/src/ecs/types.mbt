@@ -119,6 +119,20 @@ pub struct RawQuery {
 }
 
 ///|
+/// Caller-owned row query cache that reuses a prepared plan until the world's archetype layout changes.
+pub struct QueryCache {
+  priv query : Query
+  priv mut prepared : PreparedQuery?
+}
+
+///|
+/// Caller-owned raw query cache that reuses a prepared archetype plan until the layout changes.
+pub struct RawQueryCache {
+  priv query : RawQuery
+  priv mut prepared : RawPreparedQuery?
+}
+
+///|
 /// One matched archetype entry inside a read-only query plan snapshot.
 pub(all) struct QueryPlanArchetype {
   archetype_index : Int

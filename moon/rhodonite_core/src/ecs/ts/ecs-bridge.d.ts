@@ -37,6 +37,8 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
 	export type MoonRawQuery = object;
+	export type MoonQueryCache = object;
+	export type MoonRawQueryCache = object;
 	export type MoonQueryPlan = object;
 	export type MoonQueryPlanArchetype = object;
 	export type MoonPreparedQuery = object;
@@ -737,9 +739,24 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 
 	export function query_new(required: MoonComponentTypeId[]): MoonQuery;
 	export function raw_query_new(required: MoonComponentTypeId[]): MoonRawQuery;
+	export function query_cache_new(required: MoonComponentTypeId[]): MoonQueryCache;
+	export function raw_query_cache_new(
+		required: MoonComponentTypeId[],
+	): MoonRawQueryCache;
 	export function query_required_components(query: MoonQuery): MoonComponentTypeId[];
+	export function query_cache_required_components(
+		cache: MoonQueryCache,
+	): MoonComponentTypeId[];
+	export function raw_query_cache_required_components(
+		cache: MoonRawQueryCache,
+	): MoonComponentTypeId[];
 	export function query_for_each(
 		query: MoonQuery,
+		world: MoonWorld,
+		f: (row: MoonQueryRow) => void,
+	): void;
+	export function query_cache_for_each(
+		cache: MoonQueryCache,
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
@@ -748,15 +765,38 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		f: (row: MoonRawQueryRow) => void,
 	): void;
+	export function raw_query_cache_for_each(
+		cache: MoonRawQueryCache,
+		world: MoonWorld,
+		f: (row: MoonRawQueryRow) => void,
+	): void;
 	export function query_prepare(query: MoonQuery, world: MoonWorld): MoonPreparedQuery;
 	export function query_plan(query: MoonQuery, world: MoonWorld): MoonQueryPlan;
+	export function query_cache_plan(
+		cache: MoonQueryCache,
+		world: MoonWorld,
+	): MoonQueryPlan;
+	export function query_cache_refresh(cache: MoonQueryCache, world: MoonWorld): void;
 	export function raw_query_prepare(
 		query: MoonRawQuery,
 		world: MoonWorld,
 	): MoonRawPreparedQuery;
 	export function raw_query_plan(query: MoonRawQuery, world: MoonWorld): MoonQueryPlan;
+	export function raw_query_cache_plan(
+		cache: MoonRawQueryCache,
+		world: MoonWorld,
+	): MoonQueryPlan;
+	export function raw_query_cache_refresh(
+		cache: MoonRawQueryCache,
+		world: MoonWorld,
+	): void;
 	export function raw_query_for_each_archetype(
 		query: MoonRawQuery,
+		world: MoonWorld,
+		f: (archetype: MoonRawQueryArchetype) => void,
+	): void;
+	export function raw_query_cache_for_each_archetype(
+		cache: MoonRawQueryCache,
 		world: MoonWorld,
 		f: (archetype: MoonRawQueryArchetype) => void,
 	): void;

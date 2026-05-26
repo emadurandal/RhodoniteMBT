@@ -1084,3 +1084,68 @@ test "RawPreparedQuery refresh returns a fresh reusable archetype plan" {
   refreshed.for_each_archetype(world, chunk => rows = rows + chunk.length())
   assert_eq(rows, 1)
 }
+
+///|
+test "QueryCache reuses and refreshes row plans" {
+  let world = World::new()
+  let qa = world.register_cpu_component("QueryCacheA", 4)
+  let qb = world.register_cpu_component("QueryCacheB", 4)
+  let required : Array[ComponentTypeId] = [qa, qb]
+  let cache = QueryCache::new(required)
+  required[0] = qb
+  let components = cache.required_components()
+  assert_eq(components.length(), 2)
+  assert_eq(components[0].index, qa.index)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  let mut sum = 0
+  cache.for_each(world, row => {
+    row.read(qa, bytes => sum = sum + bytes[0].to_int())
+  })
+  assert_eq(sum, 1)
+  assert_false(cache.plan(world).stale)
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
+  assert_false(cache.plan(world).stale)
+  let qc = world.register_cpu_component("QueryCacheC", 4)
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e2, qa, bytes4(5, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qb, bytes4(6, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qc, bytes4(7, 0, 0, 0)))
+  assert_true(cache.plan(world).stale)
+  sum = 0
+  cache.for_each(world, row => {
+    row.read(qa, bytes => sum = sum + bytes[0].to_int())
+  })
+  assert_eq(sum, 9)
+  assert_false(cache.plan(world).stale)
+  assert_eq(cache.plan(world).matched_row_count, 3)
+}
+
+///|
+test "RawQueryCache refreshes archetype plans" {
+  let world = World::new()
+  let qa = world.register_cpu_component("RawQueryCacheA", 4)
+  let qb = world.register_cpu_component("RawQueryCacheB", 4)
+  let cache = RawQueryCache::new([qa, qb])
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  cache.refresh(world)
+  assert_false(cache.plan(world).stale)
+  let qc = world.register_cpu_component("RawQueryCacheC", 4)
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qc, bytes4(5, 0, 0, 0)))
+  assert_true(cache.plan(world).stale)
+  let mut rows = 0
+  cache.for_each_archetype(world, chunk => rows = rows + chunk.length())
+  assert_eq(rows, 2)
+  assert_false(cache.plan(world).stale)
+  let mut row_sum = 0
+  cache.for_each(world, row => row_sum = row_sum + row.read_view(qa)[0].to_int())
+  assert_eq(row_sum, 4)
+}

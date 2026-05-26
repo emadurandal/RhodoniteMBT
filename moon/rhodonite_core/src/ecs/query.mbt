@@ -38,6 +38,18 @@ pub fn RawQuery::new(required : Array[ComponentTypeId]) -> RawQuery {
 }
 
 ///|
+/// Builds a caller-owned row query cache for repeated iteration of the same required set.
+pub fn QueryCache::new(required : Array[ComponentTypeId]) -> QueryCache {
+  { query: Query::new(required), prepared: None }
+}
+
+///|
+/// Builds a caller-owned raw query cache for repeated byte-view iteration of the same required set.
+pub fn RawQueryCache::new(required : Array[ComponentTypeId]) -> RawQueryCache {
+  { query: RawQuery::new(required), prepared: None }
+}
+
+///|
 /// Returns a copy of the required component ids in callback payload order.
 pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
@@ -47,6 +59,22 @@ pub fn Query::required_components(self : Query) -> Array[ComponentTypeId] {
 /// Implements `RawQuery::required_components`.
 pub fn RawQuery::required_components(self : RawQuery) -> Array[ComponentTypeId] {
   copy_component_array(self.required)
+}
+
+///|
+/// Returns a copy of the cached row query's required component ids.
+pub fn QueryCache::required_components(
+  self : QueryCache,
+) -> Array[ComponentTypeId] {
+  self.query.required_components()
+}
+
+///|
+/// Returns a copy of the cached raw query's required component ids.
+pub fn RawQueryCache::required_components(
+  self : RawQueryCache,
+) -> Array[ComponentTypeId] {
+  self.query.required_components()
 }
 
 ///|
@@ -304,6 +332,86 @@ pub fn RawQuery::for_each_archetype(
   f : (RawQueryArchetype) -> Unit,
 ) -> Unit {
   self.prepare(world).for_each_archetype(world, f)
+}
+
+///|
+/// Returns a diagnostic plan for this cache without updating the cached prepared plan.
+pub fn QueryCache::plan(self : QueryCache, world : World) -> QueryPlan {
+  match self.prepared {
+    Some(prepared) => prepared.plan(world)
+    None => self.query.plan(world)
+  }
+}
+
+///|
+/// Returns a diagnostic plan for this raw cache without updating the cached prepared plan.
+pub fn RawQueryCache::plan(self : RawQueryCache, world : World) -> QueryPlan {
+  match self.prepared {
+    Some(prepared) => prepared.plan(world)
+    None => self.query.plan(world)
+  }
+}
+
+///|
+/// Ensures this row query cache holds a prepared plan for the current world layout.
+pub fn QueryCache::refresh(self : QueryCache, world : World) -> Unit {
+  let prepared = match self.prepared {
+    Some(existing) => existing.refresh(world)
+    None => self.query.prepare(world)
+  }
+  self.prepared = Some(prepared)
+}
+
+///|
+/// Ensures this raw query cache holds a prepared plan for the current world layout.
+pub fn RawQueryCache::refresh(self : RawQueryCache, world : World) -> Unit {
+  let prepared = match self.prepared {
+    Some(existing) => existing.refresh(world)
+    None => self.query.prepare(world)
+  }
+  self.prepared = Some(prepared)
+}
+
+///|
+/// Runs this cached row query, preparing or refreshing only when needed.
+pub fn QueryCache::for_each(
+  self : QueryCache,
+  world : World,
+  f : (QueryRow) -> Unit,
+) -> Unit {
+  self.refresh(world)
+  match self.prepared {
+    Some(prepared) => prepared.for_each(world, f)
+    None => ()
+  }
+}
+
+///|
+/// Runs this cached raw row query, preparing or refreshing only when needed.
+pub fn RawQueryCache::for_each(
+  self : RawQueryCache,
+  world : World,
+  f : (RawQueryRow) -> Unit,
+) -> Unit {
+  self.refresh(world)
+  match self.prepared {
+    Some(prepared) => prepared.for_each(world, f)
+    None => ()
+  }
+}
+
+///|
+/// Runs this cached raw query archetype-by-archetype, preparing or refreshing only when needed.
+pub fn RawQueryCache::for_each_archetype(
+  self : RawQueryCache,
+  world : World,
+  f : (RawQueryArchetype) -> Unit,
+) -> Unit {
+  self.refresh(world)
+  match self.prepared {
+    Some(prepared) => prepared.for_each_archetype(world, f)
+    None => ()
+  }
 }
 
 ///|

@@ -1678,11 +1678,43 @@ pub fn raw_query_new(required : Array[@ecs.ComponentTypeId]) -> @ecs.RawQuery {
 }
 
 ///|
+/// Implements `query_cache_new`.
+pub fn query_cache_new(
+  required : Array[@ecs.ComponentTypeId],
+) -> @ecs.QueryCache {
+  @ecs.QueryCache::new(required)
+}
+
+///|
+/// Implements `raw_query_cache_new`.
+pub fn raw_query_cache_new(
+  required : Array[@ecs.ComponentTypeId],
+) -> @ecs.RawQueryCache {
+  @ecs.RawQueryCache::new(required)
+}
+
+///|
 /// Implements `query_required_components`.
 pub fn query_required_components(
   query : @ecs.Query,
 ) -> Array[@ecs.ComponentTypeId] {
   query.required_components()
+}
+
+///|
+/// Implements `query_cache_required_components`.
+pub fn query_cache_required_components(
+  cache : @ecs.QueryCache,
+) -> Array[@ecs.ComponentTypeId] {
+  cache.required_components()
+}
+
+///|
+/// Implements `raw_query_cache_required_components`.
+pub fn raw_query_cache_required_components(
+  cache : @ecs.RawQueryCache,
+) -> Array[@ecs.ComponentTypeId] {
+  cache.required_components()
 }
 
 ///|
@@ -1696,6 +1728,16 @@ pub fn query_for_each(
 }
 
 ///|
+/// Implements `query_cache_for_each`.
+pub fn query_cache_for_each(
+  cache : @ecs.QueryCache,
+  world : @ecs.World,
+  f : (@ecs.QueryRow) -> Unit,
+) -> Unit {
+  cache.for_each(world, f)
+}
+
+///|
 /// Implements `raw_query_for_each`.
 pub fn raw_query_for_each(
   query : @ecs.RawQuery,
@@ -1703,6 +1745,16 @@ pub fn raw_query_for_each(
   f : (@ecs.RawQueryRow) -> Unit,
 ) -> Unit {
   query.for_each(world, f)
+}
+
+///|
+/// Implements `raw_query_cache_for_each`.
+pub fn raw_query_cache_for_each(
+  cache : @ecs.RawQueryCache,
+  world : @ecs.World,
+  f : (@ecs.RawQueryRow) -> Unit,
+) -> Unit {
+  cache.for_each(world, f)
 }
 
 ///|
@@ -1718,6 +1770,21 @@ pub fn query_prepare(
 /// Implements `query_plan`.
 pub fn query_plan(query : @ecs.Query, world : @ecs.World) -> @ecs.QueryPlan {
   query.plan(world)
+}
+
+///|
+/// Implements `query_cache_plan`.
+pub fn query_cache_plan(
+  cache : @ecs.QueryCache,
+  world : @ecs.World,
+) -> @ecs.QueryPlan {
+  cache.plan(world)
+}
+
+///|
+/// Implements `query_cache_refresh`.
+pub fn query_cache_refresh(cache : @ecs.QueryCache, world : @ecs.World) -> Unit {
+  cache.refresh(world)
 }
 
 ///|
@@ -1739,6 +1806,24 @@ pub fn raw_query_plan(
 }
 
 ///|
+/// Implements `raw_query_cache_plan`.
+pub fn raw_query_cache_plan(
+  cache : @ecs.RawQueryCache,
+  world : @ecs.World,
+) -> @ecs.QueryPlan {
+  cache.plan(world)
+}
+
+///|
+/// Implements `raw_query_cache_refresh`.
+pub fn raw_query_cache_refresh(
+  cache : @ecs.RawQueryCache,
+  world : @ecs.World,
+) -> Unit {
+  cache.refresh(world)
+}
+
+///|
 /// Implements `raw_query_for_each_archetype`.
 pub fn raw_query_for_each_archetype(
   query : @ecs.RawQuery,
@@ -1746,6 +1831,16 @@ pub fn raw_query_for_each_archetype(
   f : (@ecs.RawQueryArchetype) -> Unit,
 ) -> Unit {
   query.for_each_archetype(world, f)
+}
+
+///|
+/// Implements `raw_query_cache_for_each_archetype`.
+pub fn raw_query_cache_for_each_archetype(
+  cache : @ecs.RawQueryCache,
+  world : @ecs.World,
+  f : (@ecs.RawQueryArchetype) -> Unit,
+) -> Unit {
+  cache.for_each_archetype(world, f)
 }
 
 ///|
