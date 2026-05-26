@@ -75,7 +75,8 @@ pnpm run dev:js:ecs-mass-cubes
 ```
 
 The `ecs-scene-graph-undo-redo` browser demo uses `M`, `Space`, or `Enter` to
-apply a tracked move, `Z` to undo, and `Y` to redo.
+apply a tracked move, `Ctrl/Cmd+Z` to undo, and `Ctrl/Cmd+Shift+Z` or
+`Ctrl/Cmd+Y` to redo.
 
 The browser demos also include TypeScript-only WebGPU DemoState paths using the
 ECS TypeScript wrapper, multi-surface runtime, and TypeScript-only on-demand
@@ -133,7 +134,8 @@ pnpm run dev:native:ecs-mass-cubes
 ```
 
 The native Undo/Redo scene graph demo uses the same `M` / `Space` / `Enter`,
-`Z`, and `Y` controls as the MoonBit browser demo.
+`Ctrl/Cmd+Z`, and `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` controls as the MoonBit
+browser demo.
 
 The native demo scripts use `moon run --target native --release` from
 [`moon/rhodonite_examples`](moon/rhodonite_examples), so no manual `_build`

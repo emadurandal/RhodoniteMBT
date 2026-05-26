@@ -334,6 +334,7 @@ function installUndoRedoKeyboardShortcuts(state: UndoRedoDemoState): void {
 	window.addEventListener("keydown", (event) => {
 		const key = event.key.toLowerCase();
 		const command = event.ctrlKey || event.metaKey;
+		const moveKey = key === "m" || key === " " || key === "enter";
 		let handled = false;
 		if (command && key === "z" && !event.shiftKey) {
 			undoTrackedMove(state);
@@ -341,7 +342,7 @@ function installUndoRedoKeyboardShortcuts(state: UndoRedoDemoState): void {
 		} else if ((command && key === "z" && event.shiftKey) || (command && key === "y")) {
 			redoTrackedMove(state);
 			handled = true;
-		} else if (!command && key === "m") {
+		} else if (!command && moveKey) {
 			applyTrackedMove(state);
 			handled = true;
 		}

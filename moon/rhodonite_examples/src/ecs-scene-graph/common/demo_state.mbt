@@ -25,6 +25,15 @@ pub(all) struct UndoRedoDemoState {
 }
 
 ///|
+/// Internal action selected by one Undo/Redo sample keyboard shortcut.
+enum UndoRedoShortcut {
+  NoShortcut
+  ApplyMove
+  UndoShortcut
+  RedoShortcut
+} derive(Eq)
+
+///|
 /// Implements `quat_y`.
 fn quat_y(angle : Double) -> (Double, Double, Double, Double) {
   let half = angle * 0.5
@@ -321,23 +330,56 @@ pub fn UndoRedoDemoState::redo(self : UndoRedoDemoState) -> Bool {
 }
 
 ///|
+/// Reports whether a platform command modifier is active.
+fn command_modifier_pressed(modifiers : @input.Modifiers) -> Bool {
+  modifiers.ctrl() || modifiers.meta()
+}
+
+///|
+/// Classifies the first Undo/Redo sample shortcut in the current input frame.
+fn undo_redo_shortcut_from_input(input : @input.InputState) -> UndoRedoShortcut {
+  let events = input.events()
+  for i = 0; i < events.length(); i = i + 1 {
+    match events[i] {
+      KeyDown(key, modifiers, repeat) =>
+        if !repeat {
+          let command = command_modifier_pressed(modifiers)
+          if !command &&
+            (
+              key == @input.KeyCode::key_m() ||
+              key == @input.KeyCode::space() ||
+              key == @input.KeyCode::enter()
+            ) {
+            return ApplyMove
+          }
+          if command && key == @input.KeyCode::key_z() {
+            if modifiers.shift() {
+              return RedoShortcut
+            }
+            return UndoShortcut
+          }
+          if command && key == @input.KeyCode::key_y() {
+            return RedoShortcut
+          }
+        }
+      _ => ()
+    }
+  }
+  NoShortcut
+}
+
+///|
 /// Handles keyboard input for the interactive Undo/Redo sample.
 pub fn UndoRedoDemoState::update_from_input(
   self : UndoRedoDemoState,
   input : @input.InputState,
 ) -> Bool {
-  if input.key_pressed(@input.KeyCode::key_m()) ||
-    input.key_pressed(@input.KeyCode::space()) ||
-    input.key_pressed(@input.KeyCode::enter()) {
-    return self.apply_move()
+  match undo_redo_shortcut_from_input(input) {
+    ApplyMove => self.apply_move()
+    UndoShortcut => self.undo()
+    RedoShortcut => self.redo()
+    NoShortcut => false
   }
-  if input.key_pressed(@input.KeyCode::key_z()) {
-    return self.undo()
-  }
-  if input.key_pressed(@input.KeyCode::key_y()) {
-    return self.redo()
-  }
-  false
 }
 
 ///|
