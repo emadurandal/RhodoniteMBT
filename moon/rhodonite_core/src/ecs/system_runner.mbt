@@ -63,8 +63,8 @@ fn copy_scheduled_system_array(
 }
 
 ///|
-/// Builds the conflict-free batches used by phase execution and planning.
-fn SystemRunner::build_phase_batches(
+/// Rebuilds the conflict-free batches used by phase execution and planning.
+fn SystemRunner::rebuild_phase_batches(
   self : SystemRunner,
   phase : PhaseKey,
 ) -> Array[SystemBatch] {
@@ -83,6 +83,27 @@ fn SystemRunner::build_phase_batches(
   if batch.length() > 0 {
     batches.push({ systems: copy_scheduled_system_array(batch) })
   }
+  batches
+}
+
+///|
+/// Returns cached conflict-free batches for a phase, rebuilding when the runner changed.
+fn SystemRunner::phase_batches(
+  self : SystemRunner,
+  phase : PhaseKey,
+) -> Array[SystemBatch] {
+  for i = 0; i < self.phase_batch_cache.length(); i = i + 1 {
+    let cached = self.phase_batch_cache[i]
+    if cached.phase == phase && cached.generation == self.plan_generation {
+      return cached.batches
+    }
+  }
+  let batches = self.rebuild_phase_batches(phase)
+  self.phase_batch_cache.push({
+    phase,
+    generation: self.plan_generation,
+    batches,
+  })
   batches
 }
 
@@ -334,7 +355,8 @@ pub fn System::conflicts_with(self : System, other : System) -> Bool {
 /// Implements `SystemRunner::new`.
 pub fn SystemRunner::new() -> SystemRunner {
   let systems : Array[System] = []
-  { systems, }
+  let phase_batch_cache : Array[SystemPhaseBatchCache] = []
+  { systems, plan_generation: 0, phase_batch_cache }
 }
 
 ///|
@@ -347,6 +369,8 @@ pub fn SystemRunner::len(self : SystemRunner) -> Int {
 /// Implements `SystemRunner::add_system`.
 pub fn SystemRunner::add_system(self : SystemRunner, system : System) -> Unit {
   self.systems.push(system)
+  self.plan_generation = self.plan_generation + 1
+  self.phase_batch_cache = []
 }
 
 ///|
@@ -357,7 +381,7 @@ pub fn SystemRunner::plan_phase(
   self : SystemRunner,
   phase : PhaseKey,
 ) -> SystemPhasePlan {
-  let batches = self.build_phase_batches(phase)
+  let batches = self.phase_batches(phase)
   let plan_batches : Array[SystemPlanBatch] = []
   let mut system_count = 0
   for i = 0; i < batches.length(); i = i + 1 {
@@ -414,7 +438,7 @@ pub fn SystemRunner::run_phase(
   world.assert_not_history_raw_mutation("SystemRunner::run_phase")
   world.lock_component_registration()
   let mut ok = true
-  let batches = self.build_phase_batches(phase)
+  let batches = self.phase_batches(phase)
   for i = 0; i < batches.length(); i = i + 1 {
     if !run_system_batch(batches[i], world, ctx) {
       ok = false
@@ -435,7 +459,7 @@ fn SystemRunner::run_phase_tracked(
 ) -> Bool {
   world.lock_component_registration()
   let mut ok = true
-  let batches = self.build_phase_batches(phase)
+  let batches = self.phase_batches(phase)
   for i = 0; i < batches.length(); i = i + 1 {
     if !run_system_batch_tracked(batches[i], world, ctx, history) {
       ok = false

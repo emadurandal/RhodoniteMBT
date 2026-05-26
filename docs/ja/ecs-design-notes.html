@@ -45,6 +45,7 @@
             <li>entity/archetype 構造を変える API は <code>structural_write</code> を要求します。</li>
             <li><code>CommandBuffer</code> は queue 時点で component write と structural write を検証します。</li>
             <li>component 登録は system runner 実行中に lock されます。</li>
+            <li><code>SystemRunner</code> は phase batches を内部 cache し、system 追加時に invalidation します。公開 plan result は snapshot のままです。</li>
           </ul>
 
           <h2>Builtin Packed Blobs</h2>

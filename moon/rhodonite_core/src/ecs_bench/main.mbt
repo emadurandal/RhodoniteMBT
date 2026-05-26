@@ -1449,6 +1449,71 @@ fn bench_history_command_tracked_phase(count : Int) -> BenchSample {
 }
 
 ///|
+/// Builds a runner with many conflict-free no-op systems for scheduler cache benchmarks.
+fn make_cached_noop_runner(
+  phase : @ecs.PhaseKey,
+  system_count : Int,
+) -> @ecs.SystemRunner {
+  let runner = @ecs.SystemRunner::new()
+  for i = 0; i < system_count; i = i + 1 {
+    runner.add_system(
+      @ecs.System::new(
+        "system-runner-cached-noop-" + i.to_string(),
+        phase,
+        [],
+        [],
+        (_world, _ctx, _commands) => (),
+      ),
+    )
+  }
+  runner
+}
+
+///|
+/// Implements `bench_system_runner_phase_plan_cached_many_systems`.
+fn bench_system_runner_phase_plan_cached_many_systems(
+  count : Int,
+) -> BenchSample {
+  let phase = @ecs.PhaseKey::new("system-runner-cached-plan-target")
+  let runner = make_cached_noop_runner(phase, 32)
+  let warm = runner.plan_phase(phase)
+  let started = monotonic_ms()
+  let mut checksum = warm.system_count + warm.batches.length()
+  for _i = 0; _i < count; _i = _i + 1 {
+    let plan = runner.plan_phase(phase)
+    checksum = checksum + plan.system_count + plan.batches.length()
+  }
+  report(
+    "system_runner_phase_plan_cached_many_systems", count, started, checksum,
+  )
+}
+
+///|
+/// Implements `bench_system_runner_phase_run_cached_many_systems`.
+fn bench_system_runner_phase_run_cached_many_systems(
+  count : Int,
+) -> BenchSample {
+  let world = @ecs.World::new()
+  let phase = @ecs.PhaseKey::new("system-runner-cached-run-target")
+  let runner = make_cached_noop_runner(phase, 32)
+  let warm = runner.plan_phase(phase)
+  let started = monotonic_ms()
+  let mut checksum = warm.system_count + warm.batches.length()
+  for i = 0; i < count; i = i + 1 {
+    if runner.run_phase(
+        world,
+        @ecs.SystemContext::new((0.016 : Float), i),
+        phase,
+      ) {
+      checksum = checksum + 1
+    }
+  }
+  report(
+    "system_runner_phase_run_cached_many_systems", count, started, checksum,
+  )
+}
+
+///|
 /// Implements `bench_system_runner_phase_empty`.
 fn bench_system_runner_phase_empty(count : Int) -> BenchSample {
   let world = @ecs.World::new()
@@ -1630,6 +1695,12 @@ fn run_suite(count : Int) -> Unit {
   )
   run_case("make_world_batch", count, bench_make_world_batch)
   run_case("system_runner_phase_empty", count, bench_system_runner_phase_empty)
+  run_case(
+    "system_runner_phase_plan_cached_many_systems", count, bench_system_runner_phase_plan_cached_many_systems,
+  )
+  run_case(
+    "system_runner_phase_run_cached_many_systems", count, bench_system_runner_phase_run_cached_many_systems,
+  )
   run_case(
     "system_runner_phase_command_buffer", count, bench_system_runner_phase_command_buffer,
   )
