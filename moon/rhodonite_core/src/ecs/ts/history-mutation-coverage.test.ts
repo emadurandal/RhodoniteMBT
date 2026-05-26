@@ -210,6 +210,8 @@ const auditedSurfaces: readonly SurfaceAudit[] = [
 			"importRedoStack",
 			"beginTransaction",
 			"beginGuardedTransaction",
+			"withTransaction",
+			"withGuardedTransaction",
 			"commitTransaction",
 			"cancelTransaction",
 			"cancelTransactionReverting",
@@ -379,6 +381,8 @@ const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 			"set_max_undo_records",
 			"set_raw_mutation_guard_enabled",
 			"undo",
+			"with_guarded_transaction",
+			"with_transaction",
 		],
 	}),
 	moonBitSurfaceAudit("QueryRow", {

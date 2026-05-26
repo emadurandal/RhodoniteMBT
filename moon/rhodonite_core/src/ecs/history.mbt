@@ -3556,6 +3556,46 @@ pub fn WorldHistory::cancel_transaction_reverting(
 }
 
 ///|
+/// Runs `body` inside a helper-owned transaction, reverting applied deltas on `false`.
+pub fn WorldHistory::with_transaction(
+  self : WorldHistory,
+  world : World,
+  label : String,
+  body : () -> Bool,
+) -> Bool {
+  if !self.begin_transaction(label) {
+    return false
+  }
+  let ok = body()
+  if ok {
+    self.commit_transaction()
+  } else {
+    ignore(self.cancel_transaction_reverting(world))
+    false
+  }
+}
+
+///|
+/// Runs `body` inside a helper-owned guarded transaction.
+pub fn WorldHistory::with_guarded_transaction(
+  self : WorldHistory,
+  world : World,
+  label : String,
+  body : () -> Bool,
+) -> Bool {
+  if !self.begin_guarded_transaction(world, label) {
+    return false
+  }
+  let ok = body()
+  if ok {
+    self.commit_transaction()
+  } else {
+    ignore(self.cancel_transaction_reverting(world))
+    false
+  }
+}
+
+///|
 /// Implements `WorldHistory::can_undo`.
 pub fn WorldHistory::can_undo(self : WorldHistory) -> Bool {
   self.enabled && !self.open && self.undo_stack.length() > 0

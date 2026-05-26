@@ -1095,6 +1095,136 @@ describe("ECS TypeScript wrapper: history", () => {
 	});
 
 
+	it("scopes WorldHistory transactions to callbacks", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryScopedTransaction", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+
+		expect(
+			history.withTransaction(world, "scoped move", () =>
+				history.setComponentBytes(
+					world,
+					entity,
+					cpu,
+					new Uint8Array([2, 0, 0, 0]),
+				),
+			),
+		).toBe(true);
+		expect(history.undoLen()).toBe(1);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([2, 0, 0, 0]),
+		);
+		expect(history.undo(world)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+
+		const cancelHistory = WorldHistory.new();
+		expect(
+			cancelHistory.withTransaction(world, "scoped cancel", () => {
+				expect(
+					cancelHistory.setComponentBytes(
+						world,
+						entity,
+						cpu,
+						new Uint8Array([3, 0, 0, 0]),
+					),
+				).toBe(true);
+				return false;
+			}),
+		).toBe(false);
+		expect(cancelHistory.undoLen()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+
+		const throwHistory = WorldHistory.new();
+		expect(() =>
+			throwHistory.withTransaction(world, "scoped throw", () => {
+				expect(
+					throwHistory.setComponentBytes(
+						world,
+						entity,
+						cpu,
+						new Uint8Array([4, 0, 0, 0]),
+					),
+				).toBe(true);
+				throw new Error("scoped failure");
+			}),
+		).toThrow("scoped failure");
+		expect(throwHistory.undoLen()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+	});
+
+
+	it("handles guarded and inactive callback-scoped transactions", () => {
+		const world = World.new();
+		const history = WorldHistory.new();
+		const cpu = world.registerCpuComponent("TsHistoryScopedGuard", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+		history.setRawMutationGuardEnabled(true);
+
+		expect(() =>
+			history.withTransaction(
+				world,
+				"guarded scoped raw",
+				() => {
+					world.setComponentBytes(entity, cpu, new Uint8Array([2, 0, 0, 0]));
+					return true;
+				},
+				{ guarded: true },
+			),
+		).toThrow();
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(
+			new Uint8Array([1, 0, 0, 0]),
+		);
+		expect(
+			world.setComponentBytes(entity, cpu, new Uint8Array([3, 0, 0, 0])),
+		).toBe(true);
+
+		expect(
+			history.withGuardedTransaction(world, "guarded scoped tracked", () =>
+				history.setComponentBytes(
+					world,
+					entity,
+					cpu,
+					new Uint8Array([4, 0, 0, 0]),
+				),
+			),
+		).toBe(true);
+		expect(history.undoLen()).toBe(1);
+
+		let called = false;
+		expect(history.beginTransaction("outer")).toBe(true);
+		expect(
+			history.withTransaction(world, "nested", () => {
+				called = true;
+				return true;
+			}),
+		).toBe(false);
+		expect(called).toBe(false);
+		expect(history.lastDiagnostic()).toBe("transaction_open");
+		expect(history.cancelTransactionReverting(world)).toBe(true);
+
+		const disabled = WorldHistory.new();
+		disabled.setEnabled(false);
+		called = false;
+		expect(
+			disabled.withTransaction(world, "disabled", () => {
+				called = true;
+				return true;
+			}),
+		).toBe(false);
+		expect(called).toBe(false);
+		expect(disabled.lastDiagnostic()).toBe("recording_disabled");
+	});
+
+
 	it("guards raw World mutations during guarded WorldHistory transactions", () => {
 		const world = World.new();
 		const history = WorldHistory.new();

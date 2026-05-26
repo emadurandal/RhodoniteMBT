@@ -759,6 +759,89 @@ test "WorldHistory records diagnostics for common failure paths" {
 }
 
 ///|
+test "WorldHistory callback-scoped transaction commits and reverts" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let component = world.register_cpu_component("HistoryScopedTransaction", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
+  assert_true(
+    history.with_transaction(world, "Scoped Move", () => {
+      history.set_component_bytes(world, entity, component, bytes4(2, 0, 0, 0))
+    }),
+  )
+  assert_eq(history.undo_len(), 1)
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(2, 0, 0, 0)),
+  )
+  assert_true(history.undo(world))
+  assert_true(
+    world.component_bytes(entity, component) == Some(bytes4(1, 0, 0, 0)),
+  )
+
+  let cancel_world = World::new()
+  let cancel_history = WorldHistory::new()
+  let cancel_component = cancel_world.register_cpu_component(
+    "HistoryScopedCancel", 4,
+  )
+  let cancel_entity = cancel_world.create_entity()
+  assert_true(
+    cancel_world.add_component_bytes(
+      cancel_entity,
+      cancel_component,
+      bytes4(1, 0, 0, 0),
+    ),
+  )
+  assert_true(
+    !cancel_history.with_transaction(cancel_world, "Scoped Cancel", () => {
+      ignore(
+        cancel_history.set_component_bytes(
+          cancel_world,
+          cancel_entity,
+          cancel_component,
+          bytes4(3, 0, 0, 0),
+        ),
+      )
+      false
+    }),
+  )
+  assert_eq(cancel_history.undo_len(), 0)
+  assert_true(
+    cancel_world.component_bytes(cancel_entity, cancel_component) ==
+    Some(bytes4(1, 0, 0, 0)),
+  )
+}
+
+///|
+test "WorldHistory callback-scoped transaction rejects inactive starts" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let mut called = false
+  assert_true(history.begin_transaction("outer"))
+  assert_true(
+    !history.with_transaction(world, "nested", () => {
+      called = true
+      true
+    }),
+  )
+  assert_true(!called)
+  assert_eq(history.last_diagnostic(), "transaction_open")
+  assert_true(history.cancel_transaction())
+
+  let disabled = WorldHistory::new()
+  disabled.set_enabled(false)
+  called = false
+  assert_true(
+    !disabled.with_transaction(world, "disabled", () => {
+      called = true
+      true
+    }),
+  )
+  assert_true(!called)
+  assert_eq(disabled.last_diagnostic(), "recording_disabled")
+}
+
+///|
 test "WorldHistory records diagnostics for disabled recording delegates" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -2442,6 +2525,22 @@ test "panic WorldHistory guarded transaction rejects raw World mutation" {
   history.set_raw_mutation_guard_enabled(true)
   assert_true(history.begin_guarded_transaction(world, "guarded raw world"))
   ignore(world.set_component_bytes(entity, cpu, bytes4(2, 0, 0, 0)))
+}
+
+///|
+test "panic WorldHistory callback-scoped guarded transaction rejects raw World mutation" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_cpu_component("HistoryScopedGuardRejectWorld", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  ignore(
+    history.with_guarded_transaction(world, "guarded scoped raw world", () => {
+      ignore(world.set_component_bytes(entity, cpu, bytes4(2, 0, 0, 0)))
+      true
+    }),
+  )
 }
 
 ///|

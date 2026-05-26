@@ -433,6 +433,8 @@ pub fn WorldHistory::undo_serialization_report(Self, World) -> WorldHistorySeria
 pub fn WorldHistory::undo_summary(Self) -> Array[WorldHistoryRecordSummary]
 pub fn WorldHistory::validate_import_redo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
 pub fn WorldHistory::validate_import_undo_stack(Self, World, WorldHistoryExport) -> WorldHistoryImportValidationReport
+pub fn WorldHistory::with_guarded_transaction(Self, World, String, () -> Bool) -> Bool
+pub fn WorldHistory::with_transaction(Self, World, String, () -> Bool) -> Bool
 
 pub(all) struct WorldHistoryDeltaSummary {
   kind : String

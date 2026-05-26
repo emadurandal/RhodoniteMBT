@@ -179,6 +179,10 @@ import type {
 	HistorySerializationReport,
 } from "./world-history-types.ts";
 
+export type WorldHistoryTransactionOptions = {
+	readonly guarded?: boolean;
+};
+
 function historyExportBytes(bytes: Uint8Array | number[]): Uint8Array {
 	return bytes instanceof Uint8Array ? new Uint8Array(bytes) : Uint8Array.from(bytes);
 }
@@ -735,6 +739,39 @@ export class WorldHistory {
 		return moonBool(
 			world_history_cancel_transaction_reverting(this.inner, world.inner),
 		);
+	}
+
+	withTransaction(
+		world: World,
+		label: string,
+		callback: () => boolean,
+		options: WorldHistoryTransactionOptions = {},
+	): boolean {
+		const opened =
+			options.guarded === true
+				? this.beginGuardedTransaction(world, label)
+				: this.beginTransaction(label);
+		if (!opened) {
+			return false;
+		}
+		try {
+			if (callback()) {
+				return this.commitTransaction();
+			}
+			this.cancelTransactionReverting(world);
+			return false;
+		} catch (error) {
+			this.cancelTransactionReverting(world);
+			throw error;
+		}
+	}
+
+	withGuardedTransaction(
+		world: World,
+		label: string,
+		callback: () => boolean,
+	): boolean {
+		return this.withTransaction(world, label, callback, { guarded: true });
 	}
 
 	canUndo(): boolean {

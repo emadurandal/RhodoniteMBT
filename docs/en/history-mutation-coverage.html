@@ -43,6 +43,7 @@
               <tr><td>Tracked command phase</td><td>The system queues commands and <code>WorldHistory::run_system_phase</code> applies them through tracked APIs.</td><td>Queued commands become one undoable record under the phase label.</td></tr>
               <tr><td>Raw guarded</td><td>The API intentionally bypasses history, but guarded transactions abort it.</td><td>A guarded transaction has a panic/throw coverage test.</td></tr>
               <tr><td>Intentionally untracked</td><td>The API updates derived runtime data, registration metadata, or readback plumbing.</td><td>Docs explain why it is outside history scope.</td></tr>
+              <tr><td>History-control</td><td>The API changes history state or scopes tracked operations without directly mutating component data.</td><td>Control-flow tests cover commit, cancel, disabled, and nested cases.</td></tr>
             </tbody>
           </table>
 
@@ -69,6 +70,7 @@
               <tr><td><code>RawQueryArchetype::write_column_tracked</code></td><td>Tracked callback API for full-column edits. It snapshots the column and records changed rows.</td></tr>
               <tr><td><code>RawQueryArchetype::write_column_rows_tracked</code></td><td>Tracked callback API for sparse column edits when the caller already knows the candidate rows. It snapshots and records only those row views.</td></tr>
               <tr><td><code>CommandBuffer</code> through <code>WorldHistory::run_system_phase</code></td><td>Tracked command path for editor systems. Supported queued commands dispatch through the corresponding history methods; if a later command fails, successful commands remain undoable.</td></tr>
+              <tr><td><code>WorldHistory::with_transaction</code>, <code>with_guarded_transaction</code></td><td>History-control callback helpers for helper-owned editor actions. They commit only on <code>true</code> and otherwise revert applied tracked deltas.</td></tr>
               <tr><td>Raw <code>QueryRow::write</code>, <code>RawQueryRow::write_view</code>, <code>RawQueryArchetype::write_column</code></td><td>Raw guarded. These are untracked and abort inside guarded history transactions.</td></tr>
               <tr><td>Raw <code>SystemRunner::run_phase</code></td><td>Raw guarded. Use <code>WorldHistory::run_system_phase</code> for command-buffer edits that need history.</td></tr>
             </tbody>
