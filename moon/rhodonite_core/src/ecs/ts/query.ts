@@ -16,7 +16,9 @@ import type {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	prepared_query_for_each,
+	prepared_query_is_stale,
 	prepared_query_plan,
+	prepared_query_refresh,
 	query_for_each,
 	query_new,
 	query_plan,
@@ -38,7 +40,9 @@ import {
 	query_row_write_tracked,
 	raw_prepared_query_for_each,
 	raw_prepared_query_for_each_archetype,
+	raw_prepared_query_is_stale,
 	raw_prepared_query_plan,
+	raw_prepared_query_refresh,
 	raw_query_archetype_component_stride,
 	raw_query_archetype_entity,
 	raw_query_archetype_has,
@@ -106,6 +110,14 @@ export class PreparedQuery {
 
 	plan(world: { readonly inner: MoonWorld }): QueryPlan {
 		return new QueryPlan(prepared_query_plan(this.inner, world.inner));
+	}
+
+	isStale(world: { readonly inner: MoonWorld }): boolean {
+		return moonBool(prepared_query_is_stale(this.inner, world.inner));
+	}
+
+	refresh(world: { readonly inner: MoonWorld }): PreparedQuery {
+		return new PreparedQuery(prepared_query_refresh(this.inner, world.inner));
 	}
 }
 
@@ -213,6 +225,14 @@ export class RawPreparedQuery {
 
 	plan(world: { readonly inner: MoonWorld }): QueryPlan {
 		return new QueryPlan(raw_prepared_query_plan(this.inner, world.inner));
+	}
+
+	isStale(world: { readonly inner: MoonWorld }): boolean {
+		return moonBool(raw_prepared_query_is_stale(this.inner, world.inner));
+	}
+
+	refresh(world: { readonly inner: MoonWorld }): RawPreparedQuery {
+		return new RawPreparedQuery(raw_prepared_query_refresh(this.inner, world.inner));
 	}
 
 	forEachArchetype(

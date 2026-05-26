@@ -1033,3 +1033,54 @@ test "PreparedQuery plan reports current and stale row diagnostics" {
   assert_eq(stale_plan.matched_archetype_count, 2)
   assert_eq(stale_plan.matched_row_count, 2)
 }
+
+///|
+test "PreparedQuery refresh returns a fresh reusable row plan" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryRefreshA", 4)
+  let qb = world.register_cpu_component("PreparedQueryRefreshB", 4)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  let prepared = Query::new([qa, qb]).prepare(world)
+  assert_false(prepared.is_stale(world))
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
+  assert_false(prepared.is_stale(world))
+  let qc = world.register_cpu_component("PreparedQueryRefreshC", 4)
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e2, qa, bytes4(5, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qb, bytes4(6, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, qc, bytes4(7, 0, 0, 0)))
+  assert_true(prepared.is_stale(world))
+  assert_true(prepared.plan(world).stale)
+  let refreshed = prepared.refresh(world)
+  assert_false(refreshed.is_stale(world))
+  assert_false(refreshed.plan(world).stale)
+  assert_eq(refreshed.plan(world).matched_row_count, 3)
+  let mut sum = 0
+  refreshed.for_each(world, row => {
+    row.read(qa, bytes => sum = sum + bytes[0].to_int())
+  })
+  assert_eq(sum, 9)
+}
+
+///|
+test "RawPreparedQuery refresh returns a fresh reusable archetype plan" {
+  let world = World::new()
+  let qa = world.register_cpu_component("RawPreparedQueryRefreshA", 4)
+  let qb = world.register_cpu_component("RawPreparedQueryRefreshB", 4)
+  let prepared = RawQuery::new([qa, qb]).prepare(world)
+  assert_false(prepared.is_stale(world))
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  assert_true(prepared.is_stale(world))
+  let refreshed = prepared.refresh(world)
+  assert_false(refreshed.is_stale(world))
+  assert_eq(refreshed.plan(world).matched_row_count, 1)
+  let mut rows = 0
+  refreshed.for_each_archetype(world, chunk => rows = rows + chunk.length())
+  assert_eq(rows, 1)
+}

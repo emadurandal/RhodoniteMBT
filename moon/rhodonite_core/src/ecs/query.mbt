@@ -379,6 +379,31 @@ pub fn PreparedQuery::plan(self : PreparedQuery, world : World) -> QueryPlan {
 }
 
 ///|
+/// Returns true when this prepared query was built for an older archetype layout.
+pub fn PreparedQuery::is_stale(self : PreparedQuery, world : World) -> Bool {
+  self.archetype_version != world.archetype_version
+}
+
+///|
+/// Returns a current prepared query for `world`, rebuilding only when the cached plan is stale.
+pub fn PreparedQuery::refresh(
+  self : PreparedQuery,
+  world : World,
+) -> PreparedQuery {
+  world.assert_system_components_read(self.required, "PreparedQuery::refresh")
+  assert_query_components_registered(
+    self.required,
+    world,
+    "PreparedQuery::refresh",
+  )
+  if self.is_stale(world) {
+    Query::new(self.required).prepare(world)
+  } else {
+    self
+  }
+}
+
+///|
 /// Runs a prepared raw query with row callbacks. If structural changes made the plan stale,
 /// it rebuilds once before iteration.
 pub fn RawPreparedQuery::for_each(
@@ -440,6 +465,37 @@ pub fn RawPreparedQuery::plan(
       self.archetypes,
       false,
     )
+  }
+}
+
+///|
+/// Returns true when this prepared raw query was built for an older archetype layout.
+pub fn RawPreparedQuery::is_stale(
+  self : RawPreparedQuery,
+  world : World,
+) -> Bool {
+  self.archetype_version != world.archetype_version
+}
+
+///|
+/// Returns a current prepared raw query for `world`, rebuilding only when the cached plan is stale.
+pub fn RawPreparedQuery::refresh(
+  self : RawPreparedQuery,
+  world : World,
+) -> RawPreparedQuery {
+  world.assert_system_components_read(
+    self.required,
+    "RawPreparedQuery::refresh",
+  )
+  assert_query_components_registered(
+    self.required,
+    world,
+    "RawPreparedQuery::refresh",
+  )
+  if self.is_stale(world) {
+    RawQuery::new(self.required).prepare(world)
+  } else {
+    self
   }
 }
 

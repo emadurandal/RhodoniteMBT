@@ -769,6 +769,14 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonRawPreparedQuery,
 		world: MoonWorld,
 	): MoonQueryPlan;
+	export function raw_prepared_query_is_stale(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+	): MoonBool;
+	export function raw_prepared_query_refresh(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+	): MoonRawPreparedQuery;
 	export function prepared_query_for_each(
 		query: MoonPreparedQuery,
 		world: MoonWorld,
@@ -778,6 +786,14 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonPreparedQuery,
 		world: MoonWorld,
 	): MoonQueryPlan;
+	export function prepared_query_is_stale(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+	): MoonBool;
+	export function prepared_query_refresh(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+	): MoonPreparedQuery;
 	export function raw_prepared_query_for_each(
 		query: MoonRawPreparedQuery,
 		world: MoonWorld,

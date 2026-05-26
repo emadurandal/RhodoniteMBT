@@ -325,4 +325,61 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(rawPrepared.plan(world).stale()).toBe(false);
 	});
 
+	it("refreshes stale prepared query plans", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("RefreshPlanTsA", 16);
+		const cpuB = world.registerCpuComponent("RefreshPlanTsB", 16);
+		const prepared = Query.new([cpuA, cpuB]).prepare(world);
+		expect(prepared.isStale(world)).toBe(false);
+
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(entity, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(prepared.isStale(world)).toBe(true);
+		expect(prepared.plan(world).stale()).toBe(true);
+
+		const refreshed = prepared.refresh(world);
+		expect(refreshed.isStale(world)).toBe(false);
+		expect(refreshed.plan(world).stale()).toBe(false);
+		expect(refreshed.plan(world).matchedRowCount()).toBe(1);
+
+		let sum = 0;
+		refreshed.forEach(world, (row) => {
+			row.read(cpuA, (bytes) => {
+				sum += bytes.getF32(0);
+			});
+		});
+		expect(sum).toBeCloseTo(1);
+	});
+
+	it("refreshes stale raw prepared query plans", () => {
+		const world = World.new();
+		const cpuA = world.registerCpuComponent("RawRefreshPlanTsA", 16);
+		const cpuB = world.registerCpuComponent("RawRefreshPlanTsB", 16);
+		const prepared = RawQuery.new([cpuA, cpuB]).prepare(world);
+		expect(prepared.isStale(world)).toBe(false);
+
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(world.addComponentBytes(entity, cpuB, f32Bytes([4, 0, 0, 0], 16))).toBe(
+			true,
+		);
+		expect(prepared.isStale(world)).toBe(true);
+
+		const refreshed = prepared.refresh(world);
+		expect(refreshed.isStale(world)).toBe(false);
+		expect(refreshed.plan(world).matchedRowCount()).toBe(1);
+		let rows = 0;
+		refreshed.forEachArchetype(world, (archetype) => {
+			rows += archetype.length();
+		});
+		expect(rows).toBe(1);
+	});
+
 });
