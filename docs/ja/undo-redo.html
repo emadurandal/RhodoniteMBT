@@ -95,9 +95,11 @@ ignore(history.commit_transaction())</code></pre>
               <tr><td>Tracked mutation</td><td><code>set_component_bytes</code>、<code>add_component_bytes_many</code>、<code>set_global_transform</code>、<code>set_camera_matrices</code></td><td><code>setComponentBytes</code>、<code>addComponentBytesMany</code>、<code>setGlobalTransform</code>、<code>setCameraMatrices</code></td></tr>
               <tr><td>Tracked query callback</td><td><code>QueryRow::write_tracked</code>、typed <code>QueryRow::*_tracked</code>、<code>RawQueryRow::write_tracked</code>、<code>RawQueryArchetype::write_column_tracked</code>、<code>RawQueryArchetype::write_column_rows_tracked</code></td><td><code>row.writeTracked</code>、<code>rawRow.writeTracked</code>、<code>archetype.writeColumnTracked</code>、<code>archetype.writeColumnRowsTracked</code></td></tr>
               <tr><td>Tracked system phase</td><td><code>run_system_phase</code></td><td><code>runSystemPhase</code></td></tr>
+              <tr><td>Editor UI state</td><td><code>undo_label</code>、<code>redo_label</code>、summary、byte count、diagnostic を直接組み合わせます</td><td><code>historyEditorState</code></td></tr>
               <tr><td>Serialization</td><td><code>undo_serialization_report</code>、<code>export_undo_stack</code>、<code>import_undo_stack</code>、<code>validate_import_undo_stack</code></td><td><code>undoSerializationReport</code>、<code>exportUndoStack</code>、<code>importUndoStack</code>、<code>validateImportUndoStack</code></td></tr>
             </tbody>
           </table>
+          <p><code>historyEditorState(history)</code> は TypeScript editor chrome 用の convenience helper です。基礎となる history state は変更せず、<code>WorldHistory</code> から undo/redo の enabled state、表示 text、件数、保持 byte 数、次の record summary、UI 向け warning を導出します。</p>
 
           <h2>Mutation API Coverage</h2>
           <p>mutation surface の責務は <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a> で管理します。新しい mutating API を追加する場合は、その監査表と対象 coverage test を更新し、API を tracked、raw guarded、intentionally untracked のどれとして扱うか明示します。</p>
@@ -132,6 +134,7 @@ ignore(history.commit_transaction())</code></pre>
             </tbody>
           </table>
           <p><code>undo_summary</code> と <code>redo_summary</code> は editor UI や debug panel 用の payload-free record summary を返します。archive record ではありません。TypeScript wrapper では <code>undoSummary()</code> と <code>redoSummary()</code> として公開します。summary は次に実行される操作を先頭に並べ、label、delta kind、対象 entity/component id、component count、before/after presence flag、payload byte count を返しますが、保持している payload bytes 自体は公開しません。builtin change は <code>global_transform_changed</code> と <code>camera_changed</code> として現れます。<code>payloadBytes</code> は memory estimate 用の diagnostic metadata であり、payload 本体ではありません。</p>
+          <p>TypeScript editor UI では <code>historyEditorState(history)</code> が <code>canUndo()</code>、<code>canRedo()</code>、label、summary、byte count、<code>lastDiagnostic()</code> を read-only view にまとめます。生の diagnostic code は保持しつつ、stale record、byte-limit drop、trimming、recording disabled、import failure など user-visible な結果だけを <code>warningKind</code> / <code>warningText</code> に写します。空の undo stack のような flow-only state は warning ではなく disabled command として扱います。</p>
 
           <h2>Labels</h2>
           <p>transaction label は UI metadata です。<code>undo_label</code> と <code>redo_label</code> は次に実行可能な undo / redo record の label を返すため、editor UI は <code>Undo Move Entity</code> のような command 表示を作れます。label は world state、transaction ordering、delta application には影響しません。</p>
