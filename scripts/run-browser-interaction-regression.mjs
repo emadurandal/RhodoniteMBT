@@ -132,11 +132,15 @@ try {
 	).catch((error) => {
 		if (error instanceof Error && error.message.includes("timed out")) {
 			return {
-				ok: true,
-				skipped: true,
-				reason: error.message,
+				ok: false,
+				skipped: false,
 				results: [],
-				failures: [],
+				failures: [
+					{
+						name: "browser interaction regression",
+						message: error.message,
+					},
+				],
 			};
 		}
 		throw error;
