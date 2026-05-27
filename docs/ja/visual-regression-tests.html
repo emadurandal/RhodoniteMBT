@@ -51,7 +51,7 @@ pnpm run test:examples:visual:update:native
 pnpm run test:examples:visual:update:browser
 pnpm run test:examples:interaction:browser
 
-pnpm run test:examples:visual -- --verbose</code></pre>
+RHODONITE_BROWSER_VERBOSE=1 pnpm run test:examples:visual:browser</code></pre>
 
           <h2>Manifest And Golden Files</h2>
           <p>test matrix は <a href="../../moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"><code>visual_samples.tsv</code></a> にあります。各 row は target、id、display name、PNG filename、<code>max_mismatch_rate</code>、<code>perceptual_threshold</code> を持ちます。</p>
@@ -70,10 +70,10 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <ul>
             <li>native visual package は <code>supported_targets = "native"</code>、browser visual package は <code>supported_targets = "js"</code>。</li>
             <li>native は <code>webgpu_objects/native</code> を override し、次の canvas presentation を present 前に capture します。browser は <code>webgpu_objects/js</code> を override し、MoonBit、TypeScript、WASM variants の presented canvas pixels を readback します。</li>
-            <li><code>scripts/run-visual-regression.mjs</code> は native/browser をまとめ、MoonBit warnings を通常非表示にします。</li>
-            <li><code>scripts/run-browser-visual-regression.mjs</code> は Vite と local result server を起動し、headless Chrome/Chromium から result を受け取ります。</li>
+            <li><code>package.json</code> の script が native/browser visual run を分岐し、Node の child-process wrapper は使いません。</li>
+            <li><code>scripts/run-browser-visual-regression.mjs</code> は Vite と local result server を起動し、Playwright-controlled headless Chrome/Chromium から result を受け取ります。</li>
             <li><code>scripts/run-browser-interaction-regression.mjs</code> は production の軽量 Undo/Redo interaction HTML を使う WebGPU 非依存 test です。CI は button、shortcut、key-repeat behavior の PR gate としてこれを実行します。CI では Chrome runtime dependencies を入れ、runner の verbose output を有効にして、browser launch failure が timeout だけに見えないようにします。</li>
-            <li>必要な process launch はすべて <code>scripts/lib/safe-process.mjs</code> の用途別 launcher に集約し、shell execution を無効にした固定 argv array で渡します。browser discovery は runner ごとに一度だけ filesystem executable check を行い、<code>which</code> や version probe は起動しません。</li>
+            <li>browser launch は <code>scripts/lib/playwright-browser.mjs</code> から <code>playwright-core</code> を使います。browser discovery は runner ごとに一度だけ filesystem executable check を行い、<code>which</code> や version probe は起動しません。</li>
             <li>WebGPU adapter creation や Chrome startup に失敗する環境では skip message を出して pass します。golden 更新は WebGPU-capable machine で行います。</li>
             <li>visual regression は WebGPU adapter、driver、headless browser output の環境差があり得るため、明示的な rendering / golden 確認として残します。</li>
           </ul>

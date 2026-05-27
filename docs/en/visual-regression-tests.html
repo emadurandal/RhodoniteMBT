@@ -48,7 +48,7 @@ pnpm run test:examples:visual:native
 pnpm run test:examples:visual:browser
 pnpm run test:examples:visual:update
 pnpm run test:examples:interaction:browser
-pnpm run test:examples:visual -- --verbose</code></pre>
+RHODONITE_BROWSER_VERBOSE=1 pnpm run test:examples:visual:browser</code></pre>
 
           <h2>Manifest And Snapshots</h2>
           <p>The matrix lives in <a href="../../moon/rhodonite_examples/src/visual_regression/visual_samples.tsv"><code>visual_samples.tsv</code></a>. Each row contains target, id, display name, PNG filename, <code>max_mismatch_rate</code>, and <code>perceptual_threshold</code>. Golden PNGs live in <a href="../../moon/rhodonite_examples/src/visual_regression/__image_snapshots__/"><code>__image_snapshots__</code></a>.</p>
@@ -65,10 +65,10 @@ pnpm run test:examples:visual -- --verbose</code></pre>
           <h2>Implementation Notes</h2>
           <ul>
             <li>Native overrides <code>webgpu_objects/native</code> and captures the next canvas presentation before presenting; browser overrides <code>webgpu_objects/js</code> and reads presented canvas pixels for MoonBit, TypeScript, and WASM variants.</li>
-            <li><code>scripts/run-visual-regression.mjs</code> routes native/browser runs and hides MoonBit warnings unless verbose mode is enabled.</li>
-            <li><code>scripts/run-browser-visual-regression.mjs</code> starts Vite, a result server, and a headless Chrome/Chromium page.</li>
+            <li><code>package.json</code> routes native/browser visual runs through package scripts instead of a Node child-process wrapper.</li>
+            <li><code>scripts/run-browser-visual-regression.mjs</code> starts Vite, a result server, and a Playwright-controlled headless Chrome/Chromium page.</li>
             <li><code>scripts/run-browser-interaction-regression.mjs</code> uses the production lightweight Undo/Redo interaction HTML and is WebGPU-independent, so CI runs it as a PR gate for buttons, shortcuts, and key-repeat behavior. CI installs Chrome runtime dependencies and enables verbose runner output so browser launch failures are reported instead of appearing only as timeouts.</li>
-            <li>All required process launches go through purpose-specific launchers in <code>scripts/lib/safe-process.mjs</code>, which pass fixed argv arrays with shell execution disabled. Browser discovery uses one filesystem executable lookup per runner instead of invoking <code>which</code> or version probes.</li>
+            <li>Browser launch uses <code>playwright-core</code> via <code>scripts/lib/playwright-browser.mjs</code>. Browser discovery uses one filesystem executable lookup per runner instead of invoking <code>which</code> or version probes.</li>
             <li>On machines without WebGPU adapter support or Chrome/Chromium, tests print a skip message and pass without comparing pixels.</li>
             <li>Visual regression remains an explicit rendering/golden check because WebGPU adapters, drivers, and headless browser output can vary by environment.</li>
           </ul>

@@ -8,7 +8,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import { createBrowserProcessLauncher } from "./lib/safe-process.mjs";
+import {
+	attachBrowserDiagnostics,
+	createBrowserLauncher,
+	formatBrowserFailure,
+} from "./lib/playwright-browser.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const update = process.env.RHODONITE_UPDATE_VISUAL_SNAPSHOTS === "1";
@@ -19,14 +23,18 @@ const snapshotDir = path.join(
 	"moon/rhodonite_examples/src/visual_regression/__image_snapshots__",
 );
 
-const startBrowserProcess = createBrowserProcessLauncher();
-if (!startBrowserProcess) {
+const launchBrowser = createBrowserLauncher();
+if (!launchBrowser) {
 	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
 
-let browserProcess;
+let browserContext;
 let resultServer;
+const browserDiagnostics = {
+	get: () => "",
+	stop: () => {},
+};
 const vite = await createServer({
 	root,
 	logLevel: "warn",
@@ -114,31 +122,36 @@ try {
 		"--no-proxy-server",
 		"--no-first-run",
 		"--no-default-browser-check",
-		"--remote-debugging-port=0",
-		`--user-data-dir=${userDataDir}`,
-		url,
 	];
-	if (headless) {
-		browserArgs.unshift("--headless=new");
+	try {
+		const browser = await launchBrowser({
+			attachPageDiagnostics: ({ context, page }) => {
+				const diagnostics = attachBrowserDiagnostics({
+					context,
+					logPrefix: "visual_regression(browser)",
+					page,
+					rejectBrowserFailure: rejectResult,
+					verbose,
+				});
+				browserDiagnostics.get = diagnostics.get;
+				browserDiagnostics.stop = diagnostics.stop;
+				return diagnostics.stop;
+			},
+			args: browserArgs,
+			headless,
+			logPrefix: "visual_regression(browser)",
+			url,
+			userDataDir,
+			verbose,
+		});
+		browserContext = browser.context;
+	} catch (error) {
+		rejectResult(error);
 	}
-	browserProcess = startBrowserProcess(browserArgs, {
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	browserProcess.stdout.on("data", (data) => {
-		if (verbose) {
-			process.stdout.write(data);
-		}
-	});
-	browserProcess.stderr.on("data", (data) => {
-		if (verbose) {
-			process.stderr.write(data);
-		}
-	});
-	browserProcess.on("error", rejectResult);
 
 	const result = await withTimeout(resultPromise, 30000, "browser visual regression timed out").catch(
 		(error) => {
-			if (error instanceof Error && error.message.includes("timed out")) {
+			if (error instanceof TimeoutError) {
 				return {
 					ok: true,
 					skipped: true,
@@ -148,7 +161,18 @@ try {
 					updates: [],
 				};
 			}
-			throw error;
+			return {
+				ok: false,
+				skipped: false,
+				results: [],
+				failures: [
+						{
+							name: "browser visual regression",
+							message: formatBrowserFailure(error, browserDiagnostics.get()),
+						},
+				],
+				updates: [],
+			};
 		},
 	);
 	if (result.skipped) {
@@ -165,30 +189,31 @@ try {
 			console.log(message);
 			process.exitCode = 0;
 		}
-	} else if (update) {
-		await writeUpdatedSnapshots(result.updates ?? []);
-		console.log(
-			`visual_regression(browser): UPDATE wrote ${(result.updates ?? []).length} PNG snapshots`,
-		);
-		process.exitCode = 0;
-	} else if (result.ok) {
-		for (const r of result.results ?? []) {
-			console.log(
-				`visual_regression(browser): PASS ${r.filename} mismatch_rate=${r.mismatchRate} mismatches=${r.mismatches}/${r.pixels} max=${r.maxMismatchRate} threshold=${r.perceptualThreshold}`,
-			);
-		}
-		process.exitCode = 0;
-	} else {
+	} else if (!result.ok) {
 		for (const failure of result.failures ?? []) {
 			console.error(
 				`visual_regression(browser): FAIL ${failure.filename ?? failure.name}: ${failure.message}`,
 			);
 		}
 		process.exitCode = 1;
+	} else if (update) {
+		await writeUpdatedSnapshots(result.updates ?? []);
+		console.log(
+			`visual_regression(browser): UPDATE wrote ${(result.updates ?? []).length} PNG snapshots`,
+		);
+		process.exitCode = 0;
+	} else {
+		for (const r of result.results ?? []) {
+			console.log(
+				`visual_regression(browser): PASS ${r.filename} mismatch_rate=${r.mismatchRate} mismatches=${r.mismatches}/${r.pixels} max=${r.maxMismatchRate} threshold=${r.perceptualThreshold}`,
+			);
+		}
+		process.exitCode = 0;
 	}
 } finally {
-	if (browserProcess && !browserProcess.killed) {
-		browserProcess.kill("SIGTERM");
+	if (browserContext) {
+		browserDiagnostics.stop();
+		await browserContext.close();
 	}
 	await closeMaybeRunning(vite);
 	if (resultServer) {
@@ -199,9 +224,16 @@ try {
 function withTimeout(promise, ms, message) {
 	let timer;
 	const timeout = new Promise((_, reject) => {
-		timer = setTimeout(() => reject(new Error(message)), ms);
+		timer = setTimeout(() => reject(new TimeoutError(message)), ms);
 	});
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+class TimeoutError extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "TimeoutError";
+	}
 }
 
 function listen(server) {
