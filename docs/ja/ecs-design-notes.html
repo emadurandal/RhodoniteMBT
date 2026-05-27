@@ -39,7 +39,7 @@
           <p><code>QueryPlan</code> は diagnostic snapshot であり、borrow や ownership handle ではありません。required component ids と matched archetype row counts を copy するため、row/column view の lifetime を延ばさずに query shape を確認できます。</p>
           <p><code>PreparedQuery</code> と <code>RawPreparedQuery</code> は immutable lifecycle handle です。<code>is_stale</code> は version check のみで、<code>refresh</code> は繰り返し再利用する前に呼び出し側が保持し直す current prepared plan value を返します。prepared plan は matched archetype ごとの row / column access metadata を保持するため、row iteration のたびに component lookup map を作り直しません。</p>
           <p><code>QueryCache</code> と <code>RawQueryCache</code> は caller-owned mutable handle です。初回または stale 時に内部 prepared plan を更新し、通常の iteration では同じ plan を再利用します。<code>World</code> に global cache を持たせず、system や editor helper が cache lifetime を明示的に所有します。</p>
-          <p>hot path の builtin camera system は <code>RawQueryCache</code> を所有し、matched archetype を直接 iterate します。<code>GlobalTransform</code> と <code>Camera</code> blob への write は公開 <code>World</code> setter 経由のまま維持し、<code>Transform3D</code> component write は <code>RawQueryArchetype::write_column_at</code> を通すことで dirty transform propagation に変更 archetype を伝えます。</p>
+          <p>hot path の orbit camera transform system は <code>RawQueryCache</code> を所有し、matched archetype を直接 iterate します。<code>GlobalTransform</code> への write は公開 <code>World</code> setter 経由のまま維持し、<code>Transform3D</code> component write は <code>RawQueryArchetype::write_column_at</code> を通すことで dirty transform propagation に変更 archetype を伝えます。</p>
 
           <h2>SystemRunner Access Declaration</h2>
           <ul>

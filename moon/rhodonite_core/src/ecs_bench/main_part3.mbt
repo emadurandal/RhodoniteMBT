@@ -164,6 +164,12 @@ fn run_suite(count : Int) -> Unit {
     "camera_blob_sync_raw_cache", count, bench_camera_blob_sync_raw_cache,
   )
   run_case(
+    "orbit_camera_transform_row_query", count, bench_orbit_camera_transform_row_query,
+  )
+  run_case(
+    "orbit_camera_transform_raw_cache", count, bench_orbit_camera_transform_raw_cache,
+  )
+  run_case(
     "orbit_camera_transform_system_phase", count, bench_orbit_camera_transform_system_phase,
   )
   run_case("make_world_batch", count, bench_make_world_batch)
