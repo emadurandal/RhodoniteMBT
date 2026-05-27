@@ -82,6 +82,12 @@ fn run_suite(count : Int) -> Unit {
     "prepared_query_many_archetypes_reuse", count, bench_prepared_query_many_archetypes_reuse,
   )
   run_case(
+    "prepared_query_tiny_rows_many_archetypes_repeated", count, bench_prepared_query_tiny_rows_many_archetypes_repeated,
+  )
+  run_case(
+    "raw_prepared_query_tiny_rows_many_archetypes_repeated", count, bench_raw_prepared_query_tiny_rows_many_archetypes_repeated,
+  )
+  run_case(
     "prepared_query_many_archetypes_rebuild", count, bench_prepared_query_many_archetypes_rebuild,
   )
   run_case(

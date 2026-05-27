@@ -806,6 +806,49 @@ fn bench_prepared_query_many_archetypes_reuse(count : Int) -> BenchSample {
 }
 
 ///|
+/// Implements `bench_prepared_query_tiny_rows_many_archetypes_repeated`.
+fn bench_prepared_query_tiny_rows_many_archetypes_repeated(
+  count : Int,
+) -> BenchSample {
+  let (world, target, _) = make_many_archetype_query_world(
+    many_archetype_signature_count(),
+  )
+  let prepared = @ecs.Query::new([target]).prepare(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for _iteration = 0; _iteration < count; _iteration = _iteration + 1 {
+    prepared.for_each(world, row => {
+      row.read(target, bytes => checksum = checksum + bytes[0].to_int())
+    })
+  }
+  report(
+    "prepared_query_tiny_rows_many_archetypes_repeated", count, started, checksum,
+  )
+}
+
+///|
+/// Implements `bench_raw_prepared_query_tiny_rows_many_archetypes_repeated`.
+fn bench_raw_prepared_query_tiny_rows_many_archetypes_repeated(
+  count : Int,
+) -> BenchSample {
+  let (world, target, _) = make_many_archetype_query_world(
+    many_archetype_signature_count(),
+  )
+  let prepared = @ecs.RawQuery::new([target]).prepare(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  for _iteration = 0; _iteration < count; _iteration = _iteration + 1 {
+    prepared.for_each(world, row => {
+      let bytes = row.read_view_at(0)
+      checksum = checksum + bytes[0].to_int()
+    })
+  }
+  report(
+    "raw_prepared_query_tiny_rows_many_archetypes_repeated", count, started, checksum,
+  )
+}
+
+///|
 /// Implements `bench_prepared_query_many_archetypes_rebuild`.
 fn bench_prepared_query_many_archetypes_rebuild(count : Int) -> BenchSample {
   let (world, target, _) = make_many_archetype_query_world(count)

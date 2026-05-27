@@ -339,9 +339,11 @@ fn build_prepared_query_archetypes(
     for i = 0; i < candidates.length(); i = i + 1 {
       let ai = candidates[i]
       if query_matches_archetype(required, excluded, world, ai) {
+        let accesses = query_archetype_accesses(required, world, ai, operation)
         prepared_archetypes.push({
           archetype_index: ai,
-          accesses: query_archetype_accesses(required, world, ai, operation),
+          accesses,
+          row_accesses: query_row_accesses_from_archetype_accesses(accesses),
         })
       }
     }
@@ -623,7 +625,6 @@ pub fn PreparedQuery::for_each(
   world.query_depth = world.query_depth + 1
   for i = 0; i < plan.archetypes.length(); i = i + 1 {
     let chunk = plan.archetypes[i]
-    let accesses = query_row_accesses_from_archetype_accesses(chunk.accesses)
     let arch = world.archetypes[chunk.archetype_index]
     let ents = arch.entities
     for row = 0; row < ents.length(); row = row + 1 {
@@ -631,7 +632,7 @@ pub fn PreparedQuery::for_each(
         world,
         entity: ents[row],
         components: plan.required,
-        accesses,
+        accesses: chunk.row_accesses,
         archetype_index: chunk.archetype_index,
         row,
       })
@@ -732,7 +733,6 @@ pub fn RawPreparedQuery::for_each(
   world.query_depth = world.query_depth + 1
   for i = 0; i < plan.archetypes.length(); i = i + 1 {
     let chunk = plan.archetypes[i]
-    let accesses = query_row_accesses_from_archetype_accesses(chunk.accesses)
     let arch = world.archetypes[chunk.archetype_index]
     let ents = arch.entities
     for row = 0; row < ents.length(); row = row + 1 {
@@ -740,7 +740,7 @@ pub fn RawPreparedQuery::for_each(
         world,
         entity: ents[row],
         components: plan.required,
-        accesses,
+        accesses: chunk.row_accesses,
         archetype_index: chunk.archetype_index,
         row,
       })
