@@ -599,6 +599,23 @@ fn RawQueryArchetype::component_payload_index(
 }
 
 ///|
+/// Validates a row range against this archetype's current logical row count.
+fn RawQueryArchetype::assert_row_range(
+  self : RawQueryArchetype,
+  row_start : Int,
+  row_count : Int,
+  operation : String,
+) -> Unit {
+  if row_start < 0 || row_count < 0 {
+    abort(operation + ": row_start and row_count must be non-negative")
+  }
+  let len = self.length()
+  if row_start > len || row_start + row_count > len {
+    abort(operation + ": row range is outside this RawQueryArchetype")
+  }
+}
+
+///|
 /// Returns the contiguous CPU SoA column for `component`.
 pub fn RawQueryArchetype::read_column(
   self : RawQueryArchetype,
@@ -628,6 +645,48 @@ pub fn RawQueryArchetype::read_column_at(
   let col = arch.columns[access.column_index]
   let logical_end = arch.entities.length() * col.stride
   col.bytes[0:logical_end]
+}
+
+///|
+/// Returns a contiguous read-only CPU SoA column slice for a row range.
+pub fn RawQueryArchetype::read_column_range(
+  self : RawQueryArchetype,
+  component : ComponentTypeId,
+  row_start : Int,
+  row_count : Int,
+) -> ArrayView[Byte] {
+  self.world.assert_system_component_read(
+    component, "RawQueryArchetype::read_column_range",
+  )
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::read_column_range",
+  )
+  self.read_column_range_at(access_index, row_start, row_count)
+}
+
+///|
+/// Returns a contiguous read-only CPU SoA column slice for a pre-resolved payload index and row range.
+pub fn RawQueryArchetype::read_column_range_at(
+  self : RawQueryArchetype,
+  index : Int,
+  row_start : Int,
+  row_count : Int,
+) -> ArrayView[Byte] {
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::read_column_range_at",
+  )
+  self.world.assert_system_component_read(
+    access.component,
+    "RawQueryArchetype::read_column_range_at",
+  )
+  self.assert_row_range(
+    row_start, row_count, "RawQueryArchetype::read_column_range_at",
+  )
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let start = row_start * access.stride
+  let end = start + row_count * access.stride
+  col.bytes[start:end]
 }
 
 ///|
@@ -672,6 +731,119 @@ pub fn RawQueryArchetype::write_column_at(
     access.component,
   )
   col.bytes.mut_view(start=0, end=logical_end)
+}
+
+///|
+/// Returns a contiguous mutable CPU SoA column slice for a row range.
+pub fn RawQueryArchetype::write_column_range(
+  self : RawQueryArchetype,
+  component : ComponentTypeId,
+  row_start : Int,
+  row_count : Int,
+) -> MutArrayView[Byte] {
+  self.world.assert_not_history_raw_mutation(
+    "RawQueryArchetype::write_column_range",
+  )
+  self.world.assert_system_component_write(
+    component, "RawQueryArchetype::write_column_range",
+  )
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::write_column_range",
+  )
+  self.write_column_range_at(access_index, row_start, row_count)
+}
+
+///|
+/// Returns a contiguous mutable CPU SoA column slice for a pre-resolved payload index and row range.
+pub fn RawQueryArchetype::write_column_range_at(
+  self : RawQueryArchetype,
+  index : Int,
+  row_start : Int,
+  row_count : Int,
+) -> MutArrayView[Byte] {
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::write_column_range_at",
+  )
+  self.world.assert_not_history_raw_mutation(
+    "RawQueryArchetype::write_column_range_at",
+  )
+  self.world.assert_system_component_write(
+    access.component,
+    "RawQueryArchetype::write_column_range_at",
+  )
+  self.assert_row_range(
+    row_start, row_count, "RawQueryArchetype::write_column_range_at",
+  )
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let start = row_start * access.stride
+  let end = start + row_count * access.stride
+  if row_count > 0 {
+    self.world.mark_transform_dirty_archetype(
+      self.archetype_index,
+      access.component,
+    )
+    self.world.mark_camera_blob_sync_dirty_archetype(
+      self.archetype_index,
+      access.component,
+    )
+  }
+  col.bytes.mut_view(start~, end~)
+}
+
+///|
+/// Runs `f` over non-overlapping mutable column chunks for `component`.
+pub fn RawQueryArchetype::for_each_column_chunk(
+  self : RawQueryArchetype,
+  component : ComponentTypeId,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::for_each_column_chunk",
+  )
+  self.for_each_column_chunk_at(access_index, rows_per_chunk, f)
+}
+
+///|
+/// Runs `f` over non-overlapping mutable column chunks for a pre-resolved payload index.
+pub fn RawQueryArchetype::for_each_column_chunk_at(
+  self : RawQueryArchetype,
+  index : Int,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  if rows_per_chunk <= 0 {
+    abort(
+      "RawQueryArchetype::for_each_column_chunk_at: rows_per_chunk must be positive",
+    )
+  }
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::for_each_column_chunk_at",
+  )
+  self.world.assert_not_history_raw_mutation(
+    "RawQueryArchetype::for_each_column_chunk_at",
+  )
+  self.world.assert_system_component_write(
+    access.component,
+    "RawQueryArchetype::for_each_column_chunk_at",
+  )
+  let len = self.length()
+  let mut row_start = 0
+  while row_start < len {
+    let remaining = len - row_start
+    let row_count = if remaining < rows_per_chunk {
+      remaining
+    } else {
+      rows_per_chunk
+    }
+    f(
+      row_start,
+      row_count,
+      self.write_column_range_at(index, row_start, row_count),
+    )
+    row_start = row_start + row_count
+  }
 }
 
 ///|

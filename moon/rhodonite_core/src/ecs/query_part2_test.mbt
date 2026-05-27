@@ -129,6 +129,99 @@ test "RawQueryArchetype column views expose logical rows after column capacity g
 }
 
 ///|
+test "RawQueryArchetype column range views expose byte slices by row range" {
+  let world = World::new()
+  let cpu = world.register_component("QueryArchRange", 4)
+  let e0 = world.create_entity()
+  let e1 = world.create_entity()
+  let e2 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, cpu, bytes4(2, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e2, cpu, bytes4(3, 0, 0, 0)))
+  let mut read_len = -1
+  let mut read0 = (0 : Byte)
+  let mut read4 = (0 : Byte)
+  let mut write_len = -1
+  let mut zero_len = -1
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    let read = arch.read_column_range(cpu, 1, 2)
+    read_len = read.length()
+    read0 = read[0]
+    read4 = read[4]
+    let write = arch.write_column_range_at(0, 1, 1)
+    write_len = write.length()
+    write[0] = (9 : Byte)
+    zero_len = arch.read_column_range_at(0, arch.length(), 0).length()
+  })
+  assert_eq(read_len, 8)
+  assert_eq(read0, (2 : Byte))
+  assert_eq(read4, (3 : Byte))
+  assert_eq(write_len, 4)
+  assert_eq(zero_len, 0)
+  match world.component_bytes(e1, cpu) {
+    Some(bytes) => assert_eq(bytes[0], (9 : Byte))
+    None => abort("expected QueryArchRange row 1 bytes")
+  }
+  match world.component_bytes(e0, cpu) {
+    Some(bytes) => assert_eq(bytes[0], (1 : Byte))
+    None => abort("expected QueryArchRange row 0 bytes")
+  }
+}
+
+///|
+test "RawQueryArchetype column chunks visit every row once in order" {
+  let world = World::new()
+  let cpu = world.register_component("QueryArchChunks", 4)
+  let entities : Array[EntityId] = []
+  for i = 0; i < 5; i = i + 1 {
+    let entity = world.create_entity()
+    entities.push(entity)
+    assert_true(
+      world.add_component_bytes(entity, cpu, bytes4(i.to_byte(), 0, 0, 0)),
+    )
+  }
+  let starts : Array[Int] = []
+  let counts : Array[Int] = []
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_at(0, 2, (row_start, row_count, bytes) => {
+      starts.push(row_start)
+      counts.push(row_count)
+      for row = 0; row < row_count; row = row + 1 {
+        bytes[row * 4] = (row_start + row + 10).to_byte()
+      }
+    })
+  })
+  assert_eq(starts.length(), 3)
+  assert_eq(starts[0], 0)
+  assert_eq(starts[1], 2)
+  assert_eq(starts[2], 4)
+  assert_eq(counts.length(), 3)
+  assert_eq(counts[0], 2)
+  assert_eq(counts[1], 2)
+  assert_eq(counts[2], 1)
+  for i = 0; i < entities.length(); i = i + 1 {
+    match world.component_bytes(entities[i], cpu) {
+      Some(bytes) => assert_eq(bytes[0], (i + 10).to_byte())
+      None => abort("expected QueryArchChunks bytes")
+    }
+  }
+}
+
+///|
+test "RawQueryArchetype column chunks skip empty archetypes" {
+  let world = World::new()
+  let cpu = world.register_component("QueryArchEmptyChunks", 4)
+  assert_true(world.reserve_batch_capacity([cpu], 1))
+  let mut callbacks = 0
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk(cpu, 2, (_row_start, _row_count, _bytes) => {
+      callbacks = callbacks + 1
+    })
+  })
+  assert_eq(callbacks, 0)
+}
+
+///|
 test "RawPreparedQuery rebuilds after structural changes create matching archetype" {
   let world = World::new()
   let qa = world.register_component("PreparedQueryA", 4)
@@ -708,5 +801,44 @@ test "panic RawQueryArchetype read_column_at aborts for negative payload index" 
   assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
   RawQuery::new([qa]).for_each_archetype(world, arch => {
     ignore(arch.read_column_at(-1))
+  })
+}
+
+///|
+test "panic RawQueryArchetype read_column_range rejects out-of-range rows" {
+  let world = World::new()
+  let qa = world.register_component("RawQueryRangeInvalidA", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  RawQuery::new([qa]).for_each_archetype(world, arch => {
+    ignore(arch.read_column_range(qa, 1, 1))
+  })
+}
+
+///|
+test "panic RawQueryArchetype for_each_column_chunk rejects non-positive chunk size" {
+  let world = World::new()
+  let qa = world.register_component("RawQueryChunkInvalidA", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  RawQuery::new([qa]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk(qa, 0, (_row_start, _row_count, _bytes) => ())
+  })
+}
+
+///|
+test "panic RawQueryArchetype raw write column range aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_component("RawQueryArchRawRangeGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded raw column range"),
+  )
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    let column = arch.write_column_range(cpu, 0, 1)
+    column[0] = (2 : Byte)
   })
 }
