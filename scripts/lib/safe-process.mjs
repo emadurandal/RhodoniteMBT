@@ -36,7 +36,7 @@ export function runTrustedProcess(command, args, options = {}) {
 	});
 }
 
-export function isExecutable(candidate) {
+function isExecutable(candidate) {
 	try {
 		accessSync(candidate, constants.X_OK);
 		return true;
@@ -45,7 +45,7 @@ export function isExecutable(candidate) {
 	}
 }
 
-export function findExecutable(name) {
+function findExecutable(name) {
 	if (path.isAbsolute(name) || name.includes(path.sep)) {
 		return isExecutable(name) ? name : undefined;
 	}
