@@ -211,6 +211,9 @@ describe("ECS TypeScript wrapper: core", () => {
 
 		const report = world.propagateGlobalTransformsFromTransformsReport();
 		expect(report.ok()).toBe(false);
+		expect(report.usedDirtyPath()).toBe(true);
+		expect(report.usedFullPath()).toBe(false);
+		expect(report.fallbackToFull()).toBe(false);
 		expect(report.failureReason()).toBe("broken_ancestor_chain");
 		expect(report.failureCount()).toBeGreaterThan(0);
 		expect(report.brokenAncestorChainCount()).toBeGreaterThan(0);

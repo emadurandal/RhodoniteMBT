@@ -172,6 +172,28 @@ test "transform propagation report counts skipped dead dirty entries" {
 }
 
 ///|
+test "transform propagation report keeps dirty path on broken ancestor chain" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  dirty_test_set_transform_x(world, parent, (10.0 : Float))
+  dirty_test_set_transform_x(world, child, (5.0 : Float))
+  assert_true(world.set_child_of(child, parent))
+  dirty_test_add_global(world, child)
+  assert_true(world.destroy_entity(parent))
+  let report = world.propagate_global_transforms_from_transforms_report()
+  assert_true(!report.ok)
+  assert_true(report.used_dirty_path)
+  assert_true(!report.used_full_path)
+  assert_true(!report.fallback_to_full)
+  assert_true(report.failure_reason is BrokenAncestorChain)
+  assert_eq(report.failure_count, 1)
+  assert_eq(report.broken_ancestor_chain_count, 1)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 0)
+}
+
+///|
 test "transform propagation fallback report preserves entity failures" {
   let world = World::new()
   let parent = world.create_entity()

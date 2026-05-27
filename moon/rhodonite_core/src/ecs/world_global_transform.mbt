@@ -1251,7 +1251,6 @@ fn World::update_global_transforms_from_transforms_dirty_report(
         report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
           1
         report.record_failure(BrokenAncestorChain)
-        ok = false
       }
     }
   }
