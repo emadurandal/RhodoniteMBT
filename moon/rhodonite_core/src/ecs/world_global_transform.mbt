@@ -562,10 +562,14 @@ fn TransformPropagationReportDraft::finish(
 
 ///|
 /// Records one transform propagation failure while preserving the first failure reason.
+/// `NoFailure` is ignored so diagnostic counters stay internally consistent.
 fn TransformPropagationReportDraft::record_failure(
   self : TransformPropagationReportDraft,
   reason : TransformPropagationFailureReason,
 ) -> Unit {
+  if reason is NoFailure {
+    return
+  }
   if self.failure_count == 0 {
     self.failure_reason = reason
   }

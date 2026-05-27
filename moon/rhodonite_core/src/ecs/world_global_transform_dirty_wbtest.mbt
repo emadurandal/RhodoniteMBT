@@ -112,6 +112,18 @@ test "transform propagation report returns no-op diagnostics without draining up
 }
 
 ///|
+test "transform propagation report ignores no-failure records" {
+  let report = transform_propagation_report_draft(1)
+  report.record_failure(NoFailure)
+  assert_true(report.ok)
+  assert_true(report.failure_reason is NoFailure)
+  assert_eq(report.failure_count, 0)
+  assert_eq(report.broken_ancestor_chain_count, 0)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 0)
+}
+
+///|
 test "transform propagation report counts dirty subtree and pending upload ranges" {
   let world = World::new()
   let parent = world.create_entity()
