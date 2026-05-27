@@ -10,6 +10,7 @@ const args = process.argv.slice(2);
 
 let baselinePath = path.join(root, "benchmarks/ecs/baseline.jsonl");
 let currentPath = "";
+let summaryMarkdownPath = "";
 let failOnRegression = process.env.RHODONITE_ECS_BENCH_FAIL_ON_REGRESSION === "1";
 
 for (let i = 0; i < args.length; i++) {
@@ -18,6 +19,8 @@ for (let i = 0; i < args.length; i++) {
 		baselinePath = requireValue(arg, args[++i]);
 	} else if (arg === "--current") {
 		currentPath = requireValue(arg, args[++i]);
+	} else if (arg === "--summary-md") {
+		summaryMarkdownPath = requireValue(arg, args[++i]);
 	} else if (arg === "--fail-on-regression") {
 		failOnRegression = true;
 	} else {
@@ -44,12 +47,17 @@ const minMedianDeltaMs = 0.05;
 for (const [key, cur] of currentByKey) {
 	const base = baselineByKey.get(key);
 	if (!base) {
-		warnings.push(`NEW ${describe(cur)} has no baseline row`);
+		warnings.push(entry("NEW", `NEW ${describe(cur)} has no baseline row`, cur));
 		continue;
 	}
 	if (cur.checksum !== base.checksum) {
 		warnings.push(
-			`CHECKSUM ${describe(cur)} baseline=${base.checksum} current=${cur.checksum}`,
+			entry(
+				"CHECKSUM",
+				`CHECKSUM ${describe(cur)} baseline=${base.checksum} current=${cur.checksum}`,
+				cur,
+				base,
+			),
 		);
 		continue;
 	}
@@ -58,17 +66,19 @@ for (const [key, cur] of currentByKey) {
 	const nsRatio = ratio(cur.ns_per_item, base.ns_per_item);
 	const message = `${describe(cur)} median ${formatMs(base.median_ms)} -> ${formatMs(cur.median_ms)} (${formatRatio(medianRatio)}), ns/item ${formatNumber(base.ns_per_item)} -> ${formatNumber(cur.ns_per_item)} (${formatRatio(nsRatio)})`;
 	if (medianRatio > medianRatioThreshold && medianDelta >= minMedianDeltaMs) {
-		warnings.push(`REGRESSION ${message}`);
+		warnings.push(entry("REGRESSION", `REGRESSION ${message}`, cur, base));
 	} else if (medianRatio < 0.9 && medianDelta <= -minMedianDeltaMs) {
-		improvements.push(`IMPROVED ${message}`);
+		improvements.push(entry("IMPROVED", `IMPROVED ${message}`, cur, base));
 	} else {
-		stable.push(`OK ${message}`);
+		stable.push(entry("OK", `OK ${message}`, cur, base));
 	}
 }
 
 for (const [key, base] of baselineByKey) {
 	if (currentScopes.has(scopeFor(base)) && !currentByKey.has(key)) {
-		warnings.push(`MISSING ${describe(base)} is present in baseline only`);
+		warnings.push(
+			entry("MISSING", `MISSING ${describe(base)} is present in baseline only`, undefined, base),
+		);
 	}
 }
 
@@ -79,10 +89,24 @@ console.log(
 	`ecs_bench_compare: ok=${stable.length} improved=${improvements.length} warnings=${warnings.length}`,
 );
 for (const line of warnings) {
-	console.warn(`ecs_bench_compare: WARN ${line}`);
+	console.warn(`ecs_bench_compare: WARN ${line.message}`);
 }
 for (const line of improvements) {
-	console.log(`ecs_bench_compare: ${line}`);
+	console.log(`ecs_bench_compare: ${line.message}`);
+}
+
+if (summaryMarkdownPath.length > 0) {
+	fs.writeFileSync(
+		summaryMarkdownPath,
+		renderSummaryMarkdown({
+			baseline,
+			current,
+			stable,
+			improvements,
+			warnings,
+			failOnRegression,
+		}),
+	);
 }
 
 if (warnings.length > 0 && failOnRegression) {
@@ -98,9 +122,13 @@ function requireValue(option, value) {
 
 function usage(message) {
 	console.error(
-		`compare-ecs-bench: ${message}\nusage: node scripts/compare-ecs-bench.mjs --current path [--baseline path] [--fail-on-regression]`,
+		`compare-ecs-bench: ${message}\nusage: node scripts/compare-ecs-bench.mjs --current path [--baseline path] [--summary-md path] [--fail-on-regression]`,
 	);
 	process.exit(2);
+}
+
+function entry(kind, message, currentRow = undefined, baselineRow = undefined) {
+	return { kind, message, currentRow, baselineRow };
 }
 
 function readJsonl(filePath, label) {
@@ -188,4 +216,74 @@ function formatNumber(value) {
 	if (Math.abs(value) >= 100) return value.toFixed(1);
 	if (Math.abs(value) >= 10) return value.toFixed(2);
 	return value.toFixed(3);
+}
+
+function renderSummaryMarkdown(result) {
+	const warningCounts = countByKind(result.warnings);
+	const lines = [
+		"## ECS Bench Comparison",
+		"",
+		`Baseline: \`${path.relative(root, result.baseline.path)}\``,
+		`Current: \`${path.relative(root, result.current.path)}\``,
+		"",
+		"| Status | Count |",
+		"| --- | ---: |",
+		`| Stable | ${result.stable.length} |`,
+		`| Improved | ${result.improvements.length} |`,
+		`| Warnings | ${result.warnings.length} |`,
+		`| Fail on regression | ${result.failOnRegression ? "yes" : "no"} |`,
+		"",
+		"### Warning Categories",
+		"",
+		"| Category | Count |",
+		"| --- | ---: |",
+		...["REGRESSION", "NEW", "MISSING", "CHECKSUM"].map(
+			(kind) => `| ${kind} | ${warningCounts.get(kind) ?? 0} |`,
+		),
+	];
+	appendEntryTable(lines, "Top Warnings", result.warnings, 10);
+	appendEntryTable(lines, "Top Improvements", result.improvements, 10);
+	lines.push("");
+	return `${lines.join("\n")}\n`;
+}
+
+function appendEntryTable(lines, title, entries, limit) {
+	lines.push("", `### ${title}`, "");
+	if (entries.length === 0) {
+		lines.push("None.");
+		return;
+	}
+	lines.push("| Kind | Case | Count | Median | Ratio |");
+	lines.push("| --- | --- | ---: | --- | ---: |");
+	for (const item of entries.slice(0, limit)) {
+		const row = item.currentRow ?? item.baselineRow;
+		const base = item.baselineRow;
+		const cur = item.currentRow;
+		const median = base && cur
+			? `${formatMs(base.median_ms)} -> ${formatMs(cur.median_ms)}`
+			: cur
+				? `${formatMs(cur.median_ms)}`
+				: base
+					? `${formatMs(base.median_ms)}`
+					: "";
+		const medianRatio = base && cur ? formatRatio(ratio(cur.median_ms, base.median_ms)) : "";
+		lines.push(
+			`| ${escapeMarkdownTable(item.kind)} | ${escapeMarkdownTable(row ? `${row.target}/${row.build_mode} ${row.case}` : item.message)} | ${row?.count ?? ""} | ${escapeMarkdownTable(median)} | ${medianRatio} |`,
+		);
+	}
+	if (entries.length > limit) {
+		lines.push(`| ... | ${entries.length - limit} more |  |  |  |`);
+	}
+}
+
+function countByKind(entries) {
+	const counts = new Map();
+	for (const item of entries) {
+		counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+	}
+	return counts;
+}
+
+function escapeMarkdownTable(value) {
+	return String(value).replaceAll("|", "\\|").replace(/\r?\n/g, " ");
 }

@@ -439,6 +439,13 @@ pub fn SystemRunner::plan_phase(Self, PhaseKey) -> SystemPhasePlan
 pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 pub fn SystemRunner::run_phase_report(Self, World, SystemContext, PhaseKey) -> SystemRunReport
 
+pub(all) enum TransformPropagationFailureReason {
+  NoFailure
+  BrokenAncestorChain
+  MissingGlobalTransformRef
+  ArchetypePathUnavailable
+}
+
 pub(all) struct TransformPropagationReport {
   ok : Bool
   used_dirty_path : Bool
@@ -451,6 +458,11 @@ pub(all) struct TransformPropagationReport {
   global_transform_write_count : Int
   hierarchy_index_rebuilt : Bool
   pending_upload_range_count : Int
+  failure_reason : TransformPropagationFailureReason
+  failure_count : Int
+  broken_ancestor_chain_count : Int
+  missing_global_transform_ref_count : Int
+  archetype_path_unavailable_count : Int
 }
 
 pub struct World {

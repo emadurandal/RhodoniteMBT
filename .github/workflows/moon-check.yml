@@ -77,7 +77,9 @@ jobs:
 
       - name: ECS benchmark comparison (warn-only)
         working-directory: ${{ github.workspace }}
-        run: pnpm run bench:ecs:compare:js
+        run: |
+          pnpm run bench:ecs:compare:js -- --summary-md "$RUNNER_TEMP/ecs-bench-summary.md"
+          cat "$RUNNER_TEMP/ecs-bench-summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Browser interaction regression
         working-directory: ${{ github.workspace }}

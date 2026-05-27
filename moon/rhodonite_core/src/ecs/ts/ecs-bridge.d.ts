@@ -259,6 +259,21 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function transform_propagation_report_pending_upload_range_count(
 		report: MoonTransformPropagationReport,
 	): number;
+	export function transform_propagation_report_failure_reason(
+		report: MoonTransformPropagationReport,
+	): string;
+	export function transform_propagation_report_failure_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_broken_ancestor_chain_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_missing_global_transform_ref_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_archetype_path_unavailable_count(
+		report: MoonTransformPropagationReport,
+	): number;
 	export function world_set_global_transform_format(
 		world: MoonWorld,
 		entity: MoonEntityId,
