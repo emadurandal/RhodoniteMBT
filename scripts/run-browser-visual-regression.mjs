@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import { createBrowserProcessLauncher } from "./lib/safe-process.mjs";
+import { createBrowserLauncher } from "./lib/playwright-browser.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const update = process.env.RHODONITE_UPDATE_VISUAL_SNAPSHOTS === "1";
@@ -19,13 +19,13 @@ const snapshotDir = path.join(
 	"moon/rhodonite_examples/src/visual_regression/__image_snapshots__",
 );
 
-const startBrowserProcess = createBrowserProcessLauncher();
-if (!startBrowserProcess) {
+const launchBrowser = createBrowserLauncher();
+if (!launchBrowser) {
 	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
 
-let browserProcess;
+let browserContext;
 let resultServer;
 const vite = await createServer({
 	root,
@@ -114,27 +114,16 @@ try {
 		"--no-proxy-server",
 		"--no-first-run",
 		"--no-default-browser-check",
-		"--remote-debugging-port=0",
-		`--user-data-dir=${userDataDir}`,
-		url,
 	];
-	if (headless) {
-		browserArgs.unshift("--headless=new");
-	}
-	browserProcess = startBrowserProcess(browserArgs, {
-		stdio: ["ignore", "pipe", "pipe"],
+	const browser = await launchBrowser({
+		args: browserArgs,
+		headless,
+		logPrefix: "visual_regression(browser)",
+		url,
+		userDataDir,
+		verbose,
 	});
-	browserProcess.stdout.on("data", (data) => {
-		if (verbose) {
-			process.stdout.write(data);
-		}
-	});
-	browserProcess.stderr.on("data", (data) => {
-		if (verbose) {
-			process.stderr.write(data);
-		}
-	});
-	browserProcess.on("error", rejectResult);
+	browserContext = browser.context;
 
 	const result = await withTimeout(resultPromise, 30000, "browser visual regression timed out").catch(
 		(error) => {
@@ -187,8 +176,8 @@ try {
 		process.exitCode = 1;
 	}
 } finally {
-	if (browserProcess && !browserProcess.killed) {
-		browserProcess.kill("SIGTERM");
+	if (browserContext) {
+		await browserContext.close();
 	}
 	await closeMaybeRunning(vite);
 	if (resultServer) {

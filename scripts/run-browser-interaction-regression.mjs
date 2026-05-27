@@ -6,7 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBrowserProcessLauncher } from "./lib/safe-process.mjs";
+import { createBrowserLauncher } from "./lib/playwright-browser.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const distDir = path.join(root, "dist");
@@ -14,13 +14,13 @@ const verbose = process.env.RHODONITE_BROWSER_VERBOSE === "1" ||
 	process.env.RHODONITE_BROWSER_INTERACTION_VERBOSE === "1";
 const headless = process.env.RHODONITE_BROWSER_HEADLESS !== "0";
 
-const startBrowserProcess = createBrowserProcessLauncher();
-if (!startBrowserProcess) {
+const launchBrowser = createBrowserLauncher();
+if (!launchBrowser) {
 	console.log("interaction_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
 
-let browserProcess;
+let browserContext;
 let resultServer;
 let distServer;
 
@@ -93,8 +93,7 @@ try {
 	const userDataDir = await fs.mkdtemp(
 		path.join(os.tmpdir(), "rhodonite-browser-interaction-"),
 	);
-	let browserStdout = "";
-	let browserStderr = "";
+	let getBrowserDiagnostics = () => "";
 	const browserArgs = [
 		"--disable-dev-shm-usage",
 		"--no-sandbox",
@@ -104,37 +103,21 @@ try {
 		"--no-proxy-server",
 		"--no-first-run",
 		"--no-default-browser-check",
-		"--remote-debugging-port=0",
-		`--user-data-dir=${userDataDir}`,
-		url,
 	];
-	if (headless) {
-		browserArgs.unshift("--headless=new");
+	try {
+		const browser = await launchBrowser({
+			args: browserArgs,
+			headless,
+			logPrefix: "interaction_regression(browser)",
+			url,
+			userDataDir,
+			verbose: false,
+		});
+		browserContext = browser.context;
+		getBrowserDiagnostics = attachBrowserDiagnostics(browser.page, verbose);
+	} catch (error) {
+		rejectResult(error);
 	}
-	browserProcess = startBrowserProcess(browserArgs, {
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	browserProcess.stdout.on("data", (data) => {
-		browserStdout = appendOutputTail(browserStdout, data);
-		if (verbose) {
-			process.stdout.write(data);
-		}
-	});
-	browserProcess.stderr.on("data", (data) => {
-		browserStderr = appendOutputTail(browserStderr, data);
-		if (verbose) {
-			process.stderr.write(data);
-		}
-	});
-	browserProcess.on("error", rejectResult);
-	browserProcess.on("exit", (code, signal) => {
-		rejectResult(
-			new Error(
-				`browser exited before reporting results (code=${code ?? "null"} signal=${signal ?? "null"})` +
-					formatBrowserDiagnostics(browserStdout, browserStderr),
-			),
-		);
-	});
 
 	const result = await withTimeout(
 		resultPromise,
@@ -148,7 +131,7 @@ try {
 			failures: [
 				{
 					name: "browser interaction regression",
-					message: formatBrowserFailure(error, browserStdout, browserStderr),
+					message: formatBrowserFailure(error, getBrowserDiagnostics()),
 				},
 			],
 		};
@@ -170,8 +153,8 @@ try {
 		process.exitCode = 1;
 	}
 } finally {
-	if (browserProcess && !browserProcess.killed) {
-		browserProcess.kill("SIGTERM");
+	if (browserContext) {
+		await browserContext.close();
 	}
 	if (distServer) {
 		await closeServer(distServer);
@@ -526,28 +509,41 @@ function withTimeout(promise, ms, message) {
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function appendOutputTail(existing, data) {
-	const next = existing + data.toString();
+function attachBrowserDiagnostics(page, verboseOutput) {
+	let diagnostics = "";
+	const append = (line) => {
+		diagnostics = appendOutputTail(diagnostics, `${line}\n`);
+		if (verboseOutput) {
+			console.error(`interaction_regression(browser): ${line}`);
+		}
+	};
+	page.on("console", (message) => {
+		append(`console ${message.type()} ${message.text()}`);
+	});
+	page.on("pageerror", (error) => {
+		append(`pageerror ${error.message}`);
+	});
+	page.on("requestfailed", (request) => {
+		append(`requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`);
+	});
+	return () => diagnostics;
+}
+
+function appendOutputTail(existing, text) {
+	const next = existing + text;
 	return next.length > 8000 ? next.slice(next.length - 8000) : next;
 }
 
-function formatBrowserDiagnostics(stdout, stderr) {
-	const parts = [];
-	if (stderr.trim()) {
-		parts.push(`browser stderr:\n${stderr.trim()}`);
-	}
-	if (stdout.trim()) {
-		parts.push(`browser stdout:\n${stdout.trim()}`);
-	}
-	return parts.length === 0 ? "" : `\n${parts.join("\n")}`;
+function formatBrowserDiagnostics(diagnostics) {
+	return diagnostics.trim() ? `\nbrowser diagnostics:\n${diagnostics.trim()}` : "";
 }
 
-function formatBrowserFailure(error, stdout, stderr) {
+function formatBrowserFailure(error, diagnostics) {
 	const message = error instanceof Error ? error.message : String(error);
-	if (message.includes("browser stderr:") || message.includes("browser stdout:")) {
+	if (message.includes("browser diagnostics:")) {
 		return message;
 	}
-	return message + formatBrowserDiagnostics(stdout, stderr);
+	return message + formatBrowserDiagnostics(diagnostics);
 }
 
 function listen(server) {
