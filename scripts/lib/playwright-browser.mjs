@@ -44,19 +44,27 @@ export function createBrowserLauncher() {
 
 function defaultPageDiagnostics({ page, verbose, logPrefix }) {
 	if (!verbose) {
-		return;
+		return undefined;
 	}
-	page.on("console", (message) => {
+	const onConsole = (message) => {
 		console.log(`${logPrefix}: console ${message.type()} ${message.text()}`);
-	});
-	page.on("pageerror", (error) => {
+	};
+	const onPageError = (error) => {
 		console.error(`${logPrefix}: pageerror ${error.message}`);
-	});
-	page.on("requestfailed", (request) => {
+	};
+	const onRequestFailed = (request) => {
 		console.error(
 			`${logPrefix}: requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`,
 		);
-	});
+	};
+	page.on("console", onConsole);
+	page.on("pageerror", onPageError);
+	page.on("requestfailed", onRequestFailed);
+	return () => {
+		page.off("console", onConsole);
+		page.off("pageerror", onPageError);
+		page.off("requestfailed", onRequestFailed);
+	};
 }
 
 function findBrowserExecutable() {
