@@ -114,7 +114,12 @@ try {
 			verbose: false,
 		});
 		browserContext = browser.context;
-		getBrowserDiagnostics = attachBrowserDiagnostics(browser.page, verbose);
+		getBrowserDiagnostics = attachBrowserDiagnostics(
+			browser.context,
+			browser.page,
+			verbose,
+			rejectResult,
+		);
 	} catch (error) {
 		rejectResult(error);
 	}
@@ -509,13 +514,17 @@ function withTimeout(promise, ms, message) {
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function attachBrowserDiagnostics(page, verboseOutput) {
+function attachBrowserDiagnostics(context, page, verboseOutput, rejectBrowserFailure) {
 	let diagnostics = "";
 	const append = (line) => {
 		diagnostics = appendOutputTail(diagnostics, `${line}\n`);
 		if (verboseOutput) {
 			console.error(`interaction_regression(browser): ${line}`);
 		}
+	};
+	const failBrowser = (message) => {
+		append(message);
+		rejectBrowserFailure(new Error(message));
 	};
 	page.on("console", (message) => {
 		append(`console ${message.type()} ${message.text()}`);
@@ -525,6 +534,15 @@ function attachBrowserDiagnostics(page, verboseOutput) {
 	});
 	page.on("requestfailed", (request) => {
 		append(`requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`);
+	});
+	page.on("crash", () => {
+		failBrowser("browser page crashed before reporting results");
+	});
+	page.on("close", () => {
+		failBrowser("browser page closed before reporting results");
+	});
+	context.on("close", () => {
+		failBrowser("browser context closed before reporting results");
 	});
 	return () => diagnostics;
 }
