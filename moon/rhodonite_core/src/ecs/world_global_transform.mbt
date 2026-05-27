@@ -623,13 +623,14 @@ fn World::write_global_transform_matrix_if_present(
 ) -> Bool {
   match self.global_transform_ref(entity) {
     Some(gt_ref) => {
-      ignore(
-        self.global_transform_blob.write_matrix_if_changed(
-          gt_ref.format,
-          gt_ref.word_offset,
-          matrix,
-        ),
+      let changed = self.global_transform_blob.write_matrix_if_changed(
+        gt_ref.format,
+        gt_ref.word_offset,
+        matrix,
       )
+      if changed {
+        self.mark_camera_blob_sync_dirty(entity)
+      }
       true
     }
     None => true
@@ -650,6 +651,9 @@ fn World::write_global_transform_matrix_if_present_report(
         gt_ref.word_offset,
         matrix,
       )
+      if changed {
+        self.mark_camera_blob_sync_dirty(entity)
+      }
       (true, changed)
     }
     None => (true, false)
@@ -981,13 +985,14 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
     Some(m) =>
       match self.global_transform_ref(entity) {
         Some(gt_ref) => {
-          ignore(
-            self.global_transform_blob.write_matrix_if_changed(
-              gt_ref.format,
-              gt_ref.word_offset,
-              m,
-            ),
+          let changed = self.global_transform_blob.write_matrix_if_changed(
+            gt_ref.format,
+            gt_ref.word_offset,
+            m,
           )
+          if changed {
+            self.mark_camera_blob_sync_dirty(entity)
+          }
           true
         }
         None => false
@@ -1040,6 +1045,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row_report(
           gt_ref.word_offset,
           world_m,
         ) {
+        self.mark_camera_blob_sync_dirty(entity)
         report.global_transform_write_count = report.global_transform_write_count +
           1
       }

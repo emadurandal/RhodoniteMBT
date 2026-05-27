@@ -572,6 +572,156 @@ test "camera blob sync direct system skips clean frames and syncs later dirtines
 }
 
 ///|
+test "camera blob sync follows explicit Transform3D propagation" {
+  let world = World::new()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      camera,
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/render_extract_propagated")
+  let runner = SystemRunner::new()
+  runner.add_system(camera_blob_sync_system(world, phase, lens))
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+  assert_true(
+    world.set_transform_trs(
+      camera,
+      (2.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  world.update_global_transforms_from_transforms()
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
+test "camera blob sync follows TransformPropagation system changes" {
+  let world = World::new()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(
+    world.set_transform_trs(
+      camera,
+      (0.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/propagate_then_camera_sync")
+  let runner = SystemRunner::new()
+  runner.add_system(transform_propagation_system(world, phase))
+  runner.add_system(camera_blob_sync_system(world, phase, lens))
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+  assert_true(
+    world.set_transform_trs(
+      camera,
+      (3.0 : Float),
+      (0.0 : Float),
+      (0.0 : Float),
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      (1.0 : Float),
+      (1.0 : Float),
+      (1.0 : Float),
+    ),
+  )
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
 test "orbit camera blob sync applies orthographic dolly scale" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()
