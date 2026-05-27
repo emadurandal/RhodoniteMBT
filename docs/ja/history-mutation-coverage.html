@@ -32,7 +32,7 @@
           <p>TypeScript wrapper も MoonBit surface と同じ分類に従います。公開 wrapper method はここに載っている tracked API へ委譲するか、raw guarded のままにするか、intentionally untracked として docs に明記し、wrapper 側で挙動を足す場合は対応する TypeScript coverage も追加します。</p>
           <p>TypeScript public wrapper surface は <code>history-mutation-coverage.test.ts</code> でも監査します。<code>World</code>、<code>WorldHistory</code>、query row、raw query archetype、<code>SystemRunner</code>、<code>CommandBuffer</code> に method を追加する場合は、その audit で tracked、tracked callback、tracked command phase、raw guarded、intentionally untracked、read-only、history-control のいずれかに分類します。</p>
           <p>同じ test は <code>pkg.generated.mbti</code> から MoonBit public surface も監査します。public ECS method を追加または削除し、<code>moon info</code> で interface を更新した後は、その test の MoonBit ledger も更新し、method に明示的な history classification を付けます。</p>
-          <p>Tracked API parity も MoonBit public surface、<code>js_bridge</code>、<code>ecs-bridge.d.ts</code>、TypeScript wrapper をまたいで監査します。tracked Undo/Redo API を追加する場合は、bridge declaration、wrapper import、public wrapper method または mirror export、parity ledger を同じ変更で更新します。MoonBit-only typed helper は TypeScript bridge を持つまで MoonBit-only として明示的に列挙します。</p>
+          <p>Tracked API parity も MoonBit public surface、<code>js_bridge</code>、<code>ecs-bridge*.d.ts</code>、TypeScript wrapper をまたいで監査します。tracked Undo/Redo API を追加する場合は、bridge declaration、wrapper import、public wrapper method または mirror export、parity ledger を同じ変更で更新します。MoonBit-only typed helper は TypeScript bridge を持つまで MoonBit-only として明示的に列挙します。</p>
 
           <h2>Coverage Classes</h2>
           <table>
