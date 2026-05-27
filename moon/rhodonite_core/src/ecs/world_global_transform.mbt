@@ -536,6 +536,46 @@ fn transform_processed_mark(
 }
 
 ///|
+/// Builds a public immutable transform propagation report from a mutable accumulator.
+fn TransformPropagationReportDraft::finish(
+  self : TransformPropagationReportDraft,
+) -> TransformPropagationReport {
+  {
+    ok: self.ok,
+    used_dirty_path: self.used_dirty_path,
+    used_full_path: self.used_full_path,
+    fallback_to_full: self.fallback_to_full,
+    dirty_queue_count: self.dirty_queue_count,
+    dirty_root_count: self.dirty_root_count,
+    skipped_dirty_entity_count: self.skipped_dirty_entity_count,
+    visited_entity_count: self.visited_entity_count,
+    global_transform_write_count: self.global_transform_write_count,
+    hierarchy_index_rebuilt: self.hierarchy_index_rebuilt,
+    pending_upload_range_count: self.pending_upload_range_count,
+  }
+}
+
+///|
+/// Creates an empty transform propagation diagnostic accumulator.
+fn transform_propagation_report_draft(
+  dirty_queue_count : Int,
+) -> TransformPropagationReportDraft {
+  {
+    ok: true,
+    used_dirty_path: false,
+    used_full_path: false,
+    fallback_to_full: false,
+    dirty_queue_count,
+    dirty_root_count: 0,
+    skipped_dirty_entity_count: 0,
+    visited_entity_count: 0,
+    global_transform_write_count: 0,
+    hierarchy_index_rebuilt: false,
+    pending_upload_range_count: 0,
+  }
+}
+
+///|
 /// Writes `matrix` into `entity`'s GlobalTransform blob slot when present.
 fn World::write_global_transform_matrix_if_present(
   self : World,
@@ -554,6 +594,26 @@ fn World::write_global_transform_matrix_if_present(
       true
     }
     None => true
+  }
+}
+
+///|
+/// Writes `matrix` into `entity`'s GlobalTransform blob slot and reports whether bytes changed.
+fn World::write_global_transform_matrix_if_present_report(
+  self : World,
+  entity : EntityId,
+  matrix : @m44.Matrix44F,
+) -> (Bool, Bool) {
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) => {
+      let changed = self.global_transform_blob.write_matrix_if_changed(
+        gt_ref.format,
+        gt_ref.word_offset,
+        matrix,
+      )
+      (true, changed)
+    }
+    None => (true, false)
   }
 }
 
@@ -585,6 +645,75 @@ fn World::recompute_transform_dirty_subtree(
     }
     if !self.write_global_transform_matrix_if_present(entity, world_matrix) {
       ok = false
+    }
+    if entity.index < 0 ||
+      entity.index >= self.transform_children_by_parent_index.length() {
+      continue
+    }
+    let children = self.transform_children_by_parent_index[entity.index]
+    for i = 0; i < children.length(); i = i + 1 {
+      let child = children[i]
+      if !self.is_alive(child) ||
+        transform_processed_contains(processed_generations, child) {
+        continue
+      }
+      match self.child_of_parent_direct(child) {
+        Some(parent) =>
+          if parent == entity && self.has_component(child, tf) {
+            match self.get_transform(child) {
+              Some(local_tf) => {
+                stack_entities.push(child)
+                stack_matrices.push(
+                  world_matrix.mat_mul(local_tf.to_local_matrix()),
+                )
+              }
+              None => ()
+            }
+          }
+        None => ()
+      }
+    }
+  }
+  ok
+}
+
+///|
+/// Recomputes a dirty subtree and accumulates diagnostic counters.
+fn World::recompute_transform_dirty_subtree_report(
+  self : World,
+  root : EntityId,
+  root_world_matrix : @m44.Matrix44F,
+  processed_generations : FixedArray[Int],
+  report : TransformPropagationReportDraft,
+) -> Bool {
+  let tf = self.transform_component_id
+  let mut ok = true
+  let stack_entities : Array[EntityId] = [root]
+  let stack_matrices : Array[@m44.Matrix44F] = [root_world_matrix]
+  while stack_entities.length() > 0 {
+    let last = stack_entities.length() - 1
+    let entity = stack_entities[last]
+    let world_matrix = stack_matrices[last]
+    ignore(stack_entities.pop())
+    ignore(stack_matrices.pop())
+    if !self.is_alive(entity) ||
+      transform_processed_contains(processed_generations, entity) {
+      continue
+    }
+    transform_processed_mark(processed_generations, entity)
+    if !self.has_component(entity, tf) {
+      continue
+    }
+    report.visited_entity_count = report.visited_entity_count + 1
+    let (write_ok, changed) = self.write_global_transform_matrix_if_present_report(
+      entity, world_matrix,
+    )
+    if !write_ok {
+      ok = false
+    }
+    if changed {
+      report.global_transform_write_count = report.global_transform_write_count +
+        1
     }
     if entity.index < 0 ||
       entity.index >= self.transform_children_by_parent_index.length() {
@@ -829,6 +958,48 @@ fn World::compute_global_transform_for_tf_gt_bulk_row(
 }
 
 ///|
+/// Computes and writes one TF+GT bulk row while accumulating report counters.
+fn World::compute_global_transform_for_tf_gt_bulk_row_report(
+  self : World,
+  entity : EntityId,
+  has_child_of : Bool,
+  leaf_local_matrix : @m44.Matrix44F,
+  report : TransformPropagationReportDraft,
+) -> Bool {
+  let world_m = if !has_child_of {
+    Some(leaf_local_matrix)
+  } else {
+    match self.build_child_of_ancestor_chain(entity) {
+      None => None
+      Some(chain) =>
+        self.multiply_world_chain_matrix(entity, chain, Some(leaf_local_matrix))
+    }
+  }
+  match world_m {
+    Some(m) =>
+      match self.global_transform_ref(entity) {
+        Some(gt_ref) => {
+          report.visited_entity_count = report.visited_entity_count + 1
+          if self.global_transform_blob.write_matrix_if_changed(
+              gt_ref.format,
+              gt_ref.word_offset,
+              m,
+            ) {
+            report.global_transform_write_count = report.global_transform_write_count +
+              1
+          }
+          true
+        }
+        None => false
+      }
+    None => {
+      report.skipped_dirty_entity_count = report.skipped_dirty_entity_count + 1
+      false
+    }
+  }
+}
+
+///|
 
 ///|
 /// Implements `put_f32_array_le`.
@@ -895,6 +1066,63 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
 }
 
 ///|
+/// Fallback full propagation path with diagnostics for every TF+GT row.
+fn World::try_update_global_transforms_from_transforms_archetype_path_report(
+  self : World,
+  tf : ComponentTypeId,
+  gt : ComponentTypeId,
+  co : ComponentTypeId,
+  report : TransformPropagationReportDraft,
+) -> Bool {
+  let mut matched = false
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let comps = arch.components
+    if !component_array_contains(comps, tf) ||
+      !component_array_contains(comps, gt) {
+      continue
+    }
+    matched = true
+    let tf_col_index = arch.column_index(tf)
+    if tf_col_index < 0 {
+      return false
+    }
+    if arch.columns[tf_col_index].stride != 48 {
+      return false
+    }
+  }
+  if !matched {
+    return false
+  }
+  report.used_full_path = true
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    let comps = arch.components
+    if !component_array_contains(comps, tf) ||
+      !component_array_contains(comps, gt) {
+      continue
+    }
+    let has_co = component_array_contains(comps, co)
+    let tf_col = arch.columns[arch.column_index(tf)]
+    let tf_bytes = tf_col.bytes
+    let tf_stride = tf_col.stride
+    for row = 0; row < arch.entities.length(); row = row + 1 {
+      let e = arch.entities[row]
+      let tf_base = row * tf_stride
+      let local_m = @comp.Transform3D::local_matrix_from_component_view(
+        tf_bytes[tf_base:tf_base + tf_stride],
+      )
+      if !self.compute_global_transform_for_tf_gt_bulk_row_report(
+          e, has_co, local_m, report,
+        ) {
+        report.ok = false
+      }
+    }
+  }
+  true
+}
+
+///|
 /// Recomputes packed GlobalTransform blob rows for entities marked dirty since the last pass.
 fn World::update_global_transforms_from_transforms_dirty(self : World) -> Bool {
   if self.transform_dirty_entities.length() == 0 {
@@ -928,6 +1156,52 @@ fn World::update_global_transforms_from_transforms_dirty(self : World) -> Bool {
 }
 
 ///|
+/// Recomputes dirty transform rows and accumulates diagnostic counters.
+fn World::update_global_transforms_from_transforms_dirty_report(
+  self : World,
+  report : TransformPropagationReportDraft,
+) -> Bool {
+  if self.transform_dirty_entities.length() == 0 {
+    return true
+  }
+  report.used_dirty_path = true
+  if self.transform_hierarchy_index_dirty {
+    report.hierarchy_index_rebuilt = true
+  }
+  self.ensure_transform_hierarchy_index()
+  let tf = self.transform_component_id
+  let processed_generations = FixedArray::make(self.generations.length(), -1)
+  let mut ok = true
+  for i = 0; i < self.transform_dirty_entities.length(); i = i + 1 {
+    let entity = self.transform_dirty_entities[i]
+    if !self.transform_entity_is_dirty(entity) || !self.is_alive(entity) {
+      report.skipped_dirty_entity_count = report.skipped_dirty_entity_count + 1
+      continue
+    }
+    if transform_processed_contains(processed_generations, entity) ||
+      !self.has_component(entity, tf) {
+      report.skipped_dirty_entity_count = report.skipped_dirty_entity_count + 1
+      continue
+    }
+    match self.compute_global_transform(entity) {
+      Some(matrix) => {
+        report.dirty_root_count = report.dirty_root_count + 1
+        if !self.recompute_transform_dirty_subtree_report(
+            entity, matrix, processed_generations, report,
+          ) {
+          ok = false
+        }
+      }
+      None =>
+        report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
+          1
+    }
+  }
+  self.clear_transform_dirty()
+  ok
+}
+
+///|
 /// Recomputes [`GlobalTransform`] GPU payloads from [`Transform3D`] (and optional [`ChildOf`] hierarchy)
 /// for every entity that currently has **both** builtin transforms.
 pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
@@ -952,4 +1226,49 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   abort(
     "World::update_global_transforms_from_transforms: archetype path unavailable",
   )
+}
+
+///|
+/// Recomputes pending dirty transforms and returns diagnostic counters without draining upload views.
+///
+/// When the dirty path cannot complete, this falls back to the same full recompute path used by
+/// [`World::update_global_transforms_from_transforms`] and marks the fallback in the report.
+pub fn World::propagate_global_transforms_from_transforms_report(
+  self : World,
+) -> TransformPropagationReport {
+  let tf = self.transform_component_id
+  let gt = self.global_transform_component_id
+  let co = self.child_of_component_id
+  self.assert_system_component_read(
+    tf, "World::propagate_global_transforms_from_transforms_report",
+  )
+  self.assert_system_component_read(
+    co, "World::propagate_global_transforms_from_transforms_report",
+  )
+  self.assert_system_component_write(
+    gt, "World::propagate_global_transforms_from_transforms_report",
+  )
+  let report = transform_propagation_report_draft(
+    self.transform_dirty_entities.length(),
+  )
+  if self.transform_dirty_entities.length() == 0 {
+    report.pending_upload_range_count = self.global_transform_blob.pending_write_view_count()
+    return report.finish()
+  }
+  let dirty_ok = self.update_global_transforms_from_transforms_dirty_report(
+    report,
+  )
+  if !dirty_ok {
+    report.fallback_to_full = true
+    report.ok = true
+    if self.try_update_global_transforms_from_transforms_archetype_path_report(
+        tf, gt, co, report,
+      ) {
+      self.clear_transform_dirty()
+    } else {
+      report.ok = false
+    }
+  }
+  report.pending_upload_range_count = self.global_transform_blob.pending_write_view_count()
+  report.finish()
 }

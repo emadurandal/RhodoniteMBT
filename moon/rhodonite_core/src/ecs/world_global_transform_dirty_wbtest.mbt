@@ -98,6 +98,101 @@ test "dirty transform propagation updates dirty subtree only" {
 }
 
 ///|
+test "transform propagation report returns no-op diagnostics without draining uploads" {
+  let world = World::new()
+  let report = world.propagate_global_transforms_from_transforms_report()
+  assert_true(report.ok)
+  assert_true(!report.used_dirty_path)
+  assert_true(!report.used_full_path)
+  assert_true(!report.fallback_to_full)
+  assert_eq(report.dirty_queue_count, 0)
+  assert_eq(report.pending_upload_range_count, 0)
+}
+
+///|
+test "transform propagation report counts dirty subtree and pending upload ranges" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  let root = world.create_entity()
+  dirty_test_set_transform_x(world, parent, (10.0 : Float))
+  dirty_test_set_transform_x(world, child, (5.0 : Float))
+  dirty_test_set_transform_x(world, root, (7.0 : Float))
+  assert_true(world.set_child_of(child, parent))
+  dirty_test_add_global(world, parent)
+  dirty_test_add_global(world, child)
+  dirty_test_add_global(world, root)
+  world.update_global_transforms_from_transforms()
+  ignore(world.drain_global_transform_blob_write_views())
+  assert_true(
+    world.set_global_transform(root, dirty_test_translation((99.0 : Float))),
+  )
+  ignore(world.drain_global_transform_blob_write_views())
+  dirty_test_set_transform_x(world, parent, (20.0 : Float))
+  let report = world.propagate_global_transforms_from_transforms_report()
+  assert_true(report.ok)
+  assert_true(report.used_dirty_path)
+  assert_true(!report.used_full_path)
+  assert_true(!report.fallback_to_full)
+  assert_true(report.hierarchy_index_rebuilt)
+  assert_eq(report.dirty_queue_count, 1)
+  assert_eq(report.dirty_root_count, 1)
+  assert_eq(report.skipped_dirty_entity_count, 0)
+  assert_eq(report.visited_entity_count, 2)
+  assert_eq(report.global_transform_write_count, 2)
+  assert_eq(report.pending_upload_range_count, 1)
+  dirty_test_expect_global_x(world, parent, (20.0 : Float))
+  dirty_test_expect_global_x(world, child, (25.0 : Float))
+  dirty_test_expect_global_x(world, root, (99.0 : Float))
+  assert_eq(world.drain_global_transform_blob_write_views().length(), 1)
+}
+
+///|
+test "transform propagation report counts skipped dead dirty entries" {
+  let world = World::new()
+  let entity = world.create_entity()
+  dirty_test_set_transform_x(world, entity, (1.0 : Float))
+  dirty_test_add_global(world, entity)
+  world.update_global_transforms_from_transforms()
+  ignore(world.drain_global_transform_blob_write_views())
+  dirty_test_set_transform_x(world, entity, (2.0 : Float))
+  assert_true(world.destroy_entity(entity))
+  let report = world.propagate_global_transforms_from_transforms_report()
+  assert_true(report.ok)
+  assert_true(report.used_dirty_path)
+  assert_eq(report.dirty_queue_count, 1)
+  assert_eq(report.dirty_root_count, 0)
+  assert_eq(report.skipped_dirty_entity_count, 1)
+  assert_eq(report.visited_entity_count, 0)
+  assert_eq(report.global_transform_write_count, 0)
+}
+
+///|
+test "transform propagation fallback report preserves entity failures" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  dirty_test_set_transform_x(world, parent, (10.0 : Float))
+  dirty_test_set_transform_x(world, child, (5.0 : Float))
+  assert_true(world.set_child_of(child, parent))
+  dirty_test_add_global(world, child)
+  assert_true(world.destroy_entity(parent))
+  let report = transform_propagation_report_draft(1)
+  assert_true(
+    world.try_update_global_transforms_from_transforms_archetype_path_report(
+      world.transform_component(),
+      world.global_transform_component(),
+      world.child_of_component(),
+      report,
+    ),
+  )
+  assert_true(report.used_full_path)
+  assert_true(!report.ok)
+  assert_eq(report.skipped_dirty_entity_count, 1)
+  assert_eq(report.visited_entity_count, 0)
+}
+
+///|
 test "dirty transform propagation follows tracked typed query writers" {
   let world = World::new()
   let parent_a = world.create_entity()

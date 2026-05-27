@@ -10,12 +10,12 @@ pub fn camera_blob_sync_system(
 ) -> System {
   let gt = world.global_transform_component()
   let camera = world.camera_component()
-  System::new(
+  System::new_direct(
     "rhodonite/camera_blob_sync",
     phase,
     [gt, lens_component],
     [camera],
-    fn(world, _ctx, _commands) {
+    fn(world, _ctx) {
       Query::new([gt, camera, lens_component]).for_each(world, row => {
         let entity = row.entity()
         match world.get_global_transform(entity) {
@@ -89,12 +89,12 @@ pub fn orbit_camera_blob_sync_system(
 ) -> System {
   let gt = world.global_transform_component()
   let camera = world.camera_component()
-  System::new(
+  System::new_direct(
     "rhodonite/orbit_camera_blob_sync",
     phase,
     [gt, lens_component, orbit_component],
     [camera],
-    fn(world, _ctx, _commands) {
+    fn(world, _ctx) {
       Query::new([gt, camera, lens_component, orbit_component]).for_each(
         world,
         row => {

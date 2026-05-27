@@ -154,4 +154,39 @@ describe("ECS TypeScript wrapper: core", () => {
 		).toBeCloseTo(11);
 	});
 
+	it("reports transform propagation diagnostics without draining uploads", () => {
+		const world = World.new();
+		const parent = world.createEntity();
+		const child = world.createEntity();
+
+		expect(
+			world.setTransformTrs(parent, 10, 0, 0, 0, 0, 0, 1, 1, 1, 1),
+		).toBe(true);
+		expect(world.setTransformTrs(child, 5, 0, 0, 0, 0, 0, 1, 1, 1, 1)).toBe(
+			true,
+		);
+		expect(world.setChildOf(child, parent)).toBe(true);
+		expect(world.setGlobalTransform(parent, identityMat4ColMajor())).toBe(true);
+		expect(world.setGlobalTransform(child, identityMat4ColMajor())).toBe(true);
+		world.updateGlobalTransformsFromTransforms();
+		world.drainGlobalTransformBlobWriteViews();
+
+		expect(
+			world.setTransformTrs(parent, 20, 0, 0, 0, 0, 0, 1, 1, 1, 1),
+		).toBe(true);
+		const report = world.propagateGlobalTransformsFromTransformsReport();
+		expect(report.ok()).toBe(true);
+		expect(report.usedDirtyPath()).toBe(true);
+		expect(report.usedFullPath()).toBe(false);
+		expect(report.fallbackToFull()).toBe(false);
+		expect(report.dirtyQueueCount()).toBe(1);
+		expect(report.dirtyRootCount()).toBe(1);
+		expect(report.skippedDirtyEntityCount()).toBe(0);
+		expect(report.visitedEntityCount()).toBe(2);
+		expect(report.globalTransformWriteCount()).toBe(2);
+		expect(report.pendingUploadRangeCount()).toBe(1);
+		expect(world.getGlobalTransform(child)?.[12]).toBeCloseTo(25);
+		expect(world.drainGlobalTransformBlobWriteViews()).toHaveLength(1);
+	});
+
 });

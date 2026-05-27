@@ -50,9 +50,11 @@
             <li>Component registration is locked while the system runner is executing.</li>
             <li><code>SystemRunner</code> caches phase batches internally and invalidates them when systems are added; public plan results remain snapshots.</li>
             <li><code>System::new_direct</code> builds commandless systems for hot paths that mutate through <code>World</code> directly. Direct systems still use declared access guards and batching, but they do not allocate a <code>CommandBuffer</code> and their direct writes are not recorded by <code>WorldHistory::run_system_phase</code>.</li>
+            <li>The builtin runtime camera blob sync systems are direct systems; use the <code>*_command_system</code> variants when those writes must be recorded through <code>WorldHistory</code>.</li>
             <li>Non-report phase execution skips the command-buffer apply pass for command systems that queued no commands.</li>
             <li><code>SystemRunner::run_phase_report</code> still emits per-system diagnostics for direct systems and empty command buffers; the report is an execution snapshot and does not change batch ordering, command apply order, or history behavior.</li>
             <li>The builtin <code>TransformPropagation</code> system uses an internal dirty queue plus a lazy <code>ChildOf</code> hierarchy index. Dirty roots are recomputed parent-first through their indexed subtree, while the public <code>World::update_global_transforms_from_transforms</code> API remains a full recompute path for compatibility.</li>
+            <li><code>World::propagate_global_transforms_from_transforms_report</code> runs the diagnostic dirty propagation path and returns counters for dirty roots, skipped entries, visited entities, changed GlobalTransform rows, hierarchy-index rebuilds, and pending upload ranges without draining the blob.</li>
           </ul>
 
           <h2>Builtin Packed Blobs</h2>

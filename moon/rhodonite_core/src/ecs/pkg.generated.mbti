@@ -439,6 +439,20 @@ pub fn SystemRunner::plan_phase(Self, PhaseKey) -> SystemPhasePlan
 pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 pub fn SystemRunner::run_phase_report(Self, World, SystemContext, PhaseKey) -> SystemRunReport
 
+pub(all) struct TransformPropagationReport {
+  ok : Bool
+  used_dirty_path : Bool
+  used_full_path : Bool
+  fallback_to_full : Bool
+  dirty_queue_count : Int
+  dirty_root_count : Int
+  skipped_dirty_entity_count : Int
+  visited_entity_count : Int
+  global_transform_write_count : Int
+  hierarchy_index_rebuilt : Bool
+  pending_upload_range_count : Int
+}
+
 pub struct World {
   // private fields
 }
@@ -480,6 +494,7 @@ pub fn World::location(Self, EntityId) -> EntityLocation?
 pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::orbit_camera_controller_component(Self) -> ComponentTypeId
+pub fn World::propagate_global_transforms_from_transforms_report(Self) -> TransformPropagationReport
 pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
 pub fn World::register_cpu_component_with_identity(Self, String, Int, String, String?, String?) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
