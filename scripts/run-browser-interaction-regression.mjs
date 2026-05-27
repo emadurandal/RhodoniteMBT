@@ -23,6 +23,10 @@ if (!launchBrowser) {
 let browserContext;
 let resultServer;
 let distServer;
+const browserDiagnostics = {
+	get: () => "",
+	stop: () => {},
+};
 
 let resolveResult;
 let rejectResult;
@@ -93,7 +97,6 @@ try {
 	const userDataDir = await fs.mkdtemp(
 		path.join(os.tmpdir(), "rhodonite-browser-interaction-"),
 	);
-	let getBrowserDiagnostics = () => "";
 	const browserArgs = [
 		"--disable-dev-shm-usage",
 		"--no-sandbox",
@@ -107,12 +110,15 @@ try {
 	try {
 		const browser = await launchBrowser({
 			attachPageDiagnostics: ({ context, page }) => {
-				getBrowserDiagnostics = attachBrowserDiagnostics(
+				const diagnostics = attachBrowserDiagnostics(
 					context,
 					page,
 					verbose,
 					rejectResult,
 				);
+				browserDiagnostics.get = diagnostics.get;
+				browserDiagnostics.stop = diagnostics.stop;
+				return diagnostics.stop;
 			},
 			args: browserArgs,
 			headless,
@@ -138,7 +144,7 @@ try {
 			failures: [
 				{
 					name: "browser interaction regression",
-					message: formatBrowserFailure(error, getBrowserDiagnostics()),
+					message: formatBrowserFailure(error, browserDiagnostics.get()),
 				},
 			],
 		};
@@ -161,6 +167,7 @@ try {
 	}
 } finally {
 	if (browserContext) {
+		browserDiagnostics.stop();
 		await browserContext.close();
 	}
 	if (distServer) {
@@ -518,6 +525,7 @@ function withTimeout(promise, ms, message) {
 
 function attachBrowserDiagnostics(context, page, verboseOutput, rejectBrowserFailure) {
 	let diagnostics = "";
+	let active = true;
 	const append = (line) => {
 		diagnostics = appendOutputTail(diagnostics, `${line}\n`);
 		if (verboseOutput) {
@@ -525,28 +533,48 @@ function attachBrowserDiagnostics(context, page, verboseOutput, rejectBrowserFai
 		}
 	};
 	const failBrowser = (message) => {
+		if (!active) {
+			return;
+		}
 		append(message);
 		rejectBrowserFailure(new Error(message));
 	};
-	page.on("console", (message) => {
+	const onConsole = (message) => {
 		append(`console ${message.type()} ${message.text()}`);
-	});
-	page.on("pageerror", (error) => {
+	};
+	const onPageError = (error) => {
 		append(`pageerror ${error.message}`);
-	});
-	page.on("requestfailed", (request) => {
+	};
+	const onRequestFailed = (request) => {
 		append(`requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`);
-	});
-	page.on("crash", () => {
+	};
+	const onCrash = () => {
 		failBrowser("browser page crashed before reporting results");
-	});
-	page.on("close", () => {
+	};
+	const onPageClose = () => {
 		failBrowser("browser page closed before reporting results");
-	});
-	context.on("close", () => {
+	};
+	const onContextClose = () => {
 		failBrowser("browser context closed before reporting results");
-	});
-	return () => diagnostics;
+	};
+	page.on("console", onConsole);
+	page.on("pageerror", onPageError);
+	page.on("requestfailed", onRequestFailed);
+	page.on("crash", onCrash);
+	page.on("close", onPageClose);
+	context.on("close", onContextClose);
+	return {
+		get: () => diagnostics,
+		stop: () => {
+			active = false;
+			page.off("console", onConsole);
+			page.off("pageerror", onPageError);
+			page.off("requestfailed", onRequestFailed);
+			page.off("crash", onCrash);
+			page.off("close", onPageClose);
+			context.off("close", onContextClose);
+		},
+	};
 }
 
 function appendOutputTail(existing, text) {

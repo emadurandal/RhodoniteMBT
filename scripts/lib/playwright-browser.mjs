@@ -27,12 +27,15 @@ export function createBrowserLauncher() {
 			executablePath: browserPath,
 			headless,
 		});
+		let detachPageDiagnostics = () => {};
 		try {
 			const page = context.pages()[0] ?? await context.newPage();
-			attachPageDiagnostics({ context, page, verbose, logPrefix });
+			detachPageDiagnostics =
+				attachPageDiagnostics({ context, page, verbose, logPrefix }) ?? (() => {});
 			await page.goto(url);
 			return { context, page };
 		} catch (error) {
+			detachPageDiagnostics();
 			await context.close();
 			throw error;
 		}
