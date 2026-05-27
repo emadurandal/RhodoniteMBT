@@ -188,9 +188,11 @@ priv struct QueryArchetypeComponentAccess {
 }
 
 ///|
+/// Prepared metadata for one matched archetype chunk, including row and raw column access maps.
 priv struct PreparedQueryArchetype {
   archetype_index : Int
   accesses : Array[QueryArchetypeComponentAccess]
+  row_accesses : Array[QueryRowComponentAccess]
 }
 
 ///|

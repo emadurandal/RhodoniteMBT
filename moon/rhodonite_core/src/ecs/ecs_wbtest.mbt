@@ -42,6 +42,38 @@ test "World archetype version only changes when new archetypes are created" {
 }
 
 ///|
+test "PreparedQueryArchetype stores row access metadata at prepare time" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedRowAccessA", 4)
+  let qb = world.register_cpu_component("PreparedRowAccessB", 8)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4_wb(1, 2, 3, 4)))
+  assert_true(
+    world.add_component_bytes(
+      entity,
+      qb,
+      ([5, 6, 7, 8, 9, 10, 11, 12] : FixedArray[Byte]),
+    ),
+  )
+  let prepared = Query::new([qb, qa]).prepare(world)
+  assert_eq(prepared.archetypes.length(), 1)
+  let chunk = prepared.archetypes[0]
+  assert_eq(chunk.accesses.length(), 2)
+  assert_eq(chunk.row_accesses.length(), 2)
+  for i = 0; i < chunk.accesses.length(); i = i + 1 {
+    assert_eq(
+      chunk.row_accesses[i].column_index,
+      chunk.accesses[i].column_index,
+    )
+    assert_eq(chunk.row_accesses[i].stride, chunk.accesses[i].stride)
+  }
+  assert_true(chunk.accesses[0].component == qb)
+  assert_eq(chunk.row_accesses[0].stride, 8)
+  assert_true(chunk.accesses[1].component == qa)
+  assert_eq(chunk.row_accesses[1].stride, 4)
+}
+
+///|
 test "PackedGpuBlobStore normalizes non-monotonic dirty word ranges" {
   let store = PackedGpuBlobStore::new()
   store.ensure_word_capacity(30)
