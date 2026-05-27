@@ -8,10 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import {
-	hasBrowserExecutable,
-	startBrowserProcess,
-} from "./lib/safe-process.mjs";
+import { createBrowserProcessLauncher } from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const update = process.env.RHODONITE_UPDATE_VISUAL_SNAPSHOTS === "1";
@@ -22,7 +19,8 @@ const snapshotDir = path.join(
 	"moon/rhodonite_examples/src/visual_regression/__image_snapshots__",
 );
 
-if (!hasBrowserExecutable()) {
+const startBrowserProcess = createBrowserProcessLauncher();
+if (!startBrowserProcess) {
 	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }

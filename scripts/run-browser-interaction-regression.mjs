@@ -6,10 +6,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-	hasBrowserExecutable,
-	startBrowserProcess,
-} from "./lib/safe-process.mjs";
+import { createBrowserProcessLauncher } from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const distDir = path.join(root, "dist");
@@ -17,7 +14,8 @@ const verbose = process.env.RHODONITE_BROWSER_VERBOSE === "1" ||
 	process.env.RHODONITE_BROWSER_INTERACTION_VERBOSE === "1";
 const headless = process.env.RHODONITE_BROWSER_HEADLESS !== "0";
 
-if (!hasBrowserExecutable()) {
+const startBrowserProcess = createBrowserProcessLauncher();
+if (!startBrowserProcess) {
 	console.log("interaction_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }

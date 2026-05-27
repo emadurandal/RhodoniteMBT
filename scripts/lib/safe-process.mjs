@@ -40,21 +40,19 @@ export function runNodeScriptProcess(scriptPath, args = [], options = {}) {
 	);
 }
 
-export function hasBrowserExecutable() {
-	return findBrowserExecutable() !== undefined;
-}
-
-export function startBrowserProcess(args, options = {}) {
-	assertSafeArgs(args);
+export function createBrowserProcessLauncher() {
 	const browserPath = findBrowserExecutable();
 	if (!browserPath) {
-		throw new Error("Chrome/Chromium browser not found");
+		return undefined;
 	}
-	return spawn(browserPath, args, {
-		...options,
-		shell: false,
-		windowsHide: true,
-	});
+	return (args, options = {}) => {
+		assertSafeArgs(args);
+		return spawn(browserPath, args, {
+			...options,
+			shell: false,
+			windowsHide: true,
+		});
+	};
 }
 
 function waitForProcess(commandLabel, args, child) {
