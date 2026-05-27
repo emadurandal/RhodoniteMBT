@@ -7,20 +7,56 @@ import path from "node:path";
 
 const windowsExecutableExts = [".exe", ".cmd", ".bat", ".com"];
 
-// Centralized runner for repository-owned tooling. It never invokes a shell, so
-// arguments are passed as argv values instead of command-line text.
-export function startTrustedProcess(command, args, options = {}) {
+// Centralized launchers for repository-owned tooling. They never invoke a shell,
+// so arguments are passed as argv values instead of command-line text.
+export function startMoonProcess(args, options = {}) {
 	assertSafeArgs(args);
-	return spawn(command, args, {
+	return spawn("moon", args, {
 		...options,
 		shell: false,
 		windowsHide: true,
 	});
 }
 
-export function runTrustedProcess(command, args, options = {}) {
+export function runMoonProcess(args, options = {}) {
+	return waitForProcess("moon", args, startMoonProcess(args, options));
+}
+
+export function startNodeScriptProcess(scriptPath, args = [], options = {}) {
+	assertSafeScriptPath(scriptPath);
+	assertSafeArgs(args);
+	return spawn(process.execPath, [scriptPath, ...args], {
+		...options,
+		shell: false,
+		windowsHide: true,
+	});
+}
+
+export function runNodeScriptProcess(scriptPath, args = [], options = {}) {
+	return waitForProcess(
+		process.execPath,
+		[scriptPath, ...args],
+		startNodeScriptProcess(scriptPath, args, options),
+	);
+}
+
+export function createBrowserProcessLauncher() {
+	const browserPath = findBrowserExecutable();
+	if (!browserPath) {
+		return undefined;
+	}
+	return (args, options = {}) => {
+		assertSafeArgs(args);
+		return spawn(browserPath, args, {
+			...options,
+			shell: false,
+			windowsHide: true,
+		});
+	};
+}
+
+function waitForProcess(commandLabel, args, child) {
 	return new Promise((resolve, reject) => {
-		const child = startTrustedProcess(command, args, options);
 		child.on("error", reject);
 		child.on("close", (code, signal) => {
 			if (code === 0) {
@@ -28,7 +64,7 @@ export function runTrustedProcess(command, args, options = {}) {
 			} else {
 				reject(
 					new Error(
-						`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}`,
+						`${commandLabel} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}`,
 					),
 				);
 			}
@@ -65,7 +101,7 @@ function findExecutable(name) {
 	return undefined;
 }
 
-export function findBrowserExecutable() {
+function findBrowserExecutable() {
 	const fromEnv = process.env.RHODONITE_BROWSER || process.env.CHROME;
 	if (fromEnv && isExecutable(fromEnv)) {
 		return fromEnv;
@@ -88,6 +124,17 @@ export function findBrowserExecutable() {
 		}
 	}
 	return undefined;
+}
+
+function assertSafeScriptPath(scriptPath) {
+	if (
+		!scriptPath.startsWith("scripts/") ||
+		path.isAbsolute(scriptPath) ||
+		scriptPath.includes("..") ||
+		scriptPath.includes("\0")
+	) {
+		throw new Error(`unsafe Node script path: ${scriptPath}`);
+	}
 }
 
 function platformBrowserCandidates() {
