@@ -1259,13 +1259,14 @@ pub fn World::propagate_global_transforms_from_transforms_report(
     report,
   )
   if !dirty_ok {
-    report.ok = false
     report.fallback_to_full = true
+    report.ok = true
     if self.try_update_global_transforms_from_transforms_archetype_path_report(
         tf, gt, co, report,
       ) {
-      report.ok = true
       self.clear_transform_dirty()
+    } else {
+      report.ok = false
     }
   }
   report.pending_upload_range_count = self.global_transform_blob.pending_write_view_count()

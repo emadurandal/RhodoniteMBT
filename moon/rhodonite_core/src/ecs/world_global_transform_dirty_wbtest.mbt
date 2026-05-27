@@ -168,6 +168,31 @@ test "transform propagation report counts skipped dead dirty entries" {
 }
 
 ///|
+test "transform propagation fallback report preserves entity failures" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  dirty_test_set_transform_x(world, parent, (10.0 : Float))
+  dirty_test_set_transform_x(world, child, (5.0 : Float))
+  assert_true(world.set_child_of(child, parent))
+  dirty_test_add_global(world, child)
+  assert_true(world.destroy_entity(parent))
+  let report = transform_propagation_report_draft(1)
+  assert_true(
+    world.try_update_global_transforms_from_transforms_archetype_path_report(
+      world.transform_component(),
+      world.global_transform_component(),
+      world.child_of_component(),
+      report,
+    ),
+  )
+  assert_true(report.used_full_path)
+  assert_true(!report.ok)
+  assert_eq(report.skipped_dirty_entity_count, 1)
+  assert_eq(report.visited_entity_count, 0)
+}
+
+///|
 test "dirty transform propagation follows tracked typed query writers" {
   let world = World::new()
   let parent_a = world.create_entity()
