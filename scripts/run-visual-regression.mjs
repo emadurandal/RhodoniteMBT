@@ -4,8 +4,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-	runTrustedProcess,
-	startTrustedProcess,
+	runMoonProcess,
+	runNodeScriptProcess,
+	startMoonProcess,
+	startNodeScriptProcess,
 } from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -33,7 +35,7 @@ if (target === "all" || target === "browser") {
 }
 
 async function runNative() {
-	await run("moon", [
+	await runMoon([
 		"test",
 		"--target",
 		"native",
@@ -44,22 +46,22 @@ async function runNative() {
 }
 
 async function runBrowser() {
-	await run("moon", ["build", "--target", "js"], { cwd: examplesDir });
-	await run("moon", [
+	await runMoon(["build", "--target", "js"], { cwd: examplesDir });
+	await runMoon([
 		"build",
 		"--target",
 		"wasm",
 		"--release",
 		"src/ecs-mass-cubes/wasm/main",
 	], { cwd: examplesDir });
-	await run("moon", [
+	await runMoon([
 		"build",
 		"--target",
 		"wasm-gc",
 		"--release",
 		"src/ecs-mass-cubes/wasm/main",
 	], { cwd: examplesDir });
-	await run(process.execPath, ["scripts/run-browser-visual-regression.mjs"], {
+	await runNodeScript("scripts/run-browser-visual-regression.mjs", [], {
 		env: {
 			...updateEnv(),
 			...(verbose ? { RHODONITE_BROWSER_VERBOSE: "1" } : {}),
@@ -71,48 +73,68 @@ function updateEnv() {
 	return update ? { RHODONITE_UPDATE_VISUAL_SNAPSHOTS: "1" } : {};
 }
 
-function run(command, commandArgs, options = {}) {
+function runMoon(commandArgs, options = {}) {
 	const cwd = options.cwd ?? root;
 	const env = { ...process.env, ...(options.env ?? {}) };
 	if (verbose) {
-		return runTrustedProcess(command, commandArgs, { cwd, env, stdio: "inherit" });
+		return runMoonProcess(commandArgs, { cwd, env, stdio: "inherit" });
 	}
 	return new Promise((resolve, reject) => {
-		const child = startTrustedProcess(command, commandArgs, {
+		const child = startMoonProcess(commandArgs, {
 			cwd,
 			env,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
-		let stdout = "";
-		let stderr = "";
-		child.stdout.setEncoding("utf8");
-		child.stderr.setEncoding("utf8");
-		child.stdout.on("data", (chunk) => {
-			stdout += chunk;
+		captureVisualOutput(child, "moon", commandArgs, resolve, reject);
+	});
+}
+
+function runNodeScript(scriptPath, scriptArgs, options = {}) {
+	const cwd = options.cwd ?? root;
+	const env = { ...process.env, ...(options.env ?? {}) };
+	if (verbose) {
+		return runNodeScriptProcess(scriptPath, scriptArgs, { cwd, env, stdio: "inherit" });
+	}
+	return new Promise((resolve, reject) => {
+		const child = startNodeScriptProcess(scriptPath, scriptArgs, {
+			cwd,
+			env,
+			stdio: ["ignore", "pipe", "pipe"],
 		});
-		child.stderr.on("data", (chunk) => {
-			stderr += chunk;
-		});
-		child.on("error", reject);
-		child.on("close", (code, signal) => {
-			const filteredStdout = alignVisualResultColumns(filterWarnings(stdout));
-			const filteredStderr = alignVisualResultColumns(filterWarnings(stderr));
-			if (filteredStdout.length > 0) {
-				process.stdout.write(filteredStdout);
-			}
-			if (filteredStderr.length > 0) {
-				process.stderr.write(filteredStderr);
-			}
-			if (code === 0) {
-				resolve();
-			} else {
-				reject(
-					new Error(
-						`${command} ${commandArgs.join(" ")} failed with ${signal ?? `exit code ${code}`}`,
-					),
-				);
-			}
-		});
+		captureVisualOutput(child, process.execPath, [scriptPath, ...scriptArgs], resolve, reject);
+	});
+}
+
+function captureVisualOutput(child, commandLabel, commandArgs, resolve, reject) {
+	let stdout = "";
+	let stderr = "";
+	child.stdout.setEncoding("utf8");
+	child.stderr.setEncoding("utf8");
+	child.stdout.on("data", (chunk) => {
+		stdout += chunk;
+	});
+	child.stderr.on("data", (chunk) => {
+		stderr += chunk;
+	});
+	child.on("error", reject);
+	child.on("close", (code, signal) => {
+		const filteredStdout = alignVisualResultColumns(filterWarnings(stdout));
+		const filteredStderr = alignVisualResultColumns(filterWarnings(stderr));
+		if (filteredStdout.length > 0) {
+			process.stdout.write(filteredStdout);
+		}
+		if (filteredStderr.length > 0) {
+			process.stderr.write(filteredStderr);
+		}
+		if (code === 0) {
+			resolve();
+		} else {
+			reject(
+				new Error(
+					`${commandLabel} ${commandArgs.join(" ")} failed with ${signal ?? `exit code ${code}`}`,
+				),
+			);
+		}
 	});
 }
 

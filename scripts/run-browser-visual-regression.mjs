@@ -9,8 +9,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import {
-	findBrowserExecutable,
-	startTrustedProcess,
+	hasBrowserExecutable,
+	startBrowserProcess,
 } from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -22,8 +22,7 @@ const snapshotDir = path.join(
 	"moon/rhodonite_examples/src/visual_regression/__image_snapshots__",
 );
 
-const browser = findBrowserExecutable();
-if (!browser) {
+if (!hasBrowserExecutable()) {
 	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
@@ -101,7 +100,7 @@ try {
 	const port = typeof address === "object" && address ? address.port : 5173;
 	const url = `http://127.0.0.1:${port}/visual-regression/browser-harness.html?update=${update ? "1" : "0"}&result=${encodeURIComponent(resultEndpoint)}`;
 	if (verbose) {
-		console.log(`visual_regression(browser): launching ${browser}`);
+		console.log("visual_regression(browser): launching Chrome/Chromium");
 		console.log(`visual_regression(browser): opening ${url}`);
 	}
 	const userDataDir = await fs.mkdtemp(
@@ -124,7 +123,7 @@ try {
 	if (headless) {
 		browserArgs.unshift("--headless=new");
 	}
-	browserProcess = startTrustedProcess(browser, browserArgs, {
+	browserProcess = startBrowserProcess(browserArgs, {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {

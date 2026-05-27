@@ -7,8 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-	findBrowserExecutable,
-	startTrustedProcess,
+	hasBrowserExecutable,
+	startBrowserProcess,
 } from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -17,8 +17,7 @@ const verbose = process.env.RHODONITE_BROWSER_VERBOSE === "1" ||
 	process.env.RHODONITE_BROWSER_INTERACTION_VERBOSE === "1";
 const headless = process.env.RHODONITE_BROWSER_HEADLESS !== "0";
 
-const browser = findBrowserExecutable();
-if (!browser) {
+if (!hasBrowserExecutable()) {
 	console.log("interaction_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
 }
@@ -90,7 +89,7 @@ try {
 	const distPort = typeof distAddress === "object" && distAddress ? distAddress.port : 0;
 	const url = `http://127.0.0.1:${distPort}/__rhodonite_interaction_regression__.html?result=${encodeURIComponent(resultEndpoint)}`;
 	if (verbose) {
-		console.log(`interaction_regression(browser): launching ${browser}`);
+		console.log("interaction_regression(browser): launching Chrome/Chromium");
 		console.log(`interaction_regression(browser): opening ${url}`);
 	}
 	const userDataDir = await fs.mkdtemp(
@@ -114,7 +113,7 @@ try {
 	if (headless) {
 		browserArgs.unshift("--headless=new");
 	}
-	browserProcess = startTrustedProcess(browser, browserArgs, {
+	browserProcess = startBrowserProcess(browserArgs, {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {
