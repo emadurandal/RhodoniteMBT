@@ -237,7 +237,14 @@ export const auditedSurfaces: readonly SurfaceAudit[] = [
 			"writeColumnRowsTracked",
 			"writeColumnRowsTrackedAt",
 		],
-		raw_guarded: ["writeColumn", "writeColumnAt"],
+		raw_guarded: [
+			"forEachColumnChunk",
+			"forEachColumnChunkAt",
+			"writeColumn",
+			"writeColumnAt",
+			"writeColumnRange",
+			"writeColumnRangeAt",
+		],
 		read_only: [
 			"length",
 			"entity",
@@ -247,6 +254,8 @@ export const auditedSurfaces: readonly SurfaceAudit[] = [
 			"componentStrideAt",
 			"readColumn",
 			"readColumnAt",
+			"readColumnRange",
+			"readColumnRangeAt",
 		],
 	}),
 	surfaceAudit("SystemRunner", SystemRunner, {
@@ -442,7 +451,14 @@ export const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 			"write_column_tracked",
 			"write_column_tracked_at",
 		],
-		raw_guarded: ["write_column", "write_column_at"],
+		raw_guarded: [
+			"for_each_column_chunk",
+			"for_each_column_chunk_at",
+			"write_column",
+			"write_column_at",
+			"write_column_range",
+			"write_column_range_at",
+		],
 		read_only: [
 			"component_stride",
 			"component_stride_at",
@@ -452,6 +468,8 @@ export const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 			"length",
 			"read_column",
 			"read_column_at",
+			"read_column_range",
+			"read_column_range_at",
 		],
 	}),
 	moonBitSurfaceAudit("SystemRunner", {

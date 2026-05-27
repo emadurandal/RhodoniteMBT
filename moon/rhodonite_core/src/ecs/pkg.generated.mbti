@@ -304,13 +304,19 @@ pub struct RawQueryArchetype {
 pub fn RawQueryArchetype::component_stride(Self, ComponentTypeId) -> Int
 pub fn RawQueryArchetype::component_stride_at(Self, Int) -> Int
 pub fn RawQueryArchetype::entity(Self, Int) -> EntityId
+pub fn RawQueryArchetype::for_each_column_chunk(Self, ComponentTypeId, Int, (Int, Int, MutArrayView[Byte]) -> Unit) -> Unit
+pub fn RawQueryArchetype::for_each_column_chunk_at(Self, Int, Int, (Int, Int, MutArrayView[Byte]) -> Unit) -> Unit
 pub fn RawQueryArchetype::has(Self, ComponentTypeId) -> Bool
 pub fn RawQueryArchetype::has_at(Self, Int) -> Bool
 pub fn RawQueryArchetype::length(Self) -> Int
 pub fn RawQueryArchetype::read_column(Self, ComponentTypeId) -> ArrayView[Byte]
 pub fn RawQueryArchetype::read_column_at(Self, Int) -> ArrayView[Byte]
+pub fn RawQueryArchetype::read_column_range(Self, ComponentTypeId, Int, Int) -> ArrayView[Byte]
+pub fn RawQueryArchetype::read_column_range_at(Self, Int, Int, Int) -> ArrayView[Byte]
 pub fn RawQueryArchetype::write_column(Self, ComponentTypeId) -> MutArrayView[Byte]
 pub fn RawQueryArchetype::write_column_at(Self, Int) -> MutArrayView[Byte]
+pub fn RawQueryArchetype::write_column_range(Self, ComponentTypeId, Int, Int) -> MutArrayView[Byte]
+pub fn RawQueryArchetype::write_column_range_at(Self, Int, Int, Int) -> MutArrayView[Byte]
 pub fn RawQueryArchetype::write_column_rows_tracked(Self, WorldHistory, ComponentTypeId, Array[Int], (Int, MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryArchetype::write_column_rows_tracked_at(Self, WorldHistory, Int, Array[Int], (Int, MutArrayView[Byte]) -> Unit) -> Bool
 pub fn RawQueryArchetype::write_column_tracked(Self, WorldHistory, ComponentTypeId, (MutArrayView[Byte]) -> Unit) -> Bool

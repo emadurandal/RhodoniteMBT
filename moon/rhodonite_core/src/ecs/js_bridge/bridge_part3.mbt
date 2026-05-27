@@ -619,6 +619,28 @@ pub fn raw_query_archetype_read_column_at(
 }
 
 ///|
+/// Implements `raw_query_archetype_read_column_range`.
+pub fn raw_query_archetype_read_column_range(
+  arch : @ecs.RawQueryArchetype,
+  component : @ecs.ComponentTypeId,
+  row_start : Int,
+  row_count : Int,
+) -> ArrayView[Byte] {
+  arch.read_column_range(component, row_start, row_count)
+}
+
+///|
+/// Implements `raw_query_archetype_read_column_range_at`.
+pub fn raw_query_archetype_read_column_range_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+  row_start : Int,
+  row_count : Int,
+) -> ArrayView[Byte] {
+  arch.read_column_range_at(index, row_start, row_count)
+}
+
+///|
 /// Implements `raw_query_archetype_write_column`.
 pub fn raw_query_archetype_write_column(
   arch : @ecs.RawQueryArchetype,
@@ -634,6 +656,50 @@ pub fn raw_query_archetype_write_column_at(
   index : Int,
 ) -> MutArrayView[Byte] {
   arch.write_column_at(index)
+}
+
+///|
+/// Implements `raw_query_archetype_write_column_range`.
+pub fn raw_query_archetype_write_column_range(
+  arch : @ecs.RawQueryArchetype,
+  component : @ecs.ComponentTypeId,
+  row_start : Int,
+  row_count : Int,
+) -> MutArrayView[Byte] {
+  arch.write_column_range(component, row_start, row_count)
+}
+
+///|
+/// Implements `raw_query_archetype_write_column_range_at`.
+pub fn raw_query_archetype_write_column_range_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+  row_start : Int,
+  row_count : Int,
+) -> MutArrayView[Byte] {
+  arch.write_column_range_at(index, row_start, row_count)
+}
+
+///|
+/// Implements `raw_query_archetype_for_each_column_chunk`.
+pub fn raw_query_archetype_for_each_column_chunk(
+  arch : @ecs.RawQueryArchetype,
+  component : @ecs.ComponentTypeId,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  arch.for_each_column_chunk(component, rows_per_chunk, f)
+}
+
+///|
+/// Implements `raw_query_archetype_for_each_column_chunk_at`.
+pub fn raw_query_archetype_for_each_column_chunk_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte]) -> Unit,
+) -> Unit {
+  arch.for_each_column_chunk_at(index, rows_per_chunk, f)
 }
 
 ///|

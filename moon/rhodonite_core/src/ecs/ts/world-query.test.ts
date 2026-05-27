@@ -148,6 +148,51 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(getF32(e1Bytes ?? new Uint8Array(), 0)).toBeCloseTo(20);
 	});
 
+	it("exposes archetype column range and chunk views", () => {
+		const world = World.new();
+		const cpu = world.registerComponent("ChunkedVelocity", 16);
+		const entities = [world.createEntity(), world.createEntity(), world.createEntity()];
+		for (let i = 0; i < entities.length; i += 1) {
+			expect(
+				world.addComponentBytes(
+					entities[i],
+					cpu,
+					f32Bytes([i + 1, 0, 0, 0], 16),
+				),
+			).toBe(true);
+		}
+
+		RawQuery.new([cpu]).forEachArchetype(world, (archetype) => {
+			const read = archetype.readColumnRange(cpu, 1, 2);
+			expect(read.length).toBe(32);
+			expect(read.getF32(0)).toBeCloseTo(2);
+			expect(read.getF32(16)).toBeCloseTo(3);
+
+			const write = archetype.writeColumnRangeAt(0, 1, 1);
+			expect(write.length).toBe(16);
+			write.setF32(0, 20);
+			expect(archetype.readColumnRangeAt(0, archetype.length(), 0).length).toBe(0);
+
+			const starts: number[] = [];
+			const counts: number[] = [];
+			archetype.forEachColumnChunk(cpu, 2, (rowStart, rowCount, bytes) => {
+				starts.push(rowStart);
+				counts.push(rowCount);
+				for (let row = 0; row < rowCount; row += 1) {
+					bytes.setF32(row * 16, rowStart + row + 10);
+				}
+			});
+			expect(starts).toEqual([0, 2]);
+			expect(counts).toEqual([2, 1]);
+		});
+
+		for (let i = 0; i < entities.length; i += 1) {
+			expect(
+				getF32(world.componentBytesCopy(entities[i], cpu) ?? new Uint8Array(), 0),
+			).toBeCloseTo(i + 10);
+		}
+	});
+
 
 	it("tracks archetype column callback writes through WorldHistory", () => {
 		const world = World.new();

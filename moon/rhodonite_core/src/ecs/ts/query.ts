@@ -78,13 +78,19 @@ import {
 	raw_query_archetype_component_stride,
 	raw_query_archetype_component_stride_at,
 	raw_query_archetype_entity,
+	raw_query_archetype_for_each_column_chunk,
+	raw_query_archetype_for_each_column_chunk_at,
 	raw_query_archetype_has,
 	raw_query_archetype_has_at,
 	raw_query_archetype_length,
 	raw_query_archetype_read_column,
 	raw_query_archetype_read_column_at,
+	raw_query_archetype_read_column_range,
+	raw_query_archetype_read_column_range_at,
 	raw_query_archetype_write_column,
 	raw_query_archetype_write_column_at,
+	raw_query_archetype_write_column_range,
+	raw_query_archetype_write_column_range_at,
 	raw_query_archetype_write_column_rows_tracked,
 	raw_query_archetype_write_column_rows_tracked_at,
 	raw_query_archetype_write_column_tracked,
@@ -703,12 +709,98 @@ export class RawQueryArchetype {
 		return byteView(raw_query_archetype_read_column_at(this.inner, index));
 	}
 
+	readColumnRange(
+		component: ComponentTypeId,
+		rowStart: number,
+		rowCount: number,
+	): ByteView {
+		return byteView(
+			raw_query_archetype_read_column_range(
+				this.inner,
+				component.inner,
+				rowStart,
+				rowCount,
+			),
+		);
+	}
+
+	readColumnRangeAt(
+		index: number,
+		rowStart: number,
+		rowCount: number,
+	): ByteView {
+		return byteView(
+			raw_query_archetype_read_column_range_at(
+				this.inner,
+				index,
+				rowStart,
+				rowCount,
+			),
+		);
+	}
+
 	writeColumn(component: ComponentTypeId): ByteView {
 		return byteView(raw_query_archetype_write_column(this.inner, component.inner));
 	}
 
 	writeColumnAt(index: number): ByteView {
 		return byteView(raw_query_archetype_write_column_at(this.inner, index));
+	}
+
+	writeColumnRange(
+		component: ComponentTypeId,
+		rowStart: number,
+		rowCount: number,
+	): ByteView {
+		return byteView(
+			raw_query_archetype_write_column_range(
+				this.inner,
+				component.inner,
+				rowStart,
+				rowCount,
+			),
+		);
+	}
+
+	writeColumnRangeAt(
+		index: number,
+		rowStart: number,
+		rowCount: number,
+	): ByteView {
+		return byteView(
+			raw_query_archetype_write_column_range_at(
+				this.inner,
+				index,
+				rowStart,
+				rowCount,
+			),
+		);
+	}
+
+	forEachColumnChunk(
+		component: ComponentTypeId,
+		rowsPerChunk: number,
+		f: (rowStart: number, rowCount: number, bytes: ByteView) => void,
+	): void {
+		raw_query_archetype_for_each_column_chunk(
+			this.inner,
+			component.inner,
+			rowsPerChunk,
+			(rowStart, rowCount, bytes) => f(rowStart, rowCount, byteView(bytes)),
+		);
+	}
+
+	forEachColumnChunkAt(
+		index: number,
+		rowsPerChunk: number,
+		f: (rowStart: number, rowCount: number, bytes: ByteView) => void,
+	): void {
+		raw_query_archetype_for_each_column_chunk_at(
+			this.inner,
+			index,
+			rowsPerChunk,
+			(rowStart, rowCount, bytes) => f(rowStart, rowCount, byteView(bytes)),
+		);
 	}
 
 	writeColumnTracked(
