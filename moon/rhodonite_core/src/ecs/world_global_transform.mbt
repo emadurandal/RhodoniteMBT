@@ -347,6 +347,36 @@ fn World::mark_transform_dirty(self : World, entity : EntityId) -> Unit {
 }
 
 ///|
+/// Marks the cached transform hierarchy index stale after [`ChildOf`] relationship changes.
+fn World::invalidate_transform_hierarchy_index(self : World) -> Unit {
+  self.transform_hierarchy_index_dirty = true
+}
+
+///|
+/// Invalidates hierarchy cache when `component` owns [`ChildOf`] payload.
+fn World::invalidate_transform_hierarchy_index_for_component(
+  self : World,
+  component : ComponentTypeId,
+) -> Unit {
+  if component == self.child_of_component_id {
+    self.invalidate_transform_hierarchy_index()
+  }
+}
+
+///|
+/// Marks a changed transform source component and invalidates hierarchy cache for [`ChildOf`].
+fn World::mark_transform_source_dirty(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Unit {
+  if self.component_is_transform_source(component) {
+    self.invalidate_transform_hierarchy_index_for_component(component)
+    self.mark_transform_dirty(entity)
+  }
+}
+
+///|
 /// Returns true when a component payload change affects transform propagation inputs or eligibility.
 fn World::component_affects_transform_propagation(
   self : World,
@@ -374,6 +404,7 @@ fn World::mark_transform_dirty_for_component(
   entity : EntityId,
   component : ComponentTypeId,
 ) -> Unit {
+  self.invalidate_transform_hierarchy_index_for_component(component)
   if self.component_affects_transform_propagation(component) {
     self.mark_transform_dirty(entity)
   }
@@ -389,6 +420,7 @@ fn World::mark_transform_dirty_archetype(
   if !self.component_is_transform_source(component) {
     return
   }
+  self.invalidate_transform_hierarchy_index_for_component(component)
   let arch = self.archetypes[archetype_index]
   for row = 0; row < arch.entities.length(); row = row + 1 {
     self.mark_transform_dirty(arch.entities[row])
@@ -406,6 +438,7 @@ fn World::mark_transform_dirty_archetype_rows(
   if !self.component_is_transform_source(component) {
     return
   }
+  self.invalidate_transform_hierarchy_index_for_component(component)
   let arch = self.archetypes[archetype_index]
   for i = 0; i < rows.length(); i = i + 1 {
     let row = rows[i]
@@ -430,32 +463,158 @@ fn World::clear_transform_dirty(self : World) -> Unit {
 }
 
 ///|
-/// Expands dirty transform roots to descendants linked through ChildOf.
-fn World::mark_transform_dirty_descendants(self : World) -> Unit {
-  let mut changed = true
-  while changed {
-    changed = false
-    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
-      let arch = self.archetypes[ai]
-      if arch.column_index(self.child_of_component_id) < 0 {
-        continue
-      }
-      for row = 0; row < arch.entities.length(); row = row + 1 {
-        let child = arch.entities[row]
-        if self.transform_entity_is_dirty(child) {
-          continue
-        }
-        match self.child_of_parent_direct(child) {
-          Some(parent) =>
-            if self.transform_entity_is_dirty(parent) {
-              self.mark_transform_dirty(child)
-              changed = true
-            }
-          None => ()
-        }
+/// Ensures the hierarchy index can store children for `parent_index`.
+fn World::ensure_transform_children_parent_capacity(
+  self : World,
+  parent_index : Int,
+) -> Unit {
+  while self.transform_children_by_parent_index.length() <= parent_index {
+    let children : Array[EntityId] = []
+    self.transform_children_by_parent_index.push(children)
+  }
+}
+
+///|
+/// Rebuilds cached `parent.index -> children` transform hierarchy buckets from current [`ChildOf`] rows.
+fn World::rebuild_transform_hierarchy_index(self : World) -> Unit {
+  for i = 0; i < self.transform_children_by_parent_index.length(); i = i + 1 {
+    self.transform_children_by_parent_index[i].clear()
+  }
+  while self.transform_children_by_parent_index.length() <
+        self.generations.length() {
+    let children : Array[EntityId] = []
+    self.transform_children_by_parent_index.push(children)
+  }
+  for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+    let arch = self.archetypes[ai]
+    if arch.column_index(self.child_of_component_id) < 0 {
+      continue
+    }
+    for row = 0; row < arch.entities.length(); row = row + 1 {
+      let child = arch.entities[row]
+      match self.child_of_parent_direct(child) {
+        Some(parent) =>
+          if parent.index >= 0 && parent.index < self.generations.length() {
+            self.ensure_transform_children_parent_capacity(parent.index)
+            self.transform_children_by_parent_index[parent.index].push(child)
+          }
+        None => ()
       }
     }
   }
+  self.transform_hierarchy_index_dirty = false
+}
+
+///|
+/// Rebuilds the transform hierarchy index if any [`ChildOf`] ownership or payload changed.
+fn World::ensure_transform_hierarchy_index(self : World) -> Unit {
+  if self.transform_hierarchy_index_dirty {
+    self.rebuild_transform_hierarchy_index()
+  }
+}
+
+///|
+/// Returns true if `entity` has already been visited in this dirty propagation pass.
+fn transform_processed_contains(
+  processed_generations : FixedArray[Int],
+  entity : EntityId,
+) -> Bool {
+  entity.index >= 0 &&
+  entity.index < processed_generations.length() &&
+  processed_generations[entity.index] == entity.generation
+}
+
+///|
+/// Marks `entity` visited in this dirty propagation pass.
+fn transform_processed_mark(
+  processed_generations : FixedArray[Int],
+  entity : EntityId,
+) -> Unit {
+  if entity.index >= 0 && entity.index < processed_generations.length() {
+    processed_generations[entity.index] = entity.generation
+  }
+}
+
+///|
+/// Writes `matrix` into `entity`'s GlobalTransform blob slot when present.
+fn World::write_global_transform_matrix_if_present(
+  self : World,
+  entity : EntityId,
+  matrix : @m44.Matrix44F,
+) -> Bool {
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) => {
+      ignore(
+        self.global_transform_blob.write_matrix_if_changed(
+          gt_ref.format,
+          gt_ref.word_offset,
+          matrix,
+        ),
+      )
+      true
+    }
+    None => true
+  }
+}
+
+///|
+/// Recomputes a dirty subtree using parent-first matrix propagation.
+fn World::recompute_transform_dirty_subtree(
+  self : World,
+  root : EntityId,
+  root_world_matrix : @m44.Matrix44F,
+  processed_generations : FixedArray[Int],
+) -> Bool {
+  let tf = self.transform_component_id
+  let mut ok = true
+  let stack_entities : Array[EntityId] = [root]
+  let stack_matrices : Array[@m44.Matrix44F] = [root_world_matrix]
+  while stack_entities.length() > 0 {
+    let last = stack_entities.length() - 1
+    let entity = stack_entities[last]
+    let world_matrix = stack_matrices[last]
+    ignore(stack_entities.pop())
+    ignore(stack_matrices.pop())
+    if !self.is_alive(entity) ||
+      transform_processed_contains(processed_generations, entity) {
+      continue
+    }
+    transform_processed_mark(processed_generations, entity)
+    if !self.has_component(entity, tf) {
+      continue
+    }
+    if !self.write_global_transform_matrix_if_present(entity, world_matrix) {
+      ok = false
+    }
+    if entity.index < 0 ||
+      entity.index >= self.transform_children_by_parent_index.length() {
+      continue
+    }
+    let children = self.transform_children_by_parent_index[entity.index]
+    for i = 0; i < children.length(); i = i + 1 {
+      let child = children[i]
+      if !self.is_alive(child) ||
+        transform_processed_contains(processed_generations, child) {
+        continue
+      }
+      match self.child_of_parent_direct(child) {
+        Some(parent) =>
+          if parent == entity && self.has_component(child, tf) {
+            match self.get_transform(child) {
+              Some(local_tf) => {
+                stack_entities.push(child)
+                stack_matrices.push(
+                  world_matrix.mat_mul(local_tf.to_local_matrix()),
+                )
+              }
+              None => ()
+            }
+          }
+        None => ()
+      }
+    }
+  }
+  ok
 }
 
 ///|
@@ -741,30 +900,25 @@ fn World::update_global_transforms_from_transforms_dirty(self : World) -> Bool {
   if self.transform_dirty_entities.length() == 0 {
     return true
   }
-  self.mark_transform_dirty_descendants()
+  self.ensure_transform_hierarchy_index()
   let tf = self.transform_component_id
-  let gt = self.global_transform_component_id
+  let processed_generations = FixedArray::make(self.generations.length(), -1)
   let mut ok = true
   for i = 0; i < self.transform_dirty_entities.length(); i = i + 1 {
     let entity = self.transform_dirty_entities[i]
     if !self.transform_entity_is_dirty(entity) || !self.is_alive(entity) {
       continue
     }
-    if !self.has_component(entity, tf) || !self.has_component(entity, gt) {
+    if transform_processed_contains(processed_generations, entity) ||
+      !self.has_component(entity, tf) {
       continue
     }
     match self.compute_global_transform(entity) {
       Some(matrix) =>
-        match self.global_transform_ref(entity) {
-          Some(gt_ref) =>
-            ignore(
-              self.global_transform_blob.write_matrix_if_changed(
-                gt_ref.format,
-                gt_ref.word_offset,
-                matrix,
-              ),
-            )
-          None => ok = false
+        if !self.recompute_transform_dirty_subtree(
+            entity, matrix, processed_generations,
+          ) {
+          ok = false
         }
       None => ()
     }

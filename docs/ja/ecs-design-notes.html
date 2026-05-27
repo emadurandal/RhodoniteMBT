@@ -49,7 +49,7 @@
             <li>component 登録は system runner 実行中に lock されます。</li>
             <li><code>SystemRunner</code> は phase batches を内部 cache し、system 追加時に invalidation します。公開 plan result は snapshot のままです。</li>
             <li><code>SystemRunner::run_phase_report</code> は <code>run_phase</code> と同じ command-buffer path を実行します。report は execution snapshot であり、batch order、command apply order、history behavior は変えません。</li>
-            <li>builtin <code>TransformPropagation</code> system は内部 dirty queue を使い、<code>Transform3D</code> / <code>ChildOf</code> / <code>GlobalTransform</code> eligibility が変わった entity とその子孫だけを更新します。公開 <code>World::update_global_transforms_from_transforms</code> は互換性のため full recompute API のままです。</li>
+            <li>builtin <code>TransformPropagation</code> system は内部 dirty queue と lazy な <code>ChildOf</code> hierarchy index を使います。dirty root は indexed subtree を parent-first に再計算し、公開 <code>World::update_global_transforms_from_transforms</code> は互換性のため full recompute API のままです。</li>
           </ul>
 
           <h2>Builtin Packed Blobs</h2>

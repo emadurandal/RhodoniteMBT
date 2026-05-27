@@ -470,6 +470,10 @@ pub struct World {
   priv transform_dirty_entities : Array[EntityId]
   /// Generation stamp per entity index for the current transform dirty queue; `-1` means clean.
   priv transform_dirty_generations : Array[Int]
+  /// Cached transform hierarchy index: parent entity index -> child entity ids.
+  priv transform_children_by_parent_index : Array[Array[EntityId]]
+  /// True when [`ChildOf`] payload/ownership changes require rebuilding the hierarchy index.
+  priv mut transform_hierarchy_index_dirty : Bool
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
   /// SystemRunner execution depth; component registration is closed while this is nonzero.
