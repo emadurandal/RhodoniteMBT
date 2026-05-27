@@ -151,6 +151,24 @@ fn empty_system_run_report(phase : PhaseKey, ok : Bool) -> SystemRunReport {
 }
 
 ///|
+/// Builds an empty per-system execution report for a direct system.
+fn empty_system_run_system_report(
+  runner_index : Int,
+  batch_index : Int,
+  name : String,
+) -> SystemRunSystemReport {
+  {
+    runner_index,
+    batch_index,
+    name,
+    queued_command_count: 0,
+    applied_command_count: 0,
+    failed_command_count: 0,
+    failures: [],
+  }
+}
+
+///|
 /// Aggregates one batch execution report from per-system command reports.
 fn system_run_batch_report(
   batch_index : Int,
@@ -217,27 +235,38 @@ fn run_system_batch(
   ctx : SystemContext,
 ) -> Bool {
   let command_buffers : Array[CommandBuffer] = []
+  let command_systems : Array[ScheduledSystem] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let commands = CommandBuffer::new_for_system(
-      world,
-      system.name,
-      system.writes,
-      system.structural_write,
-    )
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
       system.writes,
       system.structural_write,
     )
-    (system.run)(world, ctx, commands)
+    match system.run {
+      Command(run) => {
+        let commands = CommandBuffer::new_for_system(
+          world,
+          system.name,
+          system.writes,
+          system.structural_write,
+        )
+        run(world, ctx, commands)
+        command_buffers.push(commands)
+        command_systems.push(scheduled)
+      }
+      Direct(run) => run(world, ctx)
+    }
     world.exit_system_access(system_access)
-    command_buffers.push(commands)
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch.systems[i].system
+    if command_buffers[i].is_empty() {
+      continue
+    }
+    let system = command_systems[i].system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
@@ -262,39 +291,60 @@ fn run_system_batch_report(
 ) -> SystemRunBatchReport {
   let command_buffers : Array[CommandBuffer] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let commands = CommandBuffer::new_for_system(
-      world,
-      system.name,
-      system.writes,
-      system.structural_write,
-    )
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
       system.writes,
       system.structural_write,
     )
-    (system.run)(world, ctx, commands)
+    match system.run {
+      Command(run) => {
+        let commands = CommandBuffer::new_for_system(
+          world,
+          system.name,
+          system.writes,
+          system.structural_write,
+        )
+        run(world, ctx, commands)
+        command_buffers.push(commands)
+      }
+      Direct(run) => run(world, ctx)
+    }
     world.exit_system_access(system_access)
-    command_buffers.push(commands)
   }
   let system_reports : Array[SystemRunSystemReport] = []
-  for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let system_access = world.enter_system_access(
-      system.name,
-      system.reads,
-      system.writes,
-      system.structural_write,
-    )
-    system_reports.push(
-      command_buffers[i].apply_report(
-        batch.systems[i].runner_index,
-        batch_index,
-      ),
-    )
-    world.exit_system_access(system_access)
+  let mut command_index = 0
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
+    match system.run {
+      Command(_) => {
+        let system_access = world.enter_system_access(
+          system.name,
+          system.reads,
+          system.writes,
+          system.structural_write,
+        )
+        system_reports.push(
+          command_buffers[command_index].apply_report(
+            scheduled.runner_index,
+            batch_index,
+          ),
+        )
+        world.exit_system_access(system_access)
+        command_index = command_index + 1
+      }
+      Direct(_) =>
+        system_reports.push(
+          empty_system_run_system_report(
+            scheduled.runner_index,
+            batch_index,
+            system.name,
+          ),
+        )
+    }
   }
   system_run_batch_report(batch_index, system_reports)
 }
@@ -308,28 +358,39 @@ fn run_system_batch_tracked(
   history : WorldHistory,
 ) -> Bool {
   let command_buffers : Array[CommandBuffer] = []
+  let command_systems : Array[ScheduledSystem] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let commands = CommandBuffer::new_for_history_system(
-      world,
-      system.name,
-      system.writes,
-      system.structural_write,
-      history,
-    )
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
       system.writes,
       system.structural_write,
     )
-    (system.run)(world, ctx, commands)
+    match system.run {
+      Command(run) => {
+        let commands = CommandBuffer::new_for_history_system(
+          world,
+          system.name,
+          system.writes,
+          system.structural_write,
+          history,
+        )
+        run(world, ctx, commands)
+        command_buffers.push(commands)
+        command_systems.push(scheduled)
+      }
+      Direct(run) => run(world, ctx)
+    }
     world.exit_system_access(system_access)
-    command_buffers.push(commands)
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch.systems[i].system
+    if command_buffers[i].is_empty() {
+      continue
+    }
+    let system = command_systems[i].system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
@@ -355,41 +416,62 @@ fn run_system_batch_tracked_report(
 ) -> SystemRunBatchReport {
   let command_buffers : Array[CommandBuffer] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let commands = CommandBuffer::new_for_history_system(
-      world,
-      system.name,
-      system.writes,
-      system.structural_write,
-      history,
-    )
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
     let system_access = world.enter_system_access(
       system.name,
       system.reads,
       system.writes,
       system.structural_write,
     )
-    (system.run)(world, ctx, commands)
+    match system.run {
+      Command(run) => {
+        let commands = CommandBuffer::new_for_history_system(
+          world,
+          system.name,
+          system.writes,
+          system.structural_write,
+          history,
+        )
+        run(world, ctx, commands)
+        command_buffers.push(commands)
+      }
+      Direct(run) => run(world, ctx)
+    }
     world.exit_system_access(system_access)
-    command_buffers.push(commands)
   }
   let system_reports : Array[SystemRunSystemReport] = []
-  for i = 0; i < command_buffers.length(); i = i + 1 {
-    let system = batch.systems[i].system
-    let system_access = world.enter_system_access(
-      system.name,
-      system.reads,
-      system.writes,
-      system.structural_write,
-    )
-    system_reports.push(
-      command_buffers[i].apply_tracked_report(
-        history,
-        batch.systems[i].runner_index,
-        batch_index,
-      ),
-    )
-    world.exit_system_access(system_access)
+  let mut command_index = 0
+  for i = 0; i < batch.systems.length(); i = i + 1 {
+    let scheduled = batch.systems[i]
+    let system = scheduled.system
+    match system.run {
+      Command(_) => {
+        let system_access = world.enter_system_access(
+          system.name,
+          system.reads,
+          system.writes,
+          system.structural_write,
+        )
+        system_reports.push(
+          command_buffers[command_index].apply_tracked_report(
+            history,
+            scheduled.runner_index,
+            batch_index,
+          ),
+        )
+        world.exit_system_access(system_access)
+        command_index = command_index + 1
+      }
+      Direct(_) =>
+        system_reports.push(
+          empty_system_run_system_report(
+            scheduled.runner_index,
+            batch_index,
+            system.name,
+          ),
+        )
+    }
   }
   system_run_batch_report(batch_index, system_reports)
 }
@@ -424,7 +506,7 @@ fn build_system(
   reads : Array[ComponentTypeId],
   writes : Array[ComponentTypeId],
   structural_write : Bool,
-  run : (World, SystemContext, CommandBuffer) -> Unit,
+  run : SystemRun,
 ) -> System {
   if component_array_has_duplicates(reads) {
     abort(
@@ -469,7 +551,27 @@ pub fn System::new(
   writes : Array[ComponentTypeId],
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
-  build_system("System::new", name, phase, reads, writes, false, run)
+  build_system("System::new", name, phase, reads, writes, false, Command(run))
+}
+
+///|
+/// Builds a system that writes directly through `World` and never receives a command buffer.
+pub fn System::new_direct(
+  name : String,
+  phase : PhaseKey,
+  reads : Array[ComponentTypeId],
+  writes : Array[ComponentTypeId],
+  run : (World, SystemContext) -> Unit,
+) -> System {
+  build_system(
+    "System::new_direct",
+    name,
+    phase,
+    reads,
+    writes,
+    false,
+    Direct(run),
+  )
 }
 
 ///|
@@ -482,7 +584,13 @@ pub fn System::new_with_structural_write(
   run : (World, SystemContext, CommandBuffer) -> Unit,
 ) -> System {
   build_system(
-    "System::new_with_structural_write", name, phase, reads, writes, true, run,
+    "System::new_with_structural_write",
+    name,
+    phase,
+    reads,
+    writes,
+    true,
+    Command(run),
   )
 }
 
@@ -585,10 +693,9 @@ pub fn transform_propagation_system(world : World, phase : PhaseKey) -> System {
   let tf = world.transform_component()
   let gt = world.global_transform_component()
   let co = world.child_of_component()
-  System::new("TransformPropagation", phase, [tf, co], [gt], (
+  System::new_direct("TransformPropagation", phase, [tf, co], [gt], (
     system_world,
     _ctx,
-    _commands,
   ) => {
     if !system_world.update_global_transforms_from_transforms_dirty() {
       system_world.update_global_transforms_from_transforms()

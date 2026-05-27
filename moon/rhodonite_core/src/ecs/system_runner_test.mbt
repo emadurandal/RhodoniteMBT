@@ -73,6 +73,66 @@ test "SystemRunner permits set_global_transform update with GlobalTransform writ
 }
 
 ///|
+test "SystemRunner runs direct systems without command buffers" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemRunnerDirectA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_direct("direct-set-a", update_phase(), [], [qa], (w, _ctx) => {
+      if !w.set_component_bytes(e, qa, bytes4(4, 3, 2, 1)) {
+        abort("expected direct component write")
+      }
+    }),
+  )
+  assert_true(
+    runner.run_phase(
+      world,
+      SystemContext::new((0.016 : Float), 1),
+      update_phase(),
+    ),
+  )
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_true(bytes == bytes4(4, 3, 2, 1))
+    None => abort("expected SystemRunnerDirectA bytes")
+  }
+}
+
+///|
+test "SystemRunner reports direct systems as empty command reports" {
+  let world = World::new()
+  let qa = world.register_cpu_component("SystemRunnerDirectReportA", 4)
+  let e = world.create_entity()
+  assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new_direct("direct-report", update_phase(), [], [qa], (w, _ctx) => {
+      if !w.set_component_bytes(e, qa, bytes4(2, 0, 0, 0)) {
+        abort("expected direct report write")
+      }
+    }),
+  )
+  let report = runner.run_phase_report(
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    update_phase(),
+  )
+  assert_true(report.ok)
+  assert_eq(report.batch_count, 1)
+  assert_eq(report.system_count, 1)
+  assert_eq(report.queued_command_count, 0)
+  assert_eq(report.applied_command_count, 0)
+  assert_eq(report.failed_command_count, 0)
+  assert_eq(report.batches[0].systems[0].name, "direct-report")
+  assert_eq(report.batches[0].systems[0].queued_command_count, 0)
+  match world.component_bytes(e, qa) {
+    Some(bytes) => assert_true(bytes == bytes4(2, 0, 0, 0))
+    None => abort("expected SystemRunnerDirectReportA bytes")
+  }
+}
+
+///|
 test "SystemRunner convenience setters return false for missing components without structural write" {
   let world = World::new()
   let tf_id = world.transform_component()

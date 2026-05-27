@@ -363,6 +363,7 @@ pub struct System {
 pub fn System::conflicts_with(Self, Self) -> Bool
 pub fn System::name(Self) -> String
 pub fn System::new(String, PhaseKey, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
+pub fn System::new_direct(String, PhaseKey, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext) -> Unit) -> Self
 pub fn System::new_with_structural_write(String, PhaseKey, Array[ComponentTypeId], Array[ComponentTypeId], (World, SystemContext, CommandBuffer) -> Unit) -> Self
 pub fn System::phase(Self) -> PhaseKey
 pub fn System::reads(Self) -> Array[ComponentTypeId]

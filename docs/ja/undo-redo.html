@@ -162,7 +162,7 @@ ignore(history.commit_transaction())</code></pre>
 
           <h2>Performance</h2>
           <p>Undo/Redo の主なコストは変更前後の component bytes コピーと history record allocation です。履歴が無効な場合、tracked query callback は raw write path に委譲し、bytes copy や delta retention は行いません。runtime system や animation は untracked API を使い、drag のような editor gesture は transaction で 1 record にまとめます。</p>
-          <p><code>pnpm run bench:ecs:js</code>、<code>pnpm run bench:ecs:native</code>、または <code>pnpm run bench:ecs:all -- --json-out /tmp/ecs-bench.jsonl</code> で ECS benchmark path を比較できます。各 case は warmup 1 回と measured sample 5 回を実行し、min/median/max timing を表示し、native/js 比較用の <code>ecs_bench_result</code> JSONL row を出力します。suite は query path、low-row repeated prepared-query reuse、builtin transform/blob write、dirty と full transform propagation の比較、unchanged setter fast path、system-runner command-buffer phase、history overhead を含みます。</p>
+          <p><code>pnpm run bench:ecs:js</code>、<code>pnpm run bench:ecs:native</code>、または <code>pnpm run bench:ecs:all -- --json-out /tmp/ecs-bench.jsonl</code> で ECS benchmark path を比較できます。benchmark script は常に release build で実行するため、native/js の結果を比較できます。各 case は warmup 1 回と measured sample 5 回を実行し、min/median/max timing を表示し、native/js 比較用に <code>build_mode: "release"</code> を含む <code>ecs_bench_result</code> JSONL row を出力します。suite は query path、low-row repeated prepared-query reuse、builtin transform/blob write、dirty と full transform propagation の比較、unchanged setter fast path、system-runner command-buffer phase、history overhead を含みます。</p>
         </article>
       </main>
     </div>

@@ -732,12 +732,12 @@ pub fn orbit_camera_transform_system(
   let tf_index = cache.component_index(tf)
   let orbit_index = cache.component_index(orbit_component)
   let home_index = cache.component_index(home_component)
-  System::new(
+  System::new_direct(
     "rhodonite/orbit_camera_transform",
     phase,
     [home_component],
     [tf, gt, orbit_component],
-    fn(world, _ctx, _commands) {
+    fn(world, _ctx) {
       cache.for_each_archetype(world, arch => {
         let tf_stride = arch.component_stride_at(tf_index)
         let orbit_stride = arch.component_stride_at(orbit_index)

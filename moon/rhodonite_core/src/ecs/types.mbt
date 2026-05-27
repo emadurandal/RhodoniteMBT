@@ -340,6 +340,13 @@ pub(all) struct PhaseKey {
 } derive(Eq)
 
 ///|
+/// System callback storage for command-buffer and direct execution paths.
+priv enum SystemRun {
+  Command((World, SystemContext, CommandBuffer) -> Unit)
+  Direct((World, SystemContext) -> Unit)
+}
+
+///|
 /// Function-backed ECS system metadata plus declared component access.
 pub struct System {
   priv name : String
@@ -347,7 +354,7 @@ pub struct System {
   priv reads : Array[ComponentTypeId]
   priv writes : Array[ComponentTypeId]
   priv structural_write : Bool
-  priv run : (World, SystemContext, CommandBuffer) -> Unit
+  priv run : SystemRun
 }
 
 ///|

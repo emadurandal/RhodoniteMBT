@@ -42,6 +42,7 @@ import {
 	system_context_frame_index,
 	system_context_new,
 	system_new,
+	system_new_direct,
 	system_new_with_structural_write,
 	system_phase,
 	system_reads,
@@ -234,6 +235,8 @@ export type SystemCallback = (
 	commands: CommandBuffer,
 ) => void;
 
+export type DirectSystemCallback = (world: World, ctx: SystemContext) => void;
+
 export class System {
 	readonly inner: MoonSystem;
 
@@ -256,6 +259,24 @@ export class System {
 				writes.map((component) => component.inner),
 				(world, ctx, commands) =>
 					run(new World(world), new SystemContext(ctx), new CommandBuffer(commands)),
+			),
+		);
+	}
+
+	static newDirect(
+		name: string,
+		phase: PhaseKey,
+		reads: ComponentTypeId[],
+		writes: ComponentTypeId[],
+		run: DirectSystemCallback,
+	): System {
+		return new System(
+			system_new_direct(
+				name,
+				phase.inner,
+				reads.map((component) => component.inner),
+				writes.map((component) => component.inner),
+				(world, ctx) => run(new World(world), new SystemContext(ctx)),
 			),
 		);
 	}

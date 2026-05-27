@@ -828,6 +828,18 @@ pub fn system_new(
 }
 
 ///|
+/// Wraps a JS callback into a direct ECS system without a command buffer.
+pub fn system_new_direct(
+  name : String,
+  phase : @ecs.PhaseKey,
+  reads : Array[@ecs.ComponentTypeId],
+  writes : Array[@ecs.ComponentTypeId],
+  run : (@ecs.World, @ecs.SystemContext) -> Unit,
+) -> @ecs.System {
+  @ecs.System::new_direct(name, phase, reads, writes, run)
+}
+
+///|
 /// Wraps a JS callback into an ECS system that may queue structural changes.
 pub fn system_new_with_structural_write(
   name : String,

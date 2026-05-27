@@ -603,6 +603,13 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 			commands: MoonCommandBuffer,
 		) => void,
 	): MoonSystem;
+	export function system_new_direct(
+		name: string,
+		phase: MoonPhaseKey,
+		reads: MoonComponentTypeId[],
+		writes: MoonComponentTypeId[],
+		run: (world: MoonWorld, ctx: MoonSystemContext) => void,
+	): MoonSystem;
 	export function system_new_with_structural_write(
 		name: string,
 		phase: MoonPhaseKey,

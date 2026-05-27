@@ -51,6 +51,55 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([9, 0, 0, 0]));
 	});
 
+	it("runs TS direct systems without command buffers", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("TsDirectSystemCpu", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+
+		const phase = PhaseKey.new("ts/direct");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newDirect("direct-write-cpu", phase, [], [cpu], (systemWorld, systemCtx) => {
+				expect(systemCtx.frameIndex()).toBe(9);
+				expect(
+					systemWorld.setComponentBytes(entity, cpu, new Uint8Array([7, 0, 0, 0])),
+				).toBe(true);
+			}),
+		);
+
+		expect(runner.runPhase(world, SystemContext.new(0.016, 9), phase)).toBe(true);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([7, 0, 0, 0]));
+	});
+
+	it("reports TS direct systems as empty command reports", () => {
+		const world = World.new();
+		const cpu = world.registerCpuComponent("TsDirectReportCpu", 4);
+		const entity = world.createEntity();
+		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
+
+		const phase = PhaseKey.new("ts/direct-report");
+		const runner = SystemRunner.new();
+		runner.addSystem(
+			System.newDirect("direct-report", phase, [], [cpu], (systemWorld) => {
+				expect(
+					systemWorld.setComponentBytes(entity, cpu, new Uint8Array([8, 0, 0, 0])),
+				).toBe(true);
+			}),
+		);
+
+		const report = runner.runPhaseReport(world, SystemContext.new(0.016, 1), phase);
+		expect(report.ok()).toBe(true);
+		expect(report.systemCount()).toBe(1);
+		expect(report.queuedCommandCount()).toBe(0);
+		expect(report.appliedCommandCount()).toBe(0);
+		expect(report.failedCommandCount()).toBe(0);
+		const system = report.batches()[0].systems()[0];
+		expect(system.name()).toBe("direct-report");
+		expect(system.queuedCommandCount()).toBe(0);
+		expect(world.componentBytesCopy(entity, cpu)).toEqual(new Uint8Array([8, 0, 0, 0]));
+	});
+
 	it("reports TS system command-buffer execution results", () => {
 		const world = World.new();
 		const cpu = world.registerCpuComponent("TsSystemReportCpu", 4);
