@@ -6,11 +6,16 @@ import type {
 	MoonWorld,
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
+	transform_propagation_report_archetype_path_unavailable_count,
+	transform_propagation_report_broken_ancestor_chain_count,
 	transform_propagation_report_dirty_queue_count,
 	transform_propagation_report_dirty_root_count,
 	transform_propagation_report_fallback_to_full,
+	transform_propagation_report_failure_count,
+	transform_propagation_report_failure_reason,
 	transform_propagation_report_global_transform_write_count,
 	transform_propagation_report_hierarchy_index_rebuilt,
+	transform_propagation_report_missing_global_transform_ref_count,
 	transform_propagation_report_ok,
 	transform_propagation_report_pending_upload_range_count,
 	transform_propagation_report_skipped_dirty_entity_count,
@@ -77,6 +82,12 @@ export type CpuComponentIdentity = {
 	readonly schemaHash?: string;
 };
 
+export type TransformPropagationFailureReason =
+	| "none"
+	| "broken_ancestor_chain"
+	| "missing_global_transform_ref"
+	| "archetype_path_unavailable";
+
 export class TransformPropagationReport {
 	readonly inner: MoonTransformPropagationReport;
 
@@ -128,6 +139,32 @@ export class TransformPropagationReport {
 
 	pendingUploadRangeCount(): number {
 		return transform_propagation_report_pending_upload_range_count(this.inner);
+	}
+
+	failureReason(): TransformPropagationFailureReason {
+		return transform_propagation_report_failure_reason(
+			this.inner,
+		) as TransformPropagationFailureReason;
+	}
+
+	failureCount(): number {
+		return transform_propagation_report_failure_count(this.inner);
+	}
+
+	brokenAncestorChainCount(): number {
+		return transform_propagation_report_broken_ancestor_chain_count(this.inner);
+	}
+
+	missingGlobalTransformRefCount(): number {
+		return transform_propagation_report_missing_global_transform_ref_count(
+			this.inner,
+		);
+	}
+
+	archetypePathUnavailableCount(): number {
+		return transform_propagation_report_archetype_path_unavailable_count(
+			this.inner,
+		);
 	}
 }
 

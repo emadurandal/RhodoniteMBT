@@ -552,6 +552,39 @@ fn TransformPropagationReportDraft::finish(
     global_transform_write_count: self.global_transform_write_count,
     hierarchy_index_rebuilt: self.hierarchy_index_rebuilt,
     pending_upload_range_count: self.pending_upload_range_count,
+    failure_reason: self.failure_reason,
+    failure_count: self.failure_count,
+    broken_ancestor_chain_count: self.broken_ancestor_chain_count,
+    missing_global_transform_ref_count: self.missing_global_transform_ref_count,
+    archetype_path_unavailable_count: self.archetype_path_unavailable_count,
+  }
+}
+
+///|
+/// Records one transform propagation failure while preserving the first failure reason.
+/// `NoFailure` is ignored so diagnostic counters stay internally consistent.
+fn TransformPropagationReportDraft::record_failure(
+  self : TransformPropagationReportDraft,
+  reason : TransformPropagationFailureReason,
+) -> Unit {
+  if reason is NoFailure {
+    return
+  }
+  if self.failure_count == 0 {
+    self.failure_reason = reason
+  }
+  self.failure_count = self.failure_count + 1
+  self.ok = false
+  match reason {
+    BrokenAncestorChain =>
+      self.broken_ancestor_chain_count = self.broken_ancestor_chain_count + 1
+    MissingGlobalTransformRef =>
+      self.missing_global_transform_ref_count = self.missing_global_transform_ref_count +
+        1
+    ArchetypePathUnavailable =>
+      self.archetype_path_unavailable_count = self.archetype_path_unavailable_count +
+        1
+    NoFailure => ()
   }
 }
 
@@ -572,6 +605,11 @@ fn transform_propagation_report_draft(
     global_transform_write_count: 0,
     hierarchy_index_rebuilt: false,
     pending_upload_range_count: 0,
+    failure_reason: NoFailure,
+    failure_count: 0,
+    broken_ancestor_chain_count: 0,
+    missing_global_transform_ref_count: 0,
+    archetype_path_unavailable_count: 0,
   }
 }
 
@@ -967,33 +1005,47 @@ fn World::compute_global_transform_for_tf_gt_bulk_row_report(
   report : TransformPropagationReportDraft,
 ) -> Bool {
   let world_m = if !has_child_of {
-    Some(leaf_local_matrix)
+    leaf_local_matrix
   } else {
     match self.build_child_of_ancestor_chain(entity) {
-      None => None
+      None => {
+        report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
+          1
+        report.record_failure(BrokenAncestorChain)
+        return false
+      }
       Some(chain) =>
-        self.multiply_world_chain_matrix(entity, chain, Some(leaf_local_matrix))
+        match
+          self.multiply_world_chain_matrix(
+            entity,
+            chain,
+            Some(leaf_local_matrix),
+          ) {
+          Some(matrix) => matrix
+          None => {
+            report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
+              1
+            report.record_failure(BrokenAncestorChain)
+            return false
+          }
+        }
     }
   }
-  match world_m {
-    Some(m) =>
-      match self.global_transform_ref(entity) {
-        Some(gt_ref) => {
-          report.visited_entity_count = report.visited_entity_count + 1
-          if self.global_transform_blob.write_matrix_if_changed(
-              gt_ref.format,
-              gt_ref.word_offset,
-              m,
-            ) {
-            report.global_transform_write_count = report.global_transform_write_count +
-              1
-          }
-          true
-        }
-        None => false
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) => {
+      report.visited_entity_count = report.visited_entity_count + 1
+      if self.global_transform_blob.write_matrix_if_changed(
+          gt_ref.format,
+          gt_ref.word_offset,
+          world_m,
+        ) {
+        report.global_transform_write_count = report.global_transform_write_count +
+          1
       }
+      true
+    }
     None => {
-      report.skipped_dirty_entity_count = report.skipped_dirty_entity_count + 1
+      report.record_failure(MissingGlobalTransformRef)
       false
     }
   }
@@ -1085,13 +1137,16 @@ fn World::try_update_global_transforms_from_transforms_archetype_path_report(
     matched = true
     let tf_col_index = arch.column_index(tf)
     if tf_col_index < 0 {
+      report.record_failure(ArchetypePathUnavailable)
       return false
     }
     if arch.columns[tf_col_index].stride != 48 {
+      report.record_failure(ArchetypePathUnavailable)
       return false
     }
   }
   if !matched {
+    report.record_failure(ArchetypePathUnavailable)
     return false
   }
   report.used_full_path = true
@@ -1112,11 +1167,11 @@ fn World::try_update_global_transforms_from_transforms_archetype_path_report(
       let local_m = @comp.Transform3D::local_matrix_from_component_view(
         tf_bytes[tf_base:tf_base + tf_stride],
       )
-      if !self.compute_global_transform_for_tf_gt_bulk_row_report(
+      ignore(
+        self.compute_global_transform_for_tf_gt_bulk_row_report(
           e, has_co, local_m, report,
-        ) {
-        report.ok = false
-      }
+        ),
+      )
     }
   }
   true
@@ -1192,9 +1247,11 @@ fn World::update_global_transforms_from_transforms_dirty_report(
           ok = false
         }
       }
-      None =>
+      None => {
         report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
           1
+        report.record_failure(BrokenAncestorChain)
+      }
     }
   }
   self.clear_transform_dirty()

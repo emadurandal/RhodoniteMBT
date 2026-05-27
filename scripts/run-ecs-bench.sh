@@ -3,7 +3,7 @@
 # Usage (from repo root):
 #   bash scripts/run-ecs-bench.sh           # default: js
 #   bash scripts/run-ecs-bench.sh all --json-out /tmp/ecs-bench.jsonl
-#   bash scripts/run-ecs-bench.sh js --compare-baseline benchmarks/ecs/baseline.jsonl
+#   bash scripts/run-ecs-bench.sh js --compare-baseline benchmarks/ecs/baseline.jsonl --summary-md /tmp/ecs-bench.md
 #   bash scripts/run-ecs-bench.sh native
 #   bash scripts/run-ecs-bench.sh wasm-gc # builds only (no run)
 set -euo pipefail
@@ -19,6 +19,7 @@ JSON_OUT=""
 COMPARE_BASELINE=""
 FAIL_ON_REGRESSION=0
 TMP_JSON_OUT=""
+SUMMARY_MD=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,13 +46,26 @@ while [[ $# -gt 0 ]]; do
       FAIL_ON_REGRESSION=1
       shift
       ;;
+    --summary-md)
+      if [[ $# -lt 2 ]]; then
+        echo "run-ecs-bench: --summary-md requires a path" >&2
+        exit 1
+      fi
+      SUMMARY_MD="$2"
+      shift 2
+      ;;
     *)
       echo "run-ecs-bench: unknown option '$1'" >&2
-      echo "usage: bash scripts/run-ecs-bench.sh [js|native|all|wasm-gc] [--json-out path] [--compare-baseline path] [--fail-on-regression]" >&2
+      echo "usage: bash scripts/run-ecs-bench.sh [js|native|all|wasm-gc] [--json-out path] [--compare-baseline path] [--summary-md path] [--fail-on-regression]" >&2
       exit 1
       ;;
   esac
 done
+
+if [[ -n "$SUMMARY_MD" && -z "$COMPARE_BASELINE" ]]; then
+  echo "run-ecs-bench: --summary-md requires --compare-baseline" >&2
+  exit 1
+fi
 
 if [[ -n "$COMPARE_BASELINE" && -z "$JSON_OUT" ]]; then
   TMP_JSON_OUT="$(mktemp)"
@@ -121,13 +135,16 @@ case "${TARGET}" in
     ;;
   *)
     echo "run-ecs-bench: unknown target '${TARGET}'" >&2
-    echo "usage: bash scripts/run-ecs-bench.sh [js|native|all|wasm-gc] [--json-out path] [--compare-baseline path] [--fail-on-regression]" >&2
+    echo "usage: bash scripts/run-ecs-bench.sh [js|native|all|wasm-gc] [--json-out path] [--compare-baseline path] [--summary-md path] [--fail-on-regression]" >&2
     exit 1
     ;;
 esac
 
 if [[ -n "$COMPARE_BASELINE" ]]; then
   compare_args=(scripts/compare-ecs-bench.mjs --baseline "$COMPARE_BASELINE" --current "$JSON_OUT")
+  if [[ -n "$SUMMARY_MD" ]]; then
+    compare_args+=(--summary-md "$SUMMARY_MD")
+  fi
   if [[ "$FAIL_ON_REGRESSION" == "1" ]]; then
     compare_args+=(--fail-on-regression)
   fi

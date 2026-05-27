@@ -453,6 +453,15 @@ pub(all) struct SystemRunReport {
 }
 
 ///|
+/// First failure category observed while computing transform propagation diagnostics.
+pub(all) enum TransformPropagationFailureReason {
+  NoFailure
+  BrokenAncestorChain
+  MissingGlobalTransformRef
+  ArchetypePathUnavailable
+}
+
+///|
 /// Read-only diagnostic for one transform propagation pass.
 pub(all) struct TransformPropagationReport {
   ok : Bool
@@ -466,6 +475,11 @@ pub(all) struct TransformPropagationReport {
   global_transform_write_count : Int
   hierarchy_index_rebuilt : Bool
   pending_upload_range_count : Int
+  failure_reason : TransformPropagationFailureReason
+  failure_count : Int
+  broken_ancestor_chain_count : Int
+  missing_global_transform_ref_count : Int
+  archetype_path_unavailable_count : Int
 }
 
 ///|
@@ -482,6 +496,11 @@ priv struct TransformPropagationReportDraft {
   mut global_transform_write_count : Int
   mut hierarchy_index_rebuilt : Bool
   mut pending_upload_range_count : Int
+  mut failure_reason : TransformPropagationFailureReason
+  mut failure_count : Int
+  mut broken_ancestor_chain_count : Int
+  mut missing_global_transform_ref_count : Int
+  mut archetype_path_unavailable_count : Int
 }
 
 ///|

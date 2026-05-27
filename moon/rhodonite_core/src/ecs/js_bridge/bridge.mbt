@@ -509,6 +509,51 @@ pub fn transform_propagation_report_pending_upload_range_count(
 }
 
 ///|
+/// Implements `transform_propagation_report_failure_reason`.
+pub fn transform_propagation_report_failure_reason(
+  report : @ecs.TransformPropagationReport,
+) -> String {
+  match report.failure_reason {
+    NoFailure => "none"
+    BrokenAncestorChain => "broken_ancestor_chain"
+    MissingGlobalTransformRef => "missing_global_transform_ref"
+    ArchetypePathUnavailable => "archetype_path_unavailable"
+  }
+}
+
+///|
+/// Implements `transform_propagation_report_failure_count`.
+pub fn transform_propagation_report_failure_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.failure_count
+}
+
+///|
+/// Implements `transform_propagation_report_broken_ancestor_chain_count`.
+pub fn transform_propagation_report_broken_ancestor_chain_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.broken_ancestor_chain_count
+}
+
+///|
+/// Implements `transform_propagation_report_missing_global_transform_ref_count`.
+pub fn transform_propagation_report_missing_global_transform_ref_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.missing_global_transform_ref_count
+}
+
+///|
+/// Implements `transform_propagation_report_archetype_path_unavailable_count`.
+pub fn transform_propagation_report_archetype_path_unavailable_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.archetype_path_unavailable_count
+}
+
+///|
 /// Implements `world_set_global_transform_format`.
 pub fn world_set_global_transform_format(
   world : @ecs.World,

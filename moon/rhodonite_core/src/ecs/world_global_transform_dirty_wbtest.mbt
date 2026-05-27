@@ -107,6 +107,20 @@ test "transform propagation report returns no-op diagnostics without draining up
   assert_true(!report.fallback_to_full)
   assert_eq(report.dirty_queue_count, 0)
   assert_eq(report.pending_upload_range_count, 0)
+  assert_true(report.failure_reason is NoFailure)
+  assert_eq(report.failure_count, 0)
+}
+
+///|
+test "transform propagation report ignores no-failure records" {
+  let report = transform_propagation_report_draft(1)
+  report.record_failure(NoFailure)
+  assert_true(report.ok)
+  assert_true(report.failure_reason is NoFailure)
+  assert_eq(report.failure_count, 0)
+  assert_eq(report.broken_ancestor_chain_count, 0)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 0)
 }
 
 ///|
@@ -165,6 +179,30 @@ test "transform propagation report counts skipped dead dirty entries" {
   assert_eq(report.skipped_dirty_entity_count, 1)
   assert_eq(report.visited_entity_count, 0)
   assert_eq(report.global_transform_write_count, 0)
+  assert_true(report.failure_reason is NoFailure)
+  assert_eq(report.failure_count, 0)
+}
+
+///|
+test "transform propagation report keeps dirty path on broken ancestor chain" {
+  let world = World::new()
+  let parent = world.create_entity()
+  let child = world.create_entity()
+  dirty_test_set_transform_x(world, parent, (10.0 : Float))
+  dirty_test_set_transform_x(world, child, (5.0 : Float))
+  assert_true(world.set_child_of(child, parent))
+  dirty_test_add_global(world, child)
+  assert_true(world.destroy_entity(parent))
+  let report = world.propagate_global_transforms_from_transforms_report()
+  assert_true(!report.ok)
+  assert_true(report.used_dirty_path)
+  assert_true(!report.used_full_path)
+  assert_true(!report.fallback_to_full)
+  assert_true(report.failure_reason is BrokenAncestorChain)
+  assert_eq(report.failure_count, 1)
+  assert_eq(report.broken_ancestor_chain_count, 1)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 0)
 }
 
 ///|
@@ -188,8 +226,55 @@ test "transform propagation fallback report preserves entity failures" {
   )
   assert_true(report.used_full_path)
   assert_true(!report.ok)
+  assert_true(report.failure_reason is BrokenAncestorChain)
+  assert_eq(report.failure_count, 1)
+  assert_eq(report.broken_ancestor_chain_count, 1)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 0)
   assert_eq(report.skipped_dirty_entity_count, 1)
   assert_eq(report.visited_entity_count, 0)
+}
+
+///|
+test "transform propagation report counts missing global transform refs" {
+  let world = World::new()
+  let entity = world.create_entity()
+  dirty_test_set_transform_x(world, entity, (1.0 : Float))
+  let report = transform_propagation_report_draft(1)
+  assert_true(
+    !world.compute_global_transform_for_tf_gt_bulk_row_report(
+      entity,
+      false,
+      @m44.Matrix44F::identity(),
+      report,
+    ),
+  )
+  assert_true(!report.ok)
+  assert_true(report.failure_reason is MissingGlobalTransformRef)
+  assert_eq(report.failure_count, 1)
+  assert_eq(report.broken_ancestor_chain_count, 0)
+  assert_eq(report.missing_global_transform_ref_count, 1)
+  assert_eq(report.archetype_path_unavailable_count, 0)
+}
+
+///|
+test "transform propagation report counts unavailable archetype path" {
+  let world = World::new()
+  let report = transform_propagation_report_draft(1)
+  assert_true(
+    !world.try_update_global_transforms_from_transforms_archetype_path_report(
+      world.transform_component(),
+      world.global_transform_component(),
+      world.child_of_component(),
+      report,
+    ),
+  )
+  assert_true(!report.ok)
+  assert_true(report.failure_reason is ArchetypePathUnavailable)
+  assert_eq(report.failure_count, 1)
+  assert_eq(report.broken_ancestor_chain_count, 0)
+  assert_eq(report.missing_global_transform_ref_count, 0)
+  assert_eq(report.archetype_path_unavailable_count, 1)
 }
 
 ///|

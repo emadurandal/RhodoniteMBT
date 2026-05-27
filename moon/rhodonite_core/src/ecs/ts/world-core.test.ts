@@ -185,8 +185,39 @@ describe("ECS TypeScript wrapper: core", () => {
 		expect(report.visitedEntityCount()).toBe(2);
 		expect(report.globalTransformWriteCount()).toBe(2);
 		expect(report.pendingUploadRangeCount()).toBe(1);
+		expect(report.failureReason()).toBe("none");
+		expect(report.failureCount()).toBe(0);
+		expect(report.brokenAncestorChainCount()).toBe(0);
+		expect(report.missingGlobalTransformRefCount()).toBe(0);
+		expect(report.archetypePathUnavailableCount()).toBe(0);
 		expect(world.getGlobalTransform(child)?.[12]).toBeCloseTo(25);
 		expect(world.drainGlobalTransformBlobWriteViews()).toHaveLength(1);
+	});
+
+	it("reports transform propagation failure reasons", () => {
+		const world = World.new();
+		const parent = world.createEntity();
+		const child = world.createEntity();
+
+		expect(
+			world.setTransformTrs(parent, 10, 0, 0, 0, 0, 0, 1, 1, 1, 1),
+		).toBe(true);
+		expect(world.setTransformTrs(child, 5, 0, 0, 0, 0, 0, 1, 1, 1, 1)).toBe(
+			true,
+		);
+		expect(world.setChildOf(child, parent)).toBe(true);
+		expect(world.setGlobalTransform(child, identityMat4ColMajor())).toBe(true);
+		expect(world.destroyEntity(parent)).toBe(true);
+
+		const report = world.propagateGlobalTransformsFromTransformsReport();
+		expect(report.ok()).toBe(false);
+		expect(report.usedDirtyPath()).toBe(true);
+		expect(report.usedFullPath()).toBe(false);
+		expect(report.fallbackToFull()).toBe(false);
+		expect(report.failureReason()).toBe("broken_ancestor_chain");
+		expect(report.failureCount()).toBeGreaterThan(0);
+		expect(report.brokenAncestorChainCount()).toBeGreaterThan(0);
+		expect(report.missingGlobalTransformRefCount()).toBe(0);
 	});
 
 });
