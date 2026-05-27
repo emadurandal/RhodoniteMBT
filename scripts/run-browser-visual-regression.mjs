@@ -169,26 +169,26 @@ try {
 			console.log(message);
 			process.exitCode = 0;
 		}
-	} else if (update) {
-		await writeUpdatedSnapshots(result.updates ?? []);
-		console.log(
-			`visual_regression(browser): UPDATE wrote ${(result.updates ?? []).length} PNG snapshots`,
-		);
-		process.exitCode = 0;
-	} else if (result.ok) {
-		for (const r of result.results ?? []) {
-			console.log(
-				`visual_regression(browser): PASS ${r.filename} mismatch_rate=${r.mismatchRate} mismatches=${r.mismatches}/${r.pixels} max=${r.maxMismatchRate} threshold=${r.perceptualThreshold}`,
-			);
-		}
-		process.exitCode = 0;
-	} else {
+	} else if (!result.ok) {
 		for (const failure of result.failures ?? []) {
 			console.error(
 				`visual_regression(browser): FAIL ${failure.filename ?? failure.name}: ${failure.message}`,
 			);
 		}
 		process.exitCode = 1;
+	} else if (update) {
+		await writeUpdatedSnapshots(result.updates ?? []);
+		console.log(
+			`visual_regression(browser): UPDATE wrote ${(result.updates ?? []).length} PNG snapshots`,
+		);
+		process.exitCode = 0;
+	} else {
+		for (const r of result.results ?? []) {
+			console.log(
+				`visual_regression(browser): PASS ${r.filename} mismatch_rate=${r.mismatchRate} mismatches=${r.mismatches}/${r.pixels} max=${r.maxMismatchRate} threshold=${r.perceptualThreshold}`,
+			);
+		}
+		process.exitCode = 0;
 	}
 } finally {
 	if (browserContext) {
