@@ -12,6 +12,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,7 +32,16 @@
           <h1>履歴シリアライズ</h1>
           <p class="lead">この文書は <code>WorldHistory</code> export/import に向けた永続化境界を定義します。現行実装は in-memory archive model と editor/session persistence 用の TypeScript JSON archive helper を公開しています。</p>
 
+          <div class="overview">
+            <h2>最初に理解すること</h2>
+            <p>Undo/Redo の履歴は runtime の一時状態だけでなく、editor session を保存・復元したい場合があります。このページは、どの record を archive として扱い、どの identity や payload を安定形式に含めるかを説明します。</p>
+          </div>
+
           <h2>Status</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>JSON field、delta kind、format version、fixture を変える場合は compatibility surface の変更です。decoder、golden/invalid fixture、coverage test、この文書を同じ変更で更新します。</p>
+          </div>
           <ul>
             <li><code>WorldHistory::export_undo_stack(world)</code> と <code>WorldHistory::export_redo_stack(world)</code> は、保持中の全 record が serialization 可能な場合に in-memory archive を返します。</li>
             <li><code>WorldHistory::import_undo_stack(world, archive)</code> と <code>WorldHistory::import_redo_stack(world, archive)</code> は archive を検証し、target stack を置き換えます。world は変更しません。</li>

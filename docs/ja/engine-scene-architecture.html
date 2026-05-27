@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Engine / Scene Architecture</h1>
           <p class="lead">現在の runtime は <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a> の public facade にあります。古い prototype / phase 計画は完了済みで、examples は facade runtime を直接使います。</p>
+
+          <div class="overview">
+            <h2>まず覚えること</h2>
+            <p><code>Engine</code> はアプリ全体の frame を進める object です。<code>Scene</code> は表示・更新する world を持ち、<code>Surface</code> は canvas/window ごとの描画先と入力を持ちます。通常の sample は platform runner が Engine を作り、Scene を Engine に渡し、毎 frame update と render を進めます。</p>
+          </div>
 
           <h2>Runtime Ownership</h2>
           <div class="mermaid">
@@ -63,6 +70,10 @@ flowchart TB
           </table>
 
           <h2>Phase Groups</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>phase、handler registration、surface suspension、on-demand render の詳細は、runtime behavior を変えるときに特に重要です。sample の簡単な読み始めでは、<code>Engine::on_scene_update</code> と <code>Engine::on_scene_render</code> が標準入口だと覚えれば十分です。</p>
+          </div>
           <div class="mermaid">
 flowchart TD
   A["rhodonite/frame_begin"] --> A1["rhodonite/surface"]

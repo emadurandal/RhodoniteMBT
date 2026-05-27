@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Rendering Architecture</h1>
           <p class="lead">Rendering details live under the facade runtime in <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a>. The current renderer is a narrow v1 path for unlit static meshes and sample-driven instancing.</p>
+
+          <div class="overview">
+            <h2>The Basic Flow</h2>
+            <p>In RhodoniteMBT, an entity becomes drawable by having <code>Renderable</code> plus transform data in a scene. The Renderer owns registered mesh and material resources, then gathers matching entities during the render phase and draws them into the surface render target.</p>
+          </div>
 
           <h2>Renderer v1</h2>
           <p><code>Renderer</code> is owned by <code>Engine</code> and owns device-wide GPU resources. It queries visible <code>Renderable + GlobalTransform</code> entities, uploads the scene main camera's builtin Camera blob and GlobalTransform blob, and draws unlit static indexed meshes into caller-supplied <code>RenderTargetResources</code>.</p>
@@ -59,6 +66,10 @@ flowchart TB
           </ul>
 
           <h2>Resource Registration</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>Undo/Redo restores ECS component bytes, not Renderer-owned GPU resources. When renderable or asset lifetime changes, check this resource registration policy and the history pages together.</p>
+          </div>
           <p><code>Renderable</code> stores mesh/material handle values in ECS, but the handles point into Renderer-owned tables. Undo/redo can restore the Renderable component bytes; it does not recreate meshes, materials, instance buffers, or other GPU resources. Applications that keep renderable history must ensure those resource handles outlive the history records, or add a higher-level asset/resource history above Renderer.</p>
           <p>For editor operations, use <code>add_renderable_tracked</code>, <code>set_renderable_tracked</code>, and <code>remove_renderable_tracked</code> with <code>WorldHistory</code>. The raw <code>add_renderable</code> and <code>set_renderable</code> helpers remain direct ECS mutations.</p>
           <table>

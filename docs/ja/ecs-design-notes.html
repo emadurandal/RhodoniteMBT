@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,6 +32,16 @@
         <article class="doc">
           <h1>ECS Design Notes</h1>
           <p class="lead">このページは現行 ECS の設計上の注意点をまとめます。汎用 GPU component storage は削除済みで、現在は CPU-only archetype SoA と builtin packed GPU blob に統一されています。</p>
+
+          <div class="overview">
+            <h2>読む前提</h2>
+            <p>このページは入門ではなく、ECS 実装を変更する人向けの設計メモです。初めて読む場合は <a href="./ecs.html">ECS</a> で entity/component/query の基本を確認してから、ここで lifetime、access guard、blob store の制約を確認します。</p>
+          </div>
+
+          <div class="agent-note">
+            <h2>Maintainer / Agent Notes</h2>
+            <p>ECS storage や query lifetime を変える場合は、TypeScript wrapper、history recording、visual samples、benchmark path に影響する可能性があります。関連 docs と tests を同じ変更で見直します。</p>
+          </div>
 
           <h2>Query View Lifetime</h2>
           <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。<code>PreparedQuery::for_each_read_at</code> などの read-only indexed fast path も同じ callback-scoped row view lifetime を保ちつつ、row ごとの wrapper construction を避けます。</p>

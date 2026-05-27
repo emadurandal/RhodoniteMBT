@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Input Architecture</h1>
           <p class="lead">Input is split into platform-independent <a href="../../moon/rhodonite_core/src/input/"><code>emadurandal/rhodonite_core/input</code></a> state and thin browser / SDL3 adapters. Gameplay code should not depend on DOM or SDL3 event types.</p>
+
+          <div class="overview">
+            <h2>The Basic Idea</h2>
+            <p>Browser and native events have different shapes, but RhodoniteMBT normalizes both into <code>InputState</code>. Gameplay and camera controllers read per-frame key, mouse, pointer, and wheel state instead of reading DOM or SDL3 directly.</p>
+          </div>
 
           <h2>Event Flow</h2>
           <div class="mermaid">
@@ -57,6 +64,10 @@ flowchart LR
           </table>
 
           <h2>Adapters And Rules</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>When changing adapters, confirm that browser and SDL3 still share the same <code>KeyCode</code> and pointer-coordinate model. Multi-surface samples also depend on surface-local input isolation.</p>
+          </div>
           <ul>
             <li>Browser MoonBit adapter: <code>emadurandal/rhodonite/app/browser</code>.</li>
             <li>Browser TypeScript adapter: <code>rhodonite-mbt/app</code> through <code>installBrowserInputCallbacks</code> / <code>installBrowserInput</code>.</li>

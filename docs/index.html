@@ -10,93 +10,133 @@
     <main class="content">
       <article class="doc">
         <h1>RhodoniteMBT Documentation</h1>
-        <p class="lead">MoonBit / WebGPU monorepo documentation. Choose a language and topic.</p>
+        <p class="lead">MoonBit / WebGPU graphics runtime documentation. Start with the overview if you are new to the project, or jump to the architecture and maintainer notes when you already know the codebase.</p>
 
         <h2>Japanese</h2>
         <div class="cards">
           <section class="card">
+            <h3><a href="./ja/getting-started.html">はじめに</a></h3>
+            <p>RhodoniteMBT の目的、最初に動かす sample、基本モデル、読む順番。</p>
+          </section>
+          <section class="card">
+            <h3><a href="./ja/glossary.html">用語集</a></h3>
+            <p>Engine、Scene、World、Surface、tracked/raw などの短い説明。</p>
+          </section>
+        </div>
+
+        <h3>Architecture</h3>
+        <div class="cards">
+          <section class="card">
             <h3><a href="./ja/module-boundaries.html">モジュール境界</a></h3>
-            <p>workspace、依存方向、publish 単位、npm package。</p>
+            <p>repository が複数 module に分かれている理由、依存方向、公開単位。</p>
           </section>
           <section class="card">
             <h3><a href="./ja/engine-scene-architecture.html">Engine / Scene</a></h3>
-            <p>runtime、phase、surface、platform runner。</p>
+            <p>frame を進める runtime、scene、surface、platform runner の関係。</p>
           </section>
           <section class="card">
             <h3><a href="./ja/rendering.html">描画</a></h3>
-            <p>Renderer、Renderable、resource registration、draw path。</p>
+            <p>mesh、material、renderable が画面に出るまでの流れ。</p>
           </section>
           <section class="card">
             <h3><a href="./ja/ecs.html">ECS</a></h3>
-            <p>archetype SoA、query、builtin blob、camera control。</p>
-          </section>
-          <section class="card">
-            <h3><a href="./ja/undo-redo.html">Undo / Redo</a></h3>
-            <p>WorldHistory、tracked transaction、EntityId 復元。</p>
-          </section>
-          <section class="card">
-            <h3><a href="./ja/history-serialization.html">履歴シリアライズ</a></h3>
-            <p>履歴 record の永続化方針、component identity、v1 非対応範囲。</p>
-          </section>
-          <section class="card">
-            <h3><a href="./ja/history-mutation-coverage.html">履歴 Mutation Coverage</a></h3>
-            <p>Undo/Redo 対応済み、raw guarded、意図的に untracked な mutation API の監査表。</p>
+            <p>entity、component、system、query と、RhodoniteMBT の storage model。</p>
           </section>
           <section class="card">
             <h3><a href="./ja/input-architecture.html">入力アーキテクチャ</a></h3>
-            <p>platform-independent input と browser / SDL3 adapters。</p>
+            <p>browser / SDL3 の入力を platform-independent な state へ揃える流れ。</p>
+          </section>
+        </div>
+
+        <h3>Editing / History</h3>
+        <div class="cards">
+          <section class="card">
+            <h3><a href="./ja/undo-redo.html">Undo / Redo</a></h3>
+            <p>editor 操作を戻すための WorldHistory、transaction、tracked API。</p>
           </section>
           <section class="card">
+            <h3><a href="./ja/history-serialization.html">履歴シリアライズ</a></h3>
+            <p>履歴 record を保存・復元するための archive 方針と互換性境界。</p>
+          </section>
+          <section class="card">
+            <h3><a href="./ja/history-mutation-coverage.html">履歴 Mutation Coverage</a></h3>
+            <p>mutation API を tracked、raw guarded、untracked に分類する監査表。</p>
+          </section>
+        </div>
+
+        <h3>Development</h3>
+        <div class="cards">
+          <section class="card">
             <h3><a href="./ja/visual-regression-tests.html">Visual Regression</a></h3>
-            <p>native/browser WebGPU readback と PNG snapshots。</p>
+            <p>sample rendering を WebGPU で readback し、PNG snapshot と比較する仕組み。</p>
           </section>
           <section class="card">
             <h3><a href="./ja/ecs-design-notes.html">ECS Design Notes</a></h3>
-            <p>lifetime、access guard、blob store、今後の設計論点。</p>
+            <p>ECS の内部設計、lifetime、access guard、今後の設計論点。</p>
           </section>
         </div>
 
         <h2>English</h2>
         <div class="cards">
           <section class="card">
+            <h3><a href="./en/getting-started.html">Getting Started</a></h3>
+            <p>Project purpose, first sample, runtime mental model, and reading order.</p>
+          </section>
+          <section class="card">
+            <h3><a href="./en/glossary.html">Glossary</a></h3>
+            <p>Short definitions for Engine, Scene, World, Surface, tracked/raw, and related terms.</p>
+          </section>
+        </div>
+
+        <h3>Architecture</h3>
+        <div class="cards">
+          <section class="card">
             <h3><a href="./en/module-boundaries.html">Module Boundaries</a></h3>
-            <p>Workspace modules, dependency direction, release units, and npm package.</p>
+            <p>Why the repository is split into modules, dependency direction, and release units.</p>
           </section>
           <section class="card">
             <h3><a href="./en/engine-scene-architecture.html">Engine / Scene</a></h3>
-            <p>Runtime, phases, surfaces, and platform runners.</p>
+            <p>How the runtime advances frames and connects scenes, surfaces, and platform runners.</p>
           </section>
           <section class="card">
             <h3><a href="./en/rendering.html">Rendering</a></h3>
-            <p>Renderer, Renderable, resource registration, and draw paths.</p>
+            <p>How meshes, materials, and renderables reach the screen.</p>
           </section>
           <section class="card">
             <h3><a href="./en/ecs.html">ECS</a></h3>
-            <p>Archetype SoA, queries, builtin blobs, and camera control.</p>
-          </section>
-          <section class="card">
-            <h3><a href="./en/undo-redo.html">Undo / Redo</a></h3>
-            <p>WorldHistory, tracked transactions, and EntityId restoration.</p>
-          </section>
-          <section class="card">
-            <h3><a href="./en/history-serialization.html">History Serialization</a></h3>
-            <p>History record persistence policy, component identity, and v1 exclusions.</p>
-          </section>
-          <section class="card">
-            <h3><a href="./en/history-mutation-coverage.html">History Mutation Coverage</a></h3>
-            <p>Audit table for tracked, raw guarded, and intentionally untracked mutation APIs.</p>
+            <p>Entities, components, systems, queries, and RhodoniteMBT's storage model.</p>
           </section>
           <section class="card">
             <h3><a href="./en/input-architecture.html">Input Architecture</a></h3>
-            <p>Platform-independent input plus browser and SDL3 adapters.</p>
+            <p>How browser and SDL3 input become platform-independent frame state.</p>
+          </section>
+        </div>
+
+        <h3>Editing / History</h3>
+        <div class="cards">
+          <section class="card">
+            <h3><a href="./en/undo-redo.html">Undo / Redo</a></h3>
+            <p>WorldHistory, transactions, and tracked APIs for editor-style changes.</p>
           </section>
           <section class="card">
+            <h3><a href="./en/history-serialization.html">History Serialization</a></h3>
+            <p>Archive policy and compatibility boundaries for saving and restoring history records.</p>
+          </section>
+          <section class="card">
+            <h3><a href="./en/history-mutation-coverage.html">History Mutation Coverage</a></h3>
+            <p>Audit table for classifying mutation APIs as tracked, raw guarded, or untracked.</p>
+          </section>
+        </div>
+
+        <h3>Development</h3>
+        <div class="cards">
+          <section class="card">
             <h3><a href="./en/visual-regression-tests.html">Visual Regression</a></h3>
-            <p>Native/browser WebGPU readback and PNG snapshots.</p>
+            <p>WebGPU sample readback and PNG snapshot comparison for rendering regressions.</p>
           </section>
           <section class="card">
             <h3><a href="./en/ecs-design-notes.html">ECS Design Notes</a></h3>
-            <p>Lifetime, access guards, blob stores, and future design points.</p>
+            <p>Internal ECS design notes for lifetimes, access guards, blob stores, and future work.</p>
           </section>
         </div>
       </article>

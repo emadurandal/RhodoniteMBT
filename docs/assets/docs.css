@@ -133,6 +133,36 @@ p {
   background: var(--accent-weak);
 }
 
+.overview {
+  margin: 22px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.overview h2,
+.overview h3 {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.agent-note {
+  margin: 22px 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.agent-note h2,
+.agent-note h3 {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 code {
   padding: 0.12rem 0.28rem;
   border-radius: 4px;

@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Module Boundaries</h1>
           <p class="lead">RhodoniteMBT is a MoonBit workspace joined by the root <a href="../../moon.work"><code>moon.work</code></a>. Library modules keep clear ownership boundaries; examples are repository-only and are not published as release units.</p>
+
+          <div class="overview">
+            <h2>How To Read This Page</h2>
+            <p>Use this page first to learn which directory owns which part of the project. If you are only using the runtime, start with the <code>emadurandal/rhodonite</code> facade and the samples. Lower modules exist so CPU-only logic, WebGPU wrappers, and native SDL3 runtime code can be maintained separately.</p>
+          </div>
 
           <h2>Workspace Modules</h2>
           <table>
@@ -73,6 +80,10 @@ flowchart LR
           </ul>
 
           <h2>Release Units</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>The remaining sections are maintainer-oriented release, npm package, and validation notes. When module dependencies or package entrypoints change, keep this table, README, and related scripts in sync in the same change.</p>
+          </div>
           <p>Mooncakes publishing runs in dependency order. The root script temporarily rewrites workspace path dependencies to registry versions, publishes, then restores the workspace files.</p>
           <ol>
             <li><code>emadurandal/sdl3</code></li>

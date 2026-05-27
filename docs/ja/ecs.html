@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -31,7 +33,16 @@
           <h1>ECS</h1>
           <p class="lead"><a href="../../moon/rhodonite_core/src/ecs/"><code>emadurandal/rhodonite_core/ecs</code></a> は archetype-based ECS です。任意 component の storage は CPU-only SoA に統一し、renderer upload bytes は builtin packed blob が扱います。</p>
 
+          <div class="overview">
+            <h2>ECS を初めて読む人へ</h2>
+            <p>ECS は、object を class hierarchy ではなく entity ID と component data の組み合わせで表す方法です。RhodoniteMBT の <code>World</code> は entity と component を保持し、system は query で必要な component を持つ entity を探して更新します。内部 storage の SoA や blob は performance と GPU upload のための詳細です。</p>
+          </div>
+
           <h2>Storage Model</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>ここから先は storage、query、system access、camera-control の詳細です。runtime behavior、history recording、TypeScript wrapper に関わる変更では、このページと mutation coverage / serialization docs を同時に確認します。</p>
+          </div>
           <div class="mermaid">
 flowchart LR
   W[World] --> R[ComponentRegistry]

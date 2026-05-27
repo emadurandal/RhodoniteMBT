@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -30,6 +32,16 @@
         <article class="doc">
           <h1>ECS Design Notes</h1>
           <p class="lead">The current ECS is CPU-only archetype SoA plus builtin packed GPU blobs. Generic GPU component storage has been removed.</p>
+
+          <div class="overview">
+            <h2>Before Reading</h2>
+            <p>This is a maintainer design note, not the beginner entry point. If you are new to the ECS, read <a href="./ecs.html">ECS</a> first, then use this page for lifetime, access guard, and blob-store constraints.</p>
+          </div>
+
+          <div class="agent-note">
+            <h2>Maintainer / Agent Notes</h2>
+            <p>Changing ECS storage or query lifetimes can affect TypeScript wrappers, history recording, visual samples, and benchmark paths. Review related docs and tests in the same change.</p>
+          </div>
 
           <h2>Query View Lifetime</h2>
           <p><code>QueryRow::read</code> / <code>write</code> and <code>RawQueryRow::read_view</code> / <code>write_view</code> return closure-scoped views. Read-only indexed fast paths such as <code>PreparedQuery::for_each_read_at</code> keep the same callback-scoped row view lifetime while avoiding per-row wrapper construction.</p>
