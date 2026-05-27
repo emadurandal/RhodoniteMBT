@@ -151,6 +151,140 @@ fn make_world_batch(
 }
 
 ///|
+/// Builds a flat transform world and clears initial transform/upload dirtiness.
+fn make_clean_flat_transform_world(
+  count : Int,
+) -> (@ecs.World, Array[@ecs.EntityId]) {
+  let (world, _, _, _, entities) = make_world_batch_entities(count)
+  world.update_global_transforms_from_transforms()
+  let _ = world.drain_global_transform_blob_write_views()
+  (world, entities)
+}
+
+///|
+/// Builds a broad transform hierarchy and clears initial transform/upload dirtiness.
+fn make_clean_broad_transform_world(
+  count : Int,
+) -> (@ecs.World, Array[@ecs.EntityId]) {
+  let (world, _, _, _, entities) = make_world_batch_entities(count)
+  if count > 1 {
+    let root = entities[0]
+    for i = 1; i < entities.length(); i = i + 1 {
+      ignore(world.set_child_of(entities[i], root))
+    }
+  }
+  world.update_global_transforms_from_transforms()
+  let _ = world.drain_global_transform_blob_write_views()
+  (world, entities)
+}
+
+///|
+/// Builds a chain transform hierarchy and clears initial transform/upload dirtiness.
+fn make_clean_chain_transform_world(
+  count : Int,
+) -> (@ecs.World, Array[@ecs.EntityId]) {
+  let (world, _, _, _, entities) = make_world_batch_entities(count)
+  for i = 1; i < entities.length(); i = i + 1 {
+    ignore(world.set_child_of(entities[i], entities[i - 1]))
+  }
+  world.update_global_transforms_from_transforms()
+  let _ = world.drain_global_transform_blob_write_views()
+  (world, entities)
+}
+
+///|
+/// Marks one entity's Transform3D dirty with a deterministic changed translation.
+fn mark_transform_propagation_dirty(
+  world : @ecs.World,
+  entity : @ecs.EntityId,
+  seed : Int,
+) -> Int {
+  let idx = entity.gpu_index()
+  let changed = world.set_transform_trs(
+    entity,
+    Float::from_double(idx.to_double() * 0.01 + seed.to_double() * 0.001),
+    Float::from_double(seed.to_double() * 0.002 + 1.0),
+    Float::from_double(idx.to_double() * -0.01),
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    (1.0 : Float),
+    (1.0 : Float),
+    (1.0 : Float),
+  )
+  if changed {
+    idx + 1
+  } else {
+    idx
+  }
+}
+
+///|
+/// Returns uploaded byte count from pending GlobalTransform blob write views.
+fn drain_global_transform_upload_bytes(world : @ecs.World) -> Int {
+  let writes = world.drain_global_transform_blob_write_views()
+  let mut uploaded = 0
+  for i = 0; i < writes.length(); i = i + 1 {
+    uploaded = uploaded + writes[i].bytes.length()
+  }
+  uploaded
+}
+
+///|
+/// Builds a runner that executes the builtin dirty TransformPropagation path.
+fn make_dirty_transform_propagation_runner(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+) -> @ecs.SystemRunner {
+  let runner = @ecs.SystemRunner::new()
+  runner.add_system(@ecs.transform_propagation_system(world, phase))
+  runner
+}
+
+///|
+/// Builds a runner that forces the public full transform recompute path.
+fn make_full_transform_propagation_runner(
+  world : @ecs.World,
+  phase : @ecs.PhaseKey,
+) -> @ecs.SystemRunner {
+  let runner = @ecs.SystemRunner::new()
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  let co = world.child_of_component()
+  runner.add_system(
+    @ecs.System::new("TransformPropagationFullBench", phase, [tf, co], [gt], (
+      system_world,
+      _ctx,
+      _commands,
+    ) => system_world.update_global_transforms_from_transforms()),
+  )
+  runner
+}
+
+///|
+/// Runs one transform propagation benchmark phase and drains resulting uploads.
+fn run_transform_propagation_runner(
+  name : String,
+  count : Int,
+  world : @ecs.World,
+  runner : @ecs.SystemRunner,
+  phase : @ecs.PhaseKey,
+  checksum_seed : Int,
+) -> BenchSample {
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected transform propagation benchmark phase")
+  }
+  let uploaded = drain_global_transform_upload_bytes(world)
+  report(name, count, started, uploaded + checksum_seed + 1)
+}
+
+///|
 /// Implements `bench_bytes4`.
 fn bench_bytes4(seed : Int) -> FixedArray[Byte] {
   let bytes = FixedArray::make(4, (0 : Byte))
@@ -872,6 +1006,115 @@ fn bench_global_and_drain_views(count : Int) -> BenchSample {
     uploaded = uploaded + writes[i].bytes.length()
   }
   report("global_transform_drain_views", count, started, uploaded)
+}
+
+///|
+/// Implements `bench_transform_propagation_dirty_noop_flat`.
+fn bench_transform_propagation_dirty_noop_flat(count : Int) -> BenchSample {
+  let (world, _) = make_clean_flat_transform_world(count)
+  let phase = @ecs.PhaseKey::new("transform-propagation-dirty-noop-flat")
+  let runner = make_dirty_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_dirty_noop_flat", count, world, runner, phase, count,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_dirty_one_flat`.
+fn bench_transform_propagation_dirty_one_flat(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_flat_transform_world(count)
+  let target_index = if count > 0 { count / 2 } else { 0 }
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[target_index], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-dirty-one-flat")
+  let runner = make_dirty_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_dirty_one_flat", count, world, runner, phase, checksum_seed,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_full_one_flat`.
+fn bench_transform_propagation_full_one_flat(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_flat_transform_world(count)
+  let target_index = if count > 0 { count / 2 } else { 0 }
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[target_index], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-full-one-flat")
+  let runner = make_full_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_full_one_flat", count, world, runner, phase, checksum_seed,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_dirty_broad_root`.
+fn bench_transform_propagation_dirty_broad_root(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_broad_transform_world(count)
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[0], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-dirty-broad-root")
+  let runner = make_dirty_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_dirty_broad_root", count, world, runner, phase, checksum_seed,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_full_broad_root`.
+fn bench_transform_propagation_full_broad_root(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_broad_transform_world(count)
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[0], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-full-broad-root")
+  let runner = make_full_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_full_broad_root", count, world, runner, phase, checksum_seed,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_dirty_chain_root`.
+fn bench_transform_propagation_dirty_chain_root(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_chain_transform_world(count)
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[0], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-dirty-chain-root")
+  let runner = make_dirty_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_dirty_chain_root", count, world, runner, phase, checksum_seed,
+  )
+}
+
+///|
+/// Implements `bench_transform_propagation_full_chain_root`.
+fn bench_transform_propagation_full_chain_root(count : Int) -> BenchSample {
+  let (world, entities) = make_clean_chain_transform_world(count)
+  let checksum_seed = if entities.length() > 0 {
+    mark_transform_propagation_dirty(world, entities[0], count)
+  } else {
+    0
+  }
+  let phase = @ecs.PhaseKey::new("transform-propagation-full-chain-root")
+  let runner = make_full_transform_propagation_runner(world, phase)
+  run_transform_propagation_runner(
+    "transform_propagation_full_chain_root", count, world, runner, phase, checksum_seed,
+  )
 }
 
 ///|
