@@ -39,7 +39,10 @@ const bridgeSources = {
       root,
       "_build/js/release/build/emadurandal/rhodonite_core/ecs/js_bridge",
     ),
-    types: path.join(sources.ecs, "ecs-bridge.d.ts"),
+    types: [
+      path.join(sources.ecs, "ecs-bridge.d.ts"),
+      path.join(sources.ecs, "ecs-bridge-history.d.ts"),
+    ],
   },
 };
 
@@ -57,7 +60,7 @@ function copyWrapperSource(kind) {
     recursive: true,
     filter: (source) =>
       !source.endsWith(".test.ts") &&
-      !source.endsWith("-bridge.d.ts") &&
+      !path.basename(source).includes("-bridge") &&
       !source.split(path.sep).includes("test-support"),
   });
 }
@@ -122,12 +125,17 @@ function extractAmbientModuleBody(filePath) {
     .trimStart();
 }
 
+function extractAmbientModuleBodies(filePaths) {
+  const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+  return paths.map((filePath) => extractAmbientModuleBody(filePath)).join("\n");
+}
+
 function writeInternalBridgeTypes(kind) {
   const outDir = path.join(buildSrc, "internal", kind);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(
     path.join(outDir, "js_bridge.d.ts"),
-    extractAmbientModuleBody(bridgeSources[kind].types),
+    extractAmbientModuleBodies(bridgeSources[kind].types),
   );
 }
 
