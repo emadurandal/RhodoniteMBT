@@ -27,6 +27,10 @@ if (!launchBrowser) {
 
 let browserContext;
 let resultServer;
+const browserDiagnostics = {
+	get: () => "",
+	stop: () => {},
+};
 const vite = await createServer({
 	root,
 	logLevel: "warn",
@@ -117,6 +121,17 @@ try {
 	];
 	try {
 		const browser = await launchBrowser({
+			attachPageDiagnostics: ({ context, page }) => {
+				const diagnostics = attachBrowserDiagnostics(
+					context,
+					page,
+					verbose,
+					rejectResult,
+				);
+				browserDiagnostics.get = diagnostics.get;
+				browserDiagnostics.stop = diagnostics.stop;
+				return diagnostics.stop;
+			},
 			args: browserArgs,
 			headless,
 			logPrefix: "visual_regression(browser)",
@@ -148,7 +163,7 @@ try {
 				failures: [
 					{
 						name: "browser visual regression",
-						message: formatFailure(error),
+						message: formatFailure(error, browserDiagnostics.get()),
 					},
 				],
 				updates: [],
@@ -192,6 +207,7 @@ try {
 	}
 } finally {
 	if (browserContext) {
+		browserDiagnostics.stop();
 		await browserContext.close();
 	}
 	await closeMaybeRunning(vite);
@@ -215,8 +231,75 @@ class TimeoutError extends Error {
 	}
 }
 
-function formatFailure(error) {
-	return error instanceof Error ? error.message : String(error);
+function attachBrowserDiagnostics(context, page, verboseOutput, rejectBrowserFailure) {
+	let diagnostics = "";
+	let active = true;
+	const append = (line) => {
+		diagnostics = appendOutputTail(diagnostics, `${line}\n`);
+		if (verboseOutput) {
+			console.error(`visual_regression(browser): ${line}`);
+		}
+	};
+	const failBrowser = (message) => {
+		if (!active) {
+			return;
+		}
+		append(message);
+		rejectBrowserFailure(new Error(message));
+	};
+	const onConsole = (message) => {
+		append(`console ${message.type()} ${message.text()}`);
+	};
+	const onPageError = (error) => {
+		append(`pageerror ${error.message}`);
+	};
+	const onRequestFailed = (request) => {
+		append(`requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`);
+	};
+	const onCrash = () => {
+		failBrowser("browser page crashed before reporting results");
+	};
+	const onPageClose = () => {
+		failBrowser("browser page closed before reporting results");
+	};
+	const onContextClose = () => {
+		failBrowser("browser context closed before reporting results");
+	};
+	page.on("console", onConsole);
+	page.on("pageerror", onPageError);
+	page.on("requestfailed", onRequestFailed);
+	page.on("crash", onCrash);
+	page.on("close", onPageClose);
+	context.on("close", onContextClose);
+	return {
+		get: () => diagnostics,
+		stop: () => {
+			active = false;
+			page.off("console", onConsole);
+			page.off("pageerror", onPageError);
+			page.off("requestfailed", onRequestFailed);
+			page.off("crash", onCrash);
+			page.off("close", onPageClose);
+			context.off("close", onContextClose);
+		},
+	};
+}
+
+function appendOutputTail(existing, text) {
+	const next = existing + text;
+	return next.length > 8000 ? next.slice(next.length - 8000) : next;
+}
+
+function formatFailure(error, diagnostics) {
+	const message = error instanceof Error ? error.message : String(error);
+	if (message.includes("browser diagnostics:")) {
+		return message;
+	}
+	return message + formatBrowserDiagnostics(diagnostics);
+}
+
+function formatBrowserDiagnostics(diagnostics) {
+	return diagnostics.trim() ? `\nbrowser diagnostics:\n${diagnostics.trim()}` : "";
 }
 
 function listen(server) {
