@@ -290,7 +290,6 @@ fn run_system_batch_report(
   batch_index : Int,
 ) -> SystemRunBatchReport {
   let command_buffers : Array[CommandBuffer] = []
-  let command_systems : Array[ScheduledSystem] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
     let scheduled = batch.systems[i]
     let system = scheduled.system
@@ -310,7 +309,6 @@ fn run_system_batch_report(
         )
         run(world, ctx, commands)
         command_buffers.push(commands)
-        command_systems.push(scheduled)
       }
       Direct(run) => run(world, ctx)
     }
@@ -417,7 +415,6 @@ fn run_system_batch_tracked_report(
   batch_index : Int,
 ) -> SystemRunBatchReport {
   let command_buffers : Array[CommandBuffer] = []
-  let command_systems : Array[ScheduledSystem] = []
   for i = 0; i < batch.systems.length(); i = i + 1 {
     let scheduled = batch.systems[i]
     let system = scheduled.system
@@ -438,7 +435,6 @@ fn run_system_batch_tracked_report(
         )
         run(world, ctx, commands)
         command_buffers.push(commands)
-        command_systems.push(scheduled)
       }
       Direct(run) => run(world, ctx)
     }
