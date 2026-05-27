@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the ECS microbench package (moon/rhodonite_core/src/ecs_bench) for a MoonBit target.
+# Run the ECS microbench package (moon/rhodonite_core/src/ecs_bench) for a MoonBit target in release mode.
 # Usage (from repo root):
 #   bash scripts/run-ecs-bench.sh           # default: js
 #   bash scripts/run-ecs-bench.sh all --json-out /tmp/ecs-bench.jsonl
@@ -39,7 +39,7 @@ done
 
 run_target() {
   local target="$1"
-  moon run --target "${target}" "${BENCH_PKG}"
+  moon run --release --target "${target}" "${BENCH_PKG}"
 }
 
 write_json_results() {
@@ -54,7 +54,7 @@ const out = [];
 for (const line of lines) {
   if (!line.startsWith("ecs_bench_result ")) continue;
   const result = JSON.parse(line.slice("ecs_bench_result ".length));
-  out.push(JSON.stringify({ target, ...result }));
+  out.push(JSON.stringify({ target, build_mode: "release", ...result }));
 }
 fs.appendFileSync(output, out.length > 0 ? out.join("\n") + "\n" : "");
 NODE
@@ -89,7 +89,7 @@ case "${TARGET}" in
       echo "run-ecs-bench: --json-out is only supported for runnable targets" >&2
       exit 1
     fi
-    exec moon build --target wasm-gc "${BENCH_PKG}"
+    exec moon build --release --target wasm-gc "${BENCH_PKG}"
     ;;
   *)
     echo "run-ecs-bench: unknown target '${TARGET}'" >&2
