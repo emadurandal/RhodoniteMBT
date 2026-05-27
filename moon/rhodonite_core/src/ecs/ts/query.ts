@@ -26,6 +26,7 @@ import {
 	query_cache_component_index,
 	query_cache_excluded_components,
 	query_cache_for_each,
+	query_cache_for_each_read_at,
 	query_cache_new,
 	query_cache_new_with_excluded,
 	query_cache_plan,
@@ -66,6 +67,7 @@ import {
 	raw_prepared_query_refresh,
 	raw_query_cache_for_each,
 	raw_query_cache_for_each_archetype,
+	raw_query_cache_for_each_read_view_at,
 	raw_query_cache_excluded_components,
 	raw_query_cache_new,
 	raw_query_cache_new_with_excluded,
@@ -224,6 +226,19 @@ export class QueryCache {
 	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
 		query_cache_for_each(this.inner, world.inner, (row) =>
 			f(new QueryRow(row)),
+		);
+	}
+
+	forEachReadAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		query_cache_for_each_read_at(
+			this.inner,
+			world.inner,
+			index,
+			(entity, bytes) => f(new EntityId(entity), byteView(bytes)),
 		);
 	}
 }
@@ -455,6 +470,19 @@ export class RawQueryCache {
 	forEach(world: { readonly inner: MoonWorld }, f: (row: RawQueryRow) => void): void {
 		raw_query_cache_for_each(this.inner, world.inner, (row) =>
 			f(new RawQueryRow(row)),
+		);
+	}
+
+	forEachReadViewAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		raw_query_cache_for_each_read_view_at(
+			this.inner,
+			world.inner,
+			index,
+			(entity, bytes) => f(new EntityId(entity), byteView(bytes)),
 		);
 	}
 

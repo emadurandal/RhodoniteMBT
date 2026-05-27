@@ -2,6 +2,111 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+/// Ensures the Camera blob sync dirty stamp array can address `entity`.
+fn World::ensure_camera_blob_sync_dirty_capacity(
+  self : World,
+  entity : EntityId,
+) -> Unit {
+  while self.camera_blob_sync_dirty_generations.length() <= entity.index {
+    self.camera_blob_sync_dirty_generations.push(-1)
+  }
+}
+
+///|
+/// Marks an entity as needing direct Camera blob sync.
+fn World::mark_camera_blob_sync_dirty(self : World, entity : EntityId) -> Unit {
+  if entity.index < 0 {
+    return
+  }
+  self.ensure_camera_blob_sync_dirty_capacity(entity)
+  if self.camera_blob_sync_dirty_generations[entity.index] != entity.generation {
+    self.camera_blob_sync_dirty_generations[entity.index] = entity.generation
+    self.camera_blob_sync_dirty_entities.push(entity)
+  }
+}
+
+///|
+/// Returns true when a component payload or ownership change affects direct Camera blob sync.
+fn World::component_affects_camera_blob_sync(
+  self : World,
+  component : ComponentTypeId,
+) -> Bool {
+  component == self.global_transform_component_id ||
+  component == self.camera_component_id ||
+  component == self.camera_lens_component_id ||
+  component == self.orbit_camera_controller_component_id
+}
+
+///|
+/// Marks `entity` dirty when `component` changes direct Camera blob sync inputs.
+fn World::mark_camera_blob_sync_dirty_for_component(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Unit {
+  if self.component_affects_camera_blob_sync(component) {
+    self.mark_camera_blob_sync_dirty(entity)
+  }
+}
+
+///|
+/// Marks every entity in an archetype dirty when a Camera sync source column is exposed for mutation.
+fn World::mark_camera_blob_sync_dirty_archetype(
+  self : World,
+  archetype_index : Int,
+  component : ComponentTypeId,
+) -> Unit {
+  if !self.component_affects_camera_blob_sync(component) {
+    return
+  }
+  let arch = self.archetypes[archetype_index]
+  for row = 0; row < arch.entities.length(); row = row + 1 {
+    self.mark_camera_blob_sync_dirty(arch.entities[row])
+  }
+}
+
+///|
+/// Marks selected archetype rows dirty for sparse Camera sync source mutation.
+fn World::mark_camera_blob_sync_dirty_archetype_rows(
+  self : World,
+  archetype_index : Int,
+  component : ComponentTypeId,
+  rows : Array[Int],
+) -> Unit {
+  if !self.component_affects_camera_blob_sync(component) {
+    return
+  }
+  let arch = self.archetypes[archetype_index]
+  for i = 0; i < rows.length(); i = i + 1 {
+    let row = rows[i]
+    if row >= 0 && row < arch.entities.length() {
+      self.mark_camera_blob_sync_dirty(arch.entities[row])
+    }
+  }
+}
+
+///|
+/// Drains alive Camera blob sync dirty entities and clears their generation stamps.
+fn World::drain_camera_blob_sync_dirty_entities(
+  self : World,
+) -> Array[EntityId] {
+  let out : Array[EntityId] = []
+  for i = 0; i < self.camera_blob_sync_dirty_entities.length(); i = i + 1 {
+    let entity = self.camera_blob_sync_dirty_entities[i]
+    if entity.index >= 0 &&
+      entity.index < self.camera_blob_sync_dirty_generations.length() &&
+      self.camera_blob_sync_dirty_generations[entity.index] == entity.generation {
+      self.camera_blob_sync_dirty_generations[entity.index] = -1
+      if self.is_alive(entity) {
+        out.push(entity)
+      }
+    }
+  }
+  self.camera_blob_sync_dirty_entities.clear()
+  out
+}
+
+///|
 /// Implements `World::camera_ref_from_bytes`.
 fn World::camera_ref_from_bytes(
   self : World,

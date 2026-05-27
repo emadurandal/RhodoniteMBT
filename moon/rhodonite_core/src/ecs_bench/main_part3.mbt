@@ -167,6 +167,9 @@ fn run_suite(count : Int) -> Unit {
     "camera_blob_sync_system_phase", count, bench_camera_blob_sync_system_phase,
   )
   run_case(
+    "camera_blob_sync_system_phase_clean", count, bench_camera_blob_sync_system_phase_clean,
+  )
+  run_case(
     "camera_blob_sync_command_system_phase", count, bench_camera_blob_sync_command_system_phase,
   )
   run_case(

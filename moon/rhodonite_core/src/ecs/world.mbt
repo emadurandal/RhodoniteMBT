@@ -514,6 +514,8 @@ pub fn World::new_with_global_transform_format(
   let transform_dirty_generations : Array[Int] = []
   let transform_children_by_parent_index : Array[Array[EntityId]] = []
   let transform_hierarchy_index_dirty = true
+  let camera_blob_sync_dirty_entities : Array[EntityId] = []
+  let camera_blob_sync_dirty_generations : Array[Int] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
   let system_access_depth = 0
@@ -540,6 +542,8 @@ pub fn World::new_with_global_transform_format(
     transform_dirty_generations,
     transform_children_by_parent_index,
     transform_hierarchy_index_dirty,
+    camera_blob_sync_dirty_entities,
+    camera_blob_sync_dirty_generations,
     query_depth,
     component_registration_lock_depth,
     system_access_depth,
@@ -902,5 +906,6 @@ pub fn World::set_component_bytes(
     bytes,
   )
   self.mark_transform_source_dirty(entity, component)
+  self.mark_camera_blob_sync_dirty_for_component(entity, component)
   true
 }

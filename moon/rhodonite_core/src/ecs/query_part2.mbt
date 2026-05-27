@@ -159,6 +159,7 @@ pub fn QueryRow::write(
     ),
   )
   self.world.mark_transform_source_dirty(self.entity, component)
+  self.world.mark_camera_blob_sync_dirty_for_component(self.entity, component)
 }
 
 ///|
@@ -173,6 +174,7 @@ pub fn QueryRow::write_at(
   self.world.assert_system_component_write(component, "QueryRow::write_at")
   f(self.component_mut_view_at(index, "QueryRow::write_at"))
   self.world.mark_transform_source_dirty(self.entity, component)
+  self.world.mark_camera_blob_sync_dirty_for_component(self.entity, component)
 }
 
 ///|
@@ -237,6 +239,10 @@ pub fn QueryRow::write_tracked_at(
       )
       if before != after {
         self.world.mark_transform_source_dirty(self.entity, component)
+        self.world.mark_camera_blob_sync_dirty_for_component(
+          self.entity,
+          component,
+        )
       }
       true
     }
@@ -281,6 +287,7 @@ pub fn RawQueryRow::write_view(
   row.world.assert_not_history_raw_mutation("RawQueryRow::write_view")
   row.world.assert_system_component_write(component, "RawQueryRow::write_view")
   row.world.mark_transform_source_dirty(row.entity, component)
+  row.world.mark_camera_blob_sync_dirty_for_component(row.entity, component)
   row.component_mut_view_at(index, "RawQueryRow::write_view")
 }
 
@@ -297,6 +304,7 @@ pub fn RawQueryRow::write_view_at(
     component, "RawQueryRow::write_view_at",
   )
   row.world.mark_transform_source_dirty(row.entity, component)
+  row.world.mark_camera_blob_sync_dirty_for_component(row.entity, component)
   row.component_mut_view_at(index, "RawQueryRow::write_view_at")
 }
 
@@ -659,6 +667,10 @@ pub fn RawQueryArchetype::write_column_at(
     self.archetype_index,
     access.component,
   )
+  self.world.mark_camera_blob_sync_dirty_archetype(
+    self.archetype_index,
+    access.component,
+  )
   col.bytes.mut_view(start=0, end=logical_end)
 }
 
@@ -729,6 +741,10 @@ pub fn RawQueryArchetype::write_column_tracked_at(
         ComponentChanged(arch.entities[row], component, before, after),
       )
       self.world.mark_transform_source_dirty(arch.entities[row], component)
+      self.world.mark_camera_blob_sync_dirty_for_component(
+        arch.entities[row],
+        component,
+      )
     }
   }
   history.finish_auto(auto, true)
@@ -789,6 +805,11 @@ pub fn RawQueryArchetype::write_column_rows_tracked_at(
     component,
     rows,
   )
+  self.world.mark_camera_blob_sync_dirty_archetype_rows(
+    self.archetype_index,
+    component,
+    rows,
+  )
   if !history.recording_enabled() || history.applying {
     let column = self.write_column_at(index)
     for i = 0; i < rows.length(); i = i + 1 {
@@ -832,6 +853,10 @@ pub fn RawQueryArchetype::write_column_rows_tracked_at(
         ComponentChanged(arch.entities[row], component, before, after),
       )
       self.world.mark_transform_source_dirty(arch.entities[row], component)
+      self.world.mark_camera_blob_sync_dirty_for_component(
+        arch.entities[row],
+        component,
+      )
     }
   }
   history.end_tracked_world_mutation(self.world)
