@@ -466,6 +466,10 @@ pub struct World {
   priv component_archetypes : Array[Array[Int]]
   priv global_transform_blob : GlobalTransformBlobStore
   priv camera_blob : CameraBlobStore
+  /// Entity ids whose local transform inputs changed since the last dirty propagation pass.
+  priv transform_dirty_entities : Array[EntityId]
+  /// Generation stamp per entity index for the current transform dirty queue; `-1` means clean.
+  priv transform_dirty_generations : Array[Int]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
   /// SystemRunner execution depth; component registration is closed while this is nonzero.

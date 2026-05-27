@@ -315,6 +315,150 @@ pub fn World::write_global_transform_refs_into(
 }
 
 ///|
+/// Extends transform dirty generation storage so `entity.index` can be addressed.
+fn World::ensure_transform_dirty_capacity(
+  self : World,
+  entity : EntityId,
+) -> Unit {
+  while self.transform_dirty_generations.length() <= entity.index {
+    self.transform_dirty_generations.push(-1)
+  }
+}
+
+///|
+/// Returns whether `entity` is currently queued for dirty transform propagation.
+fn World::transform_entity_is_dirty(self : World, entity : EntityId) -> Bool {
+  entity.index >= 0 &&
+  entity.index < self.transform_dirty_generations.length() &&
+  self.transform_dirty_generations[entity.index] == entity.generation
+}
+
+///|
+/// Marks an entity as needing GlobalTransform recomputation on the next dirty propagation pass.
+fn World::mark_transform_dirty(self : World, entity : EntityId) -> Unit {
+  if entity.index < 0 {
+    return
+  }
+  self.ensure_transform_dirty_capacity(entity)
+  if self.transform_dirty_generations[entity.index] != entity.generation {
+    self.transform_dirty_generations[entity.index] = entity.generation
+    self.transform_dirty_entities.push(entity)
+  }
+}
+
+///|
+/// Returns true when a component payload change affects transform propagation inputs or eligibility.
+fn World::component_affects_transform_propagation(
+  self : World,
+  component : ComponentTypeId,
+) -> Bool {
+  component == self.transform_component_id ||
+  component == self.child_of_component_id ||
+  component == self.global_transform_component_id
+}
+
+///|
+/// Returns true when a component payload directly changes transform propagation source data.
+fn World::component_is_transform_source(
+  self : World,
+  component : ComponentTypeId,
+) -> Bool {
+  component == self.transform_component_id ||
+  component == self.child_of_component_id
+}
+
+///|
+/// Marks `entity` dirty when `component` changes transform propagation state.
+fn World::mark_transform_dirty_for_component(
+  self : World,
+  entity : EntityId,
+  component : ComponentTypeId,
+) -> Unit {
+  if self.component_affects_transform_propagation(component) {
+    self.mark_transform_dirty(entity)
+  }
+}
+
+///|
+/// Marks every entity in an archetype dirty when a source transform column is exposed for mutation.
+fn World::mark_transform_dirty_archetype(
+  self : World,
+  archetype_index : Int,
+  component : ComponentTypeId,
+) -> Unit {
+  if !self.component_is_transform_source(component) {
+    return
+  }
+  let arch = self.archetypes[archetype_index]
+  for row = 0; row < arch.entities.length(); row = row + 1 {
+    self.mark_transform_dirty(arch.entities[row])
+  }
+}
+
+///|
+/// Marks selected rows in an archetype dirty for sparse source transform column mutation.
+fn World::mark_transform_dirty_archetype_rows(
+  self : World,
+  archetype_index : Int,
+  component : ComponentTypeId,
+  rows : Array[Int],
+) -> Unit {
+  if !self.component_is_transform_source(component) {
+    return
+  }
+  let arch = self.archetypes[archetype_index]
+  for i = 0; i < rows.length(); i = i + 1 {
+    let row = rows[i]
+    if row >= 0 && row < arch.entities.length() {
+      self.mark_transform_dirty(arch.entities[row])
+    }
+  }
+}
+
+///|
+/// Clears all queued transform dirty generation stamps.
+fn World::clear_transform_dirty(self : World) -> Unit {
+  for i = 0; i < self.transform_dirty_entities.length(); i = i + 1 {
+    let entity = self.transform_dirty_entities[i]
+    if entity.index >= 0 &&
+      entity.index < self.transform_dirty_generations.length() &&
+      self.transform_dirty_generations[entity.index] == entity.generation {
+      self.transform_dirty_generations[entity.index] = -1
+    }
+  }
+  self.transform_dirty_entities.clear()
+}
+
+///|
+/// Expands dirty transform roots to descendants linked through ChildOf.
+fn World::mark_transform_dirty_descendants(self : World) -> Unit {
+  let mut changed = true
+  while changed {
+    changed = false
+    for ai = 0; ai < self.archetypes.length(); ai = ai + 1 {
+      let arch = self.archetypes[ai]
+      if arch.column_index(self.child_of_component_id) < 0 {
+        continue
+      }
+      for row = 0; row < arch.entities.length(); row = row + 1 {
+        let child = arch.entities[row]
+        if self.transform_entity_is_dirty(child) {
+          continue
+        }
+        match self.child_of_parent_direct(child) {
+          Some(parent) =>
+            if self.transform_entity_is_dirty(parent) {
+              self.mark_transform_dirty(child)
+              changed = true
+            }
+          None => ()
+        }
+      }
+    }
+  }
+}
+
+///|
 /// Removed dense row API. Use blob refs plus `drain_global_transform_blob_write_views`.
 pub fn World::write_global_transforms_dense(
   self : World,
@@ -592,6 +736,44 @@ fn World::try_update_global_transforms_from_transforms_archetype_path(
 }
 
 ///|
+/// Recomputes packed GlobalTransform blob rows for entities marked dirty since the last pass.
+fn World::update_global_transforms_from_transforms_dirty(self : World) -> Bool {
+  if self.transform_dirty_entities.length() == 0 {
+    return true
+  }
+  self.mark_transform_dirty_descendants()
+  let tf = self.transform_component_id
+  let gt = self.global_transform_component_id
+  let mut ok = true
+  for i = 0; i < self.transform_dirty_entities.length(); i = i + 1 {
+    let entity = self.transform_dirty_entities[i]
+    if !self.transform_entity_is_dirty(entity) || !self.is_alive(entity) {
+      continue
+    }
+    if !self.has_component(entity, tf) || !self.has_component(entity, gt) {
+      continue
+    }
+    match self.compute_global_transform(entity) {
+      Some(matrix) =>
+        match self.global_transform_ref(entity) {
+          Some(gt_ref) =>
+            ignore(
+              self.global_transform_blob.write_matrix_if_changed(
+                gt_ref.format,
+                gt_ref.word_offset,
+                matrix,
+              ),
+            )
+          None => ok = false
+        }
+      None => ()
+    }
+  }
+  self.clear_transform_dirty()
+  ok
+}
+
+///|
 /// Recomputes [`GlobalTransform`] GPU payloads from [`Transform3D`] (and optional [`ChildOf`] hierarchy)
 /// for every entity that currently has **both** builtin transforms.
 pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
@@ -610,6 +792,7 @@ pub fn World::update_global_transforms_from_transforms(self : World) -> Unit {
   if self.try_update_global_transforms_from_transforms_archetype_path(
       tf, gt, co,
     ) {
+    self.clear_transform_dirty()
     return
   }
   abort(

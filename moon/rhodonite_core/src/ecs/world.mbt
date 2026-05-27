@@ -510,6 +510,8 @@ pub fn World::new_with_global_transform_format(
     transform_archetypes, global_transform_archetypes, child_of_archetypes, camera_archetypes,
     orbit_camera_controller_archetypes, camera_home_transform_archetypes, camera_lens_archetypes,
   ]
+  let transform_dirty_entities : Array[EntityId] = []
+  let transform_dirty_generations : Array[Int] = []
   let query_depth = 0
   let component_registration_lock_depth = 0
   let system_access_depth = 0
@@ -532,6 +534,8 @@ pub fn World::new_with_global_transform_format(
     component_archetypes,
     global_transform_blob,
     camera_blob,
+    transform_dirty_entities,
+    transform_dirty_generations,
     query_depth,
     component_registration_lock_depth,
     system_access_depth,
@@ -892,5 +896,8 @@ pub fn World::set_component_bytes(
     component,
     bytes,
   )
+  if self.component_is_transform_source(component) {
+    self.mark_transform_dirty(entity)
+  }
   true
 }

@@ -135,6 +135,9 @@ pub fn World::spawn_batch(
       )
     }
     write(i, entity, { world: self, entity, archetype_index: arch_index, row })
+    for ci = 0; ci < signature.length(); ci = ci + 1 {
+      self.mark_transform_dirty_for_component(entity, signature[ci])
+    }
   }
   self.query_depth = self.query_depth - 1
   entities
