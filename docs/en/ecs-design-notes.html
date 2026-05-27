@@ -61,7 +61,7 @@ flowchart LR
   Blob --> Writes[GpuWriteView write drains]
   Writes --> Renderer[Renderer upload]
           </div>
-          <p><code>GlobalTransform</code> and <code>Camera</code> use two layers: a CPU ref component row plus packed GPU blob bytes. <code>GpuWriteView</code> borrows blob backing storage, so upload it before mutating or resizing the same blob again.</p>
+          <p><code>GlobalTransform</code> and <code>Camera</code> use two layers: a CPU ref component row plus packed GPU blob bytes. <code>GpuWriteView</code> borrows blob backing storage, so upload it before mutating or resizing the same blob again. Dirty write views are normalized into ascending, overlapping-or-adjacent ranges before drain so renderer upload avoids unnecessary queue writes without uploading across untouched gaps.</p>
 
           <h2>Removed Responsibilities</h2>
           <ul>

@@ -130,6 +130,9 @@ fn run_suite(count : Int) -> Unit {
     "global_transform_by_refs_write", count, bench_global_transform_by_refs_write,
   )
   run_case(
+    "global_transform_blob_reverse_row_drain", count, bench_global_transform_blob_reverse_row_drain,
+  )
+  run_case(
     "set_global_transform_changed", count, bench_set_global_transform_changed,
   )
   run_case(

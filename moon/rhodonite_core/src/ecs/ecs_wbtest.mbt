@@ -42,15 +42,57 @@ test "World archetype version only changes when new archetypes are created" {
 }
 
 ///|
-test "PackedGpuBlobStore keeps non-monotonic dirty word ranges" {
+test "PackedGpuBlobStore normalizes non-monotonic dirty word ranges" {
   let store = PackedGpuBlobStore::new()
   store.ensure_word_capacity(30)
   store.mark_dirty_words(24, 6)
   store.mark_dirty_words(0, 12)
   let writes = store.drain_write_views()
   assert_eq(writes.length(), 2)
-  assert_eq(writes[0].byte_offset, 24 * 4)
-  assert_eq(writes[0].bytes.length(), 6 * 4)
-  assert_eq(writes[1].byte_offset, 0)
-  assert_eq(writes[1].bytes.length(), 12 * 4)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 12 * 4)
+  assert_eq(writes[1].byte_offset, 24 * 4)
+  assert_eq(writes[1].bytes.length(), 6 * 4)
+  assert_true(!store.has_dirty_words())
+}
+
+///|
+test "PackedGpuBlobStore merges adjacent dirty word ranges" {
+  let store = PackedGpuBlobStore::new()
+  store.ensure_word_capacity(30)
+  store.mark_dirty_words(12, 6)
+  store.mark_dirty_words(0, 12)
+  let writes = store.drain_write_views()
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 0)
+  assert_eq(writes[0].bytes.length(), 18 * 4)
+}
+
+///|
+test "PackedGpuBlobStore merges overlapping dirty word ranges" {
+  let store = PackedGpuBlobStore::new()
+  store.ensure_word_capacity(30)
+  store.mark_dirty_words(10, 8)
+  store.mark_dirty_words(4, 8)
+  let writes = store.drain_write_views()
+  assert_eq(writes.length(), 1)
+  assert_eq(writes[0].byte_offset, 4 * 4)
+  assert_eq(writes[0].bytes.length(), 14 * 4)
+}
+
+///|
+test "PackedGpuBlobStore preserves separated dirty word ranges" {
+  let store = PackedGpuBlobStore::new()
+  store.ensure_word_capacity(30)
+  store.mark_dirty_words(20, 4)
+  store.mark_dirty_words(2, 4)
+  store.mark_dirty_words(10, 4)
+  let writes = store.drain_write_views()
+  assert_eq(writes.length(), 3)
+  assert_eq(writes[0].byte_offset, 2 * 4)
+  assert_eq(writes[0].bytes.length(), 4 * 4)
+  assert_eq(writes[1].byte_offset, 10 * 4)
+  assert_eq(writes[1].bytes.length(), 4 * 4)
+  assert_eq(writes[2].byte_offset, 20 * 4)
+  assert_eq(writes[2].bytes.length(), 4 * 4)
 }

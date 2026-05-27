@@ -2,6 +2,13 @@
 /// SPDX-License-Identifier: Apache-2.0
 
 ///|
+/// Dirty word range queued for packed GPU blob upload.
+priv struct PackedGpuDirtyWordRange {
+  first : Int
+  last : Int
+}
+
+///|
 /// Implements `PackedGpuBlobStore::new`.
 fn PackedGpuBlobStore::new() -> PackedGpuBlobStore {
   {
@@ -82,6 +89,48 @@ fn PackedGpuBlobStore::mark_dirty_words(
 /// Implements `PackedGpuBlobStore::has_dirty_words`.
 fn PackedGpuBlobStore::has_dirty_words(self : PackedGpuBlobStore) -> Bool {
   self.dirty_word_first.length() > 0
+}
+
+///|
+/// Returns dirty word ranges sorted by start offset and merged when contiguous.
+fn PackedGpuBlobStore::normalized_dirty_word_ranges(
+  self : PackedGpuBlobStore,
+) -> Array[PackedGpuDirtyWordRange] {
+  let ranges : Array[PackedGpuDirtyWordRange] = []
+  for i = 0; i < self.dirty_word_first.length(); i = i + 1 {
+    ranges.push({
+      first: self.dirty_word_first[i],
+      last: self.dirty_word_last[i],
+    })
+  }
+  for i = 1; i < ranges.length(); i = i + 1 {
+    let key = ranges[i]
+    let mut j = i - 1
+    while j >= 0 && ranges[j].first > key.first {
+      ranges[j + 1] = ranges[j]
+      j = j - 1
+    }
+    ranges[j + 1] = key
+  }
+  let out : Array[PackedGpuDirtyWordRange] = []
+  for i = 0; i < ranges.length(); i = i + 1 {
+    let range = ranges[i]
+    let n = out.length()
+    if n == 0 || range.first > out[n - 1].last + 1 {
+      out.push(range)
+    } else {
+      let prev = out[n - 1]
+      out[n - 1] = {
+        first: prev.first,
+        last: if range.last > prev.last {
+          range.last
+        } else {
+          prev.last
+        },
+      }
+    }
+  }
+  out
 }
 
 ///|
@@ -177,9 +226,10 @@ fn PackedGpuBlobStore::drain_write_views(
   self : PackedGpuBlobStore,
 ) -> Array[GpuWriteView] {
   let writes : Array[GpuWriteView] = []
-  for i = 0; i < self.dirty_word_first.length(); i = i + 1 {
-    let start = self.dirty_word_first[i] * 4
-    let end = (self.dirty_word_last[i] + 1) * 4
+  let ranges = self.normalized_dirty_word_ranges()
+  for i = 0; i < ranges.length(); i = i + 1 {
+    let start = ranges[i].first * 4
+    let end = (ranges[i].last + 1) * 4
     writes.push({ byte_offset: start, bytes: self.bytes[start:end] })
   }
   self.dirty_word_first.clear()
