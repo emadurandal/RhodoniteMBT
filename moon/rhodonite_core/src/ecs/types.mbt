@@ -453,6 +453,38 @@ pub(all) struct SystemRunReport {
 }
 
 ///|
+/// Read-only diagnostic for one transform propagation pass.
+pub(all) struct TransformPropagationReport {
+  ok : Bool
+  used_dirty_path : Bool
+  used_full_path : Bool
+  fallback_to_full : Bool
+  dirty_queue_count : Int
+  dirty_root_count : Int
+  skipped_dirty_entity_count : Int
+  visited_entity_count : Int
+  global_transform_write_count : Int
+  hierarchy_index_rebuilt : Bool
+  pending_upload_range_count : Int
+}
+
+///|
+/// Mutable accumulator used while building a transform propagation diagnostic.
+priv struct TransformPropagationReportDraft {
+  mut ok : Bool
+  mut used_dirty_path : Bool
+  mut used_full_path : Bool
+  mut fallback_to_full : Bool
+  dirty_queue_count : Int
+  mut dirty_root_count : Int
+  mut skipped_dirty_entity_count : Int
+  mut visited_entity_count : Int
+  mut global_transform_write_count : Int
+  mut hierarchy_index_rebuilt : Bool
+  mut pending_upload_range_count : Int
+}
+
+///|
 /// Phase-filtered ECS system runner. `World` stays focused on ECS storage and mutation.
 pub struct SystemRunner {
   priv systems : Array[System]

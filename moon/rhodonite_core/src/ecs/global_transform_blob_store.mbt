@@ -192,6 +192,14 @@ fn GlobalTransformBlobStore::has_write_views(
 }
 
 ///|
+/// Returns the number of normalized pending upload ranges without draining them.
+fn GlobalTransformBlobStore::pending_write_view_count(
+  self : GlobalTransformBlobStore,
+) -> Int {
+  self.store.dirty_write_view_count()
+}
+
+///|
 /// Implements `GlobalTransformBlobStore::drain_write_views`.
 fn GlobalTransformBlobStore::drain_write_views(
   self : GlobalTransformBlobStore,

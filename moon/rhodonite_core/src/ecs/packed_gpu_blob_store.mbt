@@ -92,6 +92,12 @@ fn PackedGpuBlobStore::has_dirty_words(self : PackedGpuBlobStore) -> Bool {
 }
 
 ///|
+/// Returns the number of normalized dirty upload ranges without draining them.
+fn PackedGpuBlobStore::dirty_write_view_count(self : PackedGpuBlobStore) -> Int {
+  self.normalized_dirty_word_ranges().length()
+}
+
+///|
 /// Returns dirty word ranges sorted by start offset and merged when contiguous.
 fn PackedGpuBlobStore::normalized_dirty_word_ranges(
   self : PackedGpuBlobStore,

@@ -54,6 +54,7 @@
             <li>非 report の phase execution は、command を queue しなかった command system の command-buffer apply pass を skip します。</li>
             <li><code>SystemRunner::run_phase_report</code> は direct system と empty command buffer でも system ごとの diagnostics を出します。report は execution snapshot であり、batch order、command apply order、history behavior は変えません。</li>
             <li>builtin <code>TransformPropagation</code> system は内部 dirty queue と lazy な <code>ChildOf</code> hierarchy index を使います。dirty root は indexed subtree を parent-first に再計算し、公開 <code>World::update_global_transforms_from_transforms</code> は互換性のため full recompute API のままです。</li>
+            <li><code>World::propagate_global_transforms_from_transforms_report</code> は diagnostic dirty propagation path を実行し、dirty root、skipped entry、visited entity、変更された GlobalTransform row、hierarchy-index rebuild、pending upload range の counter を blob を drain せずに返します。</li>
           </ul>
 
           <h2>Builtin Packed Blobs</h2>

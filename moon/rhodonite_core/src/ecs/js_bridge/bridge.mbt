@@ -413,6 +413,102 @@ pub fn world_update_global_transforms_from_transforms(
 }
 
 ///|
+/// Implements `world_propagate_global_transforms_from_transforms_report`.
+pub fn world_propagate_global_transforms_from_transforms_report(
+  world : @ecs.World,
+) -> @ecs.TransformPropagationReport {
+  world.propagate_global_transforms_from_transforms_report()
+}
+
+///|
+/// Implements `transform_propagation_report_ok`.
+pub fn transform_propagation_report_ok(
+  report : @ecs.TransformPropagationReport,
+) -> Bool {
+  report.ok
+}
+
+///|
+/// Implements `transform_propagation_report_used_dirty_path`.
+pub fn transform_propagation_report_used_dirty_path(
+  report : @ecs.TransformPropagationReport,
+) -> Bool {
+  report.used_dirty_path
+}
+
+///|
+/// Implements `transform_propagation_report_used_full_path`.
+pub fn transform_propagation_report_used_full_path(
+  report : @ecs.TransformPropagationReport,
+) -> Bool {
+  report.used_full_path
+}
+
+///|
+/// Implements `transform_propagation_report_fallback_to_full`.
+pub fn transform_propagation_report_fallback_to_full(
+  report : @ecs.TransformPropagationReport,
+) -> Bool {
+  report.fallback_to_full
+}
+
+///|
+/// Implements `transform_propagation_report_dirty_queue_count`.
+pub fn transform_propagation_report_dirty_queue_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.dirty_queue_count
+}
+
+///|
+/// Implements `transform_propagation_report_dirty_root_count`.
+pub fn transform_propagation_report_dirty_root_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.dirty_root_count
+}
+
+///|
+/// Implements `transform_propagation_report_skipped_dirty_entity_count`.
+pub fn transform_propagation_report_skipped_dirty_entity_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.skipped_dirty_entity_count
+}
+
+///|
+/// Implements `transform_propagation_report_visited_entity_count`.
+pub fn transform_propagation_report_visited_entity_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.visited_entity_count
+}
+
+///|
+/// Implements `transform_propagation_report_global_transform_write_count`.
+pub fn transform_propagation_report_global_transform_write_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.global_transform_write_count
+}
+
+///|
+/// Implements `transform_propagation_report_hierarchy_index_rebuilt`.
+pub fn transform_propagation_report_hierarchy_index_rebuilt(
+  report : @ecs.TransformPropagationReport,
+) -> Bool {
+  report.hierarchy_index_rebuilt
+}
+
+///|
+/// Implements `transform_propagation_report_pending_upload_range_count`.
+pub fn transform_propagation_report_pending_upload_range_count(
+  report : @ecs.TransformPropagationReport,
+) -> Int {
+  report.pending_upload_range_count
+}
+
+///|
 /// Implements `world_set_global_transform_format`.
 pub fn world_set_global_transform_format(
   world : @ecs.World,

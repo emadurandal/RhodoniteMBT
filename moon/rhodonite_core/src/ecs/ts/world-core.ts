@@ -1,8 +1,22 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import type { MoonWorld } from "@moon/rhodonite_core/ecs/js_bridge";
+import type {
+	MoonTransformPropagationReport,
+	MoonWorld,
+} from "@moon/rhodonite_core/ecs/js_bridge";
 import {
+	transform_propagation_report_dirty_queue_count,
+	transform_propagation_report_dirty_root_count,
+	transform_propagation_report_fallback_to_full,
+	transform_propagation_report_global_transform_write_count,
+	transform_propagation_report_hierarchy_index_rebuilt,
+	transform_propagation_report_ok,
+	transform_propagation_report_pending_upload_range_count,
+	transform_propagation_report_skipped_dirty_entity_count,
+	transform_propagation_report_used_dirty_path,
+	transform_propagation_report_used_full_path,
+	transform_propagation_report_visited_entity_count,
 	world_add_component,
 	world_add_component_bytes,
 	world_camera_blob_word_capacity,
@@ -30,6 +44,7 @@ import {
 	world_new,
 	world_new_with_global_transform_f16,
 	world_orbit_camera_controller_component,
+	world_propagate_global_transforms_from_transforms_report,
 	world_register_cpu_component,
 	world_register_cpu_component_with_identity,
 	world_remove_component,
@@ -61,6 +76,60 @@ export type CpuComponentIdentity = {
 	readonly schemaVersion?: string;
 	readonly schemaHash?: string;
 };
+
+export class TransformPropagationReport {
+	readonly inner: MoonTransformPropagationReport;
+
+	constructor(inner: MoonTransformPropagationReport) {
+		this.inner = inner;
+	}
+
+	ok(): boolean {
+		return moonBool(transform_propagation_report_ok(this.inner));
+	}
+
+	usedDirtyPath(): boolean {
+		return moonBool(transform_propagation_report_used_dirty_path(this.inner));
+	}
+
+	usedFullPath(): boolean {
+		return moonBool(transform_propagation_report_used_full_path(this.inner));
+	}
+
+	fallbackToFull(): boolean {
+		return moonBool(transform_propagation_report_fallback_to_full(this.inner));
+	}
+
+	dirtyQueueCount(): number {
+		return transform_propagation_report_dirty_queue_count(this.inner);
+	}
+
+	dirtyRootCount(): number {
+		return transform_propagation_report_dirty_root_count(this.inner);
+	}
+
+	skippedDirtyEntityCount(): number {
+		return transform_propagation_report_skipped_dirty_entity_count(this.inner);
+	}
+
+	visitedEntityCount(): number {
+		return transform_propagation_report_visited_entity_count(this.inner);
+	}
+
+	globalTransformWriteCount(): number {
+		return transform_propagation_report_global_transform_write_count(this.inner);
+	}
+
+	hierarchyIndexRebuilt(): boolean {
+		return moonBool(
+			transform_propagation_report_hierarchy_index_rebuilt(this.inner),
+		);
+	}
+
+	pendingUploadRangeCount(): number {
+		return transform_propagation_report_pending_upload_range_count(this.inner);
+	}
+}
 
 export class World {
 	readonly inner: MoonWorld;
@@ -350,6 +419,12 @@ export class World {
 
 	updateGlobalTransformsFromTransforms(): void {
 		world_update_global_transforms_from_transforms(this.inner);
+	}
+
+	propagateGlobalTransformsFromTransformsReport(): TransformPropagationReport {
+		return new TransformPropagationReport(
+			world_propagate_global_transforms_from_transforms_report(this.inner),
+		);
 	}
 
 	setGlobalTransformFormat(entity: EntityId, formatCode: 0 | 1): boolean {

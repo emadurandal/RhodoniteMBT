@@ -37,6 +37,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonSystemRunReport = object;
 	export type MoonSystemRunBatchReport = object;
 	export type MoonSystemRunSystemReport = object;
+	export type MoonTransformPropagationReport = object;
 	export type MoonCommandBufferCommandFailure = object;
 	export type MoonCommandBuffer = object;
 	export type MoonQuery = object;
@@ -222,6 +223,42 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function world_update_global_transforms_from_transforms(
 		world: MoonWorld,
 	): void;
+	export function world_propagate_global_transforms_from_transforms_report(
+		world: MoonWorld,
+	): MoonTransformPropagationReport;
+	export function transform_propagation_report_ok(
+		report: MoonTransformPropagationReport,
+	): MoonBool;
+	export function transform_propagation_report_used_dirty_path(
+		report: MoonTransformPropagationReport,
+	): MoonBool;
+	export function transform_propagation_report_used_full_path(
+		report: MoonTransformPropagationReport,
+	): MoonBool;
+	export function transform_propagation_report_fallback_to_full(
+		report: MoonTransformPropagationReport,
+	): MoonBool;
+	export function transform_propagation_report_dirty_queue_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_dirty_root_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_skipped_dirty_entity_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_visited_entity_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_global_transform_write_count(
+		report: MoonTransformPropagationReport,
+	): number;
+	export function transform_propagation_report_hierarchy_index_rebuilt(
+		report: MoonTransformPropagationReport,
+	): MoonBool;
+	export function transform_propagation_report_pending_upload_range_count(
+		report: MoonTransformPropagationReport,
+	): number;
 	export function world_set_global_transform_format(
 		world: MoonWorld,
 		entity: MoonEntityId,
