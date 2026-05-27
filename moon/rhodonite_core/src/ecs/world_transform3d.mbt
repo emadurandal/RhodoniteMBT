@@ -143,6 +143,7 @@ pub fn World::spawn_transform_global_batch(
       tf_col.bytes.mut_view(start=tf_base, end=tf_base + tf_col.stride),
       gt_col.bytes.mut_view(start=gt_base, end=gt_base + gt_col.stride),
     )
+    self.mark_transform_dirty(entity)
   }
   entities
 }
@@ -201,6 +202,7 @@ pub fn World::update_transform3d_positions(
         y,
         z,
       )
+      self.mark_transform_dirty(entity)
     }
   })
 }
@@ -236,6 +238,7 @@ pub fn World::update_transform3d_positions(
       put_f32_array_le(col.bytes, base, x)
       put_f32_array_le(col.bytes, base + 4, y)
       put_f32_array_le(col.bytes, base + 8, z)
+      self.mark_transform_dirty(entity)
     }
   }
 }

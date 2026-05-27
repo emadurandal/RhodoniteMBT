@@ -589,7 +589,11 @@ pub fn transform_propagation_system(world : World, phase : PhaseKey) -> System {
     system_world,
     _ctx,
     _commands,
-  ) => system_world.update_global_transforms_from_transforms())
+  ) => {
+    if !system_world.update_global_transforms_from_transforms_dirty() {
+      system_world.update_global_transforms_from_transforms()
+    }
+  })
 }
 
 ///|
