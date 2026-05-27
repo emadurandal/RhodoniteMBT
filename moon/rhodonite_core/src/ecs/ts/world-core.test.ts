@@ -45,7 +45,7 @@ describe("ECS TypeScript wrapper: core", () => {
 
 	it("registers metadata and keeps GPU layout helpers available", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("TsCPU", 16);
+		const cpu = world.registerComponent("TsCPU", 16);
 		const layout = GpuLayout.empty(16);
 
 		expect(layout.isValid()).toBe(true);
@@ -68,7 +68,7 @@ describe("ECS TypeScript wrapper: core", () => {
 
 	it("registers stable component identity metadata", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponentWithIdentity("TsStableCPU", 8, {
+		const cpu = world.registerComponentWithIdentity("TsStableCPU", 8, {
 			stableKey: "com.example.TsStableCPU",
 			schemaVersion: "3",
 			schemaHash: "sha256:ts-stable",
@@ -122,11 +122,11 @@ describe("ECS TypeScript wrapper: core", () => {
 
 	it("rejects duplicate stable component identity keys", () => {
 		const world = World.new();
-		world.registerCpuComponentWithIdentity("TsStableA", 4, {
+		world.registerComponentWithIdentity("TsStableA", 4, {
 			stableKey: "com.example.DuplicateTsStable",
 		});
 		expect(() =>
-			world.registerCpuComponentWithIdentity("TsStableB", 4, {
+			world.registerComponentWithIdentity("TsStableB", 4, {
 				stableKey: "com.example.DuplicateTsStable",
 			}),
 		).toThrow();
@@ -135,8 +135,8 @@ describe("ECS TypeScript wrapper: core", () => {
 
 	it("batch-spawns arbitrary CPU components", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("SpawnBatchTsCpuA", 16);
-		const cpuB = world.registerCpuComponent("SpawnBatchTsCpuB", 16);
+		const cpuA = world.registerComponent("SpawnBatchTsCpuA", 16);
+		const cpuB = world.registerComponent("SpawnBatchTsCpuB", 16);
 		expect(world.reserveBatchCapacity([cpuB, cpuA], 2)).toBe(true);
 
 		const entities = world.spawnBatch([cpuB, cpuA], 2, (index, entity, row) => {

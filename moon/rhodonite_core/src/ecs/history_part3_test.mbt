@@ -6,14 +6,14 @@ test "WorldHistory import validation marks skipped records and deltas invalid" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let a = world.register_cpu_component_with_identity(
+  let a = world.register_component_with_identity(
     "HistoryImportSkippedA",
     4,
     "com.example.HistoryImportSkippedA",
     None,
     None,
   )
-  let b = world.register_cpu_component_with_identity(
+  let b = world.register_component_with_identity(
     "HistoryImportSkippedB",
     4,
     "com.example.HistoryImportSkippedB",
@@ -55,7 +55,7 @@ test "WorldHistory import validation marks skipped records and deltas invalid" {
 test "WorldHistory clears labels with history state" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryLabelClears", 4)
+  let component = world.register_component("HistoryLabelClears", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(history.begin_transaction(""))
@@ -644,9 +644,9 @@ test "WorldHistory Camera tracking disabled and zero limit delegate" {
 test "WorldHistory direct mutation coverage audit" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryCoverageCpu", 4)
-  let marker = world.register_cpu_component("HistoryCoverageMarker", 4)
-  let removable = world.register_cpu_component("HistoryCoverageRemovable", 4)
+  let cpu = world.register_component("HistoryCoverageCpu", 4)
+  let marker = world.register_component("HistoryCoverageMarker", 4)
+  let removable = world.register_component("HistoryCoverageRemovable", 4)
   let bulk_add0 = world.create_entity()
   let bulk_add1 = world.create_entity()
   let bulk_set0 = world.create_entity()
@@ -822,7 +822,7 @@ test "WorldHistory direct mutation coverage audit" {
 test "panic WorldHistory guarded transaction rejects raw World mutation" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryGuardRejectWorld", 4)
+  let cpu = world.register_component("HistoryGuardRejectWorld", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -834,7 +834,7 @@ test "panic WorldHistory guarded transaction rejects raw World mutation" {
 test "panic WorldHistory callback-scoped guarded transaction rejects raw World mutation" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryScopedGuardRejectWorld", 4)
+  let cpu = world.register_component("HistoryScopedGuardRejectWorld", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -869,7 +869,7 @@ test "panic WorldHistory guarded transaction rejects raw entity destruction" {
 test "panic WorldHistory guarded transaction rejects raw component add" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryGuardRejectAdd", 4)
+  let cpu = world.register_component("HistoryGuardRejectAdd", 4)
   let entity = world.create_entity()
   history.set_raw_mutation_guard_enabled(true)
   assert_true(history.begin_guarded_transaction(world, "guarded raw add"))
@@ -880,7 +880,7 @@ test "panic WorldHistory guarded transaction rejects raw component add" {
 test "panic WorldHistory guarded transaction rejects raw component byte add" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryGuardRejectAddBytes", 4)
+  let cpu = world.register_component("HistoryGuardRejectAddBytes", 4)
   let entity = world.create_entity()
   history.set_raw_mutation_guard_enabled(true)
   assert_true(history.begin_guarded_transaction(world, "guarded raw add bytes"))

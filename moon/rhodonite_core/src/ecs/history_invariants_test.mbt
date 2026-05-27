@@ -154,9 +154,9 @@ fn history_invariant_assert_camera_setup_absent(
 test "WorldHistory compound transaction preserves round-trip invariants" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantCpu", 4)
-  let bulk = world.register_cpu_component("HistoryInvariantBulk", 4)
-  let removed = world.register_cpu_component("HistoryInvariantRemoved", 4)
+  let cpu = world.register_component("HistoryInvariantCpu", 4)
+  let bulk = world.register_component("HistoryInvariantBulk", 4)
+  let removed = world.register_component("HistoryInvariantRemoved", 4)
   let removed_entity = world.create_entity()
   let bulk0 = world.create_entity()
   let bulk1 = world.create_entity()
@@ -353,7 +353,7 @@ test "WorldHistory compound transaction preserves round-trip invariants" {
 test "WorldHistory entity ids and blob rows survive create destroy round trips" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantDestroyCpu", 4)
+  let cpu = world.register_component("HistoryInvariantDestroyCpu", 4)
   let victim = world.create_entity()
   assert_true(
     world.add_component_bytes(victim, cpu, history_invariant_bytes4(7, 0, 0, 0)),
@@ -432,7 +432,7 @@ test "WorldHistory entity ids and blob rows survive create destroy round trips" 
 test "WorldHistory tracked query transaction preserves round-trip invariants" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantQueryCpu", 4)
+  let cpu = world.register_component("HistoryInvariantQueryCpu", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let e2 = world.create_entity()
@@ -530,10 +530,8 @@ test "WorldHistory tracked query transaction preserves round-trip invariants" {
 test "WorldHistory bulk validation failures preserve world and stacks" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantBulkFailureCpu", 4)
-  let marker = world.register_cpu_component(
-    "HistoryInvariantBulkFailureMarker", 4,
-  )
+  let cpu = world.register_component("HistoryInvariantBulkFailureCpu", 4)
+  let marker = world.register_component("HistoryInvariantBulkFailureMarker", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let missing = world.create_entity()
@@ -660,7 +658,7 @@ test "WorldHistory failed tracked orbit camera setup preserves world and stacks"
 test "WorldHistory cancel_transaction_reverting restores compound tracked mutations" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantCancelCpu", 4)
+  let cpu = world.register_component("HistoryInvariantCancelCpu", 4)
   let entity = world.create_entity()
   assert_true(
     world.add_component_bytes(entity, cpu, history_invariant_bytes4(1, 0, 0, 0)),
@@ -733,7 +731,7 @@ test "WorldHistory cancel_transaction_reverting restores compound tracked mutati
 test "WorldHistory failed run_system_phase keeps successful commands undoable" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryInvariantCommandCpu", 4)
+  let cpu = world.register_component("HistoryInvariantCommandCpu", 4)
   let entity = world.create_entity()
   let missing = EntityId::new(entity.index + 100, 0)
   let phase = PhaseKey::new("history-invariant-command-failure")

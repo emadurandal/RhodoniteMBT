@@ -16,7 +16,7 @@ fn history_wb_bytes4(
 test "WorldHistory undo failure rollback reapplies completed deltas" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryUndoRollback", 4)
+  let component = world.register_component("HistoryUndoRollback", 4)
   let entity = world.create_entity()
   let before = history_wb_bytes4(1, 0, 0, 0)
   let after = history_wb_bytes4(2, 0, 0, 0)
@@ -40,7 +40,7 @@ test "WorldHistory undo failure rollback reapplies completed deltas" {
 test "WorldHistory redo failure rollback inverses completed deltas" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryRedoRollback", 4)
+  let component = world.register_component("HistoryRedoRollback", 4)
   let entity = world.create_entity()
   let before = history_wb_bytes4(1, 0, 0, 0)
   let after = history_wb_bytes4(2, 0, 0, 0)
@@ -82,7 +82,7 @@ test "WorldHistory undo apply failure rolls back and keeps stacks" {
 test "WorldHistory undo apply failure clears history when rollback fails" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryUndoApplyHardClear", 4)
+  let component = world.register_component("HistoryUndoApplyHardClear", 4)
   let bad = world.create_entity()
   let good = world.create_entity()
   let bytes = history_wb_bytes4(1, 0, 0, 0)
@@ -105,7 +105,7 @@ test "WorldHistory undo apply failure clears history when rollback fails" {
 test "WorldHistory redo apply failure rolls back and keeps stacks" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryRedoApplyRollback", 4)
+  let component = world.register_component("HistoryRedoApplyRollback", 4)
   let bad = world.create_entity()
   let good = world.create_entity()
   let before = history_wb_bytes4(1, 0, 0, 0)
@@ -130,7 +130,7 @@ test "WorldHistory redo apply failure rolls back and keeps stacks" {
 test "WorldHistory redo apply failure clears history when rollback fails" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryRedoApplyHardClear", 4)
+  let component = world.register_component("HistoryRedoApplyHardClear", 4)
   let bad = world.create_entity()
   let good = world.create_entity()
   let bytes = history_wb_bytes4(1, 0, 0, 0)
@@ -327,7 +327,7 @@ test "WorldHistory guarded transactions release raw mutation guard" {
 test "WorldHistory tracked mutations bypass guarded raw mutation checks" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryGuardBypass", 4)
+  let component = world.register_component("HistoryGuardBypass", 4)
   let entity = world.create_entity()
   assert_true(
     world.add_component_bytes(entity, component, history_wb_bytes4(1, 0, 0, 0)),

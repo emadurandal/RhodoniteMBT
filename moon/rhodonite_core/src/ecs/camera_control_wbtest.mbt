@@ -16,7 +16,7 @@ fn camera_control_wb_bytes4(
 test "camera-control tracked transaction does not rerun after commit disables recording" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("CameraControlCommitDisabled", 4)
+  let component = world.register_component("CameraControlCommitDisabled", 4)
   let entity = world.create_entity()
   let before = camera_control_wb_bytes4(1, 0, 0, 0)
   let after = camera_control_wb_bytes4(2, 0, 0, 0)

@@ -20,8 +20,8 @@ test "World archetype version only changes when new archetypes are created" {
   assert_eq(world.archetype_version, initial_version)
   assert_true(world.finalize_reserved_entity(reserved))
   assert_eq(world.archetype_version, initial_version)
-  let qa = world.register_cpu_component("ArchetypeVersionA", 4)
-  let qb = world.register_cpu_component("ArchetypeVersionB", 4)
+  let qa = world.register_component("ArchetypeVersionA", 4)
+  let qb = world.register_component("ArchetypeVersionB", 4)
   assert_true(world.add_component_bytes(e1, qa, bytes4_wb(1, 2, 3, 4)))
   assert_eq(world.archetype_version, initial_version + 1)
   assert_true(world.add_component_bytes(e1, qb, bytes4_wb(5, 6, 7, 8)))
@@ -44,8 +44,8 @@ test "World archetype version only changes when new archetypes are created" {
 ///|
 test "PreparedQueryArchetype stores row access metadata at prepare time" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedRowAccessA", 4)
-  let qb = world.register_cpu_component("PreparedRowAccessB", 8)
+  let qa = world.register_component("PreparedRowAccessA", 4)
+  let qb = world.register_component("PreparedRowAccessB", 8)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, qa, bytes4_wb(1, 2, 3, 4)))
   assert_true(

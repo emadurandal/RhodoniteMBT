@@ -4,8 +4,8 @@
 ///|
 test "spawn_batch creates arbitrary CPU components directly" {
   let world = World::new()
-  let cpu_a = world.register_cpu_component("SpawnBatchCpuA", 4)
-  let cpu_b = world.register_cpu_component("SpawnBatchCpuB", 4)
+  let cpu_a = world.register_component("SpawnBatchCpuA", 4)
+  let cpu_b = world.register_component("SpawnBatchCpuB", 4)
   let entities = world.spawn_batch([cpu_b, cpu_a], 3, fn(i, _e, row) {
     row.write(cpu_a, c => c[0] = (10 + i).to_byte())
     row.write(cpu_b, c => c[0] = (20 + i).to_byte())
@@ -49,8 +49,8 @@ test "spawn_batch allocates builtin GlobalTransform refs" {
 ///|
 test "reserve_batch_capacity prepares rows before spawn_batch" {
   let world = World::new()
-  let cpu_a = world.register_cpu_component("ReserveBatchCpuA", 4)
-  let cpu_b = world.register_cpu_component("ReserveBatchCpuB", 4)
+  let cpu_a = world.register_component("ReserveBatchCpuA", 4)
+  let cpu_b = world.register_component("ReserveBatchCpuB", 4)
   assert_true(world.reserve_batch_capacity([cpu_b, cpu_a], 4))
   let entities = world.spawn_batch([cpu_a, cpu_b], 4, fn(i, _e, row) {
     row.write(cpu_a, c => c[0] = (30 + i).to_byte())

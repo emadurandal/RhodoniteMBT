@@ -4,8 +4,8 @@
 ///|
 test "Query for_each matches supersets and skips empty required" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryA", 4)
-  let qb = world.register_cpu_component("QueryB", 4)
+  let qa = world.register_component("QueryA", 4)
+  let qb = world.register_component("QueryB", 4)
   let e_both = world.create_entity()
   assert_true(world.add_component_bytes(e_both, qa, bytes4(1, 2, 3, 4)))
   assert_true(world.add_component_bytes(e_both, qb, bytes4(5, 6, 7, 8)))
@@ -33,8 +33,8 @@ test "Query for_each matches supersets and skips empty required" {
 ///|
 test "Query plan exposes matched archetypes and row counts" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryPlanA", 4)
-  let qb = world.register_cpu_component("QueryPlanB", 4)
+  let qa = world.register_component("QueryPlanA", 4)
+  let qb = world.register_component("QueryPlanB", 4)
   let e_both = world.create_entity()
   assert_true(world.add_component_bytes(e_both, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e_both, qb, bytes4(2, 0, 0, 0)))
@@ -61,9 +61,9 @@ test "Query plan exposes matched archetypes and row counts" {
 ///|
 test "Query new_with_excluded filters matching archetypes" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryWithoutA", 4)
-  let qb = world.register_cpu_component("QueryWithoutB", 4)
-  let qc = world.register_cpu_component("QueryWithoutC", 4)
+  let qa = world.register_component("QueryWithoutA", 4)
+  let qb = world.register_component("QueryWithoutB", 4)
+  let qc = world.register_component("QueryWithoutC", 4)
   let excluded : Array[ComponentTypeId] = [qc]
   let query = Query::new_with_excluded([qa, qb], excluded)
   excluded[0] = qa
@@ -94,9 +94,9 @@ test "Query new_with_excluded filters matching archetypes" {
 ///|
 test "RawQuery new_with_excluded filters archetype iteration" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryWithoutA", 4)
-  let qb = world.register_cpu_component("RawQueryWithoutB", 4)
-  let qc = world.register_cpu_component("RawQueryWithoutC", 4)
+  let qa = world.register_component("RawQueryWithoutA", 4)
+  let qb = world.register_component("RawQueryWithoutB", 4)
+  let qc = world.register_component("RawQueryWithoutC", 4)
   let raw = RawQuery::new_with_excluded([qa, qb], [qc])
   assert_eq(raw.required_components().length(), 2)
   assert_eq(raw.excluded_components()[0].index, qc.index)
@@ -118,8 +118,8 @@ test "RawQuery new_with_excluded filters archetype iteration" {
 ///|
 test "Query for_each wraps required row iteration" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryHelperA", 4)
-  let qb = world.register_cpu_component("QueryHelperB", 4)
+  let qa = world.register_component("QueryHelperA", 4)
+  let qb = world.register_component("QueryHelperB", 4)
   let required : Array[ComponentTypeId] = [qa, qb]
   let query = Query::new(required)
   required[0] = qb
@@ -143,8 +143,8 @@ test "Query for_each wraps required row iteration" {
 ///|
 test "QueryRow closure access uses component ids" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryRowA", 4)
-  let qb = world.register_cpu_component("QueryRowB", 4)
+  let qa = world.register_component("QueryRowA", 4)
+  let qb = world.register_component("QueryRowB", 4)
   let query = Query::new([qa, qb])
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
@@ -178,7 +178,7 @@ test "QueryRow closure access uses component ids" {
 test "QueryRow write_tracked records undo and redo component bytes" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryRowTracked", 4)
+  let cpu = world.register_component("QueryRowTracked", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   Query::new([cpu]).for_each(world, row => {
@@ -208,7 +208,7 @@ test "QueryRow write_tracked records undo and redo component bytes" {
 test "RawQueryRow write_tracked records undo and disabled writes delegate" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("RawQueryRowTracked", 4)
+  let cpu = world.register_component("RawQueryRowTracked", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   RawQuery::new([cpu]).for_each(world, row => {
@@ -236,7 +236,7 @@ test "RawQueryRow write_tracked records undo and disabled writes delegate" {
 test "QueryRow write_tracked works inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryRowTrackedGuard", 4)
+  let cpu = world.register_component("QueryRowTrackedGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -456,7 +456,7 @@ test "QueryRow typed tracked writers delegate when history disabled" {
 test "panic QueryRow raw write aborts inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryRowRawGuard", 4)
+  let cpu = world.register_component("QueryRowRawGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -561,7 +561,7 @@ test "QueryRow write_tracked blob delegate works inside guarded transaction" {
 test "panic RawQueryRow raw write view aborts inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("RawQueryRowRawGuard", 4)
+  let cpu = world.register_component("RawQueryRowRawGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -575,8 +575,8 @@ test "panic RawQueryRow raw write view aborts inside guarded transaction" {
 ///|
 test "RawQuery for_each_archetype exposes contiguous CPU columns" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryArchA", 4)
-  let qb = world.register_cpu_component("QueryArchB", 4)
+  let qa = world.register_component("QueryArchA", 4)
+  let qb = world.register_component("QueryArchB", 4)
   let query = RawQuery::new([qa, qb])
   let e0 = world.create_entity()
   let e1 = world.create_entity()
@@ -621,7 +621,7 @@ test "RawQuery for_each_archetype exposes contiguous CPU columns" {
 test "RawQueryArchetype write_column_tracked records changed rows only" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTracked", 4)
+  let cpu = world.register_component("QueryArchTracked", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e0, cpu, bytes4(1, 0, 0, 0)))
@@ -657,7 +657,7 @@ test "RawQueryArchetype write_column_tracked records changed rows only" {
 test "RawQueryArchetype write_column_tracked records no undo for unchanged column" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedNoop", 4)
+  let cpu = world.register_component("QueryArchTrackedNoop", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   RawQuery::new([cpu]).for_each_archetype(world, arch => {
@@ -675,7 +675,7 @@ test "RawQueryArchetype write_column_tracked records no undo for unchanged colum
 test "RawQueryArchetype write_column_tracked records sparse changed rows only" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedSparse", 4)
+  let cpu = world.register_component("QueryArchTrackedSparse", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let e2 = world.create_entity()
@@ -706,7 +706,7 @@ test "RawQueryArchetype write_column_tracked records sparse changed rows only" {
 test "RawQueryArchetype write_column_tracked compresses inside transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedCompress", 4)
+  let cpu = world.register_component("QueryArchTrackedCompress", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   assert_true(history.begin_transaction("column gesture"))
@@ -736,7 +736,7 @@ test "RawQueryArchetype write_column_tracked compresses inside transaction" {
 test "RawQueryArchetype write_column_tracked compresses repeated sparse rows" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedSparseCompress", 4)
+  let cpu = world.register_component("QueryArchTrackedSparseCompress", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let e2 = world.create_entity()
@@ -771,7 +771,7 @@ test "RawQueryArchetype write_column_tracked compresses repeated sparse rows" {
 test "RawQueryArchetype write_column_rows_tracked records sparse requested rows" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedSparse", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedSparse", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let e2 = world.create_entity()
@@ -800,7 +800,7 @@ test "RawQueryArchetype write_column_rows_tracked records sparse requested rows"
 test "RawQueryArchetype write_column_rows_tracked accepts empty rows as no-op" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedEmpty", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedEmpty", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   RawQuery::new([cpu]).for_each_archetype(world, arch => {
@@ -820,7 +820,7 @@ test "RawQueryArchetype write_column_rows_tracked accepts empty rows as no-op" {
 test "RawQueryArchetype write_column_rows_tracked rejects invalid row before mutation" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedInvalid", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedInvalid", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   let mut called = false
@@ -842,7 +842,7 @@ test "RawQueryArchetype write_column_rows_tracked rejects invalid row before mut
 test "RawQueryArchetype write_column_rows_tracked compresses duplicate rows" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedDuplicate", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedDuplicate", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   RawQuery::new([cpu]).for_each_archetype(world, arch => {
@@ -867,7 +867,7 @@ test "RawQueryArchetype write_column_rows_tracked compresses duplicate rows" {
 test "RawQueryArchetype write_column_rows_tracked delegates when history disabled" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedDisabled", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedDisabled", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_enabled(false)

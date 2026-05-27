@@ -28,7 +28,7 @@ import {
 describe("ECS TypeScript wrapper: system", () => {
 	it("runs TS systems with command-buffered component writes", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("TsSystemCpu", 4);
+		const cpu = world.registerComponent("TsSystemCpu", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 
@@ -53,7 +53,7 @@ describe("ECS TypeScript wrapper: system", () => {
 
 	it("runs TS direct systems without command buffers", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("TsDirectSystemCpu", 4);
+		const cpu = world.registerComponent("TsDirectSystemCpu", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 
@@ -74,7 +74,7 @@ describe("ECS TypeScript wrapper: system", () => {
 
 	it("reports TS direct systems as empty command reports", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("TsDirectReportCpu", 4);
+		const cpu = world.registerComponent("TsDirectReportCpu", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 
@@ -102,7 +102,7 @@ describe("ECS TypeScript wrapper: system", () => {
 
 	it("reports TS system command-buffer execution results", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("TsSystemReportCpu", 4);
+		const cpu = world.registerComponent("TsSystemReportCpu", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 		const missing = EntityId.new(entity.index() + 100, 0);
@@ -144,8 +144,8 @@ describe("ECS TypeScript wrapper: system", () => {
 
 	it("plans TS system phases without executing callbacks", () => {
 		const world = World.new();
-		const a = world.registerCpuComponent("TsSystemPlanA", 4);
-		const b = world.registerCpuComponent("TsSystemPlanB", 4);
+		const a = world.registerComponent("TsSystemPlanA", 4);
+		const b = world.registerComponent("TsSystemPlanB", 4);
 		const phase = PhaseKey.new("ts/plan");
 		const otherPhase = PhaseKey.new("ts/plan-other");
 		const runner = SystemRunner.new();
@@ -242,7 +242,7 @@ describe("ECS TypeScript wrapper: system", () => {
 	it("exposes structural TS systems and tracked system phases", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsTrackedSystemCpu", 4);
+		const cpu = world.registerComponent("TsTrackedSystemCpu", 4);
 		const phase = PhaseKey.new("ts/tracked");
 		const runner = SystemRunner.new();
 		let createdIndex = -1;
@@ -275,7 +275,7 @@ describe("ECS TypeScript wrapper: system", () => {
 	it("tracks TS system command-buffer writes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsTrackedSystemWriteCpu", 4);
+		const cpu = world.registerComponent("TsTrackedSystemWriteCpu", 4);
 		const entity = world.createEntity();
 		expect(
 			world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0])),
@@ -316,7 +316,7 @@ describe("ECS TypeScript wrapper: system", () => {
 	it("keeps successful TS command-buffer deltas when a later command fails", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsTrackedSystemPartialCpu", 4);
+		const cpu = world.registerComponent("TsTrackedSystemPartialCpu", 4);
 		const entity = world.createEntity();
 		const missing = EntityId.new(entity.index() + 100, 0);
 		expect(
@@ -360,7 +360,7 @@ describe("ECS TypeScript wrapper: system", () => {
 	it("reports tracked TS system phase command failures", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsTrackedSystemReportCpu", 4);
+		const cpu = world.registerComponent("TsTrackedSystemReportCpu", 4);
 		const entity = world.createEntity();
 		const missing = EntityId.new(entity.index() + 100, 0);
 		expect(

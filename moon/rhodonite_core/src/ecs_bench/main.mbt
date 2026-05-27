@@ -310,7 +310,7 @@ fn make_component_world(
   count : Int,
 ) -> (@ecs.World, @ecs.ComponentTypeId, Array[@ecs.EntityId]) {
   let world = @ecs.World::new()
-  let component = world.register_cpu_component("BenchHistoryBytes", 4)
+  let component = world.register_component("BenchHistoryBytes", 4)
   let entities : Array[@ecs.EntityId] = []
   for i = 0; i < count; i = i + 1 {
     let entity = world.create_entity()
@@ -573,14 +573,11 @@ fn make_many_archetype_query_world(
   count : Int,
 ) -> (@ecs.World, @ecs.ComponentTypeId, Int) {
   let world = @ecs.World::new()
-  let target = world.register_cpu_component("BenchManyArchetypeTarget", 4)
+  let target = world.register_component("BenchManyArchetypeTarget", 4)
   let markers : Array[@ecs.ComponentTypeId] = []
   for i = 0; i < 5; i = i + 1 {
     markers.push(
-      world.register_cpu_component(
-        "BenchManyArchetypeMarker" + i.to_string(),
-        4,
-      ),
+      world.register_component("BenchManyArchetypeMarker" + i.to_string(), 4),
     )
   }
   let signature_count = many_archetype_signature_count()
@@ -612,16 +609,14 @@ fn make_many_archetype_without_query_world(
   count : Int,
 ) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId, Int) {
   let world = @ecs.World::new()
-  let target = world.register_cpu_component(
-    "BenchManyArchetypeWithoutTarget", 4,
-  )
-  let excluded = world.register_cpu_component(
+  let target = world.register_component("BenchManyArchetypeWithoutTarget", 4)
+  let excluded = world.register_component(
     "BenchManyArchetypeWithoutExcluded", 4,
   )
   let markers : Array[@ecs.ComponentTypeId] = []
   for i = 0; i < 4; i = i + 1 {
     markers.push(
-      world.register_cpu_component(
+      world.register_component(
         "BenchManyArchetypeWithoutMarker" + i.to_string(),
         4,
       ),
@@ -897,7 +892,7 @@ fn bench_raw_prepared_query_tiny_rows_many_archetypes_repeated_read_view_at(
 fn bench_prepared_query_many_archetypes_rebuild(count : Int) -> BenchSample {
   let (world, target, _) = make_many_archetype_query_world(count)
   let prepared = @ecs.Query::new([target]).prepare(world)
-  let extra = world.register_cpu_component("BenchManyArchetypeExtra", 4)
+  let extra = world.register_component("BenchManyArchetypeExtra", 4)
   ignore(
     world.spawn_batch([target, extra], 1, fn(_i, _entity, row) {
       row.write(target, bytes => bytes[0] = (7 : Byte))
@@ -950,7 +945,7 @@ fn bench_prepared_query_many_archetypes_refresh_stale(
 ) -> BenchSample {
   let (world, target, _) = make_many_archetype_query_world(count)
   let prepared = @ecs.Query::new([target]).prepare(world)
-  let extra = world.register_cpu_component("BenchManyArchetypeRefreshExtra", 4)
+  let extra = world.register_component("BenchManyArchetypeRefreshExtra", 4)
   ignore(
     world.spawn_batch([target, extra], 1, fn(_i, _entity, row) {
       row.write(target, bytes => bytes[0] = (7 : Byte))
@@ -974,7 +969,7 @@ fn bench_prepared_query_many_archetypes_refresh_then_reuse(
 ) -> BenchSample {
   let (world, target, _) = make_many_archetype_query_world(count)
   let prepared = @ecs.Query::new([target]).prepare(world)
-  let extra = world.register_cpu_component("BenchManyArchetypeRefreshReuse", 4)
+  let extra = world.register_component("BenchManyArchetypeRefreshReuse", 4)
   ignore(
     world.spawn_batch([target, extra], 1, fn(_i, _entity, row) {
       row.write(target, bytes => bytes[0] = (7 : Byte))
@@ -1013,7 +1008,7 @@ fn bench_query_cache_many_archetypes_refresh_after_structural_change(
   let (world, target, _) = make_many_archetype_query_world(count)
   let cache = @ecs.QueryCache::new([target])
   cache.refresh(world)
-  let extra = world.register_cpu_component("BenchQueryCacheExtra", 4)
+  let extra = world.register_component("BenchQueryCacheExtra", 4)
   ignore(
     world.spawn_batch([target, extra], 1, fn(_i, _entity, row) {
       row.write(target, bytes => bytes[0] = (7 : Byte))

@@ -507,8 +507,8 @@ pub fn World::new() -> Self
 pub fn World::new_with_global_transform_format(@components.GlobalTransformGpuFormat) -> Self
 pub fn World::orbit_camera_controller_component(Self) -> ComponentTypeId
 pub fn World::propagate_global_transforms_from_transforms_report(Self) -> TransformPropagationReport
-pub fn World::register_cpu_component(Self, String, Int) -> ComponentTypeId
-pub fn World::register_cpu_component_with_identity(Self, String, Int, String, String?, String?) -> ComponentTypeId
+pub fn World::register_component(Self, String, Int) -> ComponentTypeId
+pub fn World::register_component_with_identity(Self, String, Int, String, String?, String?) -> ComponentTypeId
 pub fn World::remove_component(Self, EntityId, ComponentTypeId) -> Bool
 pub fn World::reserve_batch_capacity(Self, Array[ComponentTypeId], Int) -> Bool
 pub fn World::set_camera_matrices(Self, EntityId, @matrix44.Matrix44[Float], @matrix44.Matrix44[Float], Float, Float, Float, Float, Float) -> Bool

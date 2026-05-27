@@ -24,7 +24,7 @@ type InteractionState = {
 function createInteractionState(): InteractionState {
 	const world = World.new();
 	const history = WorldHistory.new();
-	const component = world.registerCpuComponent("TsUndoRedoInteractionValue", 4);
+	const component = world.registerComponent("TsUndoRedoInteractionValue", 4);
 	const entity = world.createEntity();
 	if (!world.addComponentBytes(entity, component, valueBytes(0))) {
 		throw new Error("Failed to initialize interaction component.");

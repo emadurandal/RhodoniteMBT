@@ -89,7 +89,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 	it("reports history serialization eligibility without exposing payloads", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistorySerializableStable",
 			4,
 			{
@@ -98,7 +98,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 				schemaHash: "sha256:ts-history-serializable-stable",
 			},
 		);
-		const legacy = world.registerCpuComponent("TsHistorySerializableLegacy", 4);
+		const legacy = world.registerComponent("TsHistorySerializableLegacy", 4);
 		const entity = world.createEntity();
 		expect(
 			world.addComponentBytes(entity, stable, new Uint8Array([1, 0, 0, 0])),
@@ -174,7 +174,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 	it("exports history stacks when retained components have stable identity", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryExportStable",
 			4,
 			{
@@ -183,7 +183,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 				schemaHash: "sha256:ts-history-export-stable",
 			},
 		);
-		const legacy = world.registerCpuComponent("TsHistoryExportLegacy", 4);
+		const legacy = world.registerComponent("TsHistoryExportLegacy", 4);
 		const stableEntity = world.createEntity();
 		const legacyEntity = world.createEntity();
 
@@ -429,7 +429,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		const source = WorldHistory.new();
 		const importedUndo = WorldHistory.new();
 		const importedRedo = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryImportStable",
 			4,
 			{

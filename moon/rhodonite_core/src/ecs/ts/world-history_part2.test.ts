@@ -38,7 +38,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("keeps stacks and world unchanged when undo and redo validation fails", () => {
 		const undoWorld = World.new();
 		const undoHistory = WorldHistory.new();
-		const undoCpu = undoWorld.registerCpuComponent("TsHistoryUndoValidate", 4);
+		const undoCpu = undoWorld.registerComponent("TsHistoryUndoValidate", 4);
 		const undoEntity = undoWorld.createEntity();
 		expect(
 			undoWorld.addComponentBytes(
@@ -64,7 +64,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const redoWorld = World.new();
 		const redoHistory = WorldHistory.new();
-		const redoCpu = redoWorld.registerCpuComponent("TsHistoryRedoValidate", 4);
+		const redoCpu = redoWorld.registerComponent("TsHistoryRedoValidate", 4);
 		const redoEntity = redoWorld.createEntity();
 		expect(
 			redoWorld.addComponentBytes(
@@ -107,7 +107,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("clears history when disabled", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryDisabled", 4);
+		const cpu = world.registerComponent("TsHistoryDisabled", 4);
 		const entity = world.createEntity();
 
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
@@ -176,7 +176,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const recordLimitWorld = World.new();
 		const recordLimitHistory = WorldHistory.new();
-		const recordLimitCpu = recordLimitWorld.registerCpuComponent(
+		const recordLimitCpu = recordLimitWorld.registerComponent(
 			"TsHistoryDiagnosticRecordLimit",
 			4,
 		);
@@ -209,7 +209,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const byteLimitWorld = World.new();
 		const byteLimitHistory = WorldHistory.new();
-		const byteLimitCpu = byteLimitWorld.registerCpuComponent(
+		const byteLimitCpu = byteLimitWorld.registerComponent(
 			"TsHistoryDiagnosticByteLimit",
 			4,
 		);
@@ -255,7 +255,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("limits WorldHistory undo records and exposes stack lengths", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryLimit", 4);
+		const cpu = world.registerComponent("TsHistoryLimit", 4);
 		const entity = world.createEntity();
 
 		expect(history.lastDiagnostic()).toBe("none");
@@ -296,7 +296,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("limits WorldHistory retained payload bytes", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryByteLimit", 4);
+		const cpu = world.registerComponent("TsHistoryByteLimit", 4);
 		const entity = world.createEntity();
 
 		history.setMaxUndoBytes(8);
@@ -326,7 +326,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("exposes WorldHistory undo and redo labels", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryLabels", 4);
+		const cpu = world.registerComponent("TsHistoryLabels", 4);
 		const entity = world.createEntity();
 
 		expect(history.undoLabel()).toBeNull();
@@ -363,7 +363,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("treats zero max undo records as unrecorded tracked changes", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryZeroLimit", 4);
+		const cpu = world.registerComponent("TsHistoryZeroLimit", 4);
 		const entity = world.createEntity();
 
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
@@ -393,7 +393,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("cancelTransactionReverting rolls back tracked transaction mutations", () => {
 		const cancelWorld = World.new();
 		const cancelHistory = WorldHistory.new();
-		const cancelCpu = cancelWorld.registerCpuComponent("TsHistoryCancelCpu", 4);
+		const cancelCpu = cancelWorld.registerComponent("TsHistoryCancelCpu", 4);
 		const cancelEntity = cancelWorld.createEntity();
 		expect(
 			cancelWorld.addComponentBytes(
@@ -419,8 +419,8 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryRevertCpu", 4);
-		const marker = world.registerCpuComponent("TsHistoryRevertMarker", 4);
+		const cpu = world.registerComponent("TsHistoryRevertCpu", 4);
+		const marker = world.registerComponent("TsHistoryRevertMarker", 4);
 		const entity = world.createEntity();
 		const addEntity = world.createEntity();
 		const victim = world.createEntity();
@@ -466,7 +466,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("scopes WorldHistory transactions to callbacks", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryScopedTransaction", 4);
+		const cpu = world.registerComponent("TsHistoryScopedTransaction", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 
@@ -556,7 +556,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("handles guarded and inactive callback-scoped transactions", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryScopedGuard", 4);
+		const cpu = world.registerComponent("TsHistoryScopedGuard", 4);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, new Uint8Array([1, 0, 0, 0]))).toBe(true);
 		history.setRawMutationGuardEnabled(true);
@@ -620,8 +620,8 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("guards raw World mutations during guarded WorldHistory transactions", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryRawGuard", 4);
-		const marker = world.registerCpuComponent("TsHistoryRawGuardMarker", 4);
+		const cpu = world.registerComponent("TsHistoryRawGuard", 4);
+		const marker = world.registerComponent("TsHistoryRawGuardMarker", 4);
 		const entity = world.createEntity();
 		const camera = world.createEntity();
 		const identity = identityMat4ColMajor();
@@ -633,7 +633,7 @@ describe("ECS TypeScript wrapper: history", () => {
 		expect(history.beginGuardedTransaction(world, "guarded edit")).toBe(true);
 		expect(() => world.createEntity()).toThrow();
 		expect(() => world.destroyEntity(camera)).toThrow();
-		expect(() => world.registerCpuComponent("TsHistoryRawGuardLate", 4)).toThrow();
+		expect(() => world.registerComponent("TsHistoryRawGuardLate", 4)).toThrow();
 		expect(() => world.addComponent(entity, marker)).toThrow();
 		expect(() =>
 			world.addComponentBytes(entity, marker, new Uint8Array([8, 0, 0, 0])),
@@ -688,7 +688,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const rawRowWorld = World.new();
 		const rawRowHistory = WorldHistory.new();
-		const rawRowCpu = rawRowWorld.registerCpuComponent("TsHistoryRawGuardRow", 4);
+		const rawRowCpu = rawRowWorld.registerComponent("TsHistoryRawGuardRow", 4);
 		const rawRowEntity = rawRowWorld.createEntity();
 		expect(
 			rawRowWorld.addComponentBytes(
@@ -709,7 +709,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const rawViewWorld = World.new();
 		const rawViewHistory = WorldHistory.new();
-		const rawViewCpu = rawViewWorld.registerCpuComponent("TsHistoryRawGuardView", 4);
+		const rawViewCpu = rawViewWorld.registerComponent("TsHistoryRawGuardView", 4);
 		const rawViewEntity = rawViewWorld.createEntity();
 		expect(
 			rawViewWorld.addComponentBytes(
@@ -730,7 +730,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const queryWorld = World.new();
 		const queryHistory = WorldHistory.new();
-		const queryCpu = queryWorld.registerCpuComponent("TsHistoryRawGuardQuery", 4);
+		const queryCpu = queryWorld.registerComponent("TsHistoryRawGuardQuery", 4);
 		const queryEntity = queryWorld.createEntity();
 		expect(
 			queryWorld.addComponentBytes(
@@ -750,7 +750,7 @@ describe("ECS TypeScript wrapper: history", () => {
 		).toThrow();
 		const trackedQueryWorld = World.new();
 		const trackedQueryHistory = WorldHistory.new();
-		const trackedQueryCpu = trackedQueryWorld.registerCpuComponent(
+		const trackedQueryCpu = trackedQueryWorld.registerComponent(
 			"TsHistoryTrackedQuery",
 			4,
 		);
@@ -792,7 +792,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const trackedColumnWorld = World.new();
 		const trackedColumnHistory = WorldHistory.new();
-		const trackedColumnCpu = trackedColumnWorld.registerCpuComponent(
+		const trackedColumnCpu = trackedColumnWorld.registerComponent(
 			"TsHistoryTrackedColumn",
 			4,
 		);
@@ -837,7 +837,7 @@ describe("ECS TypeScript wrapper: history", () => {
 
 		const trackedColumnRowsWorld = World.new();
 		const trackedColumnRowsHistory = WorldHistory.new();
-		const trackedColumnRowsCpu = trackedColumnRowsWorld.registerCpuComponent(
+		const trackedColumnRowsCpu = trackedColumnRowsWorld.registerComponent(
 			"TsHistoryTrackedColumnRows",
 			4,
 		);

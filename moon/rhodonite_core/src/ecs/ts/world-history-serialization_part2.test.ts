@@ -81,7 +81,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		const source = WorldHistory.new();
 		const undoTarget = WorldHistory.new();
 		const redoTarget = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryAtomicImportStable",
 			4,
 			{
@@ -243,12 +243,12 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		const world = World.new();
 		const source = WorldHistory.new();
 		const imported = WorldHistory.new();
-		const componentA = world.registerCpuComponentWithIdentity(
+		const componentA = world.registerComponentWithIdentity(
 			"TsHistoryReplayValidationA",
 			4,
 			{ stableKey: "com.example.TsHistoryReplayValidationA" },
 		);
-		const componentB = world.registerCpuComponentWithIdentity(
+		const componentB = world.registerComponentWithIdentity(
 			"TsHistoryReplayValidationB",
 			4,
 			{ stableKey: "com.example.TsHistoryReplayValidationB" },
@@ -350,7 +350,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		const redoWorld = World.new();
 		const redoSource = WorldHistory.new();
 		const redoTarget = WorldHistory.new();
-		const redoComponent = redoWorld.registerCpuComponentWithIdentity(
+		const redoComponent = redoWorld.registerComponentWithIdentity(
 			"TsHistoryReplayValidationRedo",
 			4,
 			{ stableKey: "com.example.TsHistoryReplayValidationRedo" },
@@ -415,7 +415,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 
 	it("imports v1 stable component golden fixtures", () => {
 		const world = World.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryGoldenStable",
 			4,
 			{
@@ -455,7 +455,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 	it("matches stable component exports against the v1 golden fixture", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryGoldenStable",
 			4,
 			{
@@ -488,7 +488,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 
 	it("imports v1 entity destroy snapshot golden fixtures", () => {
 		const world = World.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryGoldenDestroyStable",
 			4,
 			{ stableKey: "com.example.TsHistoryGoldenDestroyStable" },
@@ -559,7 +559,7 @@ describe("ECS TypeScript wrapper: history-serialization", () => {
 		const source = WorldHistory.new();
 		const importedUndo = WorldHistory.new();
 		const importedRedo = WorldHistory.new();
-		const stable = world.registerCpuComponentWithIdentity(
+		const stable = world.registerComponentWithIdentity(
 			"TsHistoryJsonStable",
 			4,
 			{

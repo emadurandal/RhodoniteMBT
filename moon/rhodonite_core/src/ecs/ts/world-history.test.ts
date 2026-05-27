@@ -38,8 +38,8 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("exposes payload-free undo and redo summaries", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistorySummaryCpu", 4);
-		const removable = world.registerCpuComponent("TsHistorySummaryRemovable", 4);
+		const cpu = world.registerComponent("TsHistorySummaryCpu", 4);
+		const removable = world.registerComponent("TsHistorySummaryRemovable", 4);
 		const changedEntity = world.createEntity();
 		const addEntity = world.createEntity();
 		const removeEntity = world.createEntity();
@@ -242,9 +242,9 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("audits direct WorldHistory mutation coverage", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryCoverageCpu", 4);
-		const marker = world.registerCpuComponent("TsHistoryCoverageMarker", 4);
-		const removable = world.registerCpuComponent("TsHistoryCoverageRemovable", 4);
+		const cpu = world.registerComponent("TsHistoryCoverageCpu", 4);
+		const marker = world.registerComponent("TsHistoryCoverageMarker", 4);
+		const removable = world.registerComponent("TsHistoryCoverageRemovable", 4);
 		const parent = world.createEntity();
 		const entity = world.createEntity();
 		const camera = world.createEntity();
@@ -403,8 +403,8 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("round-trips compound history invariants through TypeScript wrapper", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryInvariantCpu", 4);
-		const bulk = world.registerCpuComponent("TsHistoryInvariantBulk", 4);
+		const cpu = world.registerComponent("TsHistoryInvariantCpu", 4);
+		const bulk = world.registerComponent("TsHistoryInvariantBulk", 4);
 		const bulk0 = world.createEntity();
 		const bulk1 = world.createEntity();
 		const identity = identityMat4ColMajor();
@@ -477,7 +477,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("tracks undo and redo through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryCpu", 4);
+		const cpu = world.registerComponent("TsHistoryCpu", 4);
 		const entity = history.createEntity(world);
 
 		expect(world.isAlive(entity)).toBe(true);
@@ -502,7 +502,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("tracks batch entity creation and component adds through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryBatchAuthoringCpu", 4);
+		const cpu = world.registerComponent("TsHistoryBatchAuthoringCpu", 4);
 		const entities = history.createEntities(world, 2);
 
 		expect(entities).toHaveLength(2);
@@ -539,8 +539,8 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("tracks spawnBatch rows through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpuA = world.registerCpuComponent("TsHistorySpawnBatchA", 4);
-		const cpuB = world.registerCpuComponent("TsHistorySpawnBatchB", 4);
+		const cpuA = world.registerComponent("TsHistorySpawnBatchA", 4);
+		const cpuB = world.registerComponent("TsHistorySpawnBatchB", 4);
 
 		const entities = history.spawnBatch(world, [cpuB, cpuA], 2, (index, entity, row) => {
 			expect(row.entity().index()).toBe(entity.index());
@@ -570,7 +570,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("tracks bulk component byte changes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryBulkCpu", 4);
+		const cpu = world.registerComponent("TsHistoryBulkCpu", 4);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		const missing = world.createEntity();
@@ -629,7 +629,7 @@ describe("ECS TypeScript wrapper: history", () => {
 	it("rejects invalid bulk component adds through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsHistoryBulkAddInvalidCpu", 4);
+		const cpu = world.registerComponent("TsHistoryBulkAddInvalidCpu", 4);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 

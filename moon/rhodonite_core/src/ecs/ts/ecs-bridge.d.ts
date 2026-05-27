@@ -93,12 +93,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 	): MoonComponentTypeId;
 	export function world_camera_lens_component(world: MoonWorld): MoonComponentTypeId;
-	export function world_register_cpu_component(
+	export function world_register_component(
 		world: MoonWorld,
 		name: string,
 		cpuStride: number,
 	): MoonComponentTypeId;
-	export function world_register_cpu_component_with_identity(
+	export function world_register_component_with_identity(
 		world: MoonWorld,
 		name: string,
 		cpuStride: number,

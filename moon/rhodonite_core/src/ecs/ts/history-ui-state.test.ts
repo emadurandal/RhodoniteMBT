@@ -34,7 +34,7 @@ describe("ECS TypeScript wrapper: history UI state", () => {
 	it("formats labelled undo and redo commands with stack metadata", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const component = world.registerCpuComponent("TsHistoryUiStateLabelled", 4);
+		const component = world.registerComponent("TsHistoryUiStateLabelled", 4);
 		const entity = world.createEntity();
 		expect(
 			world.addComponentBytes(entity, component, new Uint8Array([1, 0, 0, 0])),
@@ -79,7 +79,7 @@ describe("ECS TypeScript wrapper: history UI state", () => {
 	it("does not append whitespace for empty labels", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const component = world.registerCpuComponent("TsHistoryUiStateEmptyLabel", 4);
+		const component = world.registerComponent("TsHistoryUiStateEmptyLabel", 4);
 		const entity = world.createEntity();
 		expect(
 			world.addComponentBytes(entity, component, new Uint8Array([1, 0, 0, 0])),
@@ -104,7 +104,7 @@ describe("ECS TypeScript wrapper: history UI state", () => {
 	it("maps retained diagnostics into UI warnings", () => {
 		const byteLimitWorld = World.new();
 		const byteLimitHistory = WorldHistory.new();
-		const byteLimitComponent = byteLimitWorld.registerCpuComponent(
+		const byteLimitComponent = byteLimitWorld.registerComponent(
 			"TsHistoryUiStateByteLimit",
 			4,
 		);
@@ -134,7 +134,7 @@ describe("ECS TypeScript wrapper: history UI state", () => {
 
 		const disabledWorld = World.new();
 		const disabledHistory = WorldHistory.new();
-		const disabledComponent = disabledWorld.registerCpuComponent(
+		const disabledComponent = disabledWorld.registerComponent(
 			"TsHistoryUiStateDisabled",
 			4,
 		);
@@ -163,7 +163,7 @@ describe("ECS TypeScript wrapper: history UI state", () => {
 
 		const staleWorld = World.new();
 		const staleHistory = WorldHistory.new();
-		const staleComponent = staleWorld.registerCpuComponent(
+		const staleComponent = staleWorld.registerComponent(
 			"TsHistoryUiStateStale",
 			4,
 		);

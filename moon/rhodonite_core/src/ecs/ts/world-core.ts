@@ -50,8 +50,8 @@ import {
 	world_new_with_global_transform_f16,
 	world_orbit_camera_controller_component,
 	world_propagate_global_transforms_from_transforms_report,
-	world_register_cpu_component,
-	world_register_cpu_component_with_identity,
+	world_register_component,
+	world_register_component_with_identity,
 	world_remove_component,
 	world_reserve_batch_capacity,
 	world_set_camera_matrices_col_major,
@@ -234,19 +234,19 @@ export class World {
 			: { archetypeIndex: location.archetype_index, row: location.row };
 	}
 
-	registerCpuComponent(name: string, cpuStride: number): ComponentTypeId {
+	registerComponent(name: string, cpuStride: number): ComponentTypeId {
 		return new ComponentTypeId(
-			world_register_cpu_component(this.inner, name, cpuStride),
+			world_register_component(this.inner, name, cpuStride),
 		);
 	}
 
-	registerCpuComponentWithIdentity(
+	registerComponentWithIdentity(
 		name: string,
 		cpuStride: number,
 		identity: CpuComponentIdentity,
 	): ComponentTypeId {
 		return new ComponentTypeId(
-			world_register_cpu_component_with_identity(
+			world_register_component_with_identity(
 				this.inner,
 				name,
 				cpuStride,

@@ -111,10 +111,7 @@ pub fn renderable_component_stride() -> Int {
 fn register_scene_renderable_component(
   world : @ecs.World,
 ) -> @ecs.ComponentTypeId {
-  world.register_cpu_component(
-    "RhodoniteRenderable",
-    renderable_component_stride(),
-  )
+  world.register_component("RhodoniteRenderable", renderable_component_stride())
 }
 
 ///|

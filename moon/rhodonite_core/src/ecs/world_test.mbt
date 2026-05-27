@@ -4,7 +4,7 @@
 ///|
 test "World exposes component metadata without exposing registry mutation" {
   let world = World::new()
-  let cpu = world.register_cpu_component("MetadataCPU", 4)
+  let cpu = world.register_component("MetadataCPU", 4)
   match world.component_info(cpu) {
     Some(info) => {
       assert_eq(info.name, "MetadataCPU")
@@ -15,7 +15,7 @@ test "World exposes component metadata without exposing registry mutation" {
     }
     None => abort("expected component metadata")
   }
-  let stable = world.register_cpu_component_with_identity(
+  let stable = world.register_component_with_identity(
     "StableMetadataCPU",
     8,
     "com.example.StableMetadataCPU",
@@ -94,7 +94,7 @@ test "World exposes component metadata without exposing registry mutation" {
 test "panic World rejects duplicate component stable keys" {
   let world = World::new()
   ignore(
-    world.register_cpu_component_with_identity(
+    world.register_component_with_identity(
       "DuplicateStableA",
       4,
       "com.example.DuplicateStable",
@@ -103,7 +103,7 @@ test "panic World rejects duplicate component stable keys" {
     ),
   )
   ignore(
-    world.register_cpu_component_with_identity(
+    world.register_component_with_identity(
       "DuplicateStableB",
       4,
       "com.example.DuplicateStable",
@@ -117,15 +117,15 @@ test "panic World rejects duplicate component stable keys" {
 test "panic World rejects empty component stable keys" {
   let world = World::new()
   ignore(
-    world.register_cpu_component_with_identity("EmptyStable", 4, "", None, None),
+    world.register_component_with_identity("EmptyStable", 4, "", None, None),
   )
 }
 
 ///|
 test "CPU components move entities between archetypes and preserve bytes" {
   let world = World::new()
-  let transform = world.register_cpu_component("TransformCPU", 4)
-  let material = world.register_cpu_component("MaterialCPU", 4)
+  let transform = world.register_component("TransformCPU", 4)
+  let material = world.register_component("MaterialCPU", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, transform, bytes4(1, 2, 3, 4)))
   assert_true(world.add_component_bytes(entity, material, bytes4(5, 6, 7, 8)))
@@ -147,7 +147,7 @@ test "CPU components move entities between archetypes and preserve bytes" {
 ///|
 test "add_component and add_component_bytes support CPU components" {
   let world = World::new()
-  let cpu = world.register_cpu_component("AddComponentCpu", 4)
+  let cpu = world.register_component("AddComponentCpu", 4)
   let cpu_entity = world.create_entity()
   assert_true(world.add_component(cpu_entity, cpu))
   match world.component_bytes(cpu_entity, cpu) {
@@ -160,7 +160,7 @@ test "add_component and add_component_bytes support CPU components" {
 ///|
 test "add_component_bytes rejects invalid byte lengths before mutating ownership" {
   let world = World::new()
-  let cpu = world.register_cpu_component("AddComponentBytesCpuStride", 4)
+  let cpu = world.register_component("AddComponentBytesCpuStride", 4)
   let cpu_entity = world.create_entity()
   assert_true(
     !world.add_component_bytes(cpu_entity, cpu, ([1, 2, 3] : FixedArray[Byte])),
@@ -194,7 +194,7 @@ test "builtin ChildOf uses ComponentTypeId index 2" {
 ///|
 test "set_component_bytes updates existing component without archetype migration" {
   let world = World::new()
-  let qa = world.register_cpu_component("SetComponentA", 4)
+  let qa = world.register_component("SetComponentA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   match world.location(e) {

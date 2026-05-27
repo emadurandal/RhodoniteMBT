@@ -127,18 +127,18 @@ pub fn world_camera_lens_component(world : @ecs.World) -> @ecs.ComponentTypeId {
 }
 
 ///|
-/// Implements `world_register_cpu_component`.
-pub fn world_register_cpu_component(
+/// Implements `world_register_component`.
+pub fn world_register_component(
   world : @ecs.World,
   name : String,
   cpu_stride : Int,
 ) -> @ecs.ComponentTypeId {
-  world.register_cpu_component(name, cpu_stride)
+  world.register_component(name, cpu_stride)
 }
 
 ///|
-/// Implements `world_register_cpu_component_with_identity`.
-pub fn world_register_cpu_component_with_identity(
+/// Implements `world_register_component_with_identity`.
+pub fn world_register_component_with_identity(
   world : @ecs.World,
   name : String,
   cpu_stride : Int,
@@ -146,7 +146,7 @@ pub fn world_register_cpu_component_with_identity(
   schema_version : String?,
   schema_hash : String?,
 ) -> @ecs.ComponentTypeId {
-  world.register_cpu_component_with_identity(
+  world.register_component_with_identity(
     name, cpu_stride, stable_key, schema_version, schema_hash,
   )
 }

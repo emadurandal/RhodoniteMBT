@@ -3,14 +3,14 @@
 
 ///|
 /// Registers a CPU SoA component and reserves its archetype index slot.
-pub fn World::register_cpu_component(
+pub fn World::register_component(
   self : World,
   name : String,
   cpu_stride : Int,
 ) -> ComponentTypeId {
-  self.assert_not_history_raw_mutation("World::register_cpu_component")
-  self.assert_not_querying("World::register_cpu_component")
-  self.assert_component_registration_open("World::register_cpu_component")
+  self.assert_not_history_raw_mutation("World::register_component")
+  self.assert_not_querying("World::register_component")
+  self.assert_component_registration_open("World::register_component")
   let id = self.registry.register_cpu(name, cpu_stride)
   let archetypes : Array[Int] = []
   self.component_archetypes.push(archetypes)
@@ -19,7 +19,7 @@ pub fn World::register_cpu_component(
 
 ///|
 /// Registers a CPU SoA component with stable identity metadata for future persistence.
-pub fn World::register_cpu_component_with_identity(
+pub fn World::register_component_with_identity(
   self : World,
   name : String,
   cpu_stride : Int,
@@ -28,11 +28,11 @@ pub fn World::register_cpu_component_with_identity(
   schema_hash : String?,
 ) -> ComponentTypeId {
   self.assert_not_history_raw_mutation(
-    "World::register_cpu_component_with_identity",
+    "World::register_component_with_identity",
   )
-  self.assert_not_querying("World::register_cpu_component_with_identity")
+  self.assert_not_querying("World::register_component_with_identity")
   self.assert_component_registration_open(
-    "World::register_cpu_component_with_identity",
+    "World::register_component_with_identity",
   )
   let id = self.registry.register_cpu_with_identity(
     name,

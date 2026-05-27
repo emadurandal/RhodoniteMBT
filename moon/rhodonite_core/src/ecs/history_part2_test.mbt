@@ -5,7 +5,7 @@
 test "WorldHistory records diagnostics for disabled recording delegates" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryDelegateDiagnostics", 4)
+  let component = world.register_component("HistoryDelegateDiagnostics", 4)
   let entity = world.create_entity()
   history.set_enabled(false)
   assert_eq(history.last_diagnostic(), "none")
@@ -23,7 +23,7 @@ test "WorldHistory records diagnostics for disabled recording delegates" {
 test "WorldHistory trims old undo records to max_undo_records" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryLimit", 4)
+  let component = world.register_component("HistoryLimit", 4)
   let entity = world.create_entity()
   history.set_max_undo_records(2)
   assert_eq(history.max_undo_records(), 2)
@@ -57,7 +57,7 @@ test "WorldHistory trims old undo records to max_undo_records" {
 test "WorldHistory trims old records to max_undo_bytes" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryByteLimit", 4)
+  let component = world.register_component("HistoryByteLimit", 4)
   let entity = world.create_entity()
   history.set_max_undo_bytes(16)
   assert_eq(history.max_undo_bytes(), 16)
@@ -98,7 +98,7 @@ test "WorldHistory trims old records to max_undo_bytes" {
 test "WorldHistory trims existing stacks when max_undo_bytes is lowered" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryLowerByteLimit", 4)
+  let component = world.register_component("HistoryLowerByteLimit", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
@@ -128,7 +128,7 @@ test "WorldHistory trims existing stacks when max_undo_bytes is lowered" {
 test "WorldHistory drops oversize record while keeping mutation" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryOversizeByteLimit", 4)
+  let component = world.register_component("HistoryOversizeByteLimit", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
@@ -156,7 +156,7 @@ test "WorldHistory drops oversize record while keeping mutation" {
 test "WorldHistory trims existing stacks when max_undo_records is lowered" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryLowerLimit", 4)
+  let component = world.register_component("HistoryLowerLimit", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
@@ -182,7 +182,7 @@ test "WorldHistory trims existing stacks when max_undo_records is lowered" {
 test "WorldHistory max_undo_records zero clears and keeps future changes unrecorded" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryZeroLimit", 4)
+  let component = world.register_component("HistoryZeroLimit", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
@@ -212,7 +212,7 @@ test "WorldHistory max_undo_records zero clears and keeps future changes unrecor
 test "WorldHistory exposes undo and redo labels for UI state" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryLabels", 4)
+  let component = world.register_component("HistoryLabels", 4)
   let entity = world.create_entity()
   assert_true(history.undo_label() is None)
   assert_true(history.redo_label() is None)
@@ -244,7 +244,7 @@ test "WorldHistory exposes undo and redo labels for UI state" {
 test "WorldHistory exposes payload-free undo and redo summaries" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistorySummary", 4)
+  let component = world.register_component("HistorySummary", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(history.begin_transaction("Change Component"))
@@ -292,14 +292,14 @@ test "WorldHistory exposes payload-free undo and redo summaries" {
 test "WorldHistory reports serialization eligibility without exposing payloads" {
   let world = World::new()
   let history = WorldHistory::new()
-  let stable = world.register_cpu_component_with_identity(
+  let stable = world.register_component_with_identity(
     "HistorySerializableStable",
     4,
     "com.example.HistorySerializableStable",
     Some("1"),
     Some("sha256:history-serializable-stable"),
   )
-  let legacy = world.register_cpu_component("HistorySerializableLegacy", 4)
+  let legacy = world.register_component("HistorySerializableLegacy", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, stable, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(entity, legacy, bytes4(2, 0, 0, 0)))
@@ -379,7 +379,7 @@ test "WorldHistory reports serialization eligibility without exposing payloads" 
 test "WorldHistory exports stable component byte changes" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryExportStable",
     4,
     "com.example.HistoryExportStable",
@@ -441,7 +441,7 @@ test "WorldHistory exports stable component byte changes" {
 test "WorldHistory export returns None for legacy component identity" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component("HistoryExportLegacy", 4)
+  let component = world.register_component("HistoryExportLegacy", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, component, bytes4(1, 0, 0, 0)))
   assert_true(
@@ -456,7 +456,7 @@ test "WorldHistory export returns None for legacy component identity" {
 test "WorldHistory export includes entity destroyed component snapshots" {
   let world = World::new()
   let history = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryExportDestroyStable",
     4,
     "com.example.HistoryExportDestroyStable",
@@ -589,7 +589,7 @@ test "WorldHistory imports stable component undo stack" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryImportStable",
     4,
     "com.example.HistoryImportStable",
@@ -637,7 +637,7 @@ test "WorldHistory imports redo stack" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryImportRedoStable",
     4,
     "com.example.HistoryImportRedoStable",
@@ -667,7 +667,7 @@ test "WorldHistory imports entity destroyed snapshots" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryImportDestroyStable",
     4,
     "com.example.HistoryImportDestroyStable",
@@ -747,7 +747,7 @@ test "WorldHistory import rejects invalid archive without mutating stacks" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryImportRejectStable",
     4,
     "com.example.HistoryImportRejectStable",
@@ -822,7 +822,7 @@ test "WorldHistory import validates full stack before replacing" {
   let world = World::new()
   let source = WorldHistory::new()
   let imported = WorldHistory::new()
-  let component = world.register_cpu_component_with_identity(
+  let component = world.register_component_with_identity(
     "HistoryImportFullStackStable",
     4,
     "com.example.HistoryImportFullStackStable",

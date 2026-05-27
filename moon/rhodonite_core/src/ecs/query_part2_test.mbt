@@ -5,7 +5,7 @@
 test "RawQueryArchetype write_column_rows_tracked works inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchRowsTrackedGuard", 4)
+  let cpu = world.register_component("QueryArchRowsTrackedGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -26,7 +26,7 @@ test "RawQueryArchetype write_column_rows_tracked works inside guarded transacti
 test "RawQueryArchetype write_column_tracked delegates when history disabled" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedDisabled", 4)
+  let cpu = world.register_component("QueryArchTrackedDisabled", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_max_undo_records(0)
@@ -47,7 +47,7 @@ test "RawQueryArchetype write_column_tracked delegates when history disabled" {
 test "RawQueryArchetype write_column_tracked works inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("QueryArchTrackedGuard", 4)
+  let cpu = world.register_component("QueryArchTrackedGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -69,7 +69,7 @@ test "RawQueryArchetype write_column_tracked works inside guarded transaction" {
 test "panic RawQueryArchetype raw write column aborts inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("RawQueryArchRawGuard", 4)
+  let cpu = world.register_component("RawQueryArchRawGuard", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -105,8 +105,8 @@ test "RawQueryArchetype write_column_tracked blob delegate works inside guarded 
 ///|
 test "RawQueryArchetype column views expose logical rows after column capacity growth" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryArchCapacityA", 4)
-  let qb = world.register_cpu_component("QueryArchCapacityB", 4)
+  let qa = world.register_component("QueryArchCapacityA", 4)
+  let qb = world.register_component("QueryArchCapacityB", 4)
   let e0 = world.create_entity()
   let e1 = world.create_entity()
   let e2 = world.create_entity()
@@ -131,8 +131,8 @@ test "RawQueryArchetype column views expose logical rows after column capacity g
 ///|
 test "RawPreparedQuery rebuilds after structural changes create matching archetype" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryA", 4)
-  let qb = world.register_cpu_component("PreparedQueryB", 4)
+  let qa = world.register_component("PreparedQueryA", 4)
+  let qb = world.register_component("PreparedQueryB", 4)
   let query = RawQuery::new([qa, qb])
   let prepared = query.prepare(world)
   let e = world.create_entity()
@@ -151,8 +151,8 @@ test "RawPreparedQuery rebuilds after structural changes create matching archety
 ///|
 test "RawPreparedQuery plan reports stale rebuild diagnostics" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryPlanA", 4)
-  let qb = world.register_cpu_component("PreparedQueryPlanB", 4)
+  let qa = world.register_component("PreparedQueryPlanA", 4)
+  let qb = world.register_component("PreparedQueryPlanB", 4)
   let prepared = RawQuery::new([qa, qb]).prepare(world)
   let current_plan = prepared.plan(world)
   assert_false(current_plan.stale)
@@ -171,8 +171,8 @@ test "RawPreparedQuery plan reports stale rebuild diagnostics" {
 ///|
 test "PreparedQuery for_each rebuilds stale row plan" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryRowA", 4)
-  let qb = world.register_cpu_component("PreparedQueryRowB", 4)
+  let qa = world.register_component("PreparedQueryRowA", 4)
+  let qb = world.register_component("PreparedQueryRowB", 4)
   let prepared = Query::new([qa, qb]).prepare(world)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(3, 0, 0, 0)))
@@ -188,13 +188,13 @@ test "PreparedQuery for_each rebuilds stale row plan" {
 ///|
 test "PreparedQuery for_each_read_at reads indexed rows and rebuilds stale plans" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryReadAtA", 4)
-  let qb = world.register_cpu_component("PreparedQueryReadAtB", 4)
+  let qa = world.register_component("PreparedQueryReadAtA", 4)
+  let qb = world.register_component("PreparedQueryReadAtB", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
   let prepared = Query::new([qa, qb]).prepare(world)
-  let qc = world.register_cpu_component("PreparedQueryReadAtC", 4)
+  let qc = world.register_component("PreparedQueryReadAtC", 4)
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
@@ -215,13 +215,13 @@ test "PreparedQuery for_each_read_at reads indexed rows and rebuilds stale plans
 ///|
 test "RawPreparedQuery for_each_read_view_at reads indexed rows and rebuilds stale plans" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawPreparedQueryReadAtA", 4)
-  let qb = world.register_cpu_component("RawPreparedQueryReadAtB", 4)
+  let qa = world.register_component("RawPreparedQueryReadAtA", 4)
+  let qb = world.register_component("RawPreparedQueryReadAtB", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
   let prepared = RawQuery::new([qa, qb]).prepare(world)
-  let qc = world.register_cpu_component("RawPreparedQueryReadAtC", 4)
+  let qc = world.register_component("RawPreparedQueryReadAtC", 4)
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
@@ -242,8 +242,8 @@ test "RawPreparedQuery for_each_read_view_at reads indexed rows and rebuilds sta
 ///|
 test "PreparedQuery plan reports current and stale row diagnostics" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryRowPlanA", 4)
-  let qb = world.register_cpu_component("PreparedQueryRowPlanB", 4)
+  let qa = world.register_component("PreparedQueryRowPlanA", 4)
+  let qb = world.register_component("PreparedQueryRowPlanB", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(4, 0, 0, 0)))
@@ -252,7 +252,7 @@ test "PreparedQuery plan reports current and stale row diagnostics" {
   assert_false(current_plan.stale)
   assert_eq(current_plan.matched_archetype_count, 1)
   assert_eq(current_plan.matched_row_count, 1)
-  let qc = world.register_cpu_component("PreparedQueryRowPlanC", 4)
+  let qc = world.register_component("PreparedQueryRowPlanC", 4)
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e1, qa, bytes4(5, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(6, 0, 0, 0)))
@@ -266,8 +266,8 @@ test "PreparedQuery plan reports current and stale row diagnostics" {
 ///|
 test "PreparedQuery refresh returns a fresh reusable row plan" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryRefreshA", 4)
-  let qb = world.register_cpu_component("PreparedQueryRefreshB", 4)
+  let qa = world.register_component("PreparedQueryRefreshA", 4)
+  let qb = world.register_component("PreparedQueryRefreshB", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
@@ -277,7 +277,7 @@ test "PreparedQuery refresh returns a fresh reusable row plan" {
   assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
   assert_false(prepared.is_stale(world))
-  let qc = world.register_cpu_component("PreparedQueryRefreshC", 4)
+  let qc = world.register_component("PreparedQueryRefreshC", 4)
   let e2 = world.create_entity()
   assert_true(world.add_component_bytes(e2, qa, bytes4(5, 0, 0, 0)))
   assert_true(world.add_component_bytes(e2, qb, bytes4(6, 0, 0, 0)))
@@ -298,9 +298,9 @@ test "PreparedQuery refresh returns a fresh reusable row plan" {
 ///|
 test "PreparedQuery refresh preserves excluded filters" {
   let world = World::new()
-  let qa = world.register_cpu_component("PreparedQueryWithoutRefreshA", 4)
-  let qb = world.register_cpu_component("PreparedQueryWithoutRefreshB", 4)
-  let qc = world.register_cpu_component("PreparedQueryWithoutRefreshC", 4)
+  let qa = world.register_component("PreparedQueryWithoutRefreshA", 4)
+  let qb = world.register_component("PreparedQueryWithoutRefreshB", 4)
+  let qc = world.register_component("PreparedQueryWithoutRefreshC", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
@@ -319,8 +319,8 @@ test "PreparedQuery refresh preserves excluded filters" {
 ///|
 test "RawPreparedQuery refresh returns a fresh reusable archetype plan" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawPreparedQueryRefreshA", 4)
-  let qb = world.register_cpu_component("RawPreparedQueryRefreshB", 4)
+  let qa = world.register_component("RawPreparedQueryRefreshA", 4)
+  let qb = world.register_component("RawPreparedQueryRefreshB", 4)
   let prepared = RawQuery::new([qa, qb]).prepare(world)
   assert_false(prepared.is_stale(world))
   let e0 = world.create_entity()
@@ -338,9 +338,9 @@ test "RawPreparedQuery refresh returns a fresh reusable archetype plan" {
 ///|
 test "RawPreparedQuery refresh preserves excluded filters" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawPreparedQueryWithoutRefreshA", 4)
-  let qb = world.register_cpu_component("RawPreparedQueryWithoutRefreshB", 4)
-  let qc = world.register_cpu_component("RawPreparedQueryWithoutRefreshC", 4)
+  let qa = world.register_component("RawPreparedQueryWithoutRefreshA", 4)
+  let qb = world.register_component("RawPreparedQueryWithoutRefreshB", 4)
+  let qc = world.register_component("RawPreparedQueryWithoutRefreshC", 4)
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
@@ -359,8 +359,8 @@ test "RawPreparedQuery refresh preserves excluded filters" {
 ///|
 test "QueryCache reuses and refreshes row plans" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryCacheA", 4)
-  let qb = world.register_cpu_component("QueryCacheB", 4)
+  let qa = world.register_component("QueryCacheA", 4)
+  let qb = world.register_component("QueryCacheB", 4)
   let required : Array[ComponentTypeId] = [qa, qb]
   let cache = QueryCache::new(required)
   required[0] = qb
@@ -380,7 +380,7 @@ test "QueryCache reuses and refreshes row plans" {
   assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
   assert_false(cache.plan(world).stale)
-  let qc = world.register_cpu_component("QueryCacheC", 4)
+  let qc = world.register_component("QueryCacheC", 4)
   let e2 = world.create_entity()
   assert_true(world.add_component_bytes(e2, qa, bytes4(5, 0, 0, 0)))
   assert_true(world.add_component_bytes(e2, qb, bytes4(6, 0, 0, 0)))
@@ -398,9 +398,9 @@ test "QueryCache reuses and refreshes row plans" {
 ///|
 test "QueryCache preserves excluded filters across refresh" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryCacheWithoutA", 4)
-  let qb = world.register_cpu_component("QueryCacheWithoutB", 4)
-  let qc = world.register_cpu_component("QueryCacheWithoutC", 4)
+  let qa = world.register_component("QueryCacheWithoutA", 4)
+  let qb = world.register_component("QueryCacheWithoutB", 4)
+  let qc = world.register_component("QueryCacheWithoutC", 4)
   let cache = QueryCache::new_with_excluded([qa, qb], [qc])
   assert_eq(cache.excluded_components()[0].index, qc.index)
   let e0 = world.create_entity()
@@ -425,15 +425,15 @@ test "QueryCache preserves excluded filters across refresh" {
 ///|
 test "RawQueryCache refreshes archetype plans" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryCacheA", 4)
-  let qb = world.register_cpu_component("RawQueryCacheB", 4)
+  let qa = world.register_component("RawQueryCacheA", 4)
+  let qb = world.register_component("RawQueryCacheB", 4)
   let cache = RawQueryCache::new([qa, qb])
   let e0 = world.create_entity()
   assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
   assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
   cache.refresh(world)
   assert_false(cache.plan(world).stale)
-  let qc = world.register_cpu_component("RawQueryCacheC", 4)
+  let qc = world.register_component("RawQueryCacheC", 4)
   let e1 = world.create_entity()
   assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
   assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
@@ -451,9 +451,9 @@ test "RawQueryCache refreshes archetype plans" {
 ///|
 test "RawQueryCache preserves excluded filters across refresh" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryCacheWithoutA", 4)
-  let qb = world.register_cpu_component("RawQueryCacheWithoutB", 4)
-  let qc = world.register_cpu_component("RawQueryCacheWithoutC", 4)
+  let qa = world.register_component("RawQueryCacheWithoutA", 4)
+  let qb = world.register_component("RawQueryCacheWithoutB", 4)
+  let qc = world.register_component("RawQueryCacheWithoutC", 4)
   let cache = RawQueryCache::new_with_excluded([qa, qb], [qc])
   assert_eq(cache.excluded_components()[0].index, qc.index)
   let e0 = world.create_entity()
@@ -475,8 +475,8 @@ test "RawQueryCache preserves excluded filters across refresh" {
 ///|
 test "Query component index APIs access row payloads" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryIndexA", 4)
-  let qb = world.register_cpu_component("QueryIndexB", 4)
+  let qa = world.register_component("QueryIndexA", 4)
+  let qb = world.register_component("QueryIndexB", 4)
   let query = Query::new([qa, qb])
   let cache = QueryCache::new([qa, qb])
   assert_eq(query.component_index(qa), 0)
@@ -504,7 +504,7 @@ test "Query component index APIs access row payloads" {
 test "QueryRow write_tracked_at records row changes" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("QueryIndexTrackedA", 4)
+  let qa = world.register_component("QueryIndexTrackedA", 4)
   let query = Query::new([qa])
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
@@ -524,8 +524,8 @@ test "QueryRow write_tracked_at records row changes" {
 ///|
 test "Raw query index APIs access rows and archetype columns" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryIndexA", 4)
-  let qb = world.register_cpu_component("RawQueryIndexB", 4)
+  let qa = world.register_component("RawQueryIndexA", 4)
+  let qb = world.register_component("RawQueryIndexB", 4)
   let raw = RawQuery::new([qa, qb])
   let cache = RawQueryCache::new([qa, qb])
   assert_eq(raw.component_index(qa), 0)
@@ -565,7 +565,7 @@ test "Raw query index APIs access rows and archetype columns" {
 test "RawQueryArchetype tracked index writes record full and sparse column changes" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("RawQueryIndexTrackedA", 4)
+  let qa = world.register_component("RawQueryIndexTrackedA", 4)
   let raw = RawQuery::new([qa])
   let e0 = world.create_entity()
   let e1 = world.create_entity()
@@ -599,38 +599,38 @@ test "RawQueryArchetype tracked index writes record full and sparse column chang
 ///|
 test "panic Query component_index aborts for missing component" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryIndexMissingA", 4)
-  let qb = world.register_cpu_component("QueryIndexMissingB", 4)
+  let qa = world.register_component("QueryIndexMissingA", 4)
+  let qb = world.register_component("QueryIndexMissingB", 4)
   ignore(Query::new([qa]).component_index(qb))
 }
 
 ///|
 test "panic Query new_with_excluded rejects duplicate excluded component" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryWithoutDuplicateA", 4)
-  let qb = world.register_cpu_component("QueryWithoutDuplicateB", 4)
+  let qa = world.register_component("QueryWithoutDuplicateA", 4)
+  let qb = world.register_component("QueryWithoutDuplicateB", 4)
   ignore(Query::new_with_excluded([qa], [qb, qb]))
 }
 
 ///|
 test "panic RawQuery new_with_excluded rejects required excluded overlap" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryWithoutOverlapA", 4)
+  let qa = world.register_component("RawQueryWithoutOverlapA", 4)
   ignore(RawQuery::new_with_excluded([qa], [qa]))
 }
 
 ///|
 test "panic Query component_index aborts for excluded component" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryIndexExcludedA", 4)
-  let qb = world.register_cpu_component("QueryIndexExcludedB", 4)
+  let qa = world.register_component("QueryIndexExcludedA", 4)
+  let qb = world.register_component("QueryIndexExcludedB", 4)
   ignore(Query::new_with_excluded([qa], [qb]).component_index(qb))
 }
 
 ///|
 test "panic Query plan aborts for unknown excluded component" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryUnknownExcludedA", 4)
+  let qa = world.register_component("QueryUnknownExcludedA", 4)
   let missing = ComponentTypeId::new(99999)
   ignore(Query::new_with_excluded([qa], [missing]).plan(world))
 }
@@ -638,7 +638,7 @@ test "panic Query plan aborts for unknown excluded component" {
 ///|
 test "panic QueryRow read_at aborts for out-of-range payload index" {
   let world = World::new()
-  let qa = world.register_cpu_component("QueryIndexInvalidA", 4)
+  let qa = world.register_component("QueryIndexInvalidA", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
   Query::new([qa]).for_each(world, row => row.read_at(1, _bytes => ()))
@@ -647,7 +647,7 @@ test "panic QueryRow read_at aborts for out-of-range payload index" {
 ///|
 test "panic RawQueryArchetype read_column_at aborts for negative payload index" {
   let world = World::new()
-  let qa = world.register_cpu_component("RawQueryIndexInvalidA", 4)
+  let qa = world.register_component("RawQueryIndexInvalidA", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
   RawQuery::new([qa]).for_each_archetype(world, arch => {
