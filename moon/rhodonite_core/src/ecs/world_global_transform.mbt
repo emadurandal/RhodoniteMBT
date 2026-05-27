@@ -1005,7 +1005,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row_report(
   report : TransformPropagationReportDraft,
 ) -> Bool {
   let world_m = if !has_child_of {
-    Some(leaf_local_matrix)
+    leaf_local_matrix
   } else {
     match self.build_child_of_ancestor_chain(entity) {
       None => {
@@ -1021,7 +1021,7 @@ fn World::compute_global_transform_for_tf_gt_bulk_row_report(
             chain,
             Some(leaf_local_matrix),
           ) {
-          Some(matrix) => Some(matrix)
+          Some(matrix) => matrix
           None => {
             report.skipped_dirty_entity_count = report.skipped_dirty_entity_count +
               1
@@ -1031,27 +1031,23 @@ fn World::compute_global_transform_for_tf_gt_bulk_row_report(
         }
     }
   }
-  match world_m {
-    Some(m) =>
-      match self.global_transform_ref(entity) {
-        Some(gt_ref) => {
-          report.visited_entity_count = report.visited_entity_count + 1
-          if self.global_transform_blob.write_matrix_if_changed(
-              gt_ref.format,
-              gt_ref.word_offset,
-              m,
-            ) {
-            report.global_transform_write_count = report.global_transform_write_count +
-              1
-          }
-          true
-        }
-        None => {
-          report.record_failure(MissingGlobalTransformRef)
-          false
-        }
+  match self.global_transform_ref(entity) {
+    Some(gt_ref) => {
+      report.visited_entity_count = report.visited_entity_count + 1
+      if self.global_transform_blob.write_matrix_if_changed(
+          gt_ref.format,
+          gt_ref.word_offset,
+          world_m,
+        ) {
+        report.global_transform_write_count = report.global_transform_write_count +
+          1
       }
-    None => false
+      true
+    }
+    None => {
+      report.record_failure(MissingGlobalTransformRef)
+      false
+    }
   }
 }
 
