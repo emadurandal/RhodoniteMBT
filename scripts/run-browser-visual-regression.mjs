@@ -115,15 +115,19 @@ try {
 		"--no-first-run",
 		"--no-default-browser-check",
 	];
-	const browser = await launchBrowser({
-		args: browserArgs,
-		headless,
-		logPrefix: "visual_regression(browser)",
-		url,
-		userDataDir,
-		verbose,
-	});
-	browserContext = browser.context;
+	try {
+		const browser = await launchBrowser({
+			args: browserArgs,
+			headless,
+			logPrefix: "visual_regression(browser)",
+			url,
+			userDataDir,
+			verbose,
+		});
+		browserContext = browser.context;
+	} catch (error) {
+		rejectResult(error);
+	}
 
 	const result = await withTimeout(resultPromise, 30000, "browser visual regression timed out").catch(
 		(error) => {
@@ -137,7 +141,18 @@ try {
 					updates: [],
 				};
 			}
-			throw error;
+			return {
+				ok: false,
+				skipped: false,
+				results: [],
+				failures: [
+					{
+						name: "browser visual regression",
+						message: formatFailure(error),
+					},
+				],
+				updates: [],
+			};
 		},
 	);
 	if (result.skipped) {
@@ -191,6 +206,10 @@ function withTimeout(promise, ms, message) {
 		timer = setTimeout(() => reject(new Error(message)), ms);
 	});
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function formatFailure(error) {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function listen(server) {
