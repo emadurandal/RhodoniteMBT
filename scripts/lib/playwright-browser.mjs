@@ -19,22 +19,27 @@ export function createBrowserLauncher() {
 			executablePath: browserPath,
 			headless,
 		});
-		const page = context.pages()[0] ?? await context.newPage();
-		if (verbose) {
-			page.on("console", (message) => {
-				console.log(`${logPrefix}: console ${message.type()} ${message.text()}`);
-			});
-			page.on("pageerror", (error) => {
-				console.error(`${logPrefix}: pageerror ${error.message}`);
-			});
-			page.on("requestfailed", (request) => {
-				console.error(
-					`${logPrefix}: requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`,
-				);
-			});
+		try {
+			const page = context.pages()[0] ?? await context.newPage();
+			if (verbose) {
+				page.on("console", (message) => {
+					console.log(`${logPrefix}: console ${message.type()} ${message.text()}`);
+				});
+				page.on("pageerror", (error) => {
+					console.error(`${logPrefix}: pageerror ${error.message}`);
+				});
+				page.on("requestfailed", (request) => {
+					console.error(
+						`${logPrefix}: requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`,
+					);
+				});
+			}
+			await page.goto(url);
+			return { context, page };
+		} catch (error) {
+			await context.close();
+			throw error;
 		}
-		await page.goto(url);
-		return { context, page };
 	};
 }
 
