@@ -561,6 +561,17 @@ describe("ECS TypeScript wrapper: query", () => {
 			true,
 		);
 
+		let fastReadB = 0;
+		query.forEachReadAt(world, 1, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			fastReadB = bytes.getF32(0);
+		});
+		expect(fastReadB).toBeCloseTo(2);
+		query.prepare(world).forEachReadAt(world, 0, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			expect(bytes.getF32(0)).toBeCloseTo(1);
+		});
+
 		let readA = 0;
 		query.forEach(world, (row) => {
 			expect(row.hasAt(0)).toBe(true);
@@ -575,6 +586,7 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(readA).toBeCloseTo(1);
 		expect(getF32(world.componentBytesCopy(entity, cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(5);
 		expect(getF32(world.componentBytesCopy(entity, cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(7);
+		expect(() => query.forEachReadAt(world, -1, () => {})).toThrow();
 		expect(() => query.componentIndex(world.registerCpuComponent("QueryIndexTsC", 16))).toThrow();
 	});
 
@@ -596,6 +608,15 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(world.addComponentBytes(entity, cpuB, f32Bytes([2, 0, 0, 0], 16))).toBe(
 			true,
 		);
+
+		raw.forEachReadViewAt(world, 1, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			expect(bytes.getF32(0)).toBeCloseTo(2);
+		});
+		raw.prepare(world).forEachReadViewAt(world, 0, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			expect(bytes.getF32(0)).toBeCloseTo(1);
+		});
 
 		raw.forEach(world, (row) => {
 			expect(row.hasAt(0)).toBe(true);

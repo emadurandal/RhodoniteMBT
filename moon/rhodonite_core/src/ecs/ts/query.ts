@@ -18,6 +18,7 @@ import type {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import {
 	prepared_query_for_each,
+	prepared_query_for_each_read_at,
 	prepared_query_is_stale,
 	prepared_query_plan,
 	prepared_query_refresh,
@@ -32,6 +33,7 @@ import {
 	query_cache_required_components,
 	query_excluded_components,
 	query_for_each,
+	query_for_each_read_at,
 	query_new,
 	query_new_with_excluded,
 	query_plan,
@@ -58,6 +60,7 @@ import {
 	query_row_write_tracked_at,
 	raw_prepared_query_for_each,
 	raw_prepared_query_for_each_archetype,
+	raw_prepared_query_for_each_read_view_at,
 	raw_prepared_query_is_stale,
 	raw_prepared_query_plan,
 	raw_prepared_query_refresh,
@@ -88,6 +91,7 @@ import {
 	raw_query_excluded_components,
 	raw_query_for_each,
 	raw_query_for_each_archetype,
+	raw_query_for_each_read_view_at,
 	raw_query_new,
 	raw_query_new_with_excluded,
 	raw_query_plan,
@@ -147,6 +151,16 @@ export class Query {
 
 	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
 		query_for_each(this.inner, world.inner, (row) => f(new QueryRow(row)));
+	}
+
+	forEachReadAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		query_for_each_read_at(this.inner, world.inner, index, (entity, bytes) =>
+			f(new EntityId(entity), byteView(bytes)),
+		);
 	}
 
 	prepare(world: { readonly inner: MoonWorld }): PreparedQuery {
@@ -224,6 +238,19 @@ export class PreparedQuery {
 	forEach(world: { readonly inner: MoonWorld }, f: (row: QueryRow) => void): void {
 		prepared_query_for_each(this.inner, world.inner, (row) =>
 			f(new QueryRow(row)),
+		);
+	}
+
+	forEachReadAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		prepared_query_for_each_read_at(
+			this.inner,
+			world.inner,
+			index,
+			(entity, bytes) => f(new EntityId(entity), byteView(bytes)),
 		);
 	}
 
@@ -345,6 +372,19 @@ export class RawQuery {
 		raw_query_for_each(this.inner, world.inner, (row) => f(new RawQueryRow(row)));
 	}
 
+	forEachReadViewAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		raw_query_for_each_read_view_at(
+			this.inner,
+			world.inner,
+			index,
+			(entity, bytes) => f(new EntityId(entity), byteView(bytes)),
+		);
+	}
+
 	prepare(world: { readonly inner: MoonWorld }): RawPreparedQuery {
 		return new RawPreparedQuery(raw_query_prepare(this.inner, world.inner));
 	}
@@ -438,6 +478,19 @@ export class RawPreparedQuery {
 	forEach(world: { readonly inner: MoonWorld }, f: (row: RawQueryRow) => void): void {
 		raw_prepared_query_for_each(this.inner, world.inner, (row) =>
 			f(new RawQueryRow(row)),
+		);
+	}
+
+	forEachReadViewAt(
+		world: { readonly inner: MoonWorld },
+		index: number,
+		f: (entity: EntityId, bytes: ByteView) => void,
+	): void {
+		raw_prepared_query_for_each_read_view_at(
+			this.inner,
+			world.inner,
+			index,
+			(entity, bytes) => f(new EntityId(entity), byteView(bytes)),
 		);
 	}
 

@@ -186,6 +186,60 @@ test "PreparedQuery for_each rebuilds stale row plan" {
 }
 
 ///|
+test "PreparedQuery for_each_read_at reads indexed rows and rebuilds stale plans" {
+  let world = World::new()
+  let qa = world.register_cpu_component("PreparedQueryReadAtA", 4)
+  let qb = world.register_cpu_component("PreparedQueryReadAtB", 4)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  let prepared = Query::new([qa, qb]).prepare(world)
+  let qc = world.register_cpu_component("PreparedQueryReadAtC", 4)
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qc, bytes4(5, 0, 0, 0)))
+  let mut rows = 0
+  let mut sum = 0
+  prepared.for_each_read_at(world, 1, (entity, bytes) => {
+    if entity != e0 && entity != e1 {
+      abort("expected prepared read_at entity")
+    }
+    rows = rows + 1
+    sum = sum + bytes[0].to_int()
+  })
+  assert_eq(rows, 2)
+  assert_eq(sum, 6)
+}
+
+///|
+test "RawPreparedQuery for_each_read_view_at reads indexed rows and rebuilds stale plans" {
+  let world = World::new()
+  let qa = world.register_cpu_component("RawPreparedQueryReadAtA", 4)
+  let qb = world.register_cpu_component("RawPreparedQueryReadAtB", 4)
+  let e0 = world.create_entity()
+  assert_true(world.add_component_bytes(e0, qa, bytes4(1, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e0, qb, bytes4(2, 0, 0, 0)))
+  let prepared = RawQuery::new([qa, qb]).prepare(world)
+  let qc = world.register_cpu_component("RawPreparedQueryReadAtC", 4)
+  let e1 = world.create_entity()
+  assert_true(world.add_component_bytes(e1, qa, bytes4(3, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qb, bytes4(4, 0, 0, 0)))
+  assert_true(world.add_component_bytes(e1, qc, bytes4(5, 0, 0, 0)))
+  let mut rows = 0
+  let mut sum = 0
+  prepared.for_each_read_view_at(world, 1, (entity, bytes) => {
+    if entity != e0 && entity != e1 {
+      abort("expected raw prepared read_at entity")
+    }
+    rows = rows + 1
+    sum = sum + bytes[0].to_int()
+  })
+  assert_eq(rows, 2)
+  assert_eq(sum, 6)
+}
+
+///|
 test "PreparedQuery plan reports current and stale row diagnostics" {
   let world = World::new()
   let qa = world.register_cpu_component("PreparedQueryRowPlanA", 4)

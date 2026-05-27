@@ -32,7 +32,7 @@
           <p class="lead">このページは現行 ECS の設計上の注意点をまとめます。汎用 GPU component storage は削除済みで、現在は CPU-only archetype SoA と builtin packed GPU blob に統一されています。</p>
 
           <h2>Query View Lifetime</h2>
-          <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。view を外へ逃がさない API 形状にしているため、system 実行順や将来の並列化に向けた最低限の境界を保ちます。</p>
+          <p><code>QueryRow::read</code> / <code>write</code> と <code>RawQueryRow::read_view</code> / <code>write_view</code> は closure-scoped view を返します。<code>PreparedQuery::for_each_read_at</code> などの read-only indexed fast path も同じ callback-scoped row view lifetime を保ちつつ、row ごとの wrapper construction を避けます。</p>
           <p>index-based query accessor は required component order を payload index として使います。これは hot-loop helper であり、別種の lifetime handle ではありません。component-id accessor と同じ access guard を維持します。</p>
           <p>query の excluded component は archetype signature filter 専用です。<code>QueryPlan</code> diagnostics には copy されますが、payload slot ではなく、<code>component_index</code> では解決できず、row / column view の lifetime も延ばしません。</p>
           <p><code>RawQueryArchetype::write_column</code> は archetype column 全体の mutable view を貸し出す untracked expert API です。同一 component の重複 mutable view を避けるため、query required set の duplicate check に依存します。full-column write を undo/redo tracking したい場合は <code>RawQueryArchetype::write_column_tracked</code> を使います。呼び出し側が変更候補の sparse column rows を知っている場合は <code>RawQueryArchetype::write_column_rows_tracked</code> を使います。</p>

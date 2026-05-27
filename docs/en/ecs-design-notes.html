@@ -32,7 +32,7 @@
           <p class="lead">The current ECS is CPU-only archetype SoA plus builtin packed GPU blobs. Generic GPU component storage has been removed.</p>
 
           <h2>Query View Lifetime</h2>
-          <p><code>QueryRow::read</code> / <code>write</code> and <code>RawQueryRow::read_view</code> / <code>write_view</code> return closure-scoped views. This keeps borrowed row or column views from escaping the callback boundary.</p>
+          <p><code>QueryRow::read</code> / <code>write</code> and <code>RawQueryRow::read_view</code> / <code>write_view</code> return closure-scoped views. Read-only indexed fast paths such as <code>PreparedQuery::for_each_read_at</code> keep the same callback-scoped row view lifetime while avoiding per-row wrapper construction.</p>
           <p>Index-based query accessors use the required component order as the payload index. They are hot-loop helpers, not separate lifetime handles, and keep the same access guards as the component-id accessors.</p>
           <p>Excluded query components are archetype-signature filters only. They are copied into <code>QueryPlan</code> diagnostics, but they are not payload slots, cannot be resolved with <code>component_index</code>, and do not extend row or column view lifetimes.</p>
           <p><code>RawQueryArchetype::write_column</code> is an expert untracked API that lends a mutable view of a whole archetype column. It relies on duplicate required-component rejection to avoid overlapping mutable views for the same component. Use <code>RawQueryArchetype::write_column_tracked</code> when a full-column write needs undo/redo tracking. Use <code>RawQueryArchetype::write_column_rows_tracked</code> when the caller already knows the sparse column rows that may change.</p>

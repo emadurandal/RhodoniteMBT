@@ -237,6 +237,24 @@ fn query_component_index(
 }
 
 ///|
+/// Returns the required component at `index` or aborts with a setup error.
+fn query_component_at_index(
+  required : Array[ComponentTypeId],
+  index : Int,
+  operation : String,
+) -> ComponentTypeId {
+  if index < 0 || index >= required.length() {
+    abort(
+      operation +
+      ": payload index " +
+      index.to_string() +
+      " is outside this query required component range.",
+    )
+  }
+  required[index]
+}
+
+///|
 /// Implements `Query::assert_registered_components`.
 fn Query::assert_registered_components(
   self : Query,
@@ -488,6 +506,17 @@ pub fn Query::for_each(
 }
 
 ///|
+/// Runs this query with a pre-resolved read-only payload index and no row wrapper.
+pub fn Query::for_each_read_at(
+  self : Query,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  self.prepare(world).for_each_read_at(world, index, f)
+}
+
+///|
 /// Runs this raw query with component-id based byte-view row access.
 pub fn RawQuery::for_each(
   self : RawQuery,
@@ -495,6 +524,17 @@ pub fn RawQuery::for_each(
   f : (RawQueryRow) -> Unit,
 ) -> Unit {
   self.prepare(world).for_each(world, f)
+}
+
+///|
+/// Runs this raw query with a pre-resolved read-only payload index and no row wrapper.
+pub fn RawQuery::for_each_read_view_at(
+  self : RawQuery,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  self.prepare(world).for_each_read_view_at(world, index, f)
 }
 
 ///|
@@ -642,6 +682,47 @@ pub fn PreparedQuery::for_each(
 }
 
 ///|
+/// Runs a prepared query with a pre-resolved read-only payload index and no row wrapper.
+pub fn PreparedQuery::for_each_read_at(
+  self : PreparedQuery,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  let plan = if self.archetype_version == world.archetype_version {
+    self
+  } else {
+    Query::new_with_excluded(self.required, self.excluded).prepare(world)
+  }
+  let component = query_component_at_index(
+    plan.required,
+    index,
+    "PreparedQuery::for_each_read_at",
+  )
+  world.assert_system_component_read(
+    component, "PreparedQuery::for_each_read_at",
+  )
+  assert_query_components_registered(
+    plan.excluded,
+    world,
+    "PreparedQuery::for_each_read_at",
+  )
+  world.query_depth = world.query_depth + 1
+  for i = 0; i < plan.archetypes.length(); i = i + 1 {
+    let chunk = plan.archetypes[i]
+    let access = chunk.row_accesses[index]
+    let arch = world.archetypes[chunk.archetype_index]
+    let col = arch.columns[access.column_index]
+    let ents = arch.entities
+    for row = 0; row < ents.length(); row = row + 1 {
+      let base = row * access.stride
+      f(ents[row], col.bytes[base:base + access.stride])
+    }
+  }
+  world.query_depth = world.query_depth - 1
+}
+
+///|
 /// Returns a read-only diagnostic snapshot of this prepared query against `world`.
 pub fn PreparedQuery::plan(self : PreparedQuery, world : World) -> QueryPlan {
   world.assert_system_components_read(self.required, "PreparedQuery::plan")
@@ -744,6 +825,47 @@ pub fn RawPreparedQuery::for_each(
         archetype_index: chunk.archetype_index,
         row,
       })
+    }
+  }
+  world.query_depth = world.query_depth - 1
+}
+
+///|
+/// Runs a prepared raw query with a pre-resolved read-only payload index and no row wrapper.
+pub fn RawPreparedQuery::for_each_read_view_at(
+  self : RawPreparedQuery,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  let plan = if self.archetype_version == world.archetype_version {
+    self
+  } else {
+    RawQuery::new_with_excluded(self.required, self.excluded).prepare(world)
+  }
+  let component = query_component_at_index(
+    plan.required,
+    index,
+    "RawPreparedQuery::for_each_read_view_at",
+  )
+  world.assert_system_component_read(
+    component, "RawPreparedQuery::for_each_read_view_at",
+  )
+  assert_query_components_registered(
+    plan.excluded,
+    world,
+    "RawPreparedQuery::for_each_read_view_at",
+  )
+  world.query_depth = world.query_depth + 1
+  for i = 0; i < plan.archetypes.length(); i = i + 1 {
+    let chunk = plan.archetypes[i]
+    let access = chunk.row_accesses[index]
+    let arch = world.archetypes[chunk.archetype_index]
+    let col = arch.columns[access.column_index]
+    let ents = arch.entities
+    for row = 0; row < ents.length(); row = row + 1 {
+      let base = row * access.stride
+      f(ents[row], col.bytes[base:base + access.stride])
     }
   }
   world.query_depth = world.query_depth - 1
