@@ -119,6 +119,7 @@ sequenceDiagram
             <li><code>orbit_camera_transform_system</code> は controller から <code>Transform3D</code> と parentless <code>GlobalTransform</code> を更新する。</li>
             <li><code>camera_blob_sync_system</code> と <code>orbit_camera_blob_sync_system</code> は <code>GlobalTransform + CameraLens</code> から builtin Camera blob を更新する。</li>
           </ul>
+          <p>orbit transform system は runtime hot path で raw query plan を cache し、archetype column を直接 iterate します。Camera blob sync system は matrix と blob work が支配的なため、row query path を維持します。</p>
           <p>runtime update では raw camera-control helper と system を使います。Undo / Redo に参加する editor/authoring 変更では、<code>WorldHistory</code> と一緒に MoonBit の <code>*_tracked</code> helper または TypeScript の <code>*Tracked</code> wrapper を使います。drag gesture のような一連の操作は 1 つの transaction にまとめられます。editor code で system として実行したい場合は <code>orbit_camera_transform_command_system</code>、<code>camera_blob_sync_command_system</code>、<code>orbit_camera_blob_sync_command_system</code> を使い、<code>WorldHistory::run_system_phase</code> 経由で phase を実行します。</p>
 
           <h2>TypeScript Wrapper</h2>

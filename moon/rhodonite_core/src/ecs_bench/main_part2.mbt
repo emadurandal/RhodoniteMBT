@@ -200,6 +200,111 @@ fn make_camera_world(count : Int) -> (@ecs.World, Array[@ecs.EntityId]) {
 }
 
 ///|
+/// Implements `make_camera_blob_sync_world`.
+fn make_camera_blob_sync_world(
+  count : Int,
+) -> (
+  @ecs.World,
+  @ecs.ComponentTypeId,
+  @ecs.ComponentTypeId,
+  @ecs.ComponentTypeId,
+) {
+  let world = @ecs.World::new()
+  let gt = world.global_transform_component()
+  let camera = world.camera_component()
+  let lens = world.camera_lens_component()
+  let view = @m44.Matrix44F::identity()
+  let proj = @m44.Matrix44F::identity()
+  for i = 0; i < count; i = i + 1 {
+    let entity = world.create_entity()
+    ignore(world.set_global_transform(entity, bench_matrix_for_index(i)))
+    ignore(
+      world.set_camera_matrices(
+        entity,
+        view,
+        proj,
+        (0.1 : Float),
+        (100.0 : Float),
+        (1.0 : Float),
+        @ecs.camera_projection_orthographic(),
+        (0.0 : Float),
+      ),
+    )
+    ignore(
+      @ecs.add_camera_lens_perspective(
+        world,
+        entity,
+        lens,
+        (0.1 : Float),
+        (250.0 : Float),
+        (1.7777778 : Float),
+        Float::from_double(1.0471975511965976),
+        (0.0 : Float),
+      ),
+    )
+  }
+  ignore(world.drain_global_transform_blob_write_views())
+  ignore(world.drain_camera_blob_write_views())
+  (world, gt, camera, lens)
+}
+
+///|
+/// Implements `make_orbit_camera_transform_world`.
+fn make_orbit_camera_transform_world(
+  count : Int,
+) -> (@ecs.World, @ecs.ComponentTypeId, @ecs.ComponentTypeId) {
+  let world = @ecs.World::new()
+  let orbit = world.orbit_camera_controller_component()
+  let home = world.camera_home_transform_component()
+  let id = @m44.Matrix44F::identity()
+  for i = 0; i < count; i = i + 1 {
+    let entity = world.create_entity()
+    ignore(
+      world.set_transform_trs(
+        entity,
+        Float::from_double(i.to_double() * 0.01),
+        (0.0 : Float),
+        (16.0 : Float),
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        (1.0 : Float),
+        (1.0 : Float),
+        (1.0 : Float),
+      ),
+    )
+    ignore(world.set_global_transform(entity, id))
+    ignore(
+      @ecs.add_orbit_camera_controller_with_distance(
+        world,
+        entity,
+        orbit,
+        0.0,
+        0.0,
+        (16.0 : Float),
+      ),
+    )
+    ignore(@ecs.set_camera_home_from_current_transform(world, entity, home))
+    ignore(
+      @ecs.update_orbit_camera_controller_from_mouse_frame(
+        world,
+        entity,
+        true,
+        false,
+        false,
+        false,
+        Float::from_double((i % 5).to_double()),
+        (1.0 : Float),
+        (0.0 : Float),
+      ),
+    )
+  }
+  ignore(world.drain_global_transform_blob_write_views())
+  (world, orbit, home)
+}
+
+///|
 /// Implements `bench_set_camera_matrices_changed`.
 fn bench_set_camera_matrices_changed(count : Int) -> BenchSample {
   let (world, entities) = make_camera_world(count)
@@ -253,6 +358,188 @@ fn bench_set_camera_matrices_unchanged(count : Int) -> BenchSample {
     checksum = checksum + 1
   }
   report("set_camera_matrices_unchanged", count, started, checksum)
+}
+
+///|
+/// Implements `bench_camera_blob_sync_row_query`.
+fn bench_camera_blob_sync_row_query(count : Int) -> BenchSample {
+  let (world, gt, camera, lens) = make_camera_blob_sync_world(count)
+  let query = @ecs.Query::new([gt, camera, lens])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each(world, row => {
+    let entity = row.entity()
+    match world.get_global_transform(entity) {
+      Some(global) =>
+        match global.inverse() {
+          Some(view) =>
+            row.read(lens, lens_row => {
+              let (proj, near, far, aspect, projection_kind, flags) = @ecs.camera_lens_projection_from_view(
+                lens_row,
+              )
+              if world.set_camera_matrices(
+                  entity, view, proj, near, far, aspect, projection_kind, flags,
+                ) {
+                checksum = checksum + entity.gpu_index()
+              }
+            })
+          None => ()
+        }
+      None => ()
+    }
+  })
+  if world.has_camera_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("camera_blob_sync_row_query", count, started, checksum)
+}
+
+///|
+/// Implements `bench_camera_blob_sync_raw_cache`.
+fn bench_camera_blob_sync_raw_cache(count : Int) -> BenchSample {
+  let (world, gt, camera, lens) = make_camera_blob_sync_world(count)
+  let cache = @ecs.RawQueryCache::new([gt, camera, lens])
+  let lens_index = cache.component_index(lens)
+  cache.refresh(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  cache.for_each_archetype(world, arch => {
+    let lens_stride = arch.component_stride_at(lens_index)
+    let lens_col = arch.read_column_at(lens_index)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let entity = arch.entity(row)
+      match world.get_global_transform(entity) {
+        Some(global) =>
+          match global.inverse() {
+            Some(view) => {
+              let lens_start = row * lens_stride
+              let lens_row = lens_col[lens_start:lens_start + lens_stride]
+              let (proj, near, far, aspect, projection_kind, flags) = @ecs.camera_lens_projection_from_view(
+                lens_row,
+              )
+              if world.set_camera_matrices(
+                  entity, view, proj, near, far, aspect, projection_kind, flags,
+                ) {
+                checksum = checksum + entity.gpu_index()
+              }
+            }
+            None => ()
+          }
+        None => ()
+      }
+    }
+  })
+  if world.has_camera_blob_write_views() {
+    checksum = checksum + 1
+  }
+  report("camera_blob_sync_raw_cache", count, started, checksum)
+}
+
+///|
+/// Implements `bench_orbit_camera_transform_row_query`.
+fn bench_orbit_camera_transform_row_query(count : Int) -> BenchSample {
+  let (world, orbit, home) = make_orbit_camera_transform_world(count)
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  let query = @ecs.Query::new([tf, gt, orbit, home])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  query.for_each(world, row => {
+    let entity = row.entity()
+    let mut yaw = (0.0 : Float)
+    row.read(orbit, orbit_row => yaw = @comp.get_gpu_f32_byte_view(orbit_row, 0))
+    row.write(tf, tf_row => {
+      @comp.Transform3D::write_position_to_component_mut_view(
+        tf_row,
+        yaw,
+        Float::from_double(entity.gpu_index().to_double() * 0.001),
+        (16.0 : Float),
+      )
+      ignore(
+        world.set_global_transform(
+          entity,
+          @comp.Transform3D::local_matrix_from_component_view(tf_row[:]),
+        ),
+      )
+    })
+    checksum = checksum + entity.gpu_index()
+  })
+  if world.has_global_transform_blob_write_views() {
+    checksum = checksum + count
+  }
+  report("orbit_camera_transform_row_query", count, started, checksum)
+}
+
+///|
+/// Implements `bench_orbit_camera_transform_raw_cache`.
+fn bench_orbit_camera_transform_raw_cache(count : Int) -> BenchSample {
+  let (world, orbit, home) = make_orbit_camera_transform_world(count)
+  let tf = world.transform_component()
+  let gt = world.global_transform_component()
+  let cache = @ecs.RawQueryCache::new([tf, gt, orbit, home])
+  let tf_index = cache.component_index(tf)
+  let orbit_index = cache.component_index(orbit)
+  cache.refresh(world)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  cache.for_each_archetype(world, arch => {
+    let tf_stride = arch.component_stride_at(tf_index)
+    let orbit_stride = arch.component_stride_at(orbit_index)
+    let tf_col = arch.write_column_at(tf_index)
+    let orbit_col = arch.read_column_at(orbit_index)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let entity = arch.entity(row)
+      let tf_start = row * tf_stride
+      let orbit_start = row * orbit_stride
+      let yaw = @comp.get_gpu_f32_byte_view(
+        orbit_col[orbit_start:orbit_start + orbit_stride],
+        0,
+      )
+      let tf_row = tf_col.mut_view(start=tf_start, end=tf_start + tf_stride)
+      @comp.Transform3D::write_position_to_component_mut_view(
+        tf_row,
+        yaw,
+        Float::from_double(entity.gpu_index().to_double() * 0.001),
+        (16.0 : Float),
+      )
+      ignore(
+        world.set_global_transform(
+          entity,
+          @comp.Transform3D::local_matrix_from_component_view(tf_row[:]),
+        ),
+      )
+      checksum = checksum + entity.gpu_index()
+    }
+  })
+  if world.has_global_transform_blob_write_views() {
+    checksum = checksum + count
+  }
+  report("orbit_camera_transform_raw_cache", count, started, checksum)
+}
+
+///|
+/// Implements `bench_orbit_camera_transform_system_phase`.
+fn bench_orbit_camera_transform_system_phase(count : Int) -> BenchSample {
+  let (world, orbit, home) = make_orbit_camera_transform_world(count)
+  let phase = @ecs.PhaseKey::new("orbit-camera-transform-bench")
+  let runner = @ecs.SystemRunner::new()
+  runner.add_system(
+    @ecs.orbit_camera_transform_system(world, phase, orbit, home),
+  )
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected orbit camera transform phase")
+  }
+  let checksum = if world.has_global_transform_blob_write_views() {
+    count
+  } else {
+    0
+  }
+  report("orbit_camera_transform_system_phase", count, started, checksum)
 }
 
 ///|

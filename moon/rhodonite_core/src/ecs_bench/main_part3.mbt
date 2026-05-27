@@ -157,6 +157,21 @@ fn run_suite(count : Int) -> Unit {
   run_case(
     "set_camera_matrices_unchanged", count, bench_set_camera_matrices_unchanged,
   )
+  run_case(
+    "camera_blob_sync_row_query", count, bench_camera_blob_sync_row_query,
+  )
+  run_case(
+    "camera_blob_sync_raw_cache", count, bench_camera_blob_sync_raw_cache,
+  )
+  run_case(
+    "orbit_camera_transform_row_query", count, bench_orbit_camera_transform_row_query,
+  )
+  run_case(
+    "orbit_camera_transform_raw_cache", count, bench_orbit_camera_transform_raw_cache,
+  )
+  run_case(
+    "orbit_camera_transform_system_phase", count, bench_orbit_camera_transform_system_phase,
+  )
   run_case("make_world_batch", count, bench_make_world_batch)
   run_case("system_runner_phase_empty", count, bench_system_runner_phase_empty)
   run_case(
