@@ -543,6 +543,7 @@ fn World::remove_entity_without_generation_bump(
   }
   self.release_global_transform_ref(entity)
   self.release_camera_ref(entity)
+  self.invalidate_transform_hierarchy_index()
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.alive[entity.index] = false
@@ -629,6 +630,10 @@ fn World::restore_entity_snapshot(
   remove_free_entity_index(self.free_indices, entity.index)
   for i = 0; i < snapshot.components.length(); i = i + 1 {
     self.restore_component_snapshot(arch, row, snapshot.components[i])
+    self.mark_transform_dirty_for_component(
+      entity,
+      snapshot.components[i].component,
+    )
   }
   true
 }

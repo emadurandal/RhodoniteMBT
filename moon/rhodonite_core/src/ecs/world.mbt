@@ -512,6 +512,8 @@ pub fn World::new_with_global_transform_format(
   ]
   let transform_dirty_entities : Array[EntityId] = []
   let transform_dirty_generations : Array[Int] = []
+  let transform_children_by_parent_index : Array[Array[EntityId]] = []
+  let transform_hierarchy_index_dirty = true
   let query_depth = 0
   let component_registration_lock_depth = 0
   let system_access_depth = 0
@@ -536,6 +538,8 @@ pub fn World::new_with_global_transform_format(
     camera_blob,
     transform_dirty_entities,
     transform_dirty_generations,
+    transform_children_by_parent_index,
+    transform_hierarchy_index_dirty,
     query_depth,
     component_registration_lock_depth,
     system_access_depth,
@@ -816,6 +820,7 @@ pub fn World::destroy_entity(self : World, entity : EntityId) -> Bool {
   }
   self.release_global_transform_ref(entity)
   self.release_camera_ref(entity)
+  self.invalidate_transform_hierarchy_index()
   let moved = self.archetypes[loc.archetype_index].swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.alive[entity.index] = false
@@ -896,8 +901,6 @@ pub fn World::set_component_bytes(
     component,
     bytes,
   )
-  if self.component_is_transform_source(component) {
-    self.mark_transform_dirty(entity)
-  }
+  self.mark_transform_source_dirty(entity, component)
   true
 }
