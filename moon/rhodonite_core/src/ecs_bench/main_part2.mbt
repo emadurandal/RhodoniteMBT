@@ -1134,12 +1134,12 @@ fn bench_system_runner_phase_no_command_direct_write(
   let runner = @ecs.SystemRunner::new()
   let mut checksum = 0
   runner.add_system(
-    @ecs.System::new(
+    @ecs.System::new_direct(
       "system-runner-no-command-direct-write",
       phase,
       [],
       [component],
-      (system_world, _ctx, _commands) => {
+      (system_world, _ctx) => {
         query.for_each(system_world, row => {
           let idx = row.entity().gpu_index()
           row.write(component, view => {

@@ -303,6 +303,7 @@ options(
         "command_buffer_set_camera_matrices_col_major",
         "command_buffer_remove_component",
         "system_new",
+        "system_new_direct",
         "system_new_with_structural_write",
         "system_name",
         "system_phase",
