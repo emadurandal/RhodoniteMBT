@@ -237,6 +237,9 @@ fn run_system_batch(
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
+    if command_buffers[i].is_empty() {
+      continue
+    }
     let system = batch.systems[i].system
     let system_access = world.enter_system_access(
       system.name,
@@ -329,6 +332,9 @@ fn run_system_batch_tracked(
   }
   let mut ok = true
   for i = 0; i < command_buffers.length(); i = i + 1 {
+    if command_buffers[i].is_empty() {
+      continue
+    }
     let system = batch.systems[i].system
     let system_access = world.enter_system_access(
       system.name,

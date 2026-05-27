@@ -49,7 +49,8 @@
             <li><code>CommandBuffer</code> validates component writes and structural writes at queue time.</li>
             <li>Component registration is locked while the system runner is executing.</li>
             <li><code>SystemRunner</code> caches phase batches internally and invalidates them when systems are added; public plan results remain snapshots.</li>
-            <li><code>SystemRunner::run_phase_report</code> executes the same command-buffer path as <code>run_phase</code>; the report is an execution snapshot and does not change batch ordering, command apply order, or history behavior.</li>
+            <li>Non-report phase execution skips the command-buffer apply pass for systems that queued no commands. The system callback still receives a <code>CommandBuffer</code> and runs under the same access guard.</li>
+            <li><code>SystemRunner::run_phase_report</code> still emits per-system diagnostics for empty command buffers; the report is an execution snapshot and does not change batch ordering, command apply order, or history behavior.</li>
             <li>The builtin <code>TransformPropagation</code> system uses an internal dirty queue plus a lazy <code>ChildOf</code> hierarchy index. Dirty roots are recomputed parent-first through their indexed subtree, while the public <code>World::update_global_transforms_from_transforms</code> API remains a full recompute path for compatibility.</li>
           </ul>
 

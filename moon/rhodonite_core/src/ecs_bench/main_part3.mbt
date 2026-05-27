@@ -181,6 +181,9 @@ fn run_suite(count : Int) -> Unit {
     "system_runner_phase_run_cached_many_systems", count, bench_system_runner_phase_run_cached_many_systems,
   )
   run_case(
+    "system_runner_phase_no_command_direct_write", count, bench_system_runner_phase_no_command_direct_write,
+  )
+  run_case(
     "system_runner_phase_command_buffer", count, bench_system_runner_phase_command_buffer,
   )
   run_history_suite(count)

@@ -1124,6 +1124,46 @@ fn bench_system_runner_phase_empty(count : Int) -> BenchSample {
 }
 
 ///|
+/// Implements `bench_system_runner_phase_no_command_direct_write`.
+fn bench_system_runner_phase_no_command_direct_write(
+  count : Int,
+) -> BenchSample {
+  let (world, component, _) = make_component_world(count)
+  let phase = @ecs.PhaseKey::new("system-runner-no-command-direct-write-bench")
+  let query = @ecs.Query::new([component])
+  let runner = @ecs.SystemRunner::new()
+  let mut checksum = 0
+  runner.add_system(
+    @ecs.System::new(
+      "system-runner-no-command-direct-write",
+      phase,
+      [],
+      [component],
+      (system_world, _ctx, _commands) => {
+        query.for_each(system_world, row => {
+          let idx = row.entity().gpu_index()
+          row.write(component, view => {
+            write_bench_bytes4_to_view(view, idx + 173)
+          })
+          checksum = checksum + idx
+        })
+      },
+    ),
+  )
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected system runner no-command direct write phase")
+  }
+  report(
+    "system_runner_phase_no_command_direct_write", count, started, checksum,
+  )
+}
+
+///|
 /// Implements `bench_system_runner_phase_command_buffer`.
 fn bench_system_runner_phase_command_buffer(count : Int) -> BenchSample {
   let (world, component, _) = make_component_world(count)
