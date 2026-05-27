@@ -54,6 +54,17 @@ pub fn query_for_each(
 }
 
 ///|
+/// Implements `query_for_each_read_at`.
+pub fn query_for_each_read_at(
+  query : @ecs.Query,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  query.for_each_read_at(world, index, f)
+}
+
+///|
 /// Implements `query_cache_for_each`.
 pub fn query_cache_for_each(
   cache : @ecs.QueryCache,
@@ -71,6 +82,17 @@ pub fn raw_query_for_each(
   f : (@ecs.RawQueryRow) -> Unit,
 ) -> Unit {
   query.for_each(world, f)
+}
+
+///|
+/// Implements `raw_query_for_each_read_view_at`.
+pub fn raw_query_for_each_read_view_at(
+  query : @ecs.RawQuery,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  query.for_each_read_view_at(world, index, f)
 }
 
 ///|
@@ -217,6 +239,17 @@ pub fn prepared_query_for_each(
 }
 
 ///|
+/// Implements `prepared_query_for_each_read_at`.
+pub fn prepared_query_for_each_read_at(
+  query : @ecs.PreparedQuery,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  query.for_each_read_at(world, index, f)
+}
+
+///|
 /// Implements `raw_prepared_query_for_each`.
 pub fn raw_prepared_query_for_each(
   query : @ecs.RawPreparedQuery,
@@ -224,6 +257,17 @@ pub fn raw_prepared_query_for_each(
   f : (@ecs.RawQueryRow) -> Unit,
 ) -> Unit {
   query.for_each(world, f)
+}
+
+///|
+/// Implements `raw_prepared_query_for_each_read_view_at`.
+pub fn raw_prepared_query_for_each_read_view_at(
+  query : @ecs.RawPreparedQuery,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  query.for_each_read_view_at(world, index, f)
 }
 
 ///|

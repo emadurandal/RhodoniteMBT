@@ -257,6 +257,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
+	export function query_for_each_read_at(
+		query: MoonQuery,
+		world: MoonWorld,
+		index: number,
+		f: (entity: MoonEntityId, bytes: MoonByteView) => void,
+	): void;
 	export function query_cache_for_each(
 		cache: MoonQueryCache,
 		world: MoonWorld,
@@ -266,6 +272,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonRawQuery,
 		world: MoonWorld,
 		f: (row: MoonRawQueryRow) => void,
+	): void;
+	export function raw_query_for_each_read_view_at(
+		query: MoonRawQuery,
+		world: MoonWorld,
+		index: number,
+		f: (entity: MoonEntityId, bytes: MoonByteView) => void,
 	): void;
 	export function raw_query_cache_for_each(
 		cache: MoonRawQueryCache,
@@ -324,6 +336,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		world: MoonWorld,
 		f: (row: MoonQueryRow) => void,
 	): void;
+	export function prepared_query_for_each_read_at(
+		query: MoonPreparedQuery,
+		world: MoonWorld,
+		index: number,
+		f: (entity: MoonEntityId, bytes: MoonByteView) => void,
+	): void;
 	export function prepared_query_plan(
 		query: MoonPreparedQuery,
 		world: MoonWorld,
@@ -340,6 +358,12 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		query: MoonRawPreparedQuery,
 		world: MoonWorld,
 		f: (row: MoonRawQueryRow) => void,
+	): void;
+	export function raw_prepared_query_for_each_read_view_at(
+		query: MoonRawPreparedQuery,
+		world: MoonWorld,
+		index: number,
+		f: (entity: MoonEntityId, bytes: MoonByteView) => void,
 	): void;
 	export function query_plan_required_components(
 		plan: MoonQueryPlan,

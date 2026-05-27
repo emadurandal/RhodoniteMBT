@@ -206,6 +206,7 @@ pub struct PreparedQuery {
   // private fields
 }
 pub fn PreparedQuery::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn PreparedQuery::for_each_read_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn PreparedQuery::is_stale(Self, World) -> Bool
 pub fn PreparedQuery::plan(Self, World) -> QueryPlan
 pub fn PreparedQuery::refresh(Self, World) -> Self
@@ -216,6 +217,7 @@ pub struct Query {
 pub fn Query::component_index(Self, ComponentTypeId) -> Int
 pub fn Query::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn Query::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn Query::for_each_read_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn Query::new(Array[ComponentTypeId]) -> Self
 pub fn Query::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn Query::plan(Self, World) -> QueryPlan
@@ -276,6 +278,7 @@ pub struct RawPreparedQuery {
 }
 pub fn RawPreparedQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawPreparedQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+pub fn RawPreparedQuery::for_each_read_view_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn RawPreparedQuery::is_stale(Self, World) -> Bool
 pub fn RawPreparedQuery::plan(Self, World) -> QueryPlan
 pub fn RawPreparedQuery::refresh(Self, World) -> Self
@@ -287,6 +290,7 @@ pub fn RawQuery::component_index(Self, ComponentTypeId) -> Int
 pub fn RawQuery::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn RawQuery::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQuery::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+pub fn RawQuery::for_each_read_view_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn RawQuery::new(Array[ComponentTypeId]) -> Self
 pub fn RawQuery::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn RawQuery::plan(Self, World) -> QueryPlan
