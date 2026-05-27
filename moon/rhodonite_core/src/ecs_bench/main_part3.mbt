@@ -109,6 +109,21 @@ fn run_suite(count : Int) -> Unit {
   run_case("global_transform_drain", count, bench_global_and_drain)
   run_case("global_transform_drain_views", count, bench_global_and_drain_views)
   run_case(
+    "transform_propagation_dirty_noop_flat", count, bench_transform_propagation_dirty_noop_flat,
+  )
+  run_case(
+    "transform_propagation_dirty_one_flat", count, bench_transform_propagation_dirty_one_flat,
+  )
+  run_case(
+    "transform_propagation_full_one_flat", count, bench_transform_propagation_full_one_flat,
+  )
+  run_case(
+    "transform_propagation_dirty_broad_root", count, bench_transform_propagation_dirty_broad_root,
+  )
+  run_case(
+    "transform_propagation_full_broad_root", count, bench_transform_propagation_full_broad_root,
+  )
+  run_case(
     "global_transform_dense_range_write", count, bench_global_transform_dense_range_write,
   )
   run_case(
@@ -141,9 +156,33 @@ fn run_suite(count : Int) -> Unit {
 }
 
 ///|
+/// Implements `run_transform_propagation_shape_suite`.
+fn run_transform_propagation_shape_suite() -> Unit {
+  run_case(
+    "transform_propagation_dirty_chain_root", 128, bench_transform_propagation_dirty_chain_root,
+  )
+  run_case(
+    "transform_propagation_full_chain_root", 128, bench_transform_propagation_full_chain_root,
+  )
+  run_case(
+    "transform_propagation_dirty_chain_root", 256, bench_transform_propagation_dirty_chain_root,
+  )
+  run_case(
+    "transform_propagation_full_chain_root", 256, bench_transform_propagation_full_chain_root,
+  )
+  run_case(
+    "transform_propagation_dirty_chain_root", 512, bench_transform_propagation_dirty_chain_root,
+  )
+  run_case(
+    "transform_propagation_full_chain_root", 512, bench_transform_propagation_full_chain_root,
+  )
+}
+
+///|
 /// Runs the fixed ECS microbench suite.
 fn main {
   println("ecs_bench: fixed ECS microbench suite (warmup=1 measured=5)")
   run_suite(1000)
   run_suite(10000)
+  run_transform_propagation_shape_suite()
 }
