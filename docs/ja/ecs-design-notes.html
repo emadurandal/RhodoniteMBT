@@ -61,7 +61,7 @@ flowchart LR
   Blob --> Writes[GpuWriteView write drains]
   Writes --> Renderer[Renderer upload]
           </div>
-          <p><code>GlobalTransform</code> と <code>Camera</code> は CPU ref component と packed GPU blob の二層構造です。<code>GpuWriteView</code> は blob backing storage の借用 view なので、同じ blob を次に mutate / resize する前に upload まで終える必要があります。</p>
+          <p><code>GlobalTransform</code> と <code>Camera</code> は CPU ref component と packed GPU blob の二層構造です。<code>GpuWriteView</code> は blob backing storage の借用 view なので、同じ blob を次に mutate / resize する前に upload まで終える必要があります。dirty write view は drain 前に昇順へ並べ、重複または隣接 range だけを正規化するため、未変更の gap を跨いで upload せずに renderer 側の余計な queue write を避けます。</p>
 
           <h2>Removed Responsibilities</h2>
           <p>以下の責務は現在の ECS には残していません。</p>

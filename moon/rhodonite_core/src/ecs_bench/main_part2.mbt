@@ -112,6 +112,32 @@ fn bench_global_transform_by_refs_write(count : Int) -> BenchSample {
 }
 
 ///|
+/// Implements `bench_global_transform_blob_reverse_row_drain`.
+fn bench_global_transform_blob_reverse_row_drain(count : Int) -> BenchSample {
+  let (world, _, _, _, entities) = make_world_entities(count)
+  let started = monotonic_ms()
+  let mut changed = 0
+  let mut i = entities.length() - 1
+  while i >= 0 {
+    if world.set_global_transform(entities[i], bench_matrix_for_index(i + 1)) {
+      changed = changed + 1
+    }
+    i = i - 1
+  }
+  let writes = world.drain_global_transform_blob_write_views()
+  let mut uploaded = 0
+  for j = 0; j < writes.length(); j = j + 1 {
+    uploaded = uploaded + writes[j].bytes.length()
+  }
+  report(
+    "global_transform_blob_reverse_row_drain",
+    count,
+    started,
+    uploaded + writes.length() * 1000000 + changed,
+  )
+}
+
+///|
 /// Implements `bench_set_global_transform_changed`.
 fn bench_set_global_transform_changed(count : Int) -> BenchSample {
   let (world, _, _, _, entities) = make_world_entities(count)
