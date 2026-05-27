@@ -459,6 +459,58 @@ test "camera blob sync system writes from GlobalTransform and CameraLens" {
 }
 
 ///|
+test "camera blob sync system reports as direct system" {
+  let world = World::new()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/render_extract_report")
+  let runner = SystemRunner::new()
+  runner.add_system(camera_blob_sync_system(world, phase, lens))
+  let report = runner.run_phase_report(
+    world,
+    SystemContext::new((0.016 : Float), 1),
+    phase,
+  )
+  assert_true(report.ok)
+  assert_eq(report.batch_count, 1)
+  assert_eq(report.system_count, 1)
+  assert_eq(report.queued_command_count, 0)
+  assert_eq(report.applied_command_count, 0)
+  assert_eq(report.failed_command_count, 0)
+  assert_eq(report.batches[0].systems[0].name, "rhodonite/camera_blob_sync")
+  assert_eq(report.batches[0].systems[0].queued_command_count, 0)
+  assert_eq(report.batches[0].systems[0].applied_command_count, 0)
+  assert_eq(report.batches[0].systems[0].failed_command_count, 0)
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
 test "orbit camera blob sync applies orthographic dolly scale" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()

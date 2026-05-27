@@ -50,6 +50,7 @@
             <li>component 登録は system runner 実行中に lock されます。</li>
             <li><code>SystemRunner</code> は phase batches を内部 cache し、system 追加時に invalidation します。公開 plan result は snapshot のままです。</li>
             <li><code>System::new_direct</code> は <code>World</code> に直接 mutate する hot path 向けの commandless system を作ります。direct system も access guard と batching は維持しますが、<code>CommandBuffer</code> を allocate せず、直接 write は <code>WorldHistory::run_system_phase</code> で記録されません。</li>
+            <li>runtime の builtin camera blob sync system は direct system です。これらの write を <code>WorldHistory</code> 経由で記録する場合は <code>*_command_system</code> variants を使います。</li>
             <li>非 report の phase execution は、command を queue しなかった command system の command-buffer apply pass を skip します。</li>
             <li><code>SystemRunner::run_phase_report</code> は direct system と empty command buffer でも system ごとの diagnostics を出します。report は execution snapshot であり、batch order、command apply order、history behavior は変えません。</li>
             <li>builtin <code>TransformPropagation</code> system は内部 dirty queue と lazy な <code>ChildOf</code> hierarchy index を使います。dirty root は indexed subtree を parent-first に再計算し、公開 <code>World::update_global_transforms_from_transforms</code> は互換性のため full recompute API のままです。</li>
