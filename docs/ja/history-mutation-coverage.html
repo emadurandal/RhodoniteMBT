@@ -12,6 +12,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -29,6 +31,16 @@
         <article class="doc">
           <h1>履歴 Mutation Coverage</h1>
           <p class="lead">このページは ECS mutation API と Undo/Redo behavior の監査表です。mutating API を追加する場合は、このページと対応する coverage test を同時に更新します。</p>
+
+          <div class="overview">
+            <h2>このページの役割</h2>
+            <p>RhodoniteMBT では、すべての変更 API が Undo/Redo に参加するわけではありません。このページは、どの API が tracked で、どの API が raw guarded または intentionally untracked なのかを明示し、editor 向け操作と runtime hot path を混ぜないための監査表です。</p>
+          </div>
+
+          <div class="agent-note">
+            <h2>Maintainer / Agent Notes</h2>
+            <p>新しい mutating API を追加したら、MoonBit public surface、js_bridge、TypeScript wrapper、coverage ledger のどこに出るかを確認し、この分類表と test を同時に更新します。</p>
+          </div>
           <p>TypeScript wrapper も MoonBit surface と同じ分類に従います。公開 wrapper method はここに載っている tracked API へ委譲するか、raw guarded のままにするか、intentionally untracked として docs に明記し、wrapper 側で挙動を足す場合は対応する TypeScript coverage も追加します。</p>
           <p>TypeScript public wrapper surface は <code>history-mutation-coverage.test.ts</code> でも監査します。<code>World</code>、<code>WorldHistory</code>、query row、raw query archetype、<code>SystemRunner</code>、<code>CommandBuffer</code> に method を追加する場合は、その audit で tracked、tracked callback、tracked command phase、raw guarded、intentionally untracked、read-only、history-control のいずれかに分類します。</p>
           <p>同じ test は <code>pkg.generated.mbti</code> から MoonBit public surface も監査します。public ECS method を追加または削除し、<code>moon info</code> で interface を更新した後は、その test の MoonBit ledger も更新し、method に明示的な history classification を付けます。</p>

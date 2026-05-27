@@ -1,8 +1,18 @@
 # RhodoniteMBT
 
-A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser and native). Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)).
+RhodoniteMBT is a MoonBit and WebGPU 3D graphics runtime monorepo. It targets browser WebGPU and native SDL3/WebGPU, and keeps the runtime facade, ECS, WebGPU abstraction, samples, visual tests, and npm packaging in one workspace.
+
+If you are new to the project, start with:
+
+- [Getting Started](docs/en/getting-started.html): what the runtime does, the first sample to run, and the core mental model.
+- [Glossary](docs/en/glossary.html): short definitions for Engine, Scene, World, Surface, Renderer, tracked/raw, and related terms.
+- [Documentation index](docs/index.html): architecture, editing/history, and validation pages in Japanese and English.
+
+The shortest runtime model is: a platform creates a canvas/window and GPU context, `Engine` advances frames, `Scene` owns a `World`, and `Renderer` draws renderable entities into a surface.
 
 ## Modules
+
+Multiple MoonBit **modules** are joined in a workspace via the root [`moon.work`](moon.work) ([Workspace Support](https://docs.moonbitlang.com/en/latest/toolchain/moon/workspace.html)). Most users enter through the public facade and samples; lower modules exist to keep runtime, CPU-only data, WebGPU objects, and native platform helpers separated.
 
 | Module | Description |
 |--------|-------------|
@@ -13,7 +23,7 @@ A monorepo of 3D graphics library RhodoniteMBT using MoonBit and WebGPU (browser
 | `emadurandal/rhodonite_webgpu` | WebGPU abstraction |
 | `emadurandal/rhodonite_examples` | Samples |
 
-See [docs/en/module-boundaries.html](docs/en/module-boundaries.html) for boundaries and publishing notes.
+See [docs/en/module-boundaries.html](docs/en/module-boundaries.html) for dependency boundaries, release units, and publishing notes.
 
 ## Development (workspace)
 

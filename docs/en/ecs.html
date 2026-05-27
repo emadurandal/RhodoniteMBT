@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -31,7 +33,16 @@
           <h1>ECS</h1>
           <p class="lead"><a href="../../moon/rhodonite_core/src/ecs/"><code>emadurandal/rhodonite_core/ecs</code></a> is an archetype-based ECS. Arbitrary component storage is CPU-only SoA; renderer upload bytes are handled by builtin packed blob stores.</p>
 
+          <div class="overview">
+            <h2>If You Are New To ECS</h2>
+            <p>ECS represents objects as entity IDs plus component data, rather than as class hierarchies. RhodoniteMBT's <code>World</code> stores entities and components; systems query for the component sets they need and update matching entities. SoA storage and blobs are implementation details for performance and GPU uploads.</p>
+          </div>
+
           <h2>Storage Model</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>The rest of this page covers storage, queries, system access, and camera-control details. For runtime behavior, history recording, or TypeScript wrapper changes, check this page together with mutation coverage and serialization docs.</p>
+          </div>
           <div class="mermaid">
 flowchart LR
   W[World] --> R[ComponentRegistry]

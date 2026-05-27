@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Engine / Scene Architecture</h1>
           <p class="lead">The current runtime lives in the public facade package <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a>. The older prototype and phase-plan text is obsolete; examples now use the facade runtime directly.</p>
+
+          <div class="overview">
+            <h2>Start Here</h2>
+            <p><code>Engine</code> advances the application's frames. <code>Scene</code> owns the world being updated and rendered. <code>Surface</code> represents a canvas/window destination with local input. Most samples let a platform runner create the Engine, attach a Scene, and then drive update and render each frame.</p>
+          </div>
 
           <h2>Runtime Ownership</h2>
           <div class="mermaid">
@@ -63,6 +70,10 @@ flowchart TB
           </table>
 
           <h2>Phase Groups</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>Phase order, handler registration, surface suspension, and on-demand rendering are the sensitive details when runtime behavior changes. For simple sample reading, treat <code>Engine::on_scene_update</code> and <code>Engine::on_scene_render</code> as the normal entry points.</p>
+          </div>
           <div class="mermaid">
 flowchart TD
   A["rhodonite/frame_begin"] --> A1["rhodonite/surface"]

@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>入力アーキテクチャ</h1>
           <p class="lead">入力は platform-independent な <a href="../../moon/rhodonite_core/src/input/"><code>emadurandal/rhodonite_core/input</code></a> と、browser / SDL3 adapters に分けます。gameplay code は DOM や SDL3 型を直接見ません。</p>
+
+          <div class="overview">
+            <h2>入力の基本</h2>
+            <p>browser と native では event の形が違いますが、RhodoniteMBT はどちらも <code>InputState</code> に正規化します。gameplay や camera controller は DOM/SDL3 を直接読まず、frame ごとの key、mouse、pointer、wheel state を読みます。</p>
+          </div>
 
           <h2>Event Flow</h2>
           <div class="mermaid">
@@ -73,6 +80,10 @@ rhodonite/render_frame:
   rhodonite/present</code></pre>
 
           <h2>Adapters</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>adapter を変更する場合は、browser と SDL3 が同じ <code>KeyCode</code> / pointer coordinate model に揃っているか確認します。multi-surface sample では surface-local input の分離も regression 対象です。</p>
+          </div>
           <ul>
             <li>Browser MoonBit adapter は <code>emadurandal/rhodonite/app/browser</code> にあります。<code>install_browser_input</code>、<code>install_browser_surface_input</code>、platform runner が DOM events を <code>InputState</code> へ enqueue します。</li>
             <li>Browser TypeScript adapter は <code>rhodonite-mbt/app</code> の <code>installBrowserInputCallbacks</code> / <code>installBrowserInput</code> を使います。</li>

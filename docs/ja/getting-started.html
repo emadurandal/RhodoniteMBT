@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>はじめに - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/getting-started.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>はじめに</h1>
+          <p class="lead">RhodoniteMBT は MoonBit と WebGPU で 3D graphics runtime を作るための monorepo です。browser と native SDL3 の両方を対象にし、sample、runtime、ECS、renderer、test harness を同じ workspace で管理します。</p>
+
+          <div class="overview">
+            <h2>最初に覚えるモデル</h2>
+            <p>RhodoniteMBT の実行時は、platform が canvas/window と GPU を用意し、<code>Engine</code> が frame を進め、<code>Scene</code> が表示対象の world を持ち、<code>Renderer</code> が scene の renderable data を WebGPU draw call に変換します。</p>
+          </div>
+
+          <div class="mermaid">
+flowchart LR
+  P[Browser or SDL3 platform] --> E[Engine]
+  E --> S[Scene]
+  S --> W[World / ECS data]
+  W --> R[Renderable entities]
+  E --> G[Renderer]
+  G --> T[Canvas or window surface]
+          </div>
+
+          <h2>まず動かす</h2>
+          <p>repository root から依存関係を入れ、browser sample を起動します。WebGPU が使える browser で画面が出れば、runtime、sample build、browser platform path が一通り動いています。</p>
+          <pre><code class="language-bash">pnpm install
+pnpm run dev:js:ecs-scene-graph</code></pre>
+          <p>native path を見る場合は SDL3 を入れたうえで native sample を実行します。</p>
+          <pre><code class="language-bash">pnpm run dev:native:ecs-scene-graph</code></pre>
+
+          <h2>読む順番</h2>
+          <ol>
+            <li><a href="./glossary.html">用語集</a>で、<code>Engine</code>、<code>Scene</code>、<code>World</code>、<code>Surface</code> などの名前を確認します。</li>
+            <li><a href="./engine-scene-architecture.html">Engine / Scene</a>で、frame がどの順番で処理されるかを掴みます。</li>
+            <li><a href="./rendering.html">描画</a>で、mesh/material/renderable が画面に出る流れを確認します。</li>
+            <li><a href="./ecs.html">ECS</a>で、entity と component をどう保持・検索するかを見ます。</li>
+          </ol>
+
+          <h2>この repository の見方</h2>
+          <p>実際に使う facade は <code>moon/rhodonite</code>、低レベルな ECS や math は <code>moon/rhodonite_core</code>、WebGPU wrapper は <code>moon/rhodonite_webgpu</code>、実行例は <code>moon/rhodonite_examples</code> にあります。module の境界や publish 単位は <a href="./module-boundaries.html">モジュール境界</a> にまとめています。</p>
+
+          <div class="agent-note">
+            <h2>Agent 向け</h2>
+            <p>コード変更時は、該当する docs と code を同じ変更で同期します。公開 API、runtime behavior、build/test/publish 手順、sample rendering に触れる場合は、関連する architecture page と README の導線が古くならないか確認します。</p>
+          </div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

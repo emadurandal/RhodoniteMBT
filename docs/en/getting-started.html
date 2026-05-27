@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Getting Started - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+    <script type="module" src="../assets/mermaid-init.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">History Serialization</a>
+        <a href="./history-mutation-coverage.html">History Mutation Coverage</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/getting-started.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Getting Started</h1>
+          <p class="lead">RhodoniteMBT is a MoonBit and WebGPU monorepo for building a 3D graphics runtime. It targets both browsers and native SDL3, and keeps samples, runtime code, ECS, rendering, and test harnesses in one workspace.</p>
+
+          <div class="overview">
+            <h2>The First Mental Model</h2>
+            <p>At runtime, a platform creates the canvas/window and GPU context, <code>Engine</code> advances frames, <code>Scene</code> owns the world being displayed, and <code>Renderer</code> turns renderable scene data into WebGPU draw calls.</p>
+          </div>
+
+          <div class="mermaid">
+flowchart LR
+  P[Browser or SDL3 platform] --> E[Engine]
+  E --> S[Scene]
+  S --> W[World / ECS data]
+  W --> R[Renderable entities]
+  E --> G[Renderer]
+  G --> T[Canvas or window surface]
+          </div>
+
+          <h2>Run Something First</h2>
+          <p>From the repository root, install dependencies and start a browser sample. If it renders in a WebGPU-capable browser, the runtime, sample build, and browser platform path are working together.</p>
+          <pre><code class="language-bash">pnpm install
+pnpm run dev:js:ecs-scene-graph</code></pre>
+          <p>For the native path, install SDL3 first and then run the matching native sample.</p>
+          <pre><code class="language-bash">pnpm run dev:native:ecs-scene-graph</code></pre>
+
+          <h2>Suggested Reading Order</h2>
+          <ol>
+            <li>Use the <a href="./glossary.html">Glossary</a> to map names such as <code>Engine</code>, <code>Scene</code>, <code>World</code>, and <code>Surface</code>.</li>
+            <li>Read <a href="./engine-scene-architecture.html">Engine / Scene</a> to understand frame ownership and phase order.</li>
+            <li>Read <a href="./rendering.html">Rendering</a> to see how meshes, materials, and renderables reach the screen.</li>
+            <li>Read <a href="./ecs.html">ECS</a> to understand how entities and components are stored and queried.</li>
+          </ol>
+
+          <h2>How To Read This Repository</h2>
+          <p>The facade most users touch lives in <code>moon/rhodonite</code>, low-level ECS and math live in <code>moon/rhodonite_core</code>, WebGPU wrappers live in <code>moon/rhodonite_webgpu</code>, and runnable examples live in <code>moon/rhodonite_examples</code>. Module boundaries and release units are described in <a href="./module-boundaries.html">Module Boundaries</a>.</p>
+
+          <div class="agent-note">
+            <h2>For Agents</h2>
+            <p>When code changes, keep the matching docs in the same change. For public APIs, runtime behavior, build/test/publish steps, or sample rendering changes, check whether the related architecture page and README entry points still describe the current system.</p>
+          </div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

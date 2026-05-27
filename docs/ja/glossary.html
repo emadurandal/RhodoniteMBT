@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>用語集 - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">Japanese</p>
+        <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
+        <a href="./module-boundaries.html">モジュール境界</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">描画</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">履歴シリアライズ</a>
+        <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a>
+        <a href="./input-architecture.html">入力</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">English</p>
+        <a href="../en/glossary.html">English version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>用語集</h1>
+          <p class="lead">RhodoniteMBT の docs とコードでよく出る名前を、最初に読む人向けに短くまとめます。詳細な設計や制約は各参照ページに分けています。</p>
+
+          <table>
+            <thead><tr><th>用語</th><th>意味</th><th>主な参照先</th></tr></thead>
+            <tbody>
+              <tr><td><code>Engine</code></td><td>frame の進行、scene、surface、input、renderer、phase handler をまとめて所有する runtime object。</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td><code>Scene</code></td><td>表示や更新の単位。1つの <code>World</code>、system runner、main camera、enabled/visible state を持つ。</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td><code>World</code></td><td>ECS storage。entity、component、archetype、builtin blob store を持つが、GPU resource や platform loop は持たない。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>ECS</td><td>Entity Component System。object を entity ID と component data の組み合わせとして扱い、system が query して更新する方式。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>Entity</td><td>scene 内の1つの対象を指す ID。component を付けることで transform、renderable、camera などの性質を持つ。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>Component</td><td>entity に付く data の種類。例として <code>Transform3D</code>、<code>GlobalTransform</code>、<code>Camera</code>、<code>Renderable</code> がある。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>System</td><td>特定の phase で ECS data を読む・書く処理。query と command buffer を使って world を更新する。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td><code>Renderer</code></td><td>scene から renderable entity を取り出し、登録済み mesh/material と GPU resource を使って描画する object。</td><td><a href="./rendering.html">描画</a></td></tr>
+              <tr><td><code>Renderable</code></td><td>描画対象であることを示す component。mesh handle、material handle、visibility などを renderer に渡す。</td><td><a href="./rendering.html">描画</a></td></tr>
+              <tr><td>Surface</td><td>canvas や native window のような描画先。surface ごとに input と render target resources を持つ。</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td>Phase</td><td>1 frame 内の処理順序を表す名前。input、update、render extract、render、present などがある。</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td>Blob</td><td>GPU upload 向けの packed bytes。<code>GlobalTransform</code> や <code>Camera</code> の大きな行 data を component row から分けて保持する。</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td><code>WorldHistory</code></td><td><code>World</code> の変更を undo/redo できるよう記録する optional layer。</td><td><a href="./undo-redo.html">Undo / Redo</a></td></tr>
+              <tr><td>tracked / raw</td><td>tracked API は履歴に記録され、raw API は直接 world を変更する。editor 操作では tracked、runtime hot path では raw を使うことが多い。</td><td><a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a></td></tr>
+            </tbody>
+          </table>
+
+          <div class="agent-note">
+            <h2>Agent 向け</h2>
+            <p>この用語集は説明の入口であり、正確な API surface や例外条件の一覧ではありません。変更時は各 architecture page と coverage / serialization page の詳細を優先して確認します。</p>
+          </div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

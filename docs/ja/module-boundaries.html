@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>モジュール境界</h1>
           <p class="lead">RhodoniteMBT は root <a href="../../moon.work"><code>moon.work</code></a> で結合された MoonBit workspace です。各 module は公開責務を分け、examples は release 対象から外します。</p>
+
+          <div class="overview">
+            <h2>このページの読み方</h2>
+            <p>まず「どの directory が何を担当するか」を掴むためのページです。RhodoniteMBT を使うだけなら facade の <code>emadurandal/rhodonite</code> と samples を中心に見れば十分です。低レベル module は、CPU-only logic、WebGPU wrapper、native SDL3 runtime を分けて保守するためにあります。</p>
+          </div>
 
           <h2>Workspace Modules</h2>
           <table>
@@ -73,6 +80,10 @@ flowchart LR
           </ul>
 
           <h2>Release Units</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>ここから先は release、npm package、検証コマンドのための保守者向け情報です。module dependency や package entrypoint を変える場合は、この表、README、関連 scripts を同じ変更で同期します。</p>
+          </div>
           <p>Mooncakes publish は dependency order で行います。root script は workspace の path deps を一時的に registry version へ書き換え、publish 後に戻します。</p>
           <ol>
             <li><code>emadurandal/sdl3</code></li>

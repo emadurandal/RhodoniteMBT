@@ -12,6 +12,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -29,6 +31,11 @@
         <article class="doc">
           <h1>Undo / Redo</h1>
           <p class="lead">Undo/Redo は <code>World</code> の上に置く optional な tracked transaction layer として実装します。低レベル ECS mutation API は履歴を持たず、従来の hot path を維持します。</p>
+
+          <div class="overview">
+            <h2>何のための仕組みか</h2>
+            <p>editor や importer のように「この変更を戻したい」操作では、<code>World</code> を直接変更せず <code>WorldHistory</code> の tracked API を使います。runtime animation や simulation のように履歴が不要な処理は raw API を使い、記録コストを避けます。</p>
+          </div>
 
           <h2>Model</h2>
           <ul>
@@ -69,6 +76,10 @@ ignore(history.redo(world))</code></pre>
           </ul>
 
           <h2>Raw Mutation Guard</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>ここから先は raw mutation の検出、command buffer、TypeScript wrapper、diagnostics、serialization など、API 追加時に壊れやすい領域です。mutating API を追加する場合は <a href="./history-mutation-coverage.html">履歴 Mutation Coverage</a> も更新します。</p>
+          </div>
           <p><code>WorldHistory</code> は optional に transaction を guard できます。これにより、履歴を通さない raw <code>World</code> mutation を silently に見逃さず、即 abort できます。<code>set_raw_mutation_guard_enabled(true)</code> で有効化し、<code>begin_guarded_transaction(world, label)</code> で transaction を開始します。この transaction 中は tracked な <code>WorldHistory</code> API または tracked query write callback で編集します。直接の <code>World</code> mutation、raw <code>SystemRunner::run_phase</code>、raw <code>World::spawn_batch</code>、mutable query view、raw query column view は commit/cancel まで abort します。</p>
           <pre><code class="language-moonbit">history.set_raw_mutation_guard_enabled(true)
 ignore(history.begin_guarded_transaction(world, "Edit"))

@@ -12,6 +12,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">English</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
         <a href="./module-boundaries.html">Module Boundaries</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">Rendering</a>
@@ -29,6 +31,16 @@
         <article class="doc">
           <h1>History Mutation Coverage</h1>
           <p class="lead">This page is the audit table for ECS mutation APIs and their Undo/Redo behavior. When adding a mutating API, update this page and add or extend the matching coverage test.</p>
+
+          <div class="overview">
+            <h2>Purpose Of This Page</h2>
+            <p>Not every mutation API participates in Undo/Redo. This page makes it explicit which APIs are tracked, raw guarded, or intentionally untracked, so editor-facing operations and runtime hot paths stay separated.</p>
+          </div>
+
+          <div class="agent-note">
+            <h2>Maintainer / Agent Notes</h2>
+            <p>When adding a mutating API, check whether it appears in the MoonBit public surface, js_bridge, TypeScript wrapper, and coverage ledger, then update this classification table and tests in the same change.</p>
+          </div>
           <p>The TypeScript wrapper follows the same classification as the MoonBit surface. Public wrapper methods should either delegate to the tracked API listed here, remain raw guarded, or be documented as intentionally untracked with matching TypeScript coverage when the wrapper adds behavior.</p>
           <p>The TypeScript public wrapper surface is also checked by <code>history-mutation-coverage.test.ts</code>. If a method is added to <code>World</code>, <code>WorldHistory</code>, query rows, raw query archetypes, <code>SystemRunner</code>, or <code>CommandBuffer</code>, classify it in that audit as tracked, tracked callback, tracked command phase, raw guarded, intentionally untracked, read-only, or history-control.</p>
           <p>The same test audits the MoonBit public surface from <code>pkg.generated.mbti</code>. After adding or removing a public ECS method and refreshing interfaces with <code>moon info</code>, update the MoonBit ledger in that test so the method has an explicit history classification.</p>

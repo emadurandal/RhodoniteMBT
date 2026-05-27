@@ -13,6 +13,8 @@
         <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
         <p class="subtitle">Japanese</p>
         <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">はじめに</a>
+        <a href="./glossary.html">用語集</a>
         <a href="./module-boundaries.html">モジュール境界</a>
         <a href="./engine-scene-architecture.html">Engine / Scene</a>
         <a href="./rendering.html">描画</a>
@@ -30,6 +32,11 @@
         <article class="doc">
           <h1>Rendering Architecture</h1>
           <p class="lead">描画の詳細は facade runtime の <a href="../../moon/rhodonite/src/app/"><code>emadurandal/rhodonite/app</code></a> にあります。現在の renderer は unlit static mesh と sample-driven instancing のための narrow な v1 path です。</p>
+
+          <div class="overview">
+            <h2>描画の基本</h2>
+            <p>RhodoniteMBT では、scene 内の entity に <code>Renderable</code> と transform data を持たせ、Renderer に mesh と material を登録します。frame の render phase で Renderer が該当 entity を集め、登録済み resource を使って surface の render target へ描画します。</p>
+          </div>
 
           <h2>Renderer v1</h2>
           <p><code>Renderer</code> は <code>Engine</code> が所有し、device-wide GPU resources を所有します。visible <code>Renderable + GlobalTransform</code> entity を query し、scene main camera の builtin Camera blob と GlobalTransform blob を upload して、caller-supplied <code>RenderTargetResources</code> へ unlit static indexed mesh を描画します。</p>
@@ -59,6 +66,10 @@ flowchart TB
           </ul>
 
           <h2>Resource Registration</h2>
+          <div class="agent-note">
+            <h3>Maintainer / Agent Notes</h3>
+            <p>Undo/Redo が復元するのは ECS component bytes であり、Renderer-owned GPU resource ではありません。renderable や asset lifetime を変える場合は、history page とこの resource registration policy を同時に確認します。</p>
+          </div>
           <p><code>Renderable</code> は mesh/material handle 値を ECS に保存しますが、その handle は Renderer-owned table を指します。Undo/Redo は Renderable component bytes を復元できますが、mesh、material、instance buffer、その他 GPU resource は再作成しません。renderable の履歴を保持する application は、resource handle が history record より長く生きることを保証するか、Renderer の上位に asset/resource history を追加する必要があります。</p>
           <p>editor operation では <code>WorldHistory</code> と一緒に <code>add_renderable_tracked</code>、<code>set_renderable_tracked</code>、<code>remove_renderable_tracked</code> を使います。raw な <code>add_renderable</code> と <code>set_renderable</code> は direct ECS mutation のままです。</p>
           <table>

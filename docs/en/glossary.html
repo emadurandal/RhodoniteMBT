@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Glossary - RhodoniteMBT</title>
+    <link rel="stylesheet" href="../assets/docs.css">
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar">
+        <p class="brand"><a href="../index.html">RhodoniteMBT Docs</a></p>
+        <p class="subtitle">English</p>
+        <p class="nav-section">Documents</p>
+        <a href="./getting-started.html">Getting Started</a>
+        <a href="./glossary.html">Glossary</a>
+        <a href="./module-boundaries.html">Module Boundaries</a>
+        <a href="./engine-scene-architecture.html">Engine / Scene</a>
+        <a href="./rendering.html">Rendering</a>
+        <a href="./ecs.html">ECS</a>
+        <a href="./undo-redo.html">Undo / Redo</a>
+        <a href="./history-serialization.html">History Serialization</a>
+        <a href="./history-mutation-coverage.html">History Mutation Coverage</a>
+        <a href="./input-architecture.html">Input</a>
+        <a href="./visual-regression-tests.html">Visual Regression</a>
+        <a href="./ecs-design-notes.html">ECS Design Notes</a>
+        <p class="nav-section">Japanese</p>
+        <a href="../ja/glossary.html">Japanese version</a>
+      </nav>
+      <main class="content">
+        <article class="doc">
+          <h1>Glossary</h1>
+          <p class="lead">This page gives short definitions for names that appear throughout RhodoniteMBT docs and code. Detailed design rules and edge cases live in the referenced pages.</p>
+
+          <table>
+            <thead><tr><th>Term</th><th>Meaning</th><th>Primary Reference</th></tr></thead>
+            <tbody>
+              <tr><td><code>Engine</code></td><td>Runtime object that owns frame progression, scenes, surfaces, input, renderer, and phase handlers.</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td><code>Scene</code></td><td>A unit of update and rendering. It has one <code>World</code>, a system runner, a main camera, and enabled/visible state.</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td><code>World</code></td><td>ECS storage for entities, components, archetypes, and builtin blob stores. It does not own GPU resources or platform loops.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>ECS</td><td>Entity Component System: data is attached to entity IDs as components, and systems query that data to update behavior.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>Entity</td><td>An ID for one object in a scene. Components give it properties such as transform, renderable state, or camera state.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>Component</td><td>A kind of data attached to an entity, such as <code>Transform3D</code>, <code>GlobalTransform</code>, <code>Camera</code>, or <code>Renderable</code>.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td>System</td><td>Code that runs in a phase, reads or writes ECS data, and may queue world mutations through a command buffer.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td><code>Renderer</code></td><td>Object that extracts renderable entities from a scene and draws them with registered meshes, materials, and GPU resources.</td><td><a href="./rendering.html">Rendering</a></td></tr>
+              <tr><td><code>Renderable</code></td><td>Component that marks an entity as drawable and points the renderer at mesh/material handles and visibility state.</td><td><a href="./rendering.html">Rendering</a></td></tr>
+              <tr><td>Surface</td><td>A rendering destination such as a browser canvas or native window. Each surface has local input and render target resources.</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td>Phase</td><td>A named step inside a frame, such as input, update, render extract, render, and present.</td><td><a href="./engine-scene-architecture.html">Engine / Scene</a></td></tr>
+              <tr><td>Blob</td><td>Packed bytes used for GPU uploads. Large builtin rows such as <code>GlobalTransform</code> and <code>Camera</code> live outside ordinary component rows.</td><td><a href="./ecs.html">ECS</a></td></tr>
+              <tr><td><code>WorldHistory</code></td><td>Optional layer that records <code>World</code> mutations so editor-style actions can be undone and redone.</td><td><a href="./undo-redo.html">Undo / Redo</a></td></tr>
+              <tr><td>tracked / raw</td><td>Tracked APIs record history; raw APIs mutate the world directly. Editors usually use tracked APIs, while runtime hot paths often use raw APIs.</td><td><a href="./history-mutation-coverage.html">History Mutation Coverage</a></td></tr>
+            </tbody>
+          </table>
+
+          <div class="agent-note">
+            <h2>For Agents</h2>
+            <p>This glossary is an entry point, not a complete API contract. For changes, prefer the detailed architecture, coverage, and serialization pages as the source of truth.</p>
+          </div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>
