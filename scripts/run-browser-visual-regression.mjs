@@ -131,7 +131,7 @@ try {
 
 	const result = await withTimeout(resultPromise, 30000, "browser visual regression timed out").catch(
 		(error) => {
-			if (error instanceof Error && error.message.includes("timed out")) {
+			if (error instanceof TimeoutError) {
 				return {
 					ok: true,
 					skipped: true,
@@ -203,9 +203,16 @@ try {
 function withTimeout(promise, ms, message) {
 	let timer;
 	const timeout = new Promise((_, reject) => {
-		timer = setTimeout(() => reject(new Error(message)), ms);
+		timer = setTimeout(() => reject(new TimeoutError(message)), ms);
 	});
 	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+class TimeoutError extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "TimeoutError";
+	}
 }
 
 function formatFailure(error) {
