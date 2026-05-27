@@ -12,7 +12,15 @@ export function createBrowserLauncher() {
 	if (!browserPath) {
 		return undefined;
 	}
-	return async ({ args, headless, url, userDataDir, verbose, logPrefix }) => {
+	return async ({
+		args,
+		attachPageDiagnostics = defaultPageDiagnostics,
+		headless,
+		url,
+		userDataDir,
+		verbose,
+		logPrefix,
+	}) => {
 		assertSafeArgs(args);
 		const context = await chromium.launchPersistentContext(userDataDir, {
 			args,
@@ -21,19 +29,7 @@ export function createBrowserLauncher() {
 		});
 		try {
 			const page = context.pages()[0] ?? await context.newPage();
-			if (verbose) {
-				page.on("console", (message) => {
-					console.log(`${logPrefix}: console ${message.type()} ${message.text()}`);
-				});
-				page.on("pageerror", (error) => {
-					console.error(`${logPrefix}: pageerror ${error.message}`);
-				});
-				page.on("requestfailed", (request) => {
-					console.error(
-						`${logPrefix}: requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`,
-					);
-				});
-			}
+			attachPageDiagnostics({ context, page, verbose, logPrefix });
 			await page.goto(url);
 			return { context, page };
 		} catch (error) {
@@ -41,6 +37,23 @@ export function createBrowserLauncher() {
 			throw error;
 		}
 	};
+}
+
+function defaultPageDiagnostics({ page, verbose, logPrefix }) {
+	if (!verbose) {
+		return;
+	}
+	page.on("console", (message) => {
+		console.log(`${logPrefix}: console ${message.type()} ${message.text()}`);
+	});
+	page.on("pageerror", (error) => {
+		console.error(`${logPrefix}: pageerror ${error.message}`);
+	});
+	page.on("requestfailed", (request) => {
+		console.error(
+			`${logPrefix}: requestfailed ${request.url()} ${request.failure()?.errorText ?? ""}`,
+		);
+	});
 }
 
 function findBrowserExecutable() {

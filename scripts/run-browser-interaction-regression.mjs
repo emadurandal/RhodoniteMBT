@@ -106,6 +106,14 @@ try {
 	];
 	try {
 		const browser = await launchBrowser({
+			attachPageDiagnostics: ({ context, page }) => {
+				getBrowserDiagnostics = attachBrowserDiagnostics(
+					context,
+					page,
+					verbose,
+					rejectResult,
+				);
+			},
 			args: browserArgs,
 			headless,
 			logPrefix: "interaction_regression(browser)",
@@ -114,12 +122,6 @@ try {
 			verbose: false,
 		});
 		browserContext = browser.context;
-		getBrowserDiagnostics = attachBrowserDiagnostics(
-			browser.context,
-			browser.page,
-			verbose,
-			rejectResult,
-		);
 	} catch (error) {
 		rejectResult(error);
 	}
