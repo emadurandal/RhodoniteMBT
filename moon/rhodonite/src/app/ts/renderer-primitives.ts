@@ -415,7 +415,7 @@ export function sceneRenderableComponent(scene: Scene<World, EntityId>): Compone
 	if (existing !== undefined && existing.world === world) {
 		return existing.id;
 	}
-	const id = world.registerCpuComponent(
+	const id = world.registerComponent(
 		RENDERABLE_COMPONENT_NAME,
 		RENDERABLE_COMPONENT_STRIDE,
 	);

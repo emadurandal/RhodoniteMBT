@@ -4,8 +4,8 @@
 ///|
 test "CommandBuffer applies queued structural changes after query" {
   let world = World::new()
-  let qa = world.register_cpu_component("CommandBufferA", 4)
-  let qb = world.register_cpu_component("CommandBufferB", 4)
+  let qa = world.register_component("CommandBufferA", 4)
+  let qb = world.register_component("CommandBufferB", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let query = Query::new([qa])
@@ -47,7 +47,7 @@ test "CommandBuffer applies queued structural changes after query" {
 ///|
 test "CommandBuffer applies queued component writes and reports failed commands" {
   let world = World::new()
-  let qa = world.register_cpu_component("CommandBufferWriteA", 4)
+  let qa = world.register_component("CommandBufferWriteA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let missing = EntityId::new(e.index + 100, 0)
@@ -83,7 +83,7 @@ test "CommandBuffer applies queued component writes and reports failed commands"
 ///|
 test "SystemRunner run_phase_report exposes command apply failures" {
   let world = World::new()
-  let qa = world.register_cpu_component("CommandBufferReportA", 4)
+  let qa = world.register_component("CommandBufferReportA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
   let missing = EntityId::new(e.index + 100, 0)
@@ -133,7 +133,7 @@ test "SystemRunner run_phase_report exposes command apply failures" {
 ///|
 test "SystemRunner run_phase_report reports successful command counts" {
   let world = World::new()
-  let qa = world.register_cpu_component("CommandBufferReportSuccessA", 4)
+  let qa = world.register_component("CommandBufferReportSuccessA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
   let runner = SystemRunner::new()
@@ -174,8 +174,8 @@ test "SystemRunner run_phase_report returns empty success for empty phase" {
 ///|
 test "CommandBuffer create_entity reserves id and applies components after query" {
   let world = World::new()
-  let qa = world.register_cpu_component("CommandCreateSource", 4)
-  let qb = world.register_cpu_component("CommandCreateSpawned", 4)
+  let qa = world.register_component("CommandCreateSource", 4)
+  let qb = world.register_component("CommandCreateSpawned", 4)
   let source = world.create_entity()
   assert_true(world.add_component_bytes(source, qa, bytes4(1, 2, 3, 4)))
   let query = Query::new([qa])
@@ -220,7 +220,7 @@ test "CommandBuffer create_entity reserves id and applies components after query
 test "WorldHistory tracks CommandBuffer component writes through system phase" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandWriteA", 4)
+  let qa = world.register_component("HistoryCommandWriteA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 1, 1, 1)))
   let runner = SystemRunner::new()
@@ -432,10 +432,8 @@ test "WorldHistory tracks CommandBuffer builtin blob writes through system phase
 test "WorldHistory tracks CommandBuffer create with reserved entity id" {
   let world = World::new()
   let history = WorldHistory::new()
-  let source_component = world.register_cpu_component("HistoryCommandSource", 4)
-  let spawned_component = world.register_cpu_component(
-    "HistoryCommandSpawned", 4,
-  )
+  let source_component = world.register_component("HistoryCommandSource", 4)
+  let spawned_component = world.register_component("HistoryCommandSpawned", 4)
   let source = world.create_entity()
   assert_true(
     world.add_component_bytes(source, source_component, bytes4(1, 2, 3, 4)),
@@ -490,7 +488,7 @@ test "WorldHistory tracks CommandBuffer create with reserved entity id" {
 test "WorldHistory keeps successful CommandBuffer deltas when a later command fails" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandPartialA", 4)
+  let qa = world.register_component("HistoryCommandPartialA", 4)
   let e = world.create_entity()
   let missing = EntityId::new(e.index + 100, 0)
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
@@ -526,7 +524,7 @@ test "WorldHistory keeps successful CommandBuffer deltas when a later command fa
 test "WorldHistory run_system_phase_report exposes tracked command failures" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandReportA", 4)
+  let qa = world.register_component("HistoryCommandReportA", 4)
   let e = world.create_entity()
   let missing = EntityId::new(e.index + 100, 0)
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
@@ -566,7 +564,7 @@ test "WorldHistory run_system_phase_report exposes tracked command failures" {
 test "WorldHistory groups multiple tracked system phases in one open transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandMultiA", 4)
+  let qa = world.register_component("HistoryCommandMultiA", 4)
   let e = world.create_entity()
   let phase_a = PhaseKey::new("history-command-phase-a")
   let phase_b = PhaseKey::new("history-command-phase-b")
@@ -612,7 +610,7 @@ test "WorldHistory groups multiple tracked system phases in one open transaction
 test "WorldHistory releases temporary command-buffer guard inside normal transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandTemporaryGuardA", 4)
+  let qa = world.register_component("HistoryCommandTemporaryGuardA", 4)
   let e = world.create_entity()
   let phase = PhaseKey::new("history-command-temporary-guard")
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
@@ -643,7 +641,7 @@ test "WorldHistory releases temporary command-buffer guard inside normal transac
 test "WorldHistory keeps command-buffer guard inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
-  let qa = world.register_cpu_component("HistoryCommandStickyGuardA", 4)
+  let qa = world.register_component("HistoryCommandStickyGuardA", 4)
   let e = world.create_entity()
   let phase = PhaseKey::new("history-command-sticky-guard")
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))

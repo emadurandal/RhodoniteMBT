@@ -86,7 +86,7 @@ let default_max_dolly : Double = 4.0
 pub fn register_orbit_camera_controller_component(
   world : @ecs.World,
 ) -> @ecs.ComponentTypeId {
-  world.register_cpu_component(
+  world.register_component(
     "OrbitCameraController", orbit_camera_controller_stride,
   )
 }

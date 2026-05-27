@@ -4,7 +4,7 @@
 ///|
 test "SystemRunner permits set_component_bytes without structural write" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemRunnerSetComponentA", 4)
+  let qa = world.register_component("SystemRunnerSetComponentA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let runner = SystemRunner::new()
@@ -75,7 +75,7 @@ test "SystemRunner permits set_global_transform update with GlobalTransform writ
 ///|
 test "SystemRunner runs direct systems without command buffers" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemRunnerDirectA", 4)
+  let qa = world.register_component("SystemRunnerDirectA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let runner = SystemRunner::new()
@@ -102,7 +102,7 @@ test "SystemRunner runs direct systems without command buffers" {
 ///|
 test "SystemRunner reports direct systems as empty command reports" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemRunnerDirectReportA", 4)
+  let qa = world.register_component("SystemRunnerDirectReportA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 0, 0, 0)))
   let runner = SystemRunner::new()
@@ -195,8 +195,8 @@ test "SystemRunner convenience setters return false for missing components witho
 ///|
 test "SystemRunner runs systems by phase and applies commands after conflict-free batches" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemRunnerA", 4)
-  let qb = world.register_cpu_component("SystemRunnerB", 4)
+  let qa = world.register_component("SystemRunnerA", 4)
+  let qb = world.register_component("SystemRunnerB", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let order : Array[Int] = []
@@ -263,7 +263,7 @@ test "SystemRunner::run_phase temporarily locks component registration" {
   )
   assert_true(locked_during_run)
   assert_true(!world.component_registration_locked())
-  let late = world.register_cpu_component("RegisteredAfterRunnerRun", 4)
+  let late = world.register_component("RegisteredAfterRunnerRun", 4)
   assert_true(late.index >= 0)
 }
 
@@ -301,8 +301,8 @@ test "transform_propagation_system updates GlobalTransform in a system runner" {
 ///|
 test "System access arrays are copied" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemAccessA", 4)
-  let qb = world.register_cpu_component("SystemAccessB", 4)
+  let qa = world.register_component("SystemAccessA", 4)
+  let qb = world.register_component("SystemAccessB", 4)
   let reads : Array[ComponentTypeId] = [qa]
   let writes : Array[ComponentTypeId] = [qb]
   let system = System::new("copy-access", update_phase(), reads, writes, (
@@ -322,8 +322,8 @@ test "System access arrays are copied" {
 ///|
 test "System conflict helpers detect same-phase access overlaps" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemConflictA", 4)
-  let qb = world.register_cpu_component("SystemConflictB", 4)
+  let qa = world.register_component("SystemConflictA", 4)
+  let qb = world.register_component("SystemConflictB", 4)
   let read_a = System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => {
     ()
   })
@@ -355,8 +355,8 @@ test "System conflict helpers detect same-phase access overlaps" {
 ///|
 test "SystemRunner::plan_phase exposes conflict-free execution batches" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemPlanA", 4)
-  let qb = world.register_cpu_component("SystemPlanB", 4)
+  let qa = world.register_component("SystemPlanA", 4)
+  let qb = world.register_component("SystemPlanB", 4)
   let runner = SystemRunner::new()
   runner.add_system(
     System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => ()),
@@ -418,7 +418,7 @@ test "SystemRunner::plan_phase isolates structural writes" {
 ///|
 test "SystemRunner::plan_phase returns empty and snapshot plans" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemPlanSnapshotA", 4)
+  let qa = world.register_component("SystemPlanSnapshotA", 4)
   let runner = SystemRunner::new()
   runner.add_system(
     System::new("snapshot", update_phase(), [qa], [], (_w, _c, _b) => ()),
@@ -486,7 +486,7 @@ test "SystemRunner phase batch cache stays isolated by phase and run path" {
 ///|
 test "System writes declaration also permits reads during system runner execution" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemWriteCanReadA", 4)
+  let qa = world.register_component("SystemWriteCanReadA", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   let mut saw_first = (0 : Byte)
@@ -512,8 +512,8 @@ test "System writes declaration also permits reads during system runner executio
 ///|
 test "Nested SystemRunner::run_phase restores outer system access declarations" {
   let world = World::new()
-  let qa = world.register_cpu_component("NestedRunnerOuterA", 4)
-  let qb = world.register_cpu_component("NestedRunnerInnerB", 4)
+  let qa = world.register_component("NestedRunnerOuterA", 4)
+  let qb = world.register_component("NestedRunnerInnerB", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))
@@ -552,8 +552,8 @@ test "Nested SystemRunner::run_phase restores outer system access declarations" 
 ///|
 test "System Query preserves read and write access separation during system runner execution" {
   let world = World::new()
-  let qa = world.register_cpu_component("SystemQueryReadA", 4)
-  let qb = world.register_cpu_component("SystemQueryWriteB", 4)
+  let qa = world.register_component("SystemQueryReadA", 4)
+  let qb = world.register_component("SystemQueryWriteB", 4)
   let e = world.create_entity()
   assert_true(world.add_component_bytes(e, qa, bytes4(1, 2, 3, 4)))
   assert_true(world.add_component_bytes(e, qb, bytes4(5, 6, 7, 8)))

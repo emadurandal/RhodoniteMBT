@@ -63,7 +63,7 @@
             <tbody>
               <tr><td>Entity</td><td><code>index</code> と <code>generation</code> を保存します。import は target world がその id を reserve / restore できることを検証します。</td></tr>
               <tr><td>Builtin component</td><td><code>Transform3D</code>、<code>ChildOf</code>、<code>GlobalTransform</code>、<code>Camera</code> のような stable builtin name を保存します。</td></tr>
-              <tr><td>User CPU component</td><td><code>register_cpu_component_with_identity</code> で登録し、application-provided stable key と schema version または hash を持つことを必須にします。登録済み component と一致しない場合は replay を reject します。</td></tr>
+              <tr><td>User CPU component</td><td><code>register_component_with_identity</code> で登録し、application-provided stable key と schema version または hash を持つことを必須にします。登録済み component と一致しない場合は replay を reject します。</td></tr>
               <tr><td>Component index</td><td>local hint として cache してもよいですが、session をまたいだ authoritative key にはしません。</td></tr>
             </tbody>
           </table>

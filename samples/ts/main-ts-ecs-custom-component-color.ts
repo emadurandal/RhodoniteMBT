@@ -188,7 +188,7 @@ function createDemoStateForEngine(engine: Engine): DemoState {
 	const scene = engine.mainScene<World, EntityId>();
 	const world = World.new();
 	scene.setWorld(world);
-	const pulseColor = world.registerCpuComponent(
+	const pulseColor = world.registerComponent(
 		"RhodoniteExamplePulseColor",
 		PULSE_COLOR_STRIDE,
 	);

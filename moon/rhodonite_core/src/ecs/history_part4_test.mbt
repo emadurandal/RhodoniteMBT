@@ -5,7 +5,7 @@
 test "panic WorldHistory guarded transaction rejects raw component removal" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryGuardRejectRemove", 4)
+  let cpu = world.register_component("HistoryGuardRejectRemove", 4)
   let entity = world.create_entity()
   assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
   history.set_raw_mutation_guard_enabled(true)
@@ -19,7 +19,7 @@ test "panic WorldHistory guarded transaction rejects raw component registration"
   let history = WorldHistory::new()
   history.set_raw_mutation_guard_enabled(true)
   assert_true(history.begin_guarded_transaction(world, "guarded raw register"))
-  ignore(world.register_cpu_component("HistoryGuardRejectRegister", 4))
+  ignore(world.register_component("HistoryGuardRejectRegister", 4))
 }
 
 ///|
@@ -83,7 +83,7 @@ test "panic WorldHistory guarded transaction rejects raw Camera mutation" {
 test "panic WorldHistory guarded transaction rejects raw spawn batch" {
   let world = World::new()
   let history = WorldHistory::new()
-  let cpu = world.register_cpu_component("HistoryGuardRejectSpawnBatch", 4)
+  let cpu = world.register_component("HistoryGuardRejectSpawnBatch", 4)
   history.set_raw_mutation_guard_enabled(true)
   assert_true(
     history.begin_guarded_transaction(world, "guarded raw spawn batch"),

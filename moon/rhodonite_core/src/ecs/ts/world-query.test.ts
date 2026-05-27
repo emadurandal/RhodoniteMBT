@@ -30,7 +30,7 @@ import {
 describe("ECS TypeScript wrapper: query", () => {
 	it("queries CPU component rows without copying the backing storage", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("Position", 16);
+		const cpu = world.registerComponent("Position", 16);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 2, 3, 0], 16))).toBe(
 			true,
@@ -61,7 +61,7 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("tracks query row writes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TrackedPosition", 16);
+		const cpu = world.registerComponent("TrackedPosition", 16);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
 			true,
@@ -93,7 +93,7 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("tracks raw query row callback writes and delegates when history is disabled", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TrackedRawPosition", 16);
+		const cpu = world.registerComponent("TrackedRawPosition", 16);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
 			true,
@@ -123,7 +123,7 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("exposes archetype column views for hot CPU loops", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("Velocity", 16);
+		const cpu = world.registerComponent("Velocity", 16);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
@@ -152,7 +152,7 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("tracks archetype column callback writes through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TrackedVelocity", 16);
+		const cpu = world.registerComponent("TrackedVelocity", 16);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
@@ -196,7 +196,7 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("tracks explicit archetype column rows through WorldHistory", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TrackedVelocityRows", 16);
+		const cpu = world.registerComponent("TrackedVelocityRows", 16);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		expect(world.addComponentBytes(e0, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
@@ -228,7 +228,7 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("accepts empty explicit archetype column rows", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TrackedVelocityRowsEmpty", 16);
+		const cpu = world.registerComponent("TrackedVelocityRowsEmpty", 16);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, f32Bytes([1, 0, 0, 0], 16))).toBe(
 			true,
@@ -250,7 +250,7 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("reuses prepared row query plans", () => {
 		const world = World.new();
-		const cpu = world.registerCpuComponent("PreparedTsCpu", 16);
+		const cpu = world.registerComponent("PreparedTsCpu", 16);
 		const prepared = Query.new([cpu]).prepare(world);
 		const entity = world.createEntity();
 		expect(world.addComponentBytes(entity, cpu, f32Bytes([4, 0, 0, 0], 16))).toBe(
@@ -269,8 +269,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("exposes query plan diagnostics", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("PlanTsA", 16);
-		const cpuB = world.registerCpuComponent("PlanTsB", 16);
+		const cpuA = world.registerComponent("PlanTsA", 16);
+		const cpuB = world.registerComponent("PlanTsB", 16);
 		const both = world.createEntity();
 		const onlyA = world.createEntity();
 		expect(world.addComponentBytes(both, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
@@ -303,8 +303,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("reports stale prepared query plan diagnostics", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("PreparedPlanTsA", 16);
-		const cpuB = world.registerCpuComponent("PreparedPlanTsB", 16);
+		const cpuA = world.registerComponent("PreparedPlanTsA", 16);
+		const cpuB = world.registerComponent("PreparedPlanTsB", 16);
 		const prepared = Query.new([cpuA, cpuB]).prepare(world);
 		expect(prepared.plan(world).stale()).toBe(false);
 
@@ -329,8 +329,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("refreshes stale prepared query plans", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("RefreshPlanTsA", 16);
-		const cpuB = world.registerCpuComponent("RefreshPlanTsB", 16);
+		const cpuA = world.registerComponent("RefreshPlanTsA", 16);
+		const cpuB = world.registerComponent("RefreshPlanTsB", 16);
 		const prepared = Query.new([cpuA, cpuB]).prepare(world);
 		expect(prepared.isStale(world)).toBe(false);
 
@@ -360,8 +360,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("refreshes stale raw prepared query plans", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("RawRefreshPlanTsA", 16);
-		const cpuB = world.registerCpuComponent("RawRefreshPlanTsB", 16);
+		const cpuA = world.registerComponent("RawRefreshPlanTsA", 16);
+		const cpuB = world.registerComponent("RawRefreshPlanTsB", 16);
 		const prepared = RawQuery.new([cpuA, cpuB]).prepare(world);
 		expect(prepared.isStale(world)).toBe(false);
 
@@ -386,8 +386,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("reuses and refreshes query cache row plans", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("QueryCacheTsA", 16);
-		const cpuB = world.registerCpuComponent("QueryCacheTsB", 16);
+		const cpuA = world.registerComponent("QueryCacheTsA", 16);
+		const cpuB = world.registerComponent("QueryCacheTsB", 16);
 		const cache = QueryCache.new([cpuA, cpuB]);
 		expect(cache.requiredComponents().map((component) => component.index())).toEqual([
 			cpuA.index(),
@@ -410,7 +410,7 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(sum).toBeCloseTo(1);
 		expect(cache.plan(world).stale()).toBe(false);
 
-		const cpuC = world.registerCpuComponent("QueryCacheTsC", 16);
+		const cpuC = world.registerComponent("QueryCacheTsC", 16);
 		const e1 = world.createEntity();
 		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
 			true,
@@ -429,9 +429,9 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("filters query rows with excluded components", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("QueryWithoutTsA", 16);
-		const cpuB = world.registerCpuComponent("QueryWithoutTsB", 16);
-		const cpuC = world.registerCpuComponent("QueryWithoutTsC", 16);
+		const cpuA = world.registerComponent("QueryWithoutTsA", 16);
+		const cpuB = world.registerComponent("QueryWithoutTsB", 16);
+		const cpuC = world.registerComponent("QueryWithoutTsC", 16);
 		const query = Query.newWithExcluded([cpuA, cpuB], [cpuC]);
 		expect(query.excludedComponents().map((component) => component.index())).toEqual([
 			cpuC.index(),
@@ -473,8 +473,8 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("reuses and refreshes raw query cache archetype plans", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("RawQueryCacheTsA", 16);
-		const cpuB = world.registerCpuComponent("RawQueryCacheTsB", 16);
+		const cpuA = world.registerComponent("RawQueryCacheTsA", 16);
+		const cpuB = world.registerComponent("RawQueryCacheTsB", 16);
 		const cache = RawQueryCache.new([cpuA, cpuB]);
 		const e0 = world.createEntity();
 		expect(world.addComponentBytes(e0, cpuA, f32Bytes([1, 0, 0, 0], 16))).toBe(
@@ -486,7 +486,7 @@ describe("ECS TypeScript wrapper: query", () => {
 		cache.refresh(world);
 		expect(cache.plan(world).matchedRowCount()).toBe(1);
 
-		const cpuC = world.registerCpuComponent("RawQueryCacheTsC", 16);
+		const cpuC = world.registerComponent("RawQueryCacheTsC", 16);
 		const e1 = world.createEntity();
 		expect(world.addComponentBytes(e1, cpuA, f32Bytes([3, 0, 0, 0], 16))).toBe(
 			true,
@@ -508,9 +508,9 @@ describe("ECS TypeScript wrapper: query", () => {
 
 	it("filters raw query archetypes with excluded components", () => {
 		const world = World.new();
-		const cpuA = world.registerCpuComponent("RawQueryWithoutTsA", 16);
-		const cpuB = world.registerCpuComponent("RawQueryWithoutTsB", 16);
-		const cpuC = world.registerCpuComponent("RawQueryWithoutTsC", 16);
+		const cpuA = world.registerComponent("RawQueryWithoutTsA", 16);
+		const cpuB = world.registerComponent("RawQueryWithoutTsB", 16);
+		const cpuC = world.registerComponent("RawQueryWithoutTsC", 16);
 		const cache = RawQueryCache.newWithExcluded([cpuA, cpuB], [cpuC]);
 		expect(cache.excludedComponents().map((component) => component.index())).toEqual([
 			cpuC.index(),
@@ -545,8 +545,8 @@ describe("ECS TypeScript wrapper: query", () => {
 	it("uses pre-resolved query component indexes", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpuA = world.registerCpuComponent("QueryIndexTsA", 16);
-		const cpuB = world.registerCpuComponent("QueryIndexTsB", 16);
+		const cpuA = world.registerComponent("QueryIndexTsA", 16);
+		const cpuB = world.registerComponent("QueryIndexTsB", 16);
 		const query = Query.new([cpuA, cpuB]);
 		const cache = QueryCache.new([cpuA, cpuB]);
 		expect(query.componentIndex(cpuA)).toBe(0);
@@ -587,14 +587,14 @@ describe("ECS TypeScript wrapper: query", () => {
 		expect(getF32(world.componentBytesCopy(entity, cpuA) ?? new Uint8Array(), 0)).toBeCloseTo(5);
 		expect(getF32(world.componentBytesCopy(entity, cpuB) ?? new Uint8Array(), 0)).toBeCloseTo(7);
 		expect(() => query.forEachReadAt(world, -1, () => {})).toThrow();
-		expect(() => query.componentIndex(world.registerCpuComponent("QueryIndexTsC", 16))).toThrow();
+		expect(() => query.componentIndex(world.registerComponent("QueryIndexTsC", 16))).toThrow();
 	});
 
 	it("uses pre-resolved raw query component indexes", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpuA = world.registerCpuComponent("RawQueryIndexTsA", 16);
-		const cpuB = world.registerCpuComponent("RawQueryIndexTsB", 16);
+		const cpuA = world.registerComponent("RawQueryIndexTsA", 16);
+		const cpuB = world.registerComponent("RawQueryIndexTsB", 16);
 		const raw = RawQuery.new([cpuA, cpuB]);
 		const cache = RawQueryCache.new([cpuA, cpuB]);
 		expect(raw.componentIndex(cpuA)).toBe(0);

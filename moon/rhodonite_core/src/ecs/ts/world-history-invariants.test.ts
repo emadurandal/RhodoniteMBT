@@ -19,7 +19,7 @@ import {
 function expectBytes(
 	world: World,
 	entity: ReturnType<World["createEntity"]>,
-	component: ReturnType<World["registerCpuComponent"]>,
+	component: ReturnType<World["registerComponent"]>,
 	expected: Uint8Array,
 ): void {
 	expect(world.componentBytesCopy(entity, component)).toEqual(expected);
@@ -28,7 +28,7 @@ function expectBytes(
 function expectF32(
 	world: World,
 	entity: ReturnType<World["createEntity"]>,
-	component: ReturnType<World["registerCpuComponent"]>,
+	component: ReturnType<World["registerComponent"]>,
 	expected: number,
 ): void {
 	expect(getF32(world.componentBytesCopy(entity, component) ?? new Uint8Array(), 0)).toBeCloseTo(
@@ -49,8 +49,8 @@ describe("ECS TypeScript wrapper: history invariants", () => {
 	it("round-trips compound tracked operations through the public wrapper", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsInvariantCompoundCpu", 4);
-		const bulk = world.registerCpuComponent("TsInvariantCompoundBulk", 4);
+		const cpu = world.registerComponent("TsInvariantCompoundCpu", 4);
+		const bulk = world.registerComponent("TsInvariantCompoundBulk", 4);
 		const bulk0 = world.createEntity();
 		const bulk1 = world.createEntity();
 		const identity = identityMat4ColMajor();
@@ -120,7 +120,7 @@ describe("ECS TypeScript wrapper: history invariants", () => {
 	it("round-trips tracked query and column callbacks in one transaction", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsInvariantQueryCpu", 4);
+		const cpu = world.registerComponent("TsInvariantQueryCpu", 4);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		const e2 = world.createEntity();
@@ -162,8 +162,8 @@ describe("ECS TypeScript wrapper: history invariants", () => {
 	it("keeps world and stacks unchanged after bulk validation failures", () => {
 		const world = World.new();
 		const history = WorldHistory.new();
-		const cpu = world.registerCpuComponent("TsInvariantBulkFailureCpu", 4);
-		const marker = world.registerCpuComponent("TsInvariantBulkFailureMarker", 4);
+		const cpu = world.registerComponent("TsInvariantBulkFailureCpu", 4);
+		const marker = world.registerComponent("TsInvariantBulkFailureMarker", 4);
 		const e0 = world.createEntity();
 		const e1 = world.createEntity();
 		const missing = world.createEntity();

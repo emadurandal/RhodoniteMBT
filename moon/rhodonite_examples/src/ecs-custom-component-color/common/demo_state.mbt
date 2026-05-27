@@ -38,7 +38,7 @@ pub(all) struct DemoState {
 ///|
 /// Registers the custom component used to drive per-instance colors.
 fn register_pulse_color_component(world : @ecs.World) -> @ecs.ComponentTypeId {
-  world.register_cpu_component("RhodoniteExamplePulseColor", pulse_color_stride)
+  world.register_component("RhodoniteExamplePulseColor", pulse_color_stride)
 }
 
 ///|
