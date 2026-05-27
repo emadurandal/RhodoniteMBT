@@ -1,12 +1,15 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	findBrowserExecutable,
+	startTrustedProcess,
+} from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const distDir = path.join(root, "dist");
@@ -14,7 +17,7 @@ const verbose = process.env.RHODONITE_BROWSER_VERBOSE === "1" ||
 	process.env.RHODONITE_BROWSER_INTERACTION_VERBOSE === "1";
 const headless = process.env.RHODONITE_BROWSER_HEADLESS !== "0";
 
-const browser = findBrowser();
+const browser = findBrowserExecutable();
 if (!browser) {
 	console.log("interaction_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
@@ -111,7 +114,7 @@ try {
 	if (headless) {
 		browserArgs.unshift("--headless=new");
 	}
-	browserProcess = spawn(browser, browserArgs, {
+	browserProcess = startTrustedProcess(browser, browserArgs, {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {
@@ -517,47 +520,6 @@ function contentType(filePath) {
 	}
 }
 
-function findBrowser() {
-	const fromEnv = process.env.RHODONITE_BROWSER || process.env.CHROME;
-	if (fromEnv && isExecutable(fromEnv)) {
-		return fromEnv;
-	}
-	const macCandidates = [
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-		"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-	];
-	for (const candidate of macCandidates) {
-		if (isExecutable(candidate)) {
-			return candidate;
-		}
-	}
-	for (const name of [
-		"google-chrome",
-		"google-chrome-stable",
-		"chromium",
-		"chromium-browser",
-		"microsoft-edge",
-	]) {
-		const found = which(name);
-		if (found) {
-			return found;
-		}
-	}
-	return undefined;
-}
-
-function isExecutable(candidate) {
-	return spawnSync(candidate, ["--version"], { stdio: "ignore" }).status === 0;
-}
-
-function which(name) {
-	const result = spawnSync("which", [name], { encoding: "utf8" });
-	if (result.status !== 0) {
-		return undefined;
-	}
-	return result.stdout.trim() || undefined;
-}
 
 function withTimeout(promise, ms, message) {
 	let timer;

@@ -1,7 +1,6 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -13,6 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { fileURLToPath } from "node:url";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -189,30 +189,44 @@ function writeEntrypoints() {
 }
 
 function runTsc() {
-  const tscArgs = ["-p", path.join(packageRoot, "tsconfig.build.json")];
-  const localTsc = path.join(
-    root,
-    "node_modules/.bin",
-    process.platform === "win32" ? "tsc.cmd" : "tsc",
-  );
-  if (existsSync(localTsc)) {
-    const local = spawnSync(localTsc, tscArgs, {
-      cwd: root,
-      stdio: "inherit",
-    });
-    if (local.status === 0) {
-      return;
-    }
+  const configPath = path.join(packageRoot, "tsconfig.build.json");
+  const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (configFile.error) {
+    reportTsDiagnostics([configFile.error]);
+    throw new Error("TypeScript npm package build failed.");
   }
-  const result = spawnSync(
-    "pnpm",
-    ["exec", "tsc", ...tscArgs],
-    { cwd: root, stdio: "inherit" },
+  const parsed = ts.parseJsonConfigFileContent(
+    configFile.config,
+    ts.sys,
+    packageRoot,
+    undefined,
+    configPath,
   );
-  if (result.status === 0) {
-    return;
+  if (parsed.errors.length > 0) {
+    reportTsDiagnostics(parsed.errors);
+    throw new Error("TypeScript npm package build failed.");
   }
-  throw new Error("TypeScript npm package build failed.");
+  const program = ts.createProgram(parsed.fileNames, parsed.options);
+  const emitResult = program.emit();
+  const diagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
+  if (diagnostics.length > 0) {
+    reportTsDiagnostics(diagnostics);
+  }
+  if (
+    emitResult.emitSkipped ||
+    diagnostics.some((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)
+  ) {
+    throw new Error("TypeScript npm package build failed.");
+  }
+}
+
+function reportTsDiagnostics(diagnostics) {
+  const host = {
+    getCanonicalFileName: (fileName) => fileName,
+    getCurrentDirectory: () => root,
+    getNewLine: () => "\n",
+  };
+  process.stderr.write(ts.formatDiagnosticsWithColorAndContext(diagnostics, host));
 }
 
 function prependWebGpuTypeReferences() {

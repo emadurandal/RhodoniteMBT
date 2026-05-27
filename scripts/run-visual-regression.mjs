@@ -1,9 +1,12 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	runTrustedProcess,
+	startTrustedProcess,
+} from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const examplesDir = path.join(root, "moon/rhodonite_examples");
@@ -72,10 +75,10 @@ function run(command, commandArgs, options = {}) {
 	const cwd = options.cwd ?? root;
 	const env = { ...process.env, ...(options.env ?? {}) };
 	if (verbose) {
-		return spawnAndWait(command, commandArgs, { cwd, env, stdio: "inherit" });
+		return runTrustedProcess(command, commandArgs, { cwd, env, stdio: "inherit" });
 	}
 	return new Promise((resolve, reject) => {
-		const child = spawn(command, commandArgs, {
+		const child = startTrustedProcess(command, commandArgs, {
 			cwd,
 			env,
 			stdio: ["ignore", "pipe", "pipe"],
@@ -100,24 +103,6 @@ function run(command, commandArgs, options = {}) {
 			if (filteredStderr.length > 0) {
 				process.stderr.write(filteredStderr);
 			}
-			if (code === 0) {
-				resolve();
-			} else {
-				reject(
-					new Error(
-						`${command} ${commandArgs.join(" ")} failed with ${signal ?? `exit code ${code}`}`,
-					),
-				);
-			}
-		});
-	});
-}
-
-function spawnAndWait(command, commandArgs, options) {
-	return new Promise((resolve, reject) => {
-		const child = spawn(command, commandArgs, options);
-		child.on("error", reject);
-		child.on("close", (code, signal) => {
 			if (code === 0) {
 				resolve();
 			} else {

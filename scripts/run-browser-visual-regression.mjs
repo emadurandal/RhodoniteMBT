@@ -1,7 +1,6 @@
 // Copyright (c) 2026 emadurandal (Act and Wit, Inc.)
 // SPDX-License-Identifier: Apache-2.0
 
-import { spawn, spawnSync } from "node:child_process";
 import { Buffer } from "node:buffer";
 import fs from "node:fs/promises";
 import http from "node:http";
@@ -9,6 +8,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
+import {
+	findBrowserExecutable,
+	startTrustedProcess,
+} from "./lib/safe-process.mjs";
 
 const root = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const update = process.env.RHODONITE_UPDATE_VISUAL_SNAPSHOTS === "1";
@@ -19,7 +22,7 @@ const snapshotDir = path.join(
 	"moon/rhodonite_examples/src/visual_regression/__image_snapshots__",
 );
 
-const browser = findBrowser();
+const browser = findBrowserExecutable();
 if (!browser) {
 	console.log("visual_regression(browser): SKIP Chrome/Chromium browser not found");
 	process.exit(0);
@@ -121,7 +124,7 @@ try {
 	if (headless) {
 		browserArgs.unshift("--headless=new");
 	}
-	browserProcess = spawn(browser, browserArgs, {
+	browserProcess = startTrustedProcess(browser, browserArgs, {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	browserProcess.stdout.on("data", (data) => {
@@ -194,48 +197,6 @@ try {
 	if (resultServer) {
 		await closeServer(resultServer);
 	}
-}
-
-function findBrowser() {
-	const fromEnv = process.env.RHODONITE_BROWSER || process.env.CHROME;
-	if (fromEnv && isExecutable(fromEnv)) {
-		return fromEnv;
-	}
-	const macCandidates = [
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-		"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-	];
-	for (const candidate of macCandidates) {
-		if (isExecutable(candidate)) {
-			return candidate;
-		}
-	}
-	for (const name of [
-		"google-chrome",
-		"google-chrome-stable",
-		"chromium",
-		"chromium-browser",
-		"microsoft-edge",
-	]) {
-		const found = which(name);
-		if (found) {
-			return found;
-		}
-	}
-	return undefined;
-}
-
-function isExecutable(candidate) {
-	return spawnSync(candidate, ["--version"], { stdio: "ignore" }).status === 0;
-}
-
-function which(name) {
-	const result = spawnSync("which", [name], { encoding: "utf8" });
-	if (result.status !== 0) {
-		return undefined;
-	}
-	return result.stdout.trim() || undefined;
 }
 
 function withTimeout(promise, ms, message) {
