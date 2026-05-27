@@ -39,6 +39,7 @@
           <p><code>QueryPlan</code> is a diagnostic snapshot, not a borrow or ownership handle. It copies required component ids and matched archetype row counts so callers can inspect query shape without extending row/column view lifetimes.</p>
           <p><code>PreparedQuery</code> and <code>RawPreparedQuery</code> are immutable lifecycle handles. <code>is_stale</code> is only a version check; <code>refresh</code> returns the current prepared plan value that callers should retain before repeated reuse. Prepared plans hold row and column access metadata per matched archetype so row iteration does not rebuild component lookup maps during each run.</p>
           <p><code>QueryCache</code> and <code>RawQueryCache</code> are caller-owned mutable handles. They deliberately avoid a global <code>World</code> cache so lifetime, memory use, and cross-world ownership stay explicit.</p>
+          <p>Hot builtin camera systems own <code>RawQueryCache</code> values and iterate matched archetypes directly. They still use the public <code>World</code> blob setters for <code>GlobalTransform</code> and <code>Camera</code> writes, while <code>Transform3D</code> component writes go through <code>RawQueryArchetype::write_column_at</code> so dirty transform propagation sees the changed archetype.</p>
 
           <h2>SystemRunner Access Declarations</h2>
           <ul>

@@ -728,58 +728,55 @@ pub fn orbit_camera_transform_system(
 ) -> System {
   let tf = world.transform_component()
   let gt = world.global_transform_component()
+  let cache = RawQueryCache::new([tf, gt, orbit_component, home_component])
+  let tf_index = cache.component_index(tf)
+  let orbit_index = cache.component_index(orbit_component)
+  let home_index = cache.component_index(home_component)
   System::new(
     "rhodonite/orbit_camera_transform",
     phase,
     [home_component],
     [tf, gt, orbit_component],
     fn(world, _ctx, _commands) {
-      Query::new([tf, gt, orbit_component, home_component]).for_each(world, row => {
-        let entity = row.entity()
-        let mut reset_requested = false
-        row.read(orbit_component, orbit_row => {
-          let (_, _, _, _, _, _, requested) = orbit_camera_pose_from_controller_view(
+      cache.for_each_archetype(world, arch => {
+        let tf_stride = arch.component_stride_at(tf_index)
+        let orbit_stride = arch.component_stride_at(orbit_index)
+        let home_stride = arch.component_stride_at(home_index)
+        let tf_col = arch.write_column_at(tf_index)
+        let orbit_read = arch.read_column_at(orbit_index)
+        let orbit_write = arch.write_column_at(orbit_index)
+        let home_col = arch.read_column_at(home_index)
+        for row = 0; row < arch.length(); row = row + 1 {
+          let entity = arch.entity(row)
+          let tf_start = row * tf_stride
+          let orbit_start = row * orbit_stride
+          let home_start = row * home_stride
+          let orbit_row = orbit_read[orbit_start:orbit_start + orbit_stride]
+          let (yaw, pitch, pan_x, pan_y, _dolly, distance, reset_requested) = orbit_camera_pose_from_controller_view(
             orbit_row,
           )
-          reset_requested = requested
-        })
-        if reset_requested {
-          row.read(home_component, home_row => {
-            row.write(tf, tf_row => {
-              copy_view_to_mut_view(home_row, tf_row)
-              ignore(
-                world.set_global_transform(
-                  entity,
-                  @comp.Transform3D::local_matrix_from_component_view(tf_row[:]),
-                ),
-              )
-            })
-          })
-          row.write(orbit_component, orbit_row => {
-            reset_orbit_camera_controller_view(orbit_row)
-          })
-        } else {
-          let mut yaw = (0.0 : Float)
-          let mut pitch = (0.0 : Float)
-          let mut pan_x = (0.0 : Float)
-          let mut pan_y = (0.0 : Float)
-          let mut distance = (16.0 : Float)
-          row.read(orbit_component, orbit_row => {
-            let (cy, cp, cpx, cpy, _dolly, cdistance, _requested) = orbit_camera_pose_from_controller_view(
-              orbit_row,
+          let tf_row = tf_col.mut_view(start=tf_start, end=tf_start + tf_stride)
+          if reset_requested {
+            let home_row = home_col[home_start:home_start + home_stride]
+            copy_view_to_mut_view(home_row, tf_row)
+            reset_orbit_camera_controller_view(
+              orbit_write.mut_view(
+                start=orbit_start,
+                end=orbit_start + orbit_stride,
+              ),
             )
-            yaw = cy
-            pitch = cp
-            pan_x = cpx
-            pan_y = cpy
-            distance = cdistance
-          })
-          row.write(tf, tf_row => {
+            ignore(
+              world.set_global_transform(
+                entity,
+                @comp.Transform3D::local_matrix_from_component_view(tf_row[:]),
+              ),
+            )
+          } else {
             let local_matrix = write_orbit_transform_row(
               tf_row, yaw, pitch, pan_x, pan_y, distance,
             )
             ignore(world.set_global_transform(entity, local_matrix))
-          })
+          }
         }
       })
     },
@@ -796,69 +793,57 @@ pub fn orbit_camera_transform_command_system(
 ) -> System {
   let tf = world.transform_component()
   let gt = world.global_transform_component()
+  let cache = RawQueryCache::new([tf, gt, orbit_component, home_component])
+  let orbit_index = cache.component_index(orbit_component)
+  let home_index = cache.component_index(home_component)
   System::new(
     "rhodonite/orbit_camera_transform_command",
     phase,
     [home_component],
     [tf, gt, orbit_component],
     fn(world, _ctx, commands) {
-      Query::new([tf, gt, orbit_component, home_component]).for_each(world, row => {
-        let entity = row.entity()
-        let mut reset_requested = false
-        row.read(orbit_component, orbit_row => {
-          let (_, _, _, _, _, _, requested) = orbit_camera_pose_from_controller_view(
+      cache.for_each_archetype(world, arch => {
+        let orbit_stride = arch.component_stride_at(orbit_index)
+        let home_stride = arch.component_stride_at(home_index)
+        let orbit_col = arch.read_column_at(orbit_index)
+        let home_col = arch.read_column_at(home_index)
+        for row = 0; row < arch.length(); row = row + 1 {
+          let entity = arch.entity(row)
+          let orbit_start = row * orbit_stride
+          let home_start = row * home_stride
+          let orbit_row = orbit_col[orbit_start:orbit_start + orbit_stride]
+          let (yaw, pitch, pan_x, pan_y, _dolly, distance, reset_requested) = orbit_camera_pose_from_controller_view(
             orbit_row,
           )
-          reset_requested = requested
-        })
-        if reset_requested {
-          let mut home_bytes = FixedArray::make(0, (0 : Byte))
-          row.read(home_component, home_row => {
-            home_bytes = fixed_array_from_view(home_row)
-          })
-          let mut orbit_bytes = FixedArray::make(0, (0 : Byte))
-          row.read(orbit_component, orbit_row => {
-            orbit_bytes = fixed_array_from_view(orbit_row)
+          if reset_requested {
+            let home_row = home_col[home_start:home_start + home_stride]
+            let home_bytes = fixed_array_from_view(home_row)
+            let orbit_bytes = fixed_array_from_view(orbit_row)
             reset_orbit_camera_controller_view(
               orbit_bytes.mut_view(start=0, end=orbit_bytes.length()),
             )
-          })
-          commands.set_component_bytes(entity, tf, home_bytes)
-          commands.set_component_bytes(entity, orbit_component, orbit_bytes)
-          commands.set_global_transform(
-            entity,
-            @comp.Transform3D::local_matrix_from_component_view(home_bytes[:]),
-          )
-        } else {
-          let mut yaw = (0.0 : Float)
-          let mut pitch = (0.0 : Float)
-          let mut pan_x = (0.0 : Float)
-          let mut pan_y = (0.0 : Float)
-          let mut distance = (16.0 : Float)
-          row.read(orbit_component, orbit_row => {
-            let (cy, cp, cpx, cpy, _dolly, cdistance, _requested) = orbit_camera_pose_from_controller_view(
-              orbit_row,
+            commands.set_component_bytes(entity, tf, home_bytes)
+            commands.set_component_bytes(entity, orbit_component, orbit_bytes)
+            commands.set_global_transform(
+              entity,
+              @comp.Transform3D::local_matrix_from_component_view(home_bytes[:]),
             )
-            yaw = cy
-            pitch = cp
-            pan_x = cpx
-            pan_y = cpy
-            distance = cdistance
-          })
-          let tf_bytes = FixedArray::make(
-            @comp.transform3d_gpu_layout().stride,
-            (0 : Byte),
-          )
-          let local_matrix = write_orbit_transform_row(
-            tf_bytes.mut_view(start=0, end=tf_bytes.length()),
-            yaw,
-            pitch,
-            pan_x,
-            pan_y,
-            distance,
-          )
-          commands.set_component_bytes(entity, tf, tf_bytes)
-          commands.set_global_transform(entity, local_matrix)
+          } else {
+            let tf_bytes = FixedArray::make(
+              @comp.transform3d_gpu_layout().stride,
+              (0 : Byte),
+            )
+            let local_matrix = write_orbit_transform_row(
+              tf_bytes.mut_view(start=0, end=tf_bytes.length()),
+              yaw,
+              pitch,
+              pan_x,
+              pan_y,
+              distance,
+            )
+            commands.set_component_bytes(entity, tf, tf_bytes)
+            commands.set_global_transform(entity, local_matrix)
+          }
         }
       })
     },
