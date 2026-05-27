@@ -99,13 +99,14 @@ pub fn World::set_global_transform(
   self.assert_system_component_write(id, "World::set_global_transform")
   match self.global_transform_ref_unchecked(entity) {
     Some(gt_ref) => {
-      ignore(
-        self.global_transform_blob.write_matrix_if_changed(
-          gt_ref.format,
-          gt_ref.word_offset,
-          m,
-        ),
+      let changed = self.global_transform_blob.write_matrix_if_changed(
+        gt_ref.format,
+        gt_ref.word_offset,
+        m,
       )
+      if changed {
+        self.mark_camera_blob_sync_dirty(entity)
+      }
       true
     }
     None => {

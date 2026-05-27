@@ -75,6 +75,17 @@ pub fn query_cache_for_each(
 }
 
 ///|
+/// Implements `query_cache_for_each_read_at`.
+pub fn query_cache_for_each_read_at(
+  cache : @ecs.QueryCache,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  cache.for_each_read_at(world, index, f)
+}
+
+///|
 /// Implements `raw_query_for_each`.
 pub fn raw_query_for_each(
   query : @ecs.RawQuery,
@@ -103,6 +114,17 @@ pub fn raw_query_cache_for_each(
   f : (@ecs.RawQueryRow) -> Unit,
 ) -> Unit {
   cache.for_each(world, f)
+}
+
+///|
+/// Implements `raw_query_cache_for_each_read_view_at`.
+pub fn raw_query_cache_for_each_read_view_at(
+  cache : @ecs.RawQueryCache,
+  world : @ecs.World,
+  index : Int,
+  f : (@ecs.EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  cache.for_each_read_view_at(world, index, f)
 }
 
 ///|

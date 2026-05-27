@@ -571,6 +571,13 @@ describe("ECS TypeScript wrapper: query", () => {
 			expect(seenEntity.index()).toBe(entity.index());
 			expect(bytes.getF32(0)).toBeCloseTo(1);
 		});
+		cache.refresh(world);
+		let cachedFastReadB = 0;
+		cache.forEachReadAt(world, 1, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			cachedFastReadB = bytes.getF32(0);
+		});
+		expect(cachedFastReadB).toBeCloseTo(2);
 
 		let readA = 0;
 		query.forEach(world, (row) => {
@@ -616,6 +623,11 @@ describe("ECS TypeScript wrapper: query", () => {
 		raw.prepare(world).forEachReadViewAt(world, 0, (seenEntity, bytes) => {
 			expect(seenEntity.index()).toBe(entity.index());
 			expect(bytes.getF32(0)).toBeCloseTo(1);
+		});
+		cache.refresh(world);
+		cache.forEachReadViewAt(world, 1, (seenEntity, bytes) => {
+			expect(seenEntity.index()).toBe(entity.index());
+			expect(bytes.getF32(0)).toBeCloseTo(2);
 		});
 
 		raw.forEach(world, (row) => {

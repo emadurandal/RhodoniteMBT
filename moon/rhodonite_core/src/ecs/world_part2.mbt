@@ -83,6 +83,7 @@ pub fn World::add_component(
       let ok = self.add_component_signature(entity, component, bytes)
       if ok {
         self.mark_transform_dirty_for_component(entity, component)
+        self.mark_camera_blob_sync_dirty_for_component(entity, component)
       }
       ok
     }
@@ -115,6 +116,7 @@ pub fn World::add_component_bytes(
       let ok = self.add_component_signature(entity, component, bytes)
       if ok {
         self.mark_transform_dirty_for_component(entity, component)
+        self.mark_camera_blob_sync_dirty_for_component(entity, component)
       }
       ok
     }
@@ -162,6 +164,7 @@ pub fn World::remove_component(
   let moved = old_arch.swap_remove_row(loc.row)
   self.update_moved_location(moved, loc.archetype_index, loc.row)
   self.mark_transform_dirty_for_component(entity, component)
+  self.mark_camera_blob_sync_dirty_for_component(entity, component)
   true
 }
 

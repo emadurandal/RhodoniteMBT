@@ -230,6 +230,7 @@ pub struct QueryCache {
 pub fn QueryCache::component_index(Self, ComponentTypeId) -> Int
 pub fn QueryCache::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn QueryCache::for_each(Self, World, (QueryRow) -> Unit) -> Unit
+pub fn QueryCache::for_each_read_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn QueryCache::new(Array[ComponentTypeId]) -> Self
 pub fn QueryCache::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn QueryCache::plan(Self, World) -> QueryPlan
@@ -322,6 +323,7 @@ pub fn RawQueryCache::component_index(Self, ComponentTypeId) -> Int
 pub fn RawQueryCache::excluded_components(Self) -> Array[ComponentTypeId]
 pub fn RawQueryCache::for_each(Self, World, (RawQueryRow) -> Unit) -> Unit
 pub fn RawQueryCache::for_each_archetype(Self, World, (RawQueryArchetype) -> Unit) -> Unit
+pub fn RawQueryCache::for_each_read_view_at(Self, World, Int, (EntityId, ArrayView[Byte]) -> Unit) -> Unit
 pub fn RawQueryCache::new(Array[ComponentTypeId]) -> Self
 pub fn RawQueryCache::new_with_excluded(Array[ComponentTypeId], Array[ComponentTypeId]) -> Self
 pub fn RawQueryCache::plan(Self, World) -> QueryPlan

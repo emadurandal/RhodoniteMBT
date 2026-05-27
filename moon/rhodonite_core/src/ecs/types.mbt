@@ -534,6 +534,10 @@ pub struct World {
   priv transform_children_by_parent_index : Array[Array[EntityId]]
   /// True when [`ChildOf`] payload/ownership changes require rebuilding the hierarchy index.
   priv mut transform_hierarchy_index_dirty : Bool
+  /// Entity ids whose camera sync inputs changed since the last direct Camera blob sync pass.
+  priv camera_blob_sync_dirty_entities : Array[EntityId]
+  /// Generation stamp per entity index for the current Camera blob sync dirty queue; `-1` means clean.
+  priv camera_blob_sync_dirty_generations : Array[Int]
   /// Query nesting depth; nonzero means callback code is currently iterating component views.
   priv mut query_depth : Int
   /// SystemRunner execution depth; component registration is closed while this is nonzero.

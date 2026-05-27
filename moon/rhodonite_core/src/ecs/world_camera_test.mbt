@@ -511,6 +511,67 @@ test "camera blob sync system reports as direct system" {
 }
 
 ///|
+test "camera blob sync direct system skips clean frames and syncs later dirtiness" {
+  let world = World::new()
+  let lens = world.camera_lens_component()
+  let camera = world.create_entity()
+  assert_true(world.set_global_transform(camera, @m44.Matrix44F::identity()))
+  assert_true(
+    world.set_camera_matrices(
+      camera,
+      @m44.Matrix44F::identity(),
+      @m44.Matrix44F::identity(),
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      camera_projection_orthographic(),
+      (0.0 : Float),
+    ),
+  )
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (2.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  let phase = PhaseKey::new("test/render_extract_dirty")
+  let runner = SystemRunner::new()
+  runner.add_system(camera_blob_sync_system(world, phase, lens))
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 1), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 0)
+  assert_true(world.remove_component(camera, lens))
+  assert_true(
+    add_camera_lens_orthographic(
+      world,
+      camera,
+      lens,
+      (0.1 : Float),
+      (10.0 : Float),
+      (1.0 : Float),
+      (4.0 : Float),
+      (0.0 : Float),
+    ),
+  )
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 3), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
+}
+
+///|
 test "orbit camera blob sync applies orthographic dolly scale" {
   let world = World::new()
   let orbit = world.orbit_camera_controller_component()
@@ -579,6 +640,28 @@ test "orbit camera blob sync applies orthographic dolly scale" {
     }
     None => abort("expected camera gpu row")
   }
+  ignore(world.drain_camera_blob_write_views())
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 2), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 0)
+  assert_true(
+    update_orbit_camera_controller_from_mouse_frame(
+      world,
+      camera,
+      false,
+      false,
+      false,
+      false,
+      (0.0 : Float),
+      (0.0 : Float),
+      (1000.0 : Float),
+    ),
+  )
+  assert_true(
+    runner.run_phase(world, SystemContext::new((0.016 : Float), 3), phase),
+  )
+  assert_eq(world.drain_camera_blob_write_views().length(), 1)
 }
 
 ///|

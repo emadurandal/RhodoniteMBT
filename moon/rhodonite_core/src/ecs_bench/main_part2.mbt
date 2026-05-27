@@ -455,6 +455,33 @@ fn bench_camera_blob_sync_system_phase(count : Int) -> BenchSample {
 }
 
 ///|
+/// Implements `bench_camera_blob_sync_system_phase_clean`.
+fn bench_camera_blob_sync_system_phase_clean(count : Int) -> BenchSample {
+  let (world, _, _, lens) = make_camera_blob_sync_world(count)
+  let phase = @ecs.PhaseKey::new("camera-blob-sync-system-clean-bench")
+  let runner = @ecs.SystemRunner::new()
+  runner.add_system(@ecs.camera_blob_sync_system(world, phase, lens))
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 1),
+      phase,
+    ) {
+    abort("expected camera blob sync warmup phase")
+  }
+  ignore(world.drain_camera_blob_write_views())
+  let started = monotonic_ms()
+  if !runner.run_phase(
+      world,
+      @ecs.SystemContext::new((0.016 : Float), 2),
+      phase,
+    ) {
+    abort("expected clean camera blob sync system phase")
+  }
+  let checksum = if world.has_camera_blob_write_views() { count } else { 0 }
+  report("camera_blob_sync_system_phase_clean", count, started, checksum)
+}
+
+///|
 /// Implements `bench_camera_blob_sync_command_system_phase`.
 fn bench_camera_blob_sync_command_system_phase(count : Int) -> BenchSample {
   let (world, _, _, lens) = make_camera_blob_sync_world(count)

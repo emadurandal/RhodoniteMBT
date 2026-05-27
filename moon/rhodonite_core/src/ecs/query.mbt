@@ -600,6 +600,21 @@ pub fn QueryCache::for_each(
 }
 
 ///|
+/// Runs this cached row query with a pre-resolved read-only payload index and no row wrapper.
+pub fn QueryCache::for_each_read_at(
+  self : QueryCache,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  self.refresh(world)
+  match self.prepared {
+    Some(prepared) => prepared.for_each_read_at(world, index, f)
+    None => ()
+  }
+}
+
+///|
 /// Runs this cached raw row query, preparing or refreshing only when needed.
 pub fn RawQueryCache::for_each(
   self : RawQueryCache,
@@ -609,6 +624,21 @@ pub fn RawQueryCache::for_each(
   self.refresh(world)
   match self.prepared {
     Some(prepared) => prepared.for_each(world, f)
+    None => ()
+  }
+}
+
+///|
+/// Runs this cached raw query with a pre-resolved read-only payload index and no row wrapper.
+pub fn RawQueryCache::for_each_read_view_at(
+  self : RawQueryCache,
+  world : World,
+  index : Int,
+  f : (EntityId, ArrayView[Byte]) -> Unit,
+) -> Unit {
+  self.refresh(world)
+  match self.prepared {
+    Some(prepared) => prepared.for_each_read_view_at(world, index, f)
     None => ()
   }
 }
