@@ -37,6 +37,70 @@ fn system_access_conflicts(a : System, b : System) -> Bool {
 }
 
 ///|
+/// Builds a public conflict diagnostic for one system pair.
+fn system_access_conflict(
+  left_runner_index : Int,
+  left : System,
+  right_runner_index : Int,
+  right : System,
+) -> SystemAccessConflict? {
+  if left.structural_write || right.structural_write {
+    return Some({
+      phase: left.phase,
+      left_runner_index,
+      right_runner_index,
+      left_name: left.name,
+      right_name: right.name,
+      kind: "structural_write",
+      component: None,
+    })
+  }
+  for i = 0; i < left.writes.length(); i = i + 1 {
+    let component = left.writes[i]
+    if component_array_contains(right.writes, component) {
+      return Some({
+        phase: left.phase,
+        left_runner_index,
+        right_runner_index,
+        left_name: left.name,
+        right_name: right.name,
+        kind: "write_write",
+        component: Some(component),
+      })
+    }
+  }
+  for i = 0; i < left.writes.length(); i = i + 1 {
+    let component = left.writes[i]
+    if component_array_contains(right.reads, component) {
+      return Some({
+        phase: left.phase,
+        left_runner_index,
+        right_runner_index,
+        left_name: left.name,
+        right_name: right.name,
+        kind: "left_write_right_read",
+        component: Some(component),
+      })
+    }
+  }
+  for i = 0; i < left.reads.length(); i = i + 1 {
+    let component = left.reads[i]
+    if component_array_contains(right.writes, component) {
+      return Some({
+        phase: left.phase,
+        left_runner_index,
+        right_runner_index,
+        left_name: left.name,
+        right_name: right.name,
+        kind: "left_read_right_write",
+        component: Some(component),
+      })
+    }
+  }
+  None
+}
+
+///|
 /// Implements `scheduled_system_batch_conflicts_with`.
 fn scheduled_system_batch_conflicts_with(
   batch : Array[ScheduledSystem],
@@ -676,15 +740,28 @@ pub fn SystemRunner::plan_phase(
 /// `SystemRunner::run_phase` remains single-threaded and registration-ordered; this helper is a
 /// scheduling boundary for future parallel batching or validation.
 pub fn SystemRunner::has_parallel_access_conflicts(self : SystemRunner) -> Bool {
+  self.parallel_access_conflicts().length() > 0
+}
+
+///|
+/// Returns system-pair diagnostics for same-phase systems that cannot run in parallel.
+pub fn SystemRunner::parallel_access_conflicts(
+  self : SystemRunner,
+) -> Array[SystemAccessConflict] {
+  let conflicts : Array[SystemAccessConflict] = []
   for i = 0; i < self.systems.length(); i = i + 1 {
     for j = i + 1; j < self.systems.length(); j = j + 1 {
-      if self.systems[i].phase == self.systems[j].phase &&
-        self.systems[i].conflicts_with(self.systems[j]) {
-        return true
+      let left = self.systems[i]
+      let right = self.systems[j]
+      if left.phase == right.phase {
+        match system_access_conflict(i, left, j, right) {
+          Some(conflict) => conflicts.push(conflict)
+          None => ()
+        }
       }
     }
   }
-  false
+  conflicts
 }
 
 ///|

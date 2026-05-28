@@ -10,6 +10,14 @@ pub fn system_runner_has_parallel_access_conflicts(
 }
 
 ///|
+/// Implements `system_runner_parallel_access_conflicts`.
+pub fn system_runner_parallel_access_conflicts(
+  runner : @ecs.SystemRunner,
+) -> Array[@ecs.SystemAccessConflict] {
+  runner.parallel_access_conflicts()
+}
+
+///|
 /// Implements `system_runner_plan_phase`.
 pub fn system_runner_plan_phase(
   runner : @ecs.SystemRunner,
@@ -100,6 +108,73 @@ pub fn system_plan_system_structural_write(
   system : @ecs.SystemPlanSystem,
 ) -> Bool {
   system.structural_write
+}
+
+///|
+/// Implements `system_access_conflict_phase`.
+pub fn system_access_conflict_phase(
+  conflict : @ecs.SystemAccessConflict,
+) -> @ecs.PhaseKey {
+  conflict.phase
+}
+
+///|
+/// Implements `system_access_conflict_left_runner_index`.
+pub fn system_access_conflict_left_runner_index(
+  conflict : @ecs.SystemAccessConflict,
+) -> Int {
+  conflict.left_runner_index
+}
+
+///|
+/// Implements `system_access_conflict_right_runner_index`.
+pub fn system_access_conflict_right_runner_index(
+  conflict : @ecs.SystemAccessConflict,
+) -> Int {
+  conflict.right_runner_index
+}
+
+///|
+/// Implements `system_access_conflict_left_name`.
+pub fn system_access_conflict_left_name(
+  conflict : @ecs.SystemAccessConflict,
+) -> String {
+  conflict.left_name
+}
+
+///|
+/// Implements `system_access_conflict_right_name`.
+pub fn system_access_conflict_right_name(
+  conflict : @ecs.SystemAccessConflict,
+) -> String {
+  conflict.right_name
+}
+
+///|
+/// Implements `system_access_conflict_kind`.
+pub fn system_access_conflict_kind(
+  conflict : @ecs.SystemAccessConflict,
+) -> String {
+  conflict.kind
+}
+
+///|
+/// Implements `system_access_conflict_has_component`.
+pub fn system_access_conflict_has_component(
+  conflict : @ecs.SystemAccessConflict,
+) -> Bool {
+  conflict.component is Some(_)
+}
+
+///|
+/// Implements `system_access_conflict_component`.
+pub fn system_access_conflict_component(
+  conflict : @ecs.SystemAccessConflict,
+) -> @ecs.ComponentTypeId {
+  match conflict.component {
+    Some(component) => component
+    None => abort("SystemAccessConflict has no component")
+  }
 }
 
 ///|

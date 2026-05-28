@@ -62,6 +62,7 @@
             <li><code>CommandBuffer</code> は queue 時点で component write と structural write を検証します。</li>
             <li>component 登録は system runner 実行中に lock されます。</li>
             <li><code>SystemRunner</code> は phase batches を内部 cache し、system 追加時に invalidation します。公開 plan result は snapshot のままです。</li>
+            <li><code>SystemRunner::parallel_access_conflicts</code> は将来の parallel scheduling 向けに、現行の single-threaded execution を変えずに同じ phase の conflict diagnostics を返します。</li>
             <li><code>System::new_direct</code> は <code>World</code> に直接 mutate する hot path 向けの commandless system を作ります。direct system も access guard と batching は維持しますが、<code>CommandBuffer</code> を allocate せず、直接 write は <code>WorldHistory::run_system_phase</code> で記録されません。</li>
             <li>runtime の builtin camera blob sync system は direct system で、camera sync input mutation から立つ private dirty queue を消費します。これらの write を <code>WorldHistory</code> 経由で記録する場合、または full command-buffer query pass が必要な場合は <code>*_command_system</code> variants を使います。</li>
             <li>非 report の phase execution は、command を queue しなかった command system の command-buffer apply pass を skip します。</li>

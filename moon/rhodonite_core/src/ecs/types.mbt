@@ -406,6 +406,18 @@ pub(all) struct SystemPhasePlan {
 }
 
 ///|
+/// Read-only diagnostic for one system pair that cannot safely run in parallel.
+pub(all) struct SystemAccessConflict {
+  phase : PhaseKey
+  left_runner_index : Int
+  right_runner_index : Int
+  left_name : String
+  right_name : String
+  kind : String
+  component : ComponentTypeId?
+}
+
+///|
 /// Read-only diagnostic for one failed queued command during system phase apply.
 pub(all) struct CommandBufferCommandFailure {
   command_index : Int
