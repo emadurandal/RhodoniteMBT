@@ -60,6 +60,18 @@ fn run_suite(count : Int) -> Unit {
   run_case("query_archetype", count, bench_query_archetype)
   run_case("query_archetype_indexed", count, bench_query_archetype_indexed)
   run_case(
+    "query_archetype_chunked_64", count, bench_query_archetype_chunked_64,
+  )
+  run_case(
+    "query_archetype_chunked_256", count, bench_query_archetype_chunked_256,
+  )
+  run_case(
+    "query_archetype_chunked_indexed_64", count, bench_query_archetype_chunked_indexed_64,
+  )
+  run_case(
+    "query_archetype_chunked_indexed_256", count, bench_query_archetype_chunked_indexed_256,
+  )
+  run_case(
     "query_many_archetypes_plan", count, bench_query_many_archetypes_plan,
   )
   run_case(

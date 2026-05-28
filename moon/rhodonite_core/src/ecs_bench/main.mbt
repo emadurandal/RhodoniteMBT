@@ -562,6 +562,109 @@ fn bench_query_archetype_indexed(count : Int) -> BenchSample {
 }
 
 ///|
+/// Runs the chunked raw archetype position-write benchmark through component-id access.
+fn bench_query_archetype_chunked(
+  count : Int,
+  rows_per_chunk : Int,
+  name : String,
+) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(tf)
+    arch.for_each_column_chunk(tf, rows_per_chunk, (row_start, row_count, chunk) => {
+      for local_row = 0; local_row < row_count; local_row = local_row + 1 {
+        let row = row_start + local_row
+        let entity = arch.entity(row)
+        let idx = entity.gpu_index()
+        let (x, z) = grid_xz_for_index(idx, per_side)
+        @comp.Transform3D::write_position_to_component_mut_view(
+          chunk.mut_view(
+            start=local_row * stride,
+            end=local_row * stride + stride,
+          ),
+          x,
+          Float::from_double(idx.to_double() * 0.001),
+          z,
+        )
+        checksum = checksum + idx
+      }
+    })
+  })
+  report(name, count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_64`.
+fn bench_query_archetype_chunked_64(count : Int) -> BenchSample {
+  bench_query_archetype_chunked(count, 64, "query_archetype_chunked_64")
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_256`.
+fn bench_query_archetype_chunked_256(count : Int) -> BenchSample {
+  bench_query_archetype_chunked(count, 256, "query_archetype_chunked_256")
+}
+
+///|
+/// Runs the chunked raw archetype position-write benchmark through payload-index access.
+fn bench_query_archetype_chunked_indexed(
+  count : Int,
+  rows_per_chunk : Int,
+  name : String,
+) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let tf_index = q.component_index(tf)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    let stride = arch.component_stride_at(tf_index)
+    arch.for_each_column_chunk_at(tf_index, rows_per_chunk, (
+      row_start,
+      row_count,
+      chunk,
+    ) => {
+      for local_row = 0; local_row < row_count; local_row = local_row + 1 {
+        let row = row_start + local_row
+        let entity = arch.entity(row)
+        let idx = entity.gpu_index()
+        let (x, z) = grid_xz_for_index(idx, per_side)
+        @comp.Transform3D::write_position_to_component_mut_view(
+          chunk.mut_view(
+            start=local_row * stride,
+            end=local_row * stride + stride,
+          ),
+          x,
+          Float::from_double(idx.to_double() * 0.001),
+          z,
+        )
+        checksum = checksum + idx
+      }
+    })
+  })
+  report(name, count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_indexed_64`.
+fn bench_query_archetype_chunked_indexed_64(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_indexed(
+    count, 64, "query_archetype_chunked_indexed_64",
+  )
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_indexed_256`.
+fn bench_query_archetype_chunked_indexed_256(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_indexed(
+    count, 256, "query_archetype_chunked_indexed_256",
+  )
+}
+
+///|
 /// Implements `many_archetype_signature_count`.
 fn many_archetype_signature_count() -> Int {
   32
