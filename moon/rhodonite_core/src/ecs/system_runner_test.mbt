@@ -353,6 +353,74 @@ test "System conflict helpers detect same-phase access overlaps" {
 }
 
 ///|
+test "SystemRunner::parallel_access_conflicts reports component conflict kinds" {
+  let world = World::new()
+  let qa = world.register_component("SystemConflictDiagA", 4)
+  let qb = world.register_component("SystemConflictDiagB", 4)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("write-a", update_phase(), [], [qa], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("write-b-left", update_phase(), [], [qb], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("write-b-right", update_phase(), [], [qb], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new("read-a-other-phase", post_update_phase(), [qa], [], (
+      _w,
+      _c,
+      _b,
+    ) => ()),
+  )
+  assert_true(runner.has_parallel_access_conflicts())
+  let conflicts = runner.parallel_access_conflicts()
+  assert_eq(conflicts.length(), 2)
+  assert_true(conflicts[0].phase == update_phase())
+  assert_eq(conflicts[0].left_runner_index, 0)
+  assert_eq(conflicts[0].right_runner_index, 1)
+  assert_eq(conflicts[0].left_name, "read-a")
+  assert_eq(conflicts[0].right_name, "write-a")
+  assert_eq(conflicts[0].kind, "left_read_right_write")
+  match conflicts[0].component {
+    Some(component) => assert_true(component == qa)
+    None => abort("expected read/write conflict component")
+  }
+  assert_eq(conflicts[1].left_runner_index, 2)
+  assert_eq(conflicts[1].right_runner_index, 3)
+  assert_eq(conflicts[1].kind, "write_write")
+  match conflicts[1].component {
+    Some(component) => assert_true(component == qb)
+    None => abort("expected write/write conflict component")
+  }
+}
+
+///|
+test "SystemRunner::parallel_access_conflicts reports structural conflicts without component" {
+  let world = World::new()
+  let qa = world.register_component("SystemStructuralConflictDiagA", 4)
+  let runner = SystemRunner::new()
+  runner.add_system(
+    System::new("read-a", update_phase(), [qa], [], (_w, _c, _b) => ()),
+  )
+  runner.add_system(
+    System::new_with_structural_write("structural", update_phase(), [], [], (
+      _w,
+      _c,
+      _b,
+    ) => ()),
+  )
+  let conflicts = runner.parallel_access_conflicts()
+  assert_eq(conflicts.length(), 1)
+  assert_eq(conflicts[0].kind, "structural_write")
+  assert_true(conflicts[0].component is None)
+}
+
+///|
 test "SystemRunner::plan_phase exposes conflict-free execution batches" {
   let world = World::new()
   let qa = world.register_component("SystemPlanA", 4)

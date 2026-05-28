@@ -220,6 +220,50 @@ describe("ECS TypeScript wrapper: system", () => {
 		expect(batches[1].systems()[0].structuralWrite()).toBe(true);
 	});
 
+	it("reports TS parallel access conflict diagnostics", () => {
+		const world = World.new();
+		const a = world.registerComponent("TsSystemConflictDiagA", 4);
+		const b = world.registerComponent("TsSystemConflictDiagB", 4);
+		const phase = PhaseKey.new("ts/conflict-diag");
+		const otherPhase = PhaseKey.new("ts/conflict-diag-other");
+		const runner = SystemRunner.new();
+
+		runner.addSystem(System.new("read-a", phase, [a], [], () => {}));
+		runner.addSystem(System.new("write-a", phase, [], [a], () => {}));
+		runner.addSystem(System.new("write-b-left", phase, [], [b], () => {}));
+		runner.addSystem(System.new("write-b-right", phase, [], [b], () => {}));
+		runner.addSystem(System.new("read-a-other", otherPhase, [a], [], () => {}));
+
+		const conflicts = runner.parallelAccessConflicts();
+		expect(runner.hasParallelAccessConflicts()).toBe(true);
+		expect(conflicts).toHaveLength(2);
+		expect(conflicts[0].phase().name()).toBe("ts/conflict-diag");
+		expect(conflicts[0].leftRunnerIndex()).toBe(0);
+		expect(conflicts[0].rightRunnerIndex()).toBe(1);
+		expect(conflicts[0].leftName()).toBe("read-a");
+		expect(conflicts[0].rightName()).toBe("write-a");
+		expect(conflicts[0].kind()).toBe("left_read_right_write");
+		expect(conflicts[0].hasComponent()).toBe(true);
+		expect(conflicts[0].component()?.index()).toBe(a.index());
+		expect(conflicts[1].kind()).toBe("write_write");
+		expect(conflicts[1].component()?.index()).toBe(b.index());
+	});
+
+	it("reports TS structural conflicts without components", () => {
+		const phase = PhaseKey.new("ts/conflict-diag-structural");
+		const runner = SystemRunner.new();
+		runner.addSystem(System.new("before", phase, [], [], () => {}));
+		runner.addSystem(
+			System.newWithStructuralWrite("structural", phase, [], [], () => {}),
+		);
+
+		const conflicts = runner.parallelAccessConflicts();
+		expect(conflicts).toHaveLength(1);
+		expect(conflicts[0].kind()).toBe("structural_write");
+		expect(conflicts[0].hasComponent()).toBe(false);
+		expect(conflicts[0].component()).toBeUndefined();
+	});
+
 	it("refreshes cached TS phase plans after adding systems", () => {
 		const phase = PhaseKey.new("ts/plan-cache");
 		const runner = SystemRunner.new();

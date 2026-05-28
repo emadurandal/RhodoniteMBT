@@ -380,6 +380,16 @@ pub fn System::reads(Self) -> Array[ComponentTypeId]
 pub fn System::structural_write(Self) -> Bool
 pub fn System::writes(Self) -> Array[ComponentTypeId]
 
+pub(all) struct SystemAccessConflict {
+  phase : PhaseKey
+  left_runner_index : Int
+  right_runner_index : Int
+  left_name : String
+  right_name : String
+  kind : String
+  component : ComponentTypeId?
+}
+
 pub(all) struct SystemContext {
   delta_seconds : Float
   frame_index : Int
@@ -445,6 +455,7 @@ pub fn SystemRunner::add_system(Self, System) -> Unit
 pub fn SystemRunner::has_parallel_access_conflicts(Self) -> Bool
 pub fn SystemRunner::len(Self) -> Int
 pub fn SystemRunner::new() -> Self
+pub fn SystemRunner::parallel_access_conflicts(Self) -> Array[SystemAccessConflict]
 pub fn SystemRunner::plan_phase(Self, PhaseKey) -> SystemPhasePlan
 pub fn SystemRunner::run_phase(Self, World, SystemContext, PhaseKey) -> Bool
 pub fn SystemRunner::run_phase_report(Self, World, SystemContext, PhaseKey) -> SystemRunReport

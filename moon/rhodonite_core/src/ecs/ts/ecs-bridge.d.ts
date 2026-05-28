@@ -31,6 +31,7 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export type MoonSystemContext = object;
 	export type MoonSystem = object;
 	export type MoonSystemRunner = object;
+	export type MoonSystemAccessConflict = object;
 	export type MoonSystemPhasePlan = object;
 	export type MoonSystemPlanBatch = object;
 	export type MoonSystemPlanSystem = object;
@@ -70,6 +71,33 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 	export function entity_id_gpu_index(entity: MoonEntityId): number;
 	export function component_type_id_new(index: number): MoonComponentTypeId;
 	export function component_type_id_index(component: MoonComponentTypeId): number;
+	export function system_runner_parallel_access_conflicts(
+		runner: MoonSystemRunner,
+	): MoonSystemAccessConflict[];
+	export function system_access_conflict_phase(
+		conflict: MoonSystemAccessConflict,
+	): MoonPhaseKey;
+	export function system_access_conflict_left_runner_index(
+		conflict: MoonSystemAccessConflict,
+	): number;
+	export function system_access_conflict_right_runner_index(
+		conflict: MoonSystemAccessConflict,
+	): number;
+	export function system_access_conflict_left_name(
+		conflict: MoonSystemAccessConflict,
+	): string;
+	export function system_access_conflict_right_name(
+		conflict: MoonSystemAccessConflict,
+	): string;
+	export function system_access_conflict_kind(
+		conflict: MoonSystemAccessConflict,
+	): string;
+	export function system_access_conflict_has_component(
+		conflict: MoonSystemAccessConflict,
+	): MoonBool;
+	export function system_access_conflict_component(
+		conflict: MoonSystemAccessConflict,
+	): MoonComponentTypeId;
 
 	export function world_new(): MoonWorld;
 	export function world_new_with_global_transform_f16(): MoonWorld;

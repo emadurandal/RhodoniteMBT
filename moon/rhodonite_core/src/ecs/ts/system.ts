@@ -6,6 +6,7 @@ import type {
 	MoonCommandBuffer,
 	MoonPhaseKey,
 	MoonSystem,
+	MoonSystemAccessConflict,
 	MoonSystemContext,
 	MoonSystemPhasePlan,
 	MoonSystemPlanBatch,
@@ -41,6 +42,14 @@ import {
 	system_context_delta_seconds,
 	system_context_frame_index,
 	system_context_new,
+	system_access_conflict_component,
+	system_access_conflict_has_component,
+	system_access_conflict_kind,
+	system_access_conflict_left_name,
+	system_access_conflict_left_runner_index,
+	system_access_conflict_phase,
+	system_access_conflict_right_name,
+	system_access_conflict_right_runner_index,
 	system_new,
 	system_new_direct,
 	system_new_with_structural_write,
@@ -50,6 +59,7 @@ import {
 	system_runner_has_parallel_access_conflicts,
 	system_runner_len,
 	system_runner_new,
+	system_runner_parallel_access_conflicts,
 	system_runner_plan_phase,
 	system_runner_run_phase,
 	system_runner_run_phase_report,
@@ -413,6 +423,55 @@ export class SystemPhasePlan {
 	}
 }
 
+export type SystemAccessConflictKind =
+	| "structural_write"
+	| "write_write"
+	| "left_write_right_read"
+	| "left_read_right_write";
+
+export class SystemAccessConflict {
+	readonly inner: MoonSystemAccessConflict;
+
+	constructor(inner: MoonSystemAccessConflict) {
+		this.inner = inner;
+	}
+
+	phase(): PhaseKey {
+		return new PhaseKey(system_access_conflict_phase(this.inner));
+	}
+
+	leftRunnerIndex(): number {
+		return system_access_conflict_left_runner_index(this.inner);
+	}
+
+	rightRunnerIndex(): number {
+		return system_access_conflict_right_runner_index(this.inner);
+	}
+
+	leftName(): string {
+		return system_access_conflict_left_name(this.inner);
+	}
+
+	rightName(): string {
+		return system_access_conflict_right_name(this.inner);
+	}
+
+	kind(): SystemAccessConflictKind {
+		return system_access_conflict_kind(this.inner) as SystemAccessConflictKind;
+	}
+
+	hasComponent(): boolean {
+		return moonBool(system_access_conflict_has_component(this.inner));
+	}
+
+	component(): ComponentTypeId | undefined {
+		if (!this.hasComponent()) {
+			return undefined;
+		}
+		return new ComponentTypeId(system_access_conflict_component(this.inner));
+	}
+}
+
 export class CommandBufferCommandFailure {
 	readonly inner: MoonCommandBufferCommandFailure;
 
@@ -580,6 +639,12 @@ export class SystemRunner {
 
 	hasParallelAccessConflicts(): boolean {
 		return moonBool(system_runner_has_parallel_access_conflicts(this.inner));
+	}
+
+	parallelAccessConflicts(): SystemAccessConflict[] {
+		return system_runner_parallel_access_conflicts(this.inner).map(
+			(conflict) => new SystemAccessConflict(conflict),
+		);
 	}
 
 	planPhase(phase: PhaseKey): SystemPhasePlan {

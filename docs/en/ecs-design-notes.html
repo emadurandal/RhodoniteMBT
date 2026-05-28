@@ -62,6 +62,7 @@
             <li><code>CommandBuffer</code> validates component writes and structural writes at queue time.</li>
             <li>Component registration is locked while the system runner is executing.</li>
             <li><code>SystemRunner</code> caches phase batches internally and invalidates them when systems are added; public plan results remain snapshots.</li>
+            <li><code>SystemRunner::parallel_access_conflicts</code> returns same-phase conflict diagnostics for future parallel scheduling without changing current single-threaded execution.</li>
             <li><code>System::new_direct</code> builds commandless systems for hot paths that mutate through <code>World</code> directly. Direct systems still use declared access guards and batching, but they do not allocate a <code>CommandBuffer</code> and their direct writes are not recorded by <code>WorldHistory::run_system_phase</code>.</li>
             <li>The builtin runtime camera blob sync systems are direct systems and consume a private dirty queue populated by camera sync input mutations; use the <code>*_command_system</code> variants when those writes must be recorded through <code>WorldHistory</code> or when a full command-buffer query pass is desired.</li>
             <li>Non-report phase execution skips the command-buffer apply pass for command systems that queued no commands.</li>
