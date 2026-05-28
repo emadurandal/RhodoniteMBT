@@ -740,7 +740,16 @@ pub fn SystemRunner::plan_phase(
 /// `SystemRunner::run_phase` remains single-threaded and registration-ordered; this helper is a
 /// scheduling boundary for future parallel batching or validation.
 pub fn SystemRunner::has_parallel_access_conflicts(self : SystemRunner) -> Bool {
-  self.parallel_access_conflicts().length() > 0
+  for i = 0; i < self.systems.length(); i = i + 1 {
+    for j = i + 1; j < self.systems.length(); j = j + 1 {
+      let left = self.systems[i]
+      let right = self.systems[j]
+      if left.phase == right.phase && system_access_conflicts(left, right) {
+        return true
+      }
+    }
+  }
+  false
 }
 
 ///|
