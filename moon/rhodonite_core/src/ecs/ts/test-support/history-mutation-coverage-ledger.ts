@@ -240,6 +240,8 @@ export const auditedSurfaces: readonly SurfaceAudit[] = [
 		raw_guarded: [
 			"forEachColumnChunk",
 			"forEachColumnChunkAt",
+			"forEachColumnChunkSpan",
+			"forEachColumnChunkSpanAt",
 			"writeColumn",
 			"writeColumnAt",
 			"writeColumnRange",
@@ -454,6 +456,8 @@ export const auditedMoonBitSurfaces: readonly MoonBitSurfaceAudit[] = [
 		raw_guarded: [
 			"for_each_column_chunk",
 			"for_each_column_chunk_at",
+			"for_each_column_chunk_span",
+			"for_each_column_chunk_span_at",
 			"write_column",
 			"write_column_at",
 			"write_column_range",

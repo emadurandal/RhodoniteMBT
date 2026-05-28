@@ -847,6 +847,78 @@ pub fn RawQueryArchetype::for_each_column_chunk_at(
 }
 
 ///|
+/// Runs `f` over non-overlapping mutable column chunk spans for `component`.
+///
+/// The callback receives the full column view plus byte range metadata for each chunk.
+pub fn RawQueryArchetype::for_each_column_chunk_span(
+  self : RawQueryArchetype,
+  component : ComponentTypeId,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit,
+) -> Unit {
+  let access_index = self.component_payload_index(
+    component, "RawQueryArchetype::for_each_column_chunk_span",
+  )
+  self.for_each_column_chunk_span_at(access_index, rows_per_chunk, f)
+}
+
+///|
+/// Runs `f` over non-overlapping mutable column chunk spans for a pre-resolved payload index.
+///
+/// The callback receives `row_start`, `row_count`, full `column`, `byte_start`,
+/// `byte_count`, and `stride`. It must only write inside the supplied byte range.
+pub fn RawQueryArchetype::for_each_column_chunk_span_at(
+  self : RawQueryArchetype,
+  index : Int,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit,
+) -> Unit {
+  if rows_per_chunk <= 0 {
+    abort(
+      "RawQueryArchetype::for_each_column_chunk_span_at: rows_per_chunk must be positive",
+    )
+  }
+  let access = self.access_at_index(
+    index, "RawQueryArchetype::for_each_column_chunk_span_at",
+  )
+  self.world.assert_not_history_raw_mutation(
+    "RawQueryArchetype::for_each_column_chunk_span_at",
+  )
+  self.world.assert_system_component_write(
+    access.component,
+    "RawQueryArchetype::for_each_column_chunk_span_at",
+  )
+  let arch = self.world.archetypes[self.archetype_index]
+  let col = arch.columns[access.column_index]
+  let len = arch.entities.length()
+  let logical_end = len * access.stride
+  let column = col.bytes.mut_view(start=0, end=logical_end)
+  if len > 0 {
+    self.world.mark_transform_dirty_archetype(
+      self.archetype_index,
+      access.component,
+    )
+    self.world.mark_camera_blob_sync_dirty_archetype(
+      self.archetype_index,
+      access.component,
+    )
+  }
+  let mut row_start = 0
+  while row_start < len {
+    let remaining = len - row_start
+    let row_count = if remaining < rows_per_chunk {
+      remaining
+    } else {
+      rows_per_chunk
+    }
+    let byte_start = row_start * access.stride
+    let byte_count = row_count * access.stride
+    f(row_start, row_count, column, byte_start, byte_count, access.stride)
+    row_start = row_start + row_count
+  }
+}
+
+///|
 /// Runs `f` with a mutable column view and records changed rows through `history`.
 ///
 /// When history recording is disabled, this delegates to `RawQueryArchetype::write_column`

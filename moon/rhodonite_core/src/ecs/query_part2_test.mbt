@@ -208,6 +208,64 @@ test "RawQueryArchetype column chunks visit every row once in order" {
 }
 
 ///|
+test "RawQueryArchetype column chunk spans expose full column and byte ranges" {
+  let world = World::new()
+  let cpu = world.register_component("QueryArchChunkSpans", 4)
+  let entities : Array[EntityId] = []
+  for i = 0; i < 5; i = i + 1 {
+    let entity = world.create_entity()
+    entities.push(entity)
+    assert_true(
+      world.add_component_bytes(entity, cpu, bytes4(i.to_byte(), 0, 0, 0)),
+    )
+  }
+  let starts : Array[Int] = []
+  let byte_starts : Array[Int] = []
+  let byte_counts : Array[Int] = []
+  let mut stride = -1
+  let mut column_len = -1
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span_at(0, 2, (
+      row_start,
+      row_count,
+      column,
+      byte_start,
+      byte_count,
+      row_stride,
+    ) => {
+      starts.push(row_start)
+      byte_starts.push(byte_start)
+      byte_counts.push(byte_count)
+      stride = row_stride
+      column_len = column.length()
+      for row = 0; row < row_count; row = row + 1 {
+        column[byte_start + row * row_stride] = (row_start + row + 20).to_byte()
+      }
+    })
+  })
+  assert_eq(starts.length(), 3)
+  assert_eq(starts[0], 0)
+  assert_eq(starts[1], 2)
+  assert_eq(starts[2], 4)
+  assert_eq(byte_starts.length(), 3)
+  assert_eq(byte_starts[0], 0)
+  assert_eq(byte_starts[1], 8)
+  assert_eq(byte_starts[2], 16)
+  assert_eq(byte_counts.length(), 3)
+  assert_eq(byte_counts[0], 8)
+  assert_eq(byte_counts[1], 8)
+  assert_eq(byte_counts[2], 4)
+  assert_eq(stride, 4)
+  assert_eq(column_len, 20)
+  for i = 0; i < entities.length(); i = i + 1 {
+    match world.component_bytes(entities[i], cpu) {
+      Some(bytes) => assert_eq(bytes[0], (i + 20).to_byte())
+      None => abort("expected QueryArchChunkSpans bytes")
+    }
+  }
+}
+
+///|
 test "RawQueryArchetype column chunks skip empty archetypes" {
   let world = World::new()
   let cpu = world.register_component("QueryArchEmptyChunks", 4)
@@ -217,6 +275,25 @@ test "RawQueryArchetype column chunks skip empty archetypes" {
     arch.for_each_column_chunk(cpu, 2, (_row_start, _row_count, _bytes) => {
       callbacks = callbacks + 1
     })
+  })
+  assert_eq(callbacks, 0)
+}
+
+///|
+test "RawQueryArchetype column chunk spans skip empty archetypes" {
+  let world = World::new()
+  let cpu = world.register_component("QueryArchEmptyChunkSpans", 4)
+  assert_true(world.reserve_batch_capacity([cpu], 1))
+  let mut callbacks = 0
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span(cpu, 2, (
+      _row_start,
+      _row_count,
+      _column,
+      _byte_start,
+      _byte_count,
+      _stride,
+    ) => callbacks = callbacks + 1)
   })
   assert_eq(callbacks, 0)
 }
@@ -827,6 +904,24 @@ test "panic RawQueryArchetype for_each_column_chunk rejects non-positive chunk s
 }
 
 ///|
+test "panic RawQueryArchetype for_each_column_chunk_span rejects non-positive chunk size" {
+  let world = World::new()
+  let qa = world.register_component("RawQueryChunkSpanInvalidA", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, qa, bytes4(1, 0, 0, 0)))
+  RawQuery::new([qa]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span(qa, 0, (
+      _row_start,
+      _row_count,
+      _column,
+      _byte_start,
+      _byte_count,
+      _stride,
+    ) => ())
+  })
+}
+
+///|
 test "panic RawQueryArchetype raw write column range aborts inside guarded transaction" {
   let world = World::new()
   let history = WorldHistory::new()
@@ -840,5 +935,28 @@ test "panic RawQueryArchetype raw write column range aborts inside guarded trans
   RawQuery::new([cpu]).for_each_archetype(world, arch => {
     let column = arch.write_column_range(cpu, 0, 1)
     column[0] = (2 : Byte)
+  })
+}
+
+///|
+test "panic RawQueryArchetype raw column chunk span aborts inside guarded transaction" {
+  let world = World::new()
+  let history = WorldHistory::new()
+  let cpu = world.register_component("RawQueryArchRawSpanGuard", 4)
+  let entity = world.create_entity()
+  assert_true(world.add_component_bytes(entity, cpu, bytes4(1, 0, 0, 0)))
+  history.set_raw_mutation_guard_enabled(true)
+  assert_true(
+    history.begin_guarded_transaction(world, "guarded raw column span"),
+  )
+  RawQuery::new([cpu]).for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span(cpu, 1, (
+      _row_start,
+      _row_count,
+      column,
+      byte_start,
+      _byte_count,
+      _stride,
+    ) => column[byte_start] = (2 : Byte))
   })
 }

@@ -184,12 +184,32 @@ describe("ECS TypeScript wrapper: query", () => {
 			});
 			expect(starts).toEqual([0, 2]);
 			expect(counts).toEqual([2, 1]);
+
+			const spanStarts: number[] = [];
+			const spanByteStarts: number[] = [];
+			const spanByteCounts: number[] = [];
+			archetype.forEachColumnChunkSpanAt(0, 2, (span) => {
+				spanStarts.push(span.rowStart);
+				spanByteStarts.push(span.byteStart);
+				spanByteCounts.push(span.byteCount);
+				expect(span.stride).toBe(16);
+				expect(span.column.length).toBe(48);
+				for (let row = 0; row < span.rowCount; row += 1) {
+					span.column.setF32(
+						span.byteStart + row * span.stride,
+						span.rowStart + row + 30,
+					);
+				}
+			});
+			expect(spanStarts).toEqual([0, 2]);
+			expect(spanByteStarts).toEqual([0, 32]);
+			expect(spanByteCounts).toEqual([32, 16]);
 		});
 
 		for (let i = 0; i < entities.length; i += 1) {
 			expect(
 				getF32(world.componentBytesCopy(entities[i], cpu) ?? new Uint8Array(), 0),
-			).toBeCloseTo(i + 10);
+			).toBeCloseTo(i + 30);
 		}
 	});
 

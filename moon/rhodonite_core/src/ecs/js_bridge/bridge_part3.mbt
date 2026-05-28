@@ -703,6 +703,28 @@ pub fn raw_query_archetype_for_each_column_chunk_at(
 }
 
 ///|
+/// Implements `raw_query_archetype_for_each_column_chunk_span`.
+pub fn raw_query_archetype_for_each_column_chunk_span(
+  arch : @ecs.RawQueryArchetype,
+  component : @ecs.ComponentTypeId,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit,
+) -> Unit {
+  arch.for_each_column_chunk_span(component, rows_per_chunk, f)
+}
+
+///|
+/// Implements `raw_query_archetype_for_each_column_chunk_span_at`.
+pub fn raw_query_archetype_for_each_column_chunk_span_at(
+  arch : @ecs.RawQueryArchetype,
+  index : Int,
+  rows_per_chunk : Int,
+  f : (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit,
+) -> Unit {
+  arch.for_each_column_chunk_span_at(index, rows_per_chunk, f)
+}
+
+///|
 /// Implements `raw_query_archetype_write_column_tracked`.
 pub fn raw_query_archetype_write_column_tracked(
   arch : @ecs.RawQueryArchetype,

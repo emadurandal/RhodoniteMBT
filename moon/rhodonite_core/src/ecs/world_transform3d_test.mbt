@@ -44,6 +44,33 @@ test "Transform3D writes position through zero-copy component view" {
 }
 
 ///|
+test "Transform3D writes position through zero-copy column offset" {
+  let first = transform3d_bytes_identity()
+  let second = transform3d_bytes_identity()
+  let column : FixedArray[Byte] = FixedArray::make(96, (0 : Byte))
+  for i = 0; i < 48; i = i + 1 {
+    column[i] = first[i]
+    column[i + 48] = second[i]
+  }
+  let view = column.mut_view(start=0, end=96)
+  @comp.Transform3D::write_position_to_component_column_mut_view(
+    view,
+    48,
+    (8.0 : Float),
+    (9.0 : Float),
+    (10.0 : Float),
+  )
+  let first_row = view.mut_view(start=0, end=48)
+  let second_row = view.mut_view(start=48, end=96)
+  let first_tf = @comp.Transform3D::from_component_mut_view(first_row)
+  let second_tf = @comp.Transform3D::from_component_mut_view(second_row)
+  assert_eq(first_tf.position.x(), (0.0 : Float))
+  assert_eq(second_tf.position.x(), (8.0 : Float))
+  assert_eq(second_tf.position.y(), (9.0 : Float))
+  assert_eq(second_tf.position.z(), (10.0 : Float))
+}
+
+///|
 test "spawn_transform_global_batch initializes fp16 GlobalTransform rows" {
   let world = World::new_with_global_transform_format(Affine3x4F16)
   let entities = world.spawn_transform_global_batch(1, fn(

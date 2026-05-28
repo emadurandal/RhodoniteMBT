@@ -307,6 +307,8 @@ options(
         "raw_query_archetype_write_column_range_at",
         "raw_query_archetype_for_each_column_chunk",
         "raw_query_archetype_for_each_column_chunk_at",
+        "raw_query_archetype_for_each_column_chunk_span",
+        "raw_query_archetype_for_each_column_chunk_span_at",
         "raw_query_archetype_write_column_tracked",
         "raw_query_archetype_write_column_tracked_at",
         "raw_query_archetype_write_column_rows_tracked",
