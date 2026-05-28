@@ -58,7 +58,11 @@ fn run_suite(count : Int) -> Unit {
   run_case("query_row", count, bench_query_row)
   run_case("query_row_indexed", count, bench_query_row_indexed)
   run_case("query_archetype", count, bench_query_archetype)
+  run_case("query_archetype_offset", count, bench_query_archetype_offset)
   run_case("query_archetype_indexed", count, bench_query_archetype_indexed)
+  run_case(
+    "query_archetype_indexed_offset", count, bench_query_archetype_indexed_offset,
+  )
   run_case(
     "query_archetype_chunked_64", count, bench_query_archetype_chunked_64,
   )

@@ -535,6 +535,33 @@ fn bench_query_archetype(count : Int) -> BenchSample {
 }
 
 ///|
+/// Implements `bench_query_archetype_offset`.
+fn bench_query_archetype_offset(count : Int) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    let stride = arch.component_stride(tf)
+    let col = arch.write_column(tf)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let entity = arch.entity(row)
+      let idx = entity.gpu_index()
+      let (x, z) = grid_xz_for_index(idx, per_side)
+      @comp.Transform3D::write_position_to_component_column_mut_view(
+        col,
+        row * stride,
+        x,
+        Float::from_double(idx.to_double() * 0.001),
+        z,
+      )
+      checksum = checksum + idx
+    }
+  })
+  report("query_archetype_offset", count, started, checksum)
+}
+
+///|
 /// Implements `bench_query_archetype_indexed`.
 fn bench_query_archetype_indexed(count : Int) -> BenchSample {
   let (world, tf, _, per_side) = make_world(count)
@@ -559,6 +586,34 @@ fn bench_query_archetype_indexed(count : Int) -> BenchSample {
     }
   })
   report("query_archetype_indexed", count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_archetype_indexed_offset`.
+fn bench_query_archetype_indexed_offset(count : Int) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let tf_index = q.component_index(tf)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    let stride = arch.component_stride_at(tf_index)
+    let col = arch.write_column_at(tf_index)
+    for row = 0; row < arch.length(); row = row + 1 {
+      let entity = arch.entity(row)
+      let idx = entity.gpu_index()
+      let (x, z) = grid_xz_for_index(idx, per_side)
+      @comp.Transform3D::write_position_to_component_column_mut_view(
+        col,
+        row * stride,
+        x,
+        Float::from_double(idx.to_double() * 0.001),
+        z,
+      )
+      checksum = checksum + idx
+    }
+  })
+  report("query_archetype_indexed_offset", count, started, checksum)
 }
 
 ///|
