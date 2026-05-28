@@ -665,6 +665,133 @@ fn bench_query_archetype_chunked_indexed_256(count : Int) -> BenchSample {
 }
 
 ///|
+/// Runs the span chunked raw archetype benchmark through component-id access.
+fn bench_query_archetype_chunked_span(
+  count : Int,
+  rows_per_chunk : Int,
+  name : String,
+) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span(tf, rows_per_chunk, (
+      row_start,
+      row_count,
+      column,
+      byte_start,
+      _byte_count,
+      stride,
+    ) => {
+      for local_row = 0; local_row < row_count; local_row = local_row + 1 {
+        let row = row_start + local_row
+        let entity = arch.entity(row)
+        let idx = entity.gpu_index()
+        let (x, z) = grid_xz_for_index(idx, per_side)
+        @comp.Transform3D::write_position_to_component_column_mut_view(
+          column,
+          byte_start + local_row * stride,
+          x,
+          Float::from_double(idx.to_double() * 0.001),
+          z,
+        )
+        checksum = checksum + idx
+      }
+    })
+  })
+  report(name, count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_span_64`.
+fn bench_query_archetype_chunked_span_64(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_span(
+    count, 64, "query_archetype_chunked_span_64",
+  )
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_span_256`.
+fn bench_query_archetype_chunked_span_256(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_span(
+    count, 256, "query_archetype_chunked_span_256",
+  )
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_span_1024`.
+fn bench_query_archetype_chunked_span_1024(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_span(
+    count, 1024, "query_archetype_chunked_span_1024",
+  )
+}
+
+///|
+/// Runs the span chunked raw archetype benchmark through payload-index access.
+fn bench_query_archetype_chunked_indexed_span(
+  count : Int,
+  rows_per_chunk : Int,
+  name : String,
+) -> BenchSample {
+  let (world, tf, _, per_side) = make_world(count)
+  let q = @ecs.RawQuery::new([tf])
+  let tf_index = q.component_index(tf)
+  let started = monotonic_ms()
+  let mut checksum = 0
+  q.for_each_archetype(world, arch => {
+    arch.for_each_column_chunk_span_at(tf_index, rows_per_chunk, (
+      row_start,
+      row_count,
+      column,
+      byte_start,
+      _byte_count,
+      stride,
+    ) => {
+      for local_row = 0; local_row < row_count; local_row = local_row + 1 {
+        let row = row_start + local_row
+        let entity = arch.entity(row)
+        let idx = entity.gpu_index()
+        let (x, z) = grid_xz_for_index(idx, per_side)
+        @comp.Transform3D::write_position_to_component_column_mut_view(
+          column,
+          byte_start + local_row * stride,
+          x,
+          Float::from_double(idx.to_double() * 0.001),
+          z,
+        )
+        checksum = checksum + idx
+      }
+    })
+  })
+  report(name, count, started, checksum)
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_indexed_span_64`.
+fn bench_query_archetype_chunked_indexed_span_64(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_indexed_span(
+    count, 64, "query_archetype_chunked_indexed_span_64",
+  )
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_indexed_span_256`.
+fn bench_query_archetype_chunked_indexed_span_256(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_indexed_span(
+    count, 256, "query_archetype_chunked_indexed_span_256",
+  )
+}
+
+///|
+/// Implements `bench_query_archetype_chunked_indexed_span_1024`.
+fn bench_query_archetype_chunked_indexed_span_1024(count : Int) -> BenchSample {
+  bench_query_archetype_chunked_indexed_span(
+    count, 1024, "query_archetype_chunked_indexed_span_1024",
+  )
+}
+
+///|
 /// Implements `many_archetype_signature_count`.
 fn many_archetype_signature_count() -> Int {
   32

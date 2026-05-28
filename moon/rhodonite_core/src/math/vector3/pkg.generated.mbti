@@ -33,6 +33,7 @@ pub fn Vector3Ref::set_x(Self[Byte], Float) -> Unit
 pub fn Vector3Ref::set_y(Self[Byte], Float) -> Unit
 pub fn Vector3Ref::set_z(Self[Byte], Float) -> Unit
 pub fn Vector3Ref::write_mut_view(MutArrayView[Byte], Float, Float, Float) -> Unit
+pub fn Vector3Ref::write_mut_view_at(MutArrayView[Byte], Int, Float, Float, Float) -> Unit
 pub fn Vector3Ref::x(Self[Byte]) -> Float
 pub fn Vector3Ref::y(Self[Byte]) -> Float
 pub fn Vector3Ref::z(Self[Byte]) -> Float

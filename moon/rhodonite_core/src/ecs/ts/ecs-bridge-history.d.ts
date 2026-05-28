@@ -551,6 +551,32 @@ declare module "@moon/rhodonite_core/ecs/js_bridge" {
 		rowsPerChunk: number,
 		f: (rowStart: number, rowCount: number, bytes: MoonByteView) => void,
 	): void;
+	export function raw_query_archetype_for_each_column_chunk_span(
+		archetype: MoonRawQueryArchetype,
+		component: MoonComponentTypeId,
+		rowsPerChunk: number,
+		f: (
+			rowStart: number,
+			rowCount: number,
+			column: MoonByteView,
+			byteStart: number,
+			byteCount: number,
+			stride: number,
+		) => void,
+	): void;
+	export function raw_query_archetype_for_each_column_chunk_span_at(
+		archetype: MoonRawQueryArchetype,
+		index: number,
+		rowsPerChunk: number,
+		f: (
+			rowStart: number,
+			rowCount: number,
+			column: MoonByteView,
+			byteStart: number,
+			byteCount: number,
+			stride: number,
+		) => void,
+	): void;
 	export function raw_query_archetype_write_column_tracked(
 		archetype: MoonRawQueryArchetype,
 		history: MoonWorldHistory,

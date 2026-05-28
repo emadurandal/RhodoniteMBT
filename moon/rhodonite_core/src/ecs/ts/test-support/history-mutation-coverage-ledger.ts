@@ -240,6 +240,8 @@ export const auditedSurfaces: readonly SurfaceAudit[] = [
 		raw_guarded: [
 			"forEachColumnChunk",
 			"forEachColumnChunkAt",
+			"forEachColumnChunkSpan",
+			"forEachColumnChunkSpanAt",
 			"writeColumn",
 			"writeColumnAt",
 			"writeColumnRange",

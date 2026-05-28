@@ -80,6 +80,8 @@ import {
 	raw_query_archetype_entity,
 	raw_query_archetype_for_each_column_chunk,
 	raw_query_archetype_for_each_column_chunk_at,
+	raw_query_archetype_for_each_column_chunk_span,
+	raw_query_archetype_for_each_column_chunk_span_at,
 	raw_query_archetype_has,
 	raw_query_archetype_has_at,
 	raw_query_archetype_length,
@@ -117,6 +119,15 @@ import {
 } from "@moon/rhodonite_core/ecs/js_bridge";
 import { ComponentTypeId, EntityId } from "./types.ts";
 import { ByteView, byteView, moonBool } from "./views.ts";
+
+export type RawQueryArchetypeColumnChunkSpan = {
+	readonly rowStart: number;
+	readonly rowCount: number;
+	readonly column: ByteView;
+	readonly byteStart: number;
+	readonly byteCount: number;
+	readonly stride: number;
+};
 
 export class Query {
 	readonly inner: MoonQuery;
@@ -800,6 +811,48 @@ export class RawQueryArchetype {
 			index,
 			rowsPerChunk,
 			(rowStart, rowCount, bytes) => f(rowStart, rowCount, byteView(bytes)),
+		);
+	}
+
+	forEachColumnChunkSpan(
+		component: ComponentTypeId,
+		rowsPerChunk: number,
+		f: (span: RawQueryArchetypeColumnChunkSpan) => void,
+	): void {
+		raw_query_archetype_for_each_column_chunk_span(
+			this.inner,
+			component.inner,
+			rowsPerChunk,
+			(rowStart, rowCount, column, byteStart, byteCount, stride) =>
+				f({
+					rowStart,
+					rowCount,
+					column: byteView(column),
+					byteStart,
+					byteCount,
+					stride,
+				}),
+		);
+	}
+
+	forEachColumnChunkSpanAt(
+		index: number,
+		rowsPerChunk: number,
+		f: (span: RawQueryArchetypeColumnChunkSpan) => void,
+	): void {
+		raw_query_archetype_for_each_column_chunk_span_at(
+			this.inner,
+			index,
+			rowsPerChunk,
+			(rowStart, rowCount, column, byteStart, byteCount, stride) =>
+				f({
+					rowStart,
+					rowCount,
+					column: byteView(column),
+					byteStart,
+					byteCount,
+					stride,
+				}),
 		);
 	}
 

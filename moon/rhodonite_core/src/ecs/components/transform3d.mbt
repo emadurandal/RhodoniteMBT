@@ -234,6 +234,25 @@ pub fn Transform3D::write_position_to_component_mut_view(
 }
 
 ///|
+/// Updates only the position field at `byte_offset` inside a Transform3D column view.
+///
+/// The offset must point to the start of a 48-byte Transform3D row.
+pub fn Transform3D::write_position_to_component_column_mut_view(
+  column : MutArrayView[Byte],
+  byte_offset : Int,
+  x : Float,
+  y : Float,
+  z : Float,
+) -> Unit {
+  if byte_offset < 0 || byte_offset + 48 > column.length() {
+    abort(
+      "Transform3D::write_position_to_component_column_mut_view: row range mismatch",
+    )
+  }
+  @v3.Vector3Ref::write_mut_view_at(column, byte_offset, x, y, z)
+}
+
+///|
 /// Writes a complete Transform3D row directly without allocating an intermediate FixedArray.
 pub fn Transform3D::write_trs_to_component_mut_view(
   row : MutArrayView[Byte],

@@ -306,6 +306,8 @@ pub fn RawQueryArchetype::component_stride_at(Self, Int) -> Int
 pub fn RawQueryArchetype::entity(Self, Int) -> EntityId
 pub fn RawQueryArchetype::for_each_column_chunk(Self, ComponentTypeId, Int, (Int, Int, MutArrayView[Byte]) -> Unit) -> Unit
 pub fn RawQueryArchetype::for_each_column_chunk_at(Self, Int, Int, (Int, Int, MutArrayView[Byte]) -> Unit) -> Unit
+pub fn RawQueryArchetype::for_each_column_chunk_span(Self, ComponentTypeId, Int, (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit) -> Unit
+pub fn RawQueryArchetype::for_each_column_chunk_span_at(Self, Int, Int, (Int, Int, MutArrayView[Byte], Int, Int, Int) -> Unit) -> Unit
 pub fn RawQueryArchetype::has(Self, ComponentTypeId) -> Bool
 pub fn RawQueryArchetype::has_at(Self, Int) -> Bool
 pub fn RawQueryArchetype::length(Self) -> Int
