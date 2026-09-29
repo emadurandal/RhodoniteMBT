@@ -84,7 +84,19 @@ pub(all) struct VertexBufferLayoutFFI {
 }
 
 ///|
-extern "js" fn device_createRenderPipelineAuto(
+extern "js" fn device_createRenderPipelineAuto_ffi(
+  device : GPUDevice,
+  vertex : GPUShaderModule,
+  fragment : GPUShaderModule,
+  topologyTag : Int,
+  formats : FixedArray[String],
+  vertexBuffers : FixedArray[VertexBufferLayoutFFI],
+  depthStencilFormat : String,
+) -> GPURenderPipeline =
+  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
+  #|   __moonbit_rhodonite_create_render_pipeline(device, 'auto', vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+
+fn device_createRenderPipelineAuto(
   device : GPUDevice,
   vertex : GPUShaderModule,
   fragment : GPUShaderModule,
@@ -92,12 +104,25 @@ extern "js" fn device_createRenderPipelineAuto(
   formats : Array[String],
   vertexBuffers : Array[VertexBufferLayoutFFI],
   depthStencilFormat : String,
-) -> GPURenderPipeline =
-  #| (device, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
-  #|   __moonbit_rhodonite_create_render_pipeline(device, 'auto', vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+) -> GPURenderPipeline {
+  device_createRenderPipelineAuto_ffi(device, vertex, fragment, topologyTag, FixedArray::from_array(formats), FixedArray::from_array(vertexBuffers), depthStencilFormat)
+}
 
 ///|
-extern "js" fn device_createRenderPipelineWithLayout(
+extern "js" fn device_createRenderPipelineWithLayout_ffi(
+  device : GPUDevice,
+  layout : GPUPipelineLayout,
+  vertex : GPUShaderModule,
+  fragment : GPUShaderModule,
+  topologyTag : Int,
+  formats : FixedArray[String],
+  vertexBuffers : FixedArray[VertexBufferLayoutFFI],
+  depthStencilFormat : String,
+) -> GPURenderPipeline =
+  #| (device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
+  #|   __moonbit_rhodonite_create_render_pipeline(device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+
+fn device_createRenderPipelineWithLayout(
   device : GPUDevice,
   layout : GPUPipelineLayout,
   vertex : GPUShaderModule,
@@ -106,9 +131,9 @@ extern "js" fn device_createRenderPipelineWithLayout(
   formats : Array[String],
   vertexBuffers : Array[VertexBufferLayoutFFI],
   depthStencilFormat : String,
-) -> GPURenderPipeline =
-  #| (device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat) =>
-  #|   __moonbit_rhodonite_create_render_pipeline(device, layout, vertex, fragment, topologyTag, formats, vertexBuffers, depthStencilFormat)
+) -> GPURenderPipeline {
+  device_createRenderPipelineWithLayout_ffi(device, layout, vertex, fragment, topologyTag, FixedArray::from_array(formats), FixedArray::from_array(vertexBuffers), depthStencilFormat)
+}
 
 ///|
 extern "js" fn installRenderPipelineHelper() -> Unit =
@@ -158,13 +183,13 @@ extern "js" fn installRenderPipelineHelper() -> Unit =
   #| }
 
 ///|
-extern "js" fn device_createBindGroupLayout(
+extern "js" fn device_createBindGroupLayout_ffi(
   device : GPUDevice,
-  bindings : Array[UInt],
-  visibilities : Array[UInt64],
-  bufferTypes : Array[UInt],
-  hasDynamicOffsets : Array[Bool],
-  minBindingSizes : Array[UInt64],
+  bindings : FixedArray[UInt],
+  visibilities : FixedArray[UInt64],
+  bufferTypes : FixedArray[UInt],
+  hasDynamicOffsets : FixedArray[Bool],
+  minBindingSizes : FixedArray[UInt64],
 ) -> GPUBindGroupLayout =
   #| (device, bindings, visibilities, bufferTypes, hasDynamicOffsets, minBindingSizes) => device.createBindGroupLayout({
   #|   entries: bindings.map((binding, i) => ({
@@ -180,14 +205,32 @@ extern "js" fn device_createBindGroupLayout(
   #|   })),
   #| })
 
-///|
-extern "js" fn device_createPipelineLayout(
+fn device_createBindGroupLayout(
   device : GPUDevice,
-  bindGroupLayouts : Array[GPUBindGroupLayout],
+  bindings : Array[UInt],
+  visibilities : Array[UInt64],
+  bufferTypes : Array[UInt],
+  hasDynamicOffsets : Array[Bool],
+  minBindingSizes : Array[UInt64],
+) -> GPUBindGroupLayout {
+  device_createBindGroupLayout_ffi(device, FixedArray::from_array(bindings), FixedArray::from_array(visibilities), FixedArray::from_array(bufferTypes), FixedArray::from_array(hasDynamicOffsets), FixedArray::from_array(minBindingSizes))
+}
+
+///|
+extern "js" fn device_createPipelineLayout_ffi(
+  device : GPUDevice,
+  bindGroupLayouts : FixedArray[GPUBindGroupLayout],
 ) -> GPUPipelineLayout =
   #| (device, bindGroupLayouts) => device.createPipelineLayout({
   #|   bindGroupLayouts,
   #| })
+
+fn device_createPipelineLayout(
+  device : GPUDevice,
+  bindGroupLayouts : Array[GPUBindGroupLayout],
+) -> GPUPipelineLayout {
+  device_createPipelineLayout_ffi(device, FixedArray::from_array(bindGroupLayouts))
+}
 
 ///|
 extern "js" fn device_createTexture(
@@ -420,10 +463,10 @@ pub(all) struct BindGroupEntryResolvedJs {
 }
 
 ///|
-extern "js" fn device_createBindGroup(
+extern "js" fn device_createBindGroup_ffi(
   device : GPUDevice,
   layout : GPUBindGroupLayout,
-  entries : Array[BindGroupEntryResolvedJs],
+  entries : FixedArray[BindGroupEntryResolvedJs],
 ) -> GPUBindGroup =
   #| (device, layout, entries) =>
   #|   device.createBindGroup({
@@ -434,15 +477,32 @@ extern "js" fn device_createBindGroup(
   #|     })),
   #|   })
 
+fn device_createBindGroup(
+  device : GPUDevice,
+  layout : GPUBindGroupLayout,
+  entries : Array[BindGroupEntryResolvedJs],
+) -> GPUBindGroup {
+  device_createBindGroup_ffi(device, layout, FixedArray::from_array(entries))
+}
+
 ///|
-extern "js" fn renderPass_setBindGroup(
+extern "js" fn renderPass_setBindGroup_ffi(
+  pass : GPURenderPassEncoder,
+  index : UInt,
+  group : GPUBindGroup,
+  dynamic_offsets : FixedArray[UInt],
+) -> Unit =
+  #| (pass, index, group, dynamic_offsets) =>
+  #|   pass.setBindGroup(index, group, dynamic_offsets)
+
+fn renderPass_setBindGroup(
   pass : GPURenderPassEncoder,
   index : UInt,
   group : GPUBindGroup,
   dynamic_offsets : Array[UInt],
-) -> Unit =
-  #| (pass, index, group, dynamic_offsets) =>
-  #|   pass.setBindGroup(index, group, dynamic_offsets)
+) -> Unit {
+  renderPass_setBindGroup_ffi(pass, index, group, FixedArray::from_array(dynamic_offsets))
+}
 
 ///|
 extern "js" fn renderPass_end(pass : GPURenderPassEncoder) -> Unit =
